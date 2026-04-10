@@ -259,7 +259,7 @@ async def admin_dashboard_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admin</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
 <h1>Dashboard</h1>
 <div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
 <div class="stat"><div class="num">{dau}</div><div class="lbl">DAU</div></div>
@@ -291,7 +291,7 @@ async def admin_users_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
 <h1>Users ({total})</h1>
 <form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
 <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Provider</th><th>Admin</th><th>Created</th></tr>{rows_html}</table>
@@ -317,7 +317,7 @@ async def admin_proposals_page(
         rows_html += f"<tr><td>{p.id}</td><td>{esc(p.source_run)}</td><td>{esc(p.status)}</td><td>{esc(p.notes or '-')}</td><td>{p.created_at}</td><td>{actions}</td></tr>"
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
 <h1>Curriculum Proposals</h1>
 <table><tr><th>ID</th><th>Source Run</th><th>Status</th><th>Notes</th><th>Created</th><th>Actions</th></tr>{rows_html}</table>
 </body></html>"""
