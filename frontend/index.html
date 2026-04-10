@@ -75,7 +75,8 @@
   .topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15, 20, 25, 0.92); }
   .topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; }
   .topnav-brand span { color: var(--paper-dim); font-size: 13px; margin-left: 8px; opacity: 0.6; }
-  .conn-badge { display: inline-block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; background: rgba(109,181,133,0.15); color: var(--success); border: 1px solid rgba(109,181,133,0.3); margin-left: 4px; opacity: 1 !important; vertical-align: middle; }
+  .conn-badge { display: inline-block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; background: rgba(109,181,133,0.15); color: var(--success); border: 1px solid rgba(109,181,133,0.3); margin-left: 4px; opacity: 1 !important; vertical-align: middle; cursor: default; }
+  .conn-badge.unverified { background: rgba(74,82,96,0.3); color: var(--ink-soft); border-color: var(--line); }
 
   /* TOOLBAR (stats bar below nav) */
   .toolbar { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); background: var(--bg-2); }
@@ -280,9 +281,9 @@
 <nav class="topnav">
   <div class="topnav-brand">AI Roadmap<span id="planBadge"></span>
     <span id="connectionBadges" style="display:none;margin-left:8px">
-      <span id="badgeGithub" class="conn-badge" style="display:none" title="GitHub connected">GH</span>
-      <span id="badgeLinkedin" class="conn-badge" style="display:none" title="LinkedIn connected">LI</span>
-      <span id="badgeGoogle" class="conn-badge" style="display:none" title="Google connected">G</span>
+      <span id="badgeGoogle" class="conn-badge" style="display:none">Google</span>
+      <span id="badgeGithub" class="conn-badge" style="display:none">GitHub</span>
+      <span id="badgeLinkedin" class="conn-badge" style="display:none">LinkedIn</span>
     </span>
   </div>
   <span id="anonButtons">
@@ -1096,9 +1097,33 @@ async function sendChat() {
 function updateConnectionBadges() {
   if (!currentUser) return;
   document.getElementById("connectionBadges").style.display = "inline";
-  document.getElementById("badgeGoogle").style.display = currentUser.provider === "google" ? "inline" : "none";
-  document.getElementById("badgeGithub").style.display = currentUser.github_username ? "inline" : "none";
-  document.getElementById("badgeLinkedin").style.display = currentUser.linkedin_url ? "inline" : "none";
+
+  // Google — always verified if signed in via Google
+  const gEl = document.getElementById("badgeGoogle");
+  if (currentUser.provider === "google") {
+    gEl.style.display = "inline";
+    gEl.className = "conn-badge";
+    gEl.innerHTML = "&#10003; Google";
+    gEl.title = "Signed in with Google";
+  } else { gEl.style.display = "none"; }
+
+  // GitHub — verified against API on save
+  const ghEl = document.getElementById("badgeGithub");
+  if (currentUser.github_username) {
+    ghEl.style.display = "inline";
+    ghEl.className = "conn-badge";
+    ghEl.innerHTML = "&#10003; GitHub";
+    ghEl.title = "Verified: github.com/" + currentUser.github_username;
+  } else { ghEl.style.display = "none"; }
+
+  // LinkedIn — format-checked only (no API verification available)
+  const liEl = document.getElementById("badgeLinkedin");
+  if (currentUser.linkedin_url) {
+    liEl.style.display = "inline";
+    liEl.className = "conn-badge unverified";
+    liEl.innerHTML = "&#8211; LinkedIn";
+    liEl.title = "Linked (not verified): " + currentUser.linkedin_url;
+  } else { liEl.style.display = "none"; }
 }
 
 function signIn() {
@@ -1129,10 +1154,28 @@ function openProfileModal() {
 function closeProfileModal() { document.getElementById("profileModal").style.display = "none"; }
 
 async function saveProfile() {
+  const ghUser = document.getElementById("pGithub").value.trim();
+  const liUrl = document.getElementById("pLinkedin").value.trim();
+
+  // Validate GitHub username against API
+  if (ghUser) {
+    try {
+      const ghResp = await fetch(`https://api.github.com/users/${encodeURIComponent(ghUser)}`);
+      if (ghResp.status === 404) { showToast("GitHub username not found: " + ghUser); return; }
+      if (!ghResp.ok && ghResp.status !== 403) { showToast("Could not verify GitHub username"); return; }
+    } catch { showToast("Could not verify GitHub username"); return; }
+  }
+
+  // Validate LinkedIn URL format
+  if (liUrl && !liUrl.match(/linkedin\.com\/in\//i)) {
+    showToast("LinkedIn URL should contain linkedin.com/in/username");
+    return;
+  }
+
   const body = {
     name: document.getElementById("pName").value || null,
-    github_username: document.getElementById("pGithub").value || null,
-    linkedin_url: document.getElementById("pLinkedin").value || null,
+    github_username: ghUser || null,
+    linkedin_url: liUrl || null,
     learning_goal: document.getElementById("pGoal").value || null,
     experience_level: document.getElementById("pLevel").value,
   };
