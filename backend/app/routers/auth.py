@@ -100,13 +100,14 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
     # Set httpOnly cookie and redirect to frontend
     settings = get_settings()
-    response = Response(status_code=307, headers={"Location": "/"})
+    from fastapi.responses import RedirectResponse
+    response = RedirectResponse(url="/", status_code=302)
     response.set_cookie(
         key="session",
         value=jwt_token,
         httponly=True,
-        secure=settings.is_prod,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=settings.jwt_expiry_days * 86400,
         path="/",
     )
