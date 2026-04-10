@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import get_settings
 
@@ -26,6 +27,16 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+
+# Map HTTP status codes to API_SPEC error slugs
+_STATUS_SLUGS = {
+    400: "invalid_input",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    409: "conflict",
+    429: "rate_limited",
+}
 
 settings = get_settings()
 
@@ -61,7 +72,17 @@ app.add_middleware(
 )
 
 
-# ----- Global exception handler -----
+# ----- Global exception handlers -----
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Format all HTTPExceptions per API_SPEC.md error schema."""
+    slug = _STATUS_SLUGS.get(exc.status_code, "internal_error")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": slug, "message": str(exc.detail)},
+    )
+
 
 @app.exception_handler(Exception)
 async def unhandled_exception(request: Request, exc: Exception):
