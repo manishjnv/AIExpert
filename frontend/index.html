@@ -102,6 +102,23 @@
   .repo-input-row input:focus { outline:none;border-color:var(--accent); }
   .repo-input-row button { padding:6px 10px; }
 
+  /* Evaluation */
+  .eval-section { margin-top:12px;padding:12px;background:var(--bg-3);border-radius:6px;border:1px solid var(--line); }
+  .eval-score { font-family:var(--serif);font-size:36px;font-weight:400;color:var(--accent);display:inline-block;margin-right:12px; }
+  .eval-score.high { color:var(--success); }
+  .eval-score.mid { color:var(--accent); }
+  .eval-score.low { color:var(--danger); }
+  .eval-summary { font-size:13px;color:var(--paper-dim);margin:8px 0; }
+  .eval-cols { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px; }
+  .eval-cols h5 { font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px; }
+  .eval-cols ul { list-style:none;font-size:12px;color:var(--paper-dim); }
+  .eval-cols li { padding:2px 0; }
+  .eval-cols li::before { content:'→ ';color:var(--accent); }
+  .eval-loading { font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:8px 0; }
+  .eval-badge { display:inline-block;font-size:10px;padding:2px 6px;border-radius:2px;margin-left:8px; }
+  .eval-badge.met { background:rgba(109,181,133,0.15);color:var(--success); }
+  .eval-badge.notmet { background:rgba(217,119,87,0.15);color:var(--danger); }
+
   /* MAIN */
   main { max-width: 100%; margin: 0 auto; padding: 48px; }
 
@@ -801,22 +818,75 @@ async function loadRepoLinks() {
   } catch {}
 }
 
+let evalResults = {}; // weekN -> evaluation object
+
 function renderRepoSection(weekN) {
   const el = document.getElementById(`repo-w${weekN}`);
   if (!el) return;
   const link = repoLinks[weekN];
   if (link) {
+    let evalHtml = '';
+    const ev = evalResults[weekN];
+    if (ev) {
+      const scoreClass = ev.score >= 70 ? 'high' : ev.score >= 40 ? 'mid' : 'low';
+      evalHtml = `<div class="eval-section">
+        <span class="eval-score ${scoreClass}">${ev.score}</span>
+        <span class="eval-badge ${ev.deliverable_met ? 'met' : 'notmet'}">${ev.deliverable_met ? 'Deliverable met' : 'Deliverable not met'}</span>
+        <div class="eval-summary">${ev.summary}</div>
+        <div class="eval-cols">
+          <div><h5>Strengths</h5><ul>${(ev.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
+          <div><h5>Improvements</h5><ul>${(ev.improvements||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
+        </div>
+        <div style="margin-top:6px;font-family:var(--mono);font-size:9px;color:var(--ink-soft)">${ev.model} · ${ev.created_at ? new Date(ev.created_at).toLocaleDateString() : ''}</div>
+      </div>`;
+    }
     el.innerHTML = `<div class="repo-chip">
       <a href="https://github.com/${link.owner}/${link.name}" target="_blank">${link.owner}/${link.name}</a>
       ${link.last_commit_date ? `<span style="color:var(--ink-soft);font-size:10px">${new Date(link.last_commit_date).toLocaleDateString()}</span>` : ''}
+      <button class="btn" onclick="runEval(${weekN})" style="font-size:10px;padding:4px 8px;margin-left:6px">Evaluate</button>
       <span class="unlink" onclick="unlinkRepo(${weekN})" title="Unlink">✕</span>
-    </div>`;
+    </div>
+    <div id="eval-status-${weekN}"></div>
+    ${evalHtml}`;
   } else {
     el.innerHTML = `<div class="repo-input-row">
       <input type="text" placeholder="owner/repo or GitHub URL" id="repo-input-${weekN}">
       <button class="btn" onclick="linkRepo(${weekN})" style="font-size:10px;padding:6px 10px">Link</button>
     </div>`;
   }
+}
+
+async function runEval(weekN) {
+  const statusEl = document.getElementById(`eval-status-${weekN}`);
+  if (statusEl) statusEl.innerHTML = '<div class="eval-loading">Evaluating repository… this takes 5-10 seconds</div>';
+  try {
+    const resp = await fetch("/api/evaluate", {
+      method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin",
+      body: JSON.stringify({ week_num: weekN }),
+    });
+    if (resp.ok) {
+      evalResults[weekN] = await resp.json();
+      renderRepoSection(weekN);
+      showToast("Evaluation complete");
+    } else {
+      const d = await resp.json();
+      if (statusEl) statusEl.innerHTML = '';
+      showToast(d.detail || d.message || "Evaluation failed");
+    }
+  } catch {
+    if (statusEl) statusEl.innerHTML = '';
+    showToast("Evaluation failed");
+  }
+}
+
+async function loadEvals(weekN) {
+  try {
+    const resp = await fetch(`/api/evaluations?week_num=${weekN}`, { credentials: "same-origin" });
+    if (resp.ok) {
+      const evals = await resp.json();
+      if (evals.length > 0) evalResults[weekN] = evals[0];
+    }
+  } catch {}
 }
 
 async function linkRepo(weekN) {
