@@ -20,7 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from sqlalchemy import func, select
+
 from app.config import get_settings
+import app.db as db_module
+from app.db import close_db, init_db
+from app.models.user import User
 
 logger = logging.getLogger("roadmap")
 logging.basicConfig(
@@ -45,10 +50,10 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Runs on app startup and shutdown."""
     logger.info("Starting AI Roadmap Platform backend (env=%s)", settings.env)
-    # Phase 2: initialize DB connection pool here
+    await init_db()
     yield
     logger.info("Shutting down")
-    # Phase 2: dispose DB engine here
+    await close_db()
 
 
 app = FastAPI(
@@ -103,7 +108,6 @@ async def health():
 
 
 # In-memory cache for learner count (60s TTL).
-# Phase 2 replaces the hardcoded 0 with a real DB count.
 _learner_count_cache: dict = {"value": 0, "expires_at": 0.0}
 
 
@@ -115,10 +119,9 @@ async def learner_count():
     if now < _learner_count_cache["expires_at"]:
         return {"count": _learner_count_cache["value"]}
 
-    # Phase 2 TODO: replace with actual DB query
-    # async with get_session() as s:
-    #     count = await s.scalar(select(func.count()).select_from(User))
-    count = 0
+    async with db_module.async_session_factory() as session:
+        count = await session.scalar(select(func.count()).select_from(User))
+    count = count or 0
 
     _learner_count_cache["value"] = count
     _learner_count_cache["expires_at"] = now + 60

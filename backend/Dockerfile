@@ -27,6 +27,8 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY app ./app
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY tests ./tests
+COPY pytest.ini ./
 
 # Data volume mount point
 RUN mkdir -p /data && chown -R app:app /data /app

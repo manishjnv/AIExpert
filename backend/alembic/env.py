@@ -35,10 +35,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ----- Target metadata -----
-# Phase 2 TODO: uncomment once app.models.base.Base exists
-# from app.models.base import Base
-# target_metadata = Base.metadata
-target_metadata = None
+# Import all models so Base.metadata includes every table
+import app.models  # noqa: F401
+from app.db import Base
+
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
