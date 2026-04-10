@@ -18,6 +18,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -80,6 +83,19 @@ app = FastAPI(
     redoc_url=None,
     openapi_url="/api/openapi.json" if settings.env == "dev" else None,
 )
+
+# ----- Rate limiter -----
+limiter = Limiter(key_func=get_remote_address, default_limits=["300/hour"])
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"error": "rate_limited", "message": "Too many requests. Please slow down."},
+    )
+
 
 # ----- Middleware -----
 

@@ -4,31 +4,31 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Phase 10 complete (Tasks 10.1–10.2)
+**Last worked on:** Phase 11 complete (Tasks 11.1–11.2)
 **Branch:** master
-**Commit:** 01e236a
+**Commit:** 9e13284
 
 ## What got done this session
 
-- 10.1: Admin API (dashboard stats, paginated users, proposal apply/reject) protected by get_current_admin
-- 10.2: Server-rendered admin HTML pages (dashboard, users list, proposals list)
-- Codex security review running in background
+- 11.1: Quarterly sync script — fetches sources, extracts text, calls Gemini for proposals, writes to /proposals/ and DB
+- 11.2: Cron container already existed; scripts now mounted in backend too for testing
+- Codex test coverage analysis running in background
 
 ## What is in progress (not committed)
 
-- Codex security review findings (will fix if any)
+- Codex test coverage gap analysis (will address findings)
 
 ## Decisions made
 
-- Admin UI uses f-string HTML (not Jinja2 templates) — keeps it simple, single file
-- DAU/WAU/MAU approximated from session issued_at timestamps
-- Proposal apply/reject only changes status — curriculum JSON edits are manual
+- HTML text extraction uses regex (no bs4/trafilatura dependency) — simple, good enough
+- AI fallback generates minimal proposal when Gemini unavailable
+- Scripts mounted read-only in backend container for testing
 
 ## Tests
 
-**Passing:** 83 automated
+**Passing:** 88 automated
 **Failing:** none
-**New tests:** test_admin (7 — 403 non-admin, API endpoints, HTML pages)
+**New tests:** test_sync (5 — fetch success/failure, write proposal, fallback, load topics)
 
 ## Blockers
 
@@ -40,7 +40,7 @@
 
 ## Next action
 
-Phase 11 Task 11.1 from docs/TASKS.md — Quarterly curriculum sync script.
+Phase 12 from docs/TASKS.md — Polish and ship (end-to-end smoke test, security pass, deploy).
 
 ---
 
@@ -58,3 +58,4 @@ Phase 11 Task 11.1 from docs/TASKS.md — Quarterly curriculum sync script.
 | 2026-04-10 | Phase 8    | AI chat — SSE streaming, rate limit, floating chat panel   |
 | 2026-04-10 | Phase 9    | LinkedIn sharing — OG tags, dynamic SVG, share buttons     |
 | 2026-04-10 | Phase 10   | Admin panel — dashboard, users, proposals, HTML pages      |
+| 2026-04-10 | Phase 11   | Quarterly sync — source fetch, AI proposals, cron          |

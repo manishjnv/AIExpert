@@ -7,6 +7,8 @@ All endpoints under /api/auth (prefix set in main.py).
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +23,7 @@ from app.db import get_db
 from app.models.user import User
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 # ------------------------------------------------------------------ #
@@ -114,6 +117,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 # ------------------------------------------------------------------ #
 
 @router.post("/otp/request", status_code=204)
+@limiter.limit("5/15minutes")
 async def otp_request(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -136,6 +140,7 @@ async def otp_request(
 
 
 @router.post("/otp/verify")
+@limiter.limit("10/15minutes")
 async def otp_verify(
     request: Request,
     db: AsyncSession = Depends(get_db),
