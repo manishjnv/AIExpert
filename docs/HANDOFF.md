@@ -4,46 +4,51 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Phase 12 complete (Tasks 12.1–12.3) — ALL PHASES DONE
+**Last worked on:** ALL 12 PHASES COMPLETE + PRODUCTION LAUNCH
 **Branch:** master
-**Commit:** 5bea1c0
+**Commit:** see git log
+**Live site:** https://automateedge.cloud
 
 ## What got done this session
 
-- 12.1: E2E smoke test — full user journey (auth → enroll → tick → link → chat → share → logout) + admin flow
-- 12.2: Security hardening — slowapi rate limits on OTP endpoints (5/15min, 10/15min) + global 300/hr
-- 12.3: Full stack deployed to VPS — backend, cron, web all healthy
-- Codex security reviews done for Phases 7, 10 (6 issues found and fixed total)
+- Phases 1–12 fully implemented, tested, deployed
+- Production configuration complete:
+  - Google OAuth — working (SSO sign-in verified)
+  - Gemini API — configured (key set)
+  - Gmail SMTP + Cloudflare email routing — working (OTP email verified)
+  - Caddy reverse proxy — working (HTTPS via Cloudflare Full SSL)
+  - Admin user set (manishjnvk@gmail.com)
+- Post-launch fixes:
+  - OAuth cookie collision (renamed `session` → `auth_token`)
+  - Plan picker invalid template combinations
+  - Frontend now loads active plan from API + shows plan badge
+  - PDF export redesigned with TOC, profile, clickable resources
+  - Admin button in toolbar, back-to-site link in admin nav
+  - Export/Import/Reset hidden for signed-in users
+- Architecture docs updated with all 7 external integrations
+- Codex contribution log maintained (2 security reviews, 6 issues found+fixed)
 
-## What is in progress (not committed)
+## Production credentials (configured on VPS .env only, NOT in repo)
 
-- Nothing — all 12 phases complete
-
-## Decisions made
-
-- slowapi for rate limiting (in-memory, fine for single-worker)
-- E2E test mocks external services (GitHub, AI) but tests real app routing and DB
-- All three docker services running: backend (healthy), cron (quarterly sync), web (nginx)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google Cloud Console, project "automateedge"
+- `GOOGLE_REDIRECT_URI` — https://automateedge.cloud/api/auth/google/callback
+- `GEMINI_API_KEY` — Google AI Studio
+- `SMTP_HOST=smtp.gmail.com` / `SMTP_USER=manishjnvk@gmail.com` / `SMTP_FROM=contact@automateedge.cloud`
+- `JWT_SECRET` — 64-char hex (already set)
+- `ENV=prod`
 
 ## Tests
 
 **Passing:** 90 automated
 **Failing:** none
 
-## Blockers
+## What remains for the user
 
-- None
-
-## Open questions for the user
-
-- Google OAuth credentials needed for real sign-in flow
-- Gemini/Groq API keys needed for real AI evaluation/chat
-- SMTP credentials needed for real OTP email sending
-- Caddy config needed to expose the site publicly via domain
-
-## Next action
-
-Task 12.4 — Public soft launch. User needs to configure production secrets and domain.
+- Test AI chat and AI evaluation live
+- Task 12.4: Share with 3–5 friends for feedback
+- Optional: Groq API key for AI fallback
+- Optional: DB backup cron
+- Optional: pip-audit security scan
 
 ---
 
@@ -63,3 +68,4 @@ Task 12.4 — Public soft launch. User needs to configure production secrets and
 | 2026-04-10 | Phase 10   | Admin panel — dashboard, users, proposals, HTML pages      |
 | 2026-04-10 | Phase 11   | Quarterly sync — source fetch, AI proposals, cron          |
 | 2026-04-10 | Phase 12   | E2E smoke test, slowapi rate limits, full stack deploy     |
+| 2026-04-10 | Launch     | OAuth fix, OTP email verified, PDF export, admin UX, docs  |
