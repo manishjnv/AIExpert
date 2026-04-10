@@ -117,13 +117,15 @@ When a task is completed, mark it with ✅ and add the commit SHA that shipped i
 - [ ] Start with ONE template; others are copy-paste variants
 - **AC:** Loading the template produces a typed object with 24 weeks
 
-### 4.2 `POST /api/plans` (enroll)
+### 4.2 `POST /api/plans` (enroll) + `GET /api/plan/default`
 - [ ] Creates a `user_plans` row, archives any previous active plan
-- **AC:** Re-enrolling archives the old plan; user_plans table has exactly one `status='active'` per user at all times
+- [ ] `GET /api/plan/default` returns the default plan template (`generalist_6mo_intermediate.json`) for anonymous browsing
+- **AC:** Re-enrolling archives the old plan; user_plans table has exactly one `status='active'` per user at all times; `/api/plan/default` returns the default plan without auth
 
-### 4.3 `GET /api/plans/active`
+### 4.3 `GET /api/plans/active` + `GET /api/plan-versions`
 - [ ] Returns the plan template merged with the user's progress
-- **AC:** Freshly enrolled plan returns all weeks with `done=false` for every checkbox
+- [ ] `GET /api/plan-versions` returns the full changelog from the `plan_versions` table
+- **AC:** Freshly enrolled plan returns all weeks with `done=false` for every checkbox; `/api/plan-versions` returns the version history
 
 ### 4.4 `PATCH /api/progress`
 - [ ] Upserts the progress row

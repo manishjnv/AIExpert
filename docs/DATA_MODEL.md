@@ -121,6 +121,7 @@ AI-generated repo evaluations.
 | `summary` | TEXT NOT NULL | short paragraph |
 | `strengths_json` | TEXT NOT NULL | JSON array of strings |
 | `improvements_json` | TEXT NOT NULL | JSON array of strings |
+| `deliverable_met` | BOOLEAN NOT NULL | whether the stated deliverable is clearly achieved |
 | `commit_sha` | TEXT NOT NULL | the commit this evaluation was run against |
 | `model` | TEXT NOT NULL | e.g. `"gemini-1.5-flash"` or `"llama-3.3-70b-versatile"` |
 | `created_at` | DATETIME NOT NULL | |

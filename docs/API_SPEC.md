@@ -84,8 +84,8 @@ Merges into the user's active plan with the merge rule from ARCHITECTURE.md. Ret
 Body: `{"week_num":8,"repo_url":"https://github.com/owner/name"}` or `{"week_num":8,"repo":"owner/name"}`.
 Validates via GitHub REST `GET /repos/{owner}/{name}`. On 200, upserts `repo_links`. Returns `{"owner","name","default_branch","last_commit_sha","last_commit_date"}`.
 
-### `DELETE /api/repos/link` 🔒
-Body: `{"week_num":8}`. Removes the link. Does not remove past evaluations.
+### `DELETE /api/repos/link?week_num=8` 🔒
+Removes the link for the given week. Does not remove past evaluations.
 
 ## AI evaluation
 
