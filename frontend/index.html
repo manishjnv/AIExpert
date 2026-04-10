@@ -90,6 +90,18 @@
   .modal-field input, .modal-field select { width:100%;padding:8px 10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-family:var(--sans);font-size:13px;border-radius:3px; }
   .modal-field input:focus, .modal-field select:focus { outline:none;border-color:var(--accent); }
 
+  /* Repo link */
+  .repo-link-section { margin-top:12px;padding-top:12px;border-top:1px solid var(--line); }
+  .repo-link-section h4 { font-family:var(--mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px; }
+  .repo-chip { display:inline-flex;align-items:center;gap:8px;background:var(--bg-3);border:1px solid var(--line);padding:6px 12px;border-radius:4px;font-size:12px; }
+  .repo-chip a { color:var(--info);text-decoration:none; }
+  .repo-chip a:hover { text-decoration:underline; }
+  .repo-chip .unlink { cursor:pointer;color:var(--danger);font-size:14px;margin-left:4px; }
+  .repo-input-row { display:flex;gap:6px; }
+  .repo-input-row input { flex:1;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px;font-family:var(--mono); }
+  .repo-input-row input:focus { outline:none;border-color:var(--accent); }
+  .repo-input-row button { padding:6px 10px; }
+
   /* MAIN */
   main { max-width: 100%; margin: 0 auto; padding: 48px; }
 
@@ -640,6 +652,10 @@ function render() {
             </div>`;
           }).join("")}
         </div>
+        ${currentUser ? `<div class="repo-link-section" data-week="${w.n}">
+          <h4>GitHub Repo</h4>
+          <div class="repo-link-content" id="repo-w${w.n}"></div>
+        </div>` : ''}
       `;
       monthEl.appendChild(wEl);
     });
@@ -771,6 +787,68 @@ async function enrollPlan() {
   } catch { showToast("Enrollment failed"); }
 }
 
+// ---- Repo linking ----
+let repoLinks = {}; // weekNum -> {owner, name, last_commit_sha, last_commit_date}
+
+async function loadRepoLinks() {
+  if (!currentUser) return;
+  try {
+    const resp = await fetch("/api/plans/active", { credentials: "same-origin" });
+    if (!resp.ok) return;
+    const plan = await resp.json();
+    // Extract repo links from plan data if available (future: dedicated endpoint)
+    // For now we track them client-side after linking
+  } catch {}
+}
+
+function renderRepoSection(weekN) {
+  const el = document.getElementById(`repo-w${weekN}`);
+  if (!el) return;
+  const link = repoLinks[weekN];
+  if (link) {
+    el.innerHTML = `<div class="repo-chip">
+      <a href="https://github.com/${link.owner}/${link.name}" target="_blank">${link.owner}/${link.name}</a>
+      ${link.last_commit_date ? `<span style="color:var(--ink-soft);font-size:10px">${new Date(link.last_commit_date).toLocaleDateString()}</span>` : ''}
+      <span class="unlink" onclick="unlinkRepo(${weekN})" title="Unlink">✕</span>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="repo-input-row">
+      <input type="text" placeholder="owner/repo or GitHub URL" id="repo-input-${weekN}">
+      <button class="btn" onclick="linkRepo(${weekN})" style="font-size:10px;padding:6px 10px">Link</button>
+    </div>`;
+  }
+}
+
+async function linkRepo(weekN) {
+  const input = document.getElementById(`repo-input-${weekN}`);
+  if (!input || !input.value.trim()) return;
+  try {
+    const resp = await fetch("/api/repos/link", {
+      method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin",
+      body: JSON.stringify({ week_num: weekN, repo_url: input.value.trim() }),
+    });
+    if (resp.ok) {
+      repoLinks[weekN] = await resp.json();
+      renderRepoSection(weekN);
+      showToast("Repo linked");
+    } else {
+      const d = await resp.json();
+      showToast(d.message || d.detail || "Link failed");
+    }
+  } catch { showToast("Link failed"); }
+}
+
+async function unlinkRepo(weekN) {
+  try {
+    const resp = await fetch(`/api/repos/link?week_num=${weekN}`, { method: "DELETE", credentials: "same-origin" });
+    if (resp.ok || resp.status === 204) {
+      delete repoLinks[weekN];
+      renderRepoSection(weekN);
+      showToast("Repo unlinked");
+    }
+  } catch { showToast("Unlink failed"); }
+}
+
 // ---- Backend sync layer ----
 let currentUser = null;
 let syncDebounceTimer = null;
@@ -847,6 +925,9 @@ render();
   const signedIn = await checkAuth();
   if (signedIn) {
     await migrateProgress();
+    render(); // Re-render to show repo sections
+    // Render empty repo sections for each week
+    DATA.forEach(m => m.weeks.forEach(w => renderRepoSection(w.n)));
   }
 })();
 </script>
