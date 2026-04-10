@@ -75,7 +75,8 @@
   .topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15, 20, 25, 0.92); }
   .topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; }
   .topnav-brand span { color: var(--paper-dim); font-size: 13px; margin-left: 8px; opacity: 0.6; }
-  .conn-badge { display: inline-block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; background: rgba(109,181,133,0.15); color: var(--success); border: 1px solid rgba(109,181,133,0.3); margin-left: 4px; opacity: 1 !important; vertical-align: middle; cursor: default; }
+  .conn-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; background: rgba(109,181,133,0.2); color: var(--success); border: 1px solid rgba(109,181,133,0.4); margin-left: 6px; opacity: 1 !important; vertical-align: middle; cursor: default; transition: background 0.2s; }
+  .conn-badge:hover { background: rgba(109,181,133,0.35); }
   .conn-badge.unverified { background: rgba(74,82,96,0.3); color: var(--ink-soft); border-color: var(--line); }
 
   /* TOOLBAR (stats bar below nav) */
