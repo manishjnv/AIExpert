@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Generalist Roadmap — 6-Month Interactive Tracker</title>
+<meta name="description" content="A free, interactive 24-week roadmap to become an AI generalist. Math, ML, deep learning, LLMs, RAG, agents, MLOps. With time estimates, top resources, and progress tracking that saves to your browser.">
+<meta name="theme-color" content="#0f1419">
+<meta property="og:title" content="AI Generalist Roadmap — 6-Month Interactive Tracker">
+<meta property="og:description" content="Free, self-paced 24-week roadmap from Python fundamentals to deployed AI applications. Track progress, hand-picked resources, no signup.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1419;
+    --bg-2: #161c24;
+    --bg-3: #1d242e;
+    --paper: #f5f1e8;
+    --paper-dim: #e8e2d3;
+    --ink: #0a0e13;
+    --ink-soft: #4a5260;
+    --line: #2a323d;
+    --line-soft: #3a4452;
+    --accent: #e8a849;
+    --accent-soft: #c98e2f;
+    --success: #6db585;
+    --danger: #d97757;
+    --info: #6fa8d6;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--paper); font-family: var(--sans); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; background-image: radial-gradient(circle at 20% 0%, rgba(232,168,73,0.06), transparent 50%), radial-gradient(circle at 80% 100%, rgba(109,181,133,0.04), transparent 50%); }
+
+  /* HEADER */
+  header { padding: 56px 48px 32px; border-bottom: 1px solid var(--line); position: relative; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(36px, 6vw, 64px); letter-spacing: -0.02em; line-height: 1.0; color: var(--paper); margin-bottom: 8px; font-variation-settings: "opsz" 144; }
+  h1 em { font-style: italic; color: var(--accent); font-weight: 400; }
+  .subtitle { font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--paper-dim); opacity: 0.7; margin-bottom: 36px; max-width: 720px; }
+  .version-tag { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; padding: 3px 8px; background: rgba(232,168,73,0.12); border: 1px solid rgba(232,168,73,0.3); color: var(--accent); border-radius: 2px; margin-left: 12px; vertical-align: middle; }
+
+  /* META BAR */
+  .meta-bar { display: flex; gap: 32px; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid var(--line); }
+  .meta-item { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+  .meta-item strong { display: block; font-family: var(--serif); font-size: 22px; letter-spacing: -0.01em; text-transform: none; color: var(--paper); margin-top: 4px; font-weight: 400; }
+  .meta-item strong em { color: var(--accent); font-style: normal; }
+
+  /* PROGRESS RING */
+  .progress-overall { position: absolute; top: 56px; right: 48px; width: 110px; height: 110px; }
+  .progress-overall svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+  .progress-overall circle { fill: none; stroke-width: 6; }
+  .progress-overall .track { stroke: var(--line); }
+  .progress-overall .fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1); }
+  .progress-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .progress-label .pct { font-family: var(--serif); font-size: 28px; color: var(--paper); font-weight: 400; }
+  .progress-label .lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin-top: -2px; }
+
+  /* CROSS-CUTTING HABITS */
+  .habits { padding: 32px 48px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .habits-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 16px; }
+  .habits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+  .habit { display: flex; gap: 12px; align-items: flex-start; }
+  .habit-icon { color: var(--accent); font-family: var(--serif); font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
+  .habit-text { font-size: 13px; color: var(--paper-dim); line-height: 1.5; }
+  .habit-text strong { color: var(--paper); font-weight: 600; display: block; margin-bottom: 2px; font-size: 13.5px; }
+
+  /* TOOLBAR */
+  .toolbar { padding: 20px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); background: rgba(22, 28, 36, 0.85); }
+  .btn { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 16px; background: transparent; border: 1px solid var(--line-soft); color: var(--paper-dim); cursor: pointer; transition: all 0.2s; border-radius: 2px; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .toolbar-stats { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+  .toolbar-stats span { color: var(--accent); }
+
+  /* MAIN */
+  main { max-width: 1100px; margin: 0 auto; padding: 48px; }
+
+  /* MONTH */
+  .month { margin-bottom: 80px; }
+  .month-header { display: flex; align-items: baseline; gap: 24px; margin-bottom: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .month-num { font-family: var(--serif); font-size: 88px; line-height: 0.85; font-weight: 200; color: var(--accent); font-variation-settings: "opsz" 144; }
+  .month-title { flex: 1; }
+  .month-title .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px; }
+  .month-title h2 { font-family: var(--serif); font-size: 32px; font-weight: 400; line-height: 1.1; letter-spacing: -0.01em; color: var(--paper); }
+  .month-title h2 em { font-style: italic; color: var(--accent); }
+  .month-progress { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); text-align: right; min-width: 80px; }
+  .month-progress .bar { width: 80px; height: 3px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .month-progress .bar > div { height: 100%; background: var(--accent); transition: width 0.5s ease; }
+  .month-tagline { font-family: var(--serif); font-style: italic; color: var(--paper-dim); opacity: 0.65; font-size: 16px; margin: 16px 0 32px; max-width: 750px; }
+
+  /* WEEK CARD */
+  .week { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: 28px 32px; margin-bottom: 16px; position: relative; transition: border-color 0.3s, transform 0.2s; }
+  .week:hover { border-color: var(--line-soft); }
+  .week.complete { border-color: var(--success); border-left-width: 3px; }
+  .week.complete::before { content: '✓'; position: absolute; top: 24px; right: 28px; color: var(--success); font-size: 20px; font-weight: 600; }
+  .week.buffer { background: linear-gradient(135deg, rgba(111,168,214,0.05), rgba(111,168,214,0.01)); border-color: rgba(111,168,214,0.3); }
+  .week.buffer .week-num { color: var(--info); border-color: var(--info); }
+  .week-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .week-num { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); padding: 4px 10px; border: 1px solid var(--accent); border-radius: 2px; }
+  .week-title { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.01em; color: var(--paper); flex: 1; min-width: 200px; }
+  .week-title .new { display: inline-block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; padding: 2px 6px; background: var(--accent); color: var(--ink); border-radius: 2px; vertical-align: middle; margin-left: 6px; font-weight: 600; }
+  .week-hours { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); padding: 4px 10px; border: 1px solid var(--line-soft); border-radius: 2px; white-space: nowrap; }
+  .week-hours strong { color: var(--accent); font-weight: 500; }
+
+  .resources { padding: 18px 0 22px; border-bottom: 1px dashed var(--line-soft); margin-bottom: 22px; }
+  .resources h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 12px; }
+  .res-list { display: flex; flex-direction: column; gap: 8px; }
+  .res-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--bg-3); border: 1px solid var(--line); border-radius: 3px; text-decoration: none; color: var(--paper-dim); transition: all 0.2s; font-size: 13px; }
+  .res-item:hover { border-color: var(--accent); color: var(--paper); transform: translateX(2px); }
+  .res-arrow { color: var(--accent); font-family: var(--mono); flex-shrink: 0; opacity: 0.6; transition: opacity 0.2s; }
+  .res-item:hover .res-arrow { opacity: 1; }
+  .res-name { flex: 1; }
+  .res-hrs { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); padding: 2px 8px; background: var(--bg-2); border-radius: 2px; flex-shrink: 0; }
+  .res-item:hover .res-hrs { color: var(--paper-dim); }
+
+  .week-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px dashed var(--line-soft); }
+  @media (max-width: 720px) { .week-grid { grid-template-columns: 1fr; } }
+  .week-section h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px; }
+  .week-section ul { list-style: none; }
+  .week-section li { font-size: 13.5px; color: var(--paper-dim); padding: 4px 0 4px 14px; position: relative; line-height: 1.5; }
+  .week-section li::before { content: ''; position: absolute; left: 0; top: 12px; width: 5px; height: 1px; background: var(--accent); }
+
+  .checklist h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 14px; }
+  .check-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; cursor: pointer; user-select: none; transition: background 0.15s; border-radius: 2px; padding-left: 6px; padding-right: 6px; }
+  .check-item:hover { background: var(--bg-3); }
+  .check-box { flex-shrink: 0; width: 18px; height: 18px; border: 1.5px solid var(--line-soft); border-radius: 3px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-top: 1px; }
+  .check-item.done .check-box { background: var(--accent); border-color: var(--accent); }
+  .check-box svg { width: 12px; height: 12px; opacity: 0; transform: scale(0.5); transition: all 0.2s; }
+  .check-item.done .check-box svg { opacity: 1; transform: scale(1); }
+  .check-text { font-size: 14px; color: var(--paper-dim); line-height: 1.5; transition: all 0.2s; }
+  .check-item.done .check-text { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--line-soft); }
+
+  /* CHECKPOINT */
+  .checkpoint { background: linear-gradient(135deg, rgba(109,181,133,0.08), rgba(109,181,133,0.02)); border: 1px solid rgba(109,181,133,0.25); border-left: 3px solid var(--success); padding: 20px 28px; border-radius: 4px; margin-top: 24px; font-size: 14px; color: var(--paper-dim); display: flex; align-items: center; gap: 16px; }
+  .checkpoint-icon { color: var(--success); font-size: 20px; flex-shrink: 0; }
+  .checkpoint strong { color: var(--success); font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 4px; font-weight: 600; }
+
+  /* FOOTER */
+  footer { padding: 48px; text-align: center; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-family: var(--mono); letter-spacing: 0.05em; }
+  footer em { color: var(--accent); font-style: normal; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-3); border: 1px solid var(--accent); color: var(--paper); padding: 14px 24px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 100; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .week { animation: fadeUp 0.4s ease backwards; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span></div>
+  <h1>Six Months. <em>One Generalist.</em></h1>
+  <p class="subtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
+  <div class="meta-bar">
+    <div class="meta-item">Duration<strong>24 weeks</strong></div>
+    <div class="meta-item">Total hours<strong>~380 <em>hrs</em></strong></div>
+    <div class="meta-item">Weekly load<strong>15–18 <em>hrs</em></strong></div>
+    <div class="meta-item">Certifications<strong>2–3</strong></div>
+    <div class="meta-item">Repos shipped<strong>6+</strong></div>
+    <div class="meta-item">Public posts<strong>1+</strong></div>
+    <div class="meta-item">Kaggle subs<strong>2+</strong></div>
+  </div>
+  <div class="progress-overall">
+    <svg viewBox="0 0 110 110">
+      <circle class="track" cx="55" cy="55" r="48"></circle>
+      <circle class="fill" cx="55" cy="55" r="48" id="ringFill" stroke-dasharray="301.6" stroke-dashoffset="301.6"></circle>
+    </svg>
+    <div class="progress-label"><div class="pct" id="ringPct">0%</div><div class="lbl">complete</div></div>
+  </div>
+</header>
+
+<section class="habits">
+  <div class="habits-label">Cross-cutting habits — running every week</div>
+  <div class="habits-grid">
+    <div class="habit"><div class="habit-icon">◈</div><div class="habit-text"><strong>Daily reading · 20 min</strong>The Batch, Import AI, Latent Space, one practitioner blog</div></div>
+    <div class="habit"><div class="habit-icon">◇</div><div class="habit-text"><strong>One paper / week · from Month 2</strong>Skim arXiv-sanity or Papers With Code — abstract + figures</div></div>
+    <div class="habit"><div class="habit-icon">◉</div><div class="habit-text"><strong>Project compounding</strong>Pick one thread or domain. Let weekly deliverables build on it</div></div>
+    <div class="habit"><div class="habit-icon">◐</div><div class="habit-text"><strong>"Explain it" rule</strong>Every README has a section explaining the work to a non-technical person</div></div>
+    <div class="habit"><div class="habit-icon">◍</div><div class="habit-text"><strong>Interview prep · from Week 13</strong>2 hrs/week LeetCode + ML system design questions</div></div>
+    <div class="habit"><div class="habit-icon">◆</div><div class="habit-text"><strong>Public commits</strong>Empty weeks become visible. The repo is your accountability partner</div></div>
+  </div>
+</section>
+
+<div class="toolbar">
+  <button class="btn" onclick="exportData()">↓ Export JSON</button>
+  <button class="btn" onclick="importData()">↑ Import JSON</button>
+  <button class="btn danger" onclick="resetAll()">⟲ Reset</button>
+  <div class="toolbar-stats"><span id="doneCount">0</span> / <span id="totalCount">0</span> complete</div>
+</div>
+
+<main id="content"></main>
+
+<footer>Build &gt; watch. Ship &gt; learn. Progress saves to your browser — use <em>Export JSON</em> to back up or move between devices. <em>One commit a day keeps drift away.</em></footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = [
+  {
+    month: 1, label: "Foundations", title: "Python, SQL, math, first ML",
+    tagline: "Remove friction. By the end of this month, opening a Jupyter notebook should feel as natural as opening a terminal.",
+    checkpoint: "Comfortable in Pandas/NumPy/SQL · 4 notebooks shipped · Stats vocab nailed · Repo public",
+    weeks: [
+      { n: 1, t: "Python, SQL & Dev Environment", isNew: true, hours: 16,
+        focus: ["Python: NumPy, Pandas, Matplotlib", "SQL: joins, CTEs, window functions (NEW)", "Dev setup: VS Code, Jupyter, Git, GitHub", "Repo `ai-journey` created"],
+        deliv: ["EDA notebook on a public dataset", "30+ SQL exercises completed", "Repo live with README"],
+        resources: [
+          { name: "Pandas — Getting Started Tutorials", url: "https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html", hrs: 5 },
+          { name: "SQLBolt — Interactive SQL Lessons", url: "https://sqlbolt.com", hrs: 4 },
+          { name: "Kaggle Learn — Pandas", url: "https://www.kaggle.com/learn/pandas", hrs: 4 }
+        ],
+        checks: ["Repo `ai-journey` created with README", "Python + Jupyter + VS Code set up cleanly", "30+ SQLBolt or Mode Analytics exercises done", "EDA notebook on Titanic or California housing pushed", "Subscribed to The Batch, Import AI, Latent Space"] },
+      { n: 2, t: "Math + Statistics Refresh", isNew: true, hours: 15,
+        focus: ["Linear algebra: vectors, matrices, dot products", "Probability + Bayes + distributions", "Calculus: gradients, chain rule", "Statistics: hypothesis testing, p-values, CI (NEW)"],
+        deliv: ["Gradient descent from scratch in NumPy", "A/B test simulation notebook", "Statistics cheat sheet"],
+        resources: [
+          { name: "3Blue1Brown — Essence of Linear Algebra", url: "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab", hrs: 4 },
+          { name: "StatQuest — Statistics Fundamentals", url: "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9", hrs: 5 },
+          { name: "Khan Academy — Statistics & Probability", url: "https://www.khanacademy.org/math/statistics-probability", hrs: 5 }
+        ],
+        checks: ["Watched 3Blue1Brown linear algebra series", "StatQuest hypothesis testing playlist watched", "Notebook: gradient descent from scratch (NumPy)", "A/B test simulation notebook published", "Statistics terminology cheat sheet committed"] },
+      { n: 3, t: "First ML Models", hours: 16,
+        focus: ["Supervised learning concepts", "Train/test split", "Linear & logistic regression", "k-Nearest Neighbors"],
+        deliv: ["3-model comparison notebook with explanation"],
+        resources: [
+          { name: "Andrew Ng — ML Specialization (audit free)", url: "https://www.coursera.org/specializations/machine-learning-introduction", hrs: 8 },
+          { name: "scikit-learn — User Guide", url: "https://scikit-learn.org/stable/user_guide.html", hrs: 4 },
+          { name: "StatQuest — Machine Learning Playlist", url: "https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF", hrs: 3 }
+        ],
+        checks: ["Andrew Ng ML Specialization Course 1 watched", "Linear regression: from scratch + sklearn", "Logistic regression on a classification dataset", "3-model comparison notebook pushed", "README explains which won and why"] },
+      { n: 4, t: "Evaluation Done Right", hours: 15,
+        focus: ["Cross-validation", "Confusion matrix, precision/recall/F1", "ROC/AUC, calibration", "Overfitting, data leakage"],
+        deliv: ["Model evaluation cheat sheet notebook"],
+        resources: [
+          { name: "Google ML Crash Course — Classification", url: "https://developers.google.com/machine-learning/crash-course/classification/video-lecture", hrs: 5 },
+          { name: "scikit-learn — Model Evaluation", url: "https://scikit-learn.org/stable/modules/model_evaluation.html", hrs: 5 },
+          { name: "StatQuest — ROC and AUC explained", url: "https://www.youtube.com/watch?v=4jRBRDbJemM", hrs: 2 }
+        ],
+        checks: ["Cross-validation implemented from scratch", "ROC curve + confusion matrix plotted", "F1, precision, recall vocabulary fluent", "Cheat sheet notebook published", "Identified one data leakage example with fix"] },
+    ]
+  },
+  {
+    month: 2, label: "Classical ML", title: "Features, trees, time series, Kaggle",
+    tagline: "Most real-world ML in industry is still classical ML on tabular data. Don't skip this. Ship one real project by month-end.",
+    checkpoint: "First real portfolio project shipped · Kaggle profile active · Feature engineering muscle built",
+    weeks: [
+      { n: 5, t: "Feature Engineering & Pipelines", isNew: true, hours: 16,
+        focus: ["Encoding categoricals, missing values", "Scaling, feature selection", "sklearn Pipeline & ColumnTransformer", "Feature engineering BEFORE modeling (reordered)"],
+        deliv: ["End-to-end pipeline that ingests raw CSV"],
+        resources: [
+          { name: "Kaggle Learn — Feature Engineering", url: "https://www.kaggle.com/learn/feature-engineering", hrs: 5 },
+          { name: "scikit-learn — Pipelines & Composite Estimators", url: "https://scikit-learn.org/stable/modules/compose.html", hrs: 5 },
+          { name: "Kaggle Learn — Data Cleaning", url: "https://www.kaggle.com/learn/data-cleaning", hrs: 5 }
+        ],
+        checks: ["ColumnTransformer pipeline built", "Missing value strategies compared", "Feature importance computed", "Pipeline runs end-to-end on raw CSV", "README shows feature engineering improving baseline"] },
+      { n: 6, t: "Tree-Based Models + Kaggle Kickoff", isNew: true, hours: 16,
+        focus: ["Decision trees, random forests", "XGBoost, LightGBM (still win on tabular)", "Hyperparameter tuning", "Kaggle Getting Started competition (NEW)"],
+        deliv: ["XGBoost notebook with tuning", "First Kaggle submission"],
+        resources: [
+          { name: "XGBoost — Get Started", url: "https://xgboost.readthedocs.io/en/stable/get_started.html", hrs: 4 },
+          { name: "Kaggle — Titanic Getting Started", url: "https://www.kaggle.com/c/titanic", hrs: 7 },
+          { name: "Kaggle Learn — Intermediate ML", url: "https://www.kaggle.com/learn/intermediate-machine-learning", hrs: 4 }
+        ],
+        checks: ["XGBoost notebook with hyperparameter tuning", "Joined Kaggle, picked Getting Started competition", "First submission made on Kaggle leaderboard", "LightGBM compared with XGBoost", "README documents tuning approach"] },
+      { n: 7, t: "Unsupervised + Recommender Systems", isNew: true, hours: 15,
+        focus: ["k-means, DBSCAN", "PCA, t-SNE, UMAP", "Collaborative filtering basics (NEW)", "Matrix factorization concepts"],
+        deliv: ["Clustering notebook + simple recommender"],
+        resources: [
+          { name: "scikit-learn — Clustering Guide", url: "https://scikit-learn.org/stable/modules/clustering.html", hrs: 5 },
+          { name: "Google — Recommendation Systems Crash Course", url: "https://developers.google.com/machine-learning/recommendation", hrs: 5 },
+          { name: "Surprise — Python recsys library docs", url: "https://surpriselib.com", hrs: 4 }
+        ],
+        checks: ["k-means + DBSCAN compared on a real dataset", "PCA visualization in 2D", "t-SNE or UMAP visualization", "Collaborative filtering recommender built", "Both notebooks pushed with write-ups"] },
+      { n: 8, t: "Time Series + End-to-End Project", isNew: true, hours: 16,
+        focus: ["Time series basics, stationarity", "ARIMA conceptually, Prophet practically (NEW)", "First complete end-to-end project", "Project compounding starts here"],
+        deliv: ["Time series notebook", "First complete portfolio project"],
+        resources: [
+          { name: "Kaggle Learn — Time Series", url: "https://www.kaggle.com/learn/time-series", hrs: 5 },
+          { name: "Facebook Prophet — Quick Start", url: "https://facebook.github.io/prophet/docs/quick_start.html", hrs: 4 },
+          { name: "Forecasting: Principles and Practice (free book)", url: "https://otexts.com/fpp3/", hrs: 6 }
+        ],
+        checks: ["Prophet forecast on a real time series", "ARIMA concepts understood", "End-to-end project: data → cleaning → features → model → eval", "Project README explains problem, approach, results", "Kaggle submission improved (2nd attempt)"] },
+    ]
+  },
+  {
+    month: 3, label: "Deep Learning", title: "Neural nets, vision, transformers",
+    tagline: "Understand how modern AI models work internally — at code level, not just slides. Portfolio site goes live this month.",
+    checkpoint: "Deep learning solid · Transformer internals understood · Portfolio site live",
+    weeks: [
+      { n: 9, t: "NN Fundamentals + Portfolio Site", isNew: true, hours: 16,
+        focus: ["Perceptrons → MLPs → backprop", "Karpathy's NN Zero to Hero (essential)", "Activation functions, loss", "GitHub Pages portfolio site live (NEW — moved earlier)"],
+        deliv: ["NN from scratch in NumPy + PyTorch", "Portfolio site live"],
+        resources: [
+          { name: "Karpathy — Neural Networks: Zero to Hero", url: "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ", hrs: 8 },
+          { name: "3Blue1Brown — Neural Networks series", url: "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi", hrs: 3 },
+          { name: "GitHub Pages — Get Started", url: "https://pages.github.com", hrs: 3 }
+        ],
+        checks: ["Karpathy NN Zero to Hero Ep 1–2 watched", "Micrograd-style NN built from scratch in NumPy", "Same NN re-implemented in PyTorch", "GitHub Pages portfolio site live (even barebones)", "All earlier projects linked from portfolio"] },
+      { n: 10, t: "PyTorch Fluency", hours: 16,
+        focus: ["Tensors, autograd", "Datasets, dataloaders", "Training loops, checkpoints", "Early stopping"],
+        deliv: ["MNIST or Fashion-MNIST classifier >95%"],
+        resources: [
+          { name: "PyTorch — 60 Minute Blitz", url: "https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html", hrs: 4 },
+          { name: "PyTorch — Official Tutorials", url: "https://pytorch.org/tutorials/", hrs: 7 },
+          { name: "Daniel Bourke — Learn PyTorch", url: "https://www.learnpytorch.io", hrs: 5 }
+        ],
+        checks: ["Official PyTorch tutorials completed", "MNIST classifier achieving >95% accuracy", "Train/val/test split with early stopping", "Model checkpoints saved correctly", "Pushed with metrics in README"] },
+      { n: 11, t: "Computer Vision (CNNs)", hours: 16,
+        focus: ["Convolutions, pooling", "ResNet conceptually", "Transfer learning", "Fine-tuning a pretrained model"],
+        deliv: ["Fine-tuned ResNet on a custom image task"],
+        resources: [
+          { name: "PyTorch — Transfer Learning Tutorial", url: "https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html", hrs: 5 },
+          { name: "Stanford CS231n — Course Notes", url: "https://cs231n.github.io", hrs: 6 },
+          { name: "fast.ai — Practical Deep Learning", url: "https://course.fast.ai", hrs: 5 }
+        ],
+        checks: ["CNN built from scratch on CIFAR-10", "Pretrained ResNet fine-tuned on custom task", "Train/val curves plotted", "Comparison: from scratch vs transfer learning", "Demo screenshot in README"] },
+      { n: 12, t: "Sequences & Transformers ★", hours: 17,
+        focus: ["RNN/LSTM (briefly — historical)", "Attention mechanism", "Transformer architecture", "Karpathy's Let's Build GPT (the most important hour)"],
+        deliv: ["Tiny GPT trained on a chosen text corpus"],
+        resources: [
+          { name: "Karpathy — Let's build GPT (from scratch)", url: "https://www.youtube.com/watch?v=kCc8FmEb1nY", hrs: 6 },
+          { name: "Jay Alammar — The Illustrated Transformer", url: "https://jalammar.github.io/illustrated-transformer/", hrs: 4 },
+          { name: "The Annotated Transformer (Harvard)", url: "https://nlp.seas.harvard.edu/annotated-transformer/", hrs: 7 }
+        ],
+        checks: ["Watched Karpathy 'Let's Build GPT' (twice)", "Skim of Annotated Transformer", "Tiny GPT trained on Shakespeare/lyrics/whatever", "Generated samples in README", "Can explain self-attention to a non-ML person in 3 min"] },
+    ]
+  },
+  {
+    month: 4, label: "LLMs & GenAI", title: "Prompts, RAG, agents, evals",
+    tagline: "Where the modern job market lives. Spend it wisely. Interview prep starts as a background activity this month.",
+    checkpoint: "2 LLM apps shipped · Interview prep underway · RAG + agent fluency",
+    weeks: [
+      { n: 13, t: "Classical NLP + LLM Internals + Interview Prep Begins", isNew: true, hours: 17,
+        focus: ["TF-IDF, word2vec/GloVe (NEW — context for transformers)", "spaCy NER", "Tokens, embeddings, sampling (temp, top-k, top-p)", "Interview prep kicks off (NEW)"],
+        deliv: ["NLP exploration notebook", "Interview prep schedule live"],
+        resources: [
+          { name: "Hugging Face — NLP Course", url: "https://huggingface.co/learn/nlp-course", hrs: 8 },
+          { name: "spaCy — Advanced NLP with spaCy course", url: "https://course.spacy.io", hrs: 5 },
+          { name: "Tiktokenizer — explore tokenizers visually", url: "https://tiktokenizer.vercel.app", hrs: 2 }
+        ],
+        checks: ["TF-IDF + word2vec exploration notebook", "spaCy NER on a small project", "Tokenization explored across multiple models", "Sampling strategies notebook with side-by-side outputs", "Interview prep started: 2 hrs/week LeetCode easy/medium"] },
+      { n: 14, t: "LLM APIs + Multi-Modal Awareness", isNew: true, hours: 16,
+        focus: ["Claude API + OpenAI API hands-on", "Few-shot, chain-of-thought, structured output", "Multi-modal awareness: CLIP, Whisper, Stable Diffusion (NEW)", "System prompts"],
+        deliv: ["First LLM-powered app with Streamlit UI", "Multi-modal exploration notebook"],
+        resources: [
+          { name: "Anthropic — Claude API docs", url: "https://docs.anthropic.com", hrs: 5 },
+          { name: "OpenAI — API Reference", url: "https://platform.openai.com/docs", hrs: 5 },
+          { name: "Hugging Face — Transformers docs", url: "https://huggingface.co/docs/transformers", hrs: 5 }
+        ],
+        checks: ["Hands-on with Claude API", "Hands-on with OpenAI API", "Streamlit chatbot working locally", "Multi-modal models surveyed (CLIP, Whisper, SD)", "Half-day playing with Whisper or CLIP"] },
+      { n: 15, t: "RAG + Vector Databases", hours: 17,
+        focus: ["Embeddings deep dive", "Chroma or FAISS (free, local)", "Chunking strategies", "Hybrid search basics"],
+        deliv: ["'Chat with your PDF' app with citations"],
+        resources: [
+          { name: "LangChain — RAG Tutorial", url: "https://python.langchain.com/docs/tutorials/rag/", hrs: 6 },
+          { name: "Chroma — Getting Started", url: "https://docs.trychroma.com", hrs: 5 },
+          { name: "Pinecone Learn — Vector DB primer", url: "https://www.pinecone.io/learn/", hrs: 5 }
+        ],
+        checks: ["Embeddings explored hands-on", "Chroma or FAISS vector DB used", "'Chat with your PDF' app built", "Citations added to grounded answers", "Streamlit UI deployed locally"] },
+      { n: 16, t: "Agents + Tool Use + LLM Evaluation", isNew: true, hours: 17,
+        focus: ["Function calling, tool use, multi-step reasoning", "LangChain, LlamaIndex, or Claude Agent SDK", "LLM evaluation: Ragas or homegrown harness (NEW)", "Golden datasets"],
+        deliv: ["Working agent with traced execution", "Eval harness for RAG app"],
+        resources: [
+          { name: "Anthropic — Tool Use docs", url: "https://docs.anthropic.com/en/docs/build-with-claude/tool-use", hrs: 5 },
+          { name: "LangGraph — Tutorials", url: "https://langchain-ai.github.io/langgraph/", hrs: 6 },
+          { name: "Ragas — Evaluation framework docs", url: "https://docs.ragas.io", hrs: 5 }
+        ],
+        checks: ["Agent with 3+ tools built", "Multi-step task completed autonomously", "Trace logged and reviewed", "20+ golden Q&A pairs created for RAG app", "Ragas or simple eval harness running"] },
+    ]
+  },
+  {
+    month: 5, label: "MLOps & Deploy", title: "FastAPI, Docker, cloud, responsible AI",
+    tagline: "Knowing how to ship AI is what separates hobbyists from professionals. Buffer week built in — life happens.",
+    checkpoint: "Deployed cloud app · Open-source contributor · Backlog cleared · Interview ready",
+    weeks: [
+      { n: 17, t: "FastAPI + Streamlit", hours: 15,
+        focus: ["REST APIs, request/response schemas", "Async endpoints", "FastAPI standard", "Streamlit front-end"],
+        deliv: ["Earlier project exposed as FastAPI service"],
+        resources: [
+          { name: "FastAPI — Official Tutorial", url: "https://fastapi.tiangolo.com/tutorial/", hrs: 6 },
+          { name: "Streamlit — Documentation", url: "https://docs.streamlit.io", hrs: 5 },
+          { name: "Real Python — FastAPI Web APIs", url: "https://realpython.com/fastapi-python-web-apis/", hrs: 4 }
+        ],
+        checks: ["FastAPI service wraps an earlier model", "OpenAPI docs auto-generated", "Async endpoints working", "Streamlit front-end calling the API", "Local demo recorded as a GIF"] },
+      { n: 18, t: "Docker + Containerization", hours: 14,
+        focus: ["Dockerfiles, images, containers", "docker-compose", "Multi-stage builds", "Image size optimization"],
+        deliv: ["Dockerized FastAPI service"],
+        resources: [
+          { name: "Docker — Get Started Guide", url: "https://docs.docker.com/get-started/", hrs: 6 },
+          { name: "Play with Docker — browser playground", url: "https://labs.play-with-docker.com", hrs: 4 },
+          { name: "Docker Curriculum (free tutorial)", url: "https://docker-curriculum.com", hrs: 4 }
+        ],
+        checks: ["Dockerfile written and building", "Image builds successfully", "docker-compose.yml for multi-service setup", "README explains build/run steps", "Container size optimized"] },
+      { n: 19, t: "Cloud Deployment (AWS)", hours: 17,
+        focus: ["EC2, S3, IAM", "One managed AI service (SageMaker or Bedrock)", "Public deployment with URL", "Optional: AIF-C01 cert booked"],
+        deliv: ["Cloud-deployed app with public URL"],
+        resources: [
+          { name: "AWS Skill Builder — free training catalog", url: "https://skillbuilder.aws", hrs: 6 },
+          { name: "Stéphane Maarek — AIF-C01 (Udemy)", url: "https://www.udemy.com/course/aws-ai-practitioner-certified/", hrs: 8 },
+          { name: "AWS — Bedrock User Guide", url: "https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html", hrs: 3 }
+        ],
+        checks: ["AWS account set up + IAM configured properly", "Dockerized app deployed to EC2 or ECS", "Public URL working and shared", "S3 bucket used for storage", "AIF-C01 cert booked (optional)"] },
+      { n: 20, t: "BUFFER + Responsible AI + Open Source", isNew: true, isBuffer: true, hours: 15,
+        focus: ["Catch-up time for any slipped weeks (NEW)", "Responsible AI: bias, fairness, model cards (NEW)", "One open-source PR — even docs counts (NEW)", "Interview prep ramps up"],
+        deliv: ["Backlog cleared", "1 open-source PR submitted", "Responsible AI write-up"],
+        resources: [
+          { name: "Google — Responsible AI Practices", url: "https://ai.google/responsibility/responsible-ai-practices/", hrs: 3 },
+          { name: "First Contributions — beginner OSS guide", url: "https://github.com/firstcontributions/first-contributions", hrs: 4 },
+          { name: "Chip Huyen — ML Interviews Book (free)", url: "https://github.com/chiphuyen/ml-interviews-book", hrs: 6 }
+        ],
+        checks: ["All earlier weeks' loose ends closed", "Responsible AI half-day done (bias, fairness, model cards)", "One open-source PR submitted (sklearn, HF, LangChain, docs OK)", "Interview prep ramps to 4 hrs/week", "ML system design questions practiced (3+)"] },
+    ]
+  },
+  {
+    month: 6, label: "Capstone & Job Hunt", title: "Ship, publish, apply",
+    tagline: "Months 1–5 collapse into one ambitious project. By Week 24 you're not starting interviews — you're already in them.",
+    checkpoint: "Capstone deployed + blogged · Portfolio live · 15+ applications out · Mock interviews done",
+    weeks: [
+      { n: 21, t: "Capstone Planning + Build Kickoff", hours: 16,
+        focus: ["Pick ambitious project combining skills", "Should compound with earlier work", "Architecture sketched", "Tech stack chosen"],
+        deliv: ["Capstone repo created with architecture doc"],
+        resources: [
+          { name: "Awesome Machine Learning (project ideas)", url: "https://github.com/josephmisiti/awesome-machine-learning", hrs: 4 },
+          { name: "Hugging Face Spaces — examples", url: "https://huggingface.co/spaces", hrs: 4 },
+          { name: "Made With ML — applied ML examples", url: "https://madewithml.com", hrs: 6 }
+        ],
+        checks: ["Capstone idea chosen (compounds with earlier projects)", "Architecture sketched (whiteboard OK)", "Tech stack chosen and justified", "Repo created with README", "Core feature scoped for Week 22"] },
+      { n: 22, t: "Capstone Build", hours: 18,
+        focus: ["Heads down build", "Core features end-to-end", "Tests for critical paths", "Daily commits"],
+        deliv: ["Working capstone with core functionality"],
+        resources: [
+          { name: "Anthropic — Claude API docs (reference)", url: "https://docs.anthropic.com", hrs: 4 },
+          { name: "Hugging Face — Models hub", url: "https://huggingface.co/models", hrs: 4 },
+          { name: "GitHub — Issues & Projects (your own)", url: "https://github.com", hrs: 10 }
+        ],
+        checks: ["Core feature working end-to-end", "At least 1 LLM/ML model integrated", "Data pipeline working", "Tests for critical paths", "Daily commits visible in repo"] },
+      { n: 23, t: "Polish, Deploy, Document, Publish", hours: 14,
+        focus: ["UI polish (Streamlit fastest)", "Cloud deployment with public URL", "README + screenshots + demo GIF", "Blog post on Medium or Dev.to"],
+        deliv: ["Deployed capstone + blog post live"],
+        resources: [
+          { name: "Streamlit Community Cloud (free hosting)", url: "https://streamlit.io/cloud", hrs: 4 },
+          { name: "Hugging Face Spaces (free hosting)", url: "https://huggingface.co/spaces", hrs: 4 },
+          { name: "Dev.to — write & publish", url: "https://dev.to", hrs: 6 }
+        ],
+        checks: ["UI polished and clickable", "Deployed with public URL", "README has screenshots + demo GIF", "Blog post drafted and reviewed", "Blog post published on Medium or Dev.to"] },
+      { n: 24, t: "Resume, Portfolio, Applications, Interviews", hours: 14,
+        focus: ["Resume polished for AI/ML roles", "LinkedIn About + Featured updated", "Mock interviews done", "Apply to 15–20 roles"],
+        deliv: ["15–20 applications submitted", "Mock interviews completed"],
+        resources: [
+          { name: "Chip Huyen — ML Interviews Book (free)", url: "https://github.com/chiphuyen/ml-interviews-book", hrs: 5 },
+          { name: "Pramp — free peer mock interviews", url: "https://www.pramp.com", hrs: 4 },
+          { name: "LinkedIn Jobs — AI/ML filter", url: "https://www.linkedin.com/jobs/", hrs: 5 }
+        ],
+        checks: ["Resume rewritten for AI/ML roles", "LinkedIn About + Featured section updated", "15–20 applications submitted", "2+ mock interviews done with peer or coach", "Cert exam taken (AIF-C01 or MLA-C01)"] },
+    ]
+  },
+];
+
+const STORAGE_KEY = "ai-generalist-tracker-v3";
+let state = {};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch (e) { state = {}; }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) { console.error("Save failed:", e); }
+}
+
+function key(weekN, idx) { return `w${weekN}_${idx}`; }
+
+function render() {
+  const main = document.getElementById("content");
+  main.innerHTML = "";
+  let totalChecks = 0, doneChecks = 0;
+
+  DATA.forEach((m, mi) => {
+    const monthEl = document.createElement("section");
+    monthEl.className = "month";
+    let mTotal = 0, mDone = 0;
+    m.weeks.forEach(w => { w.checks.forEach((_, i) => { mTotal++; totalChecks++; if (state[key(w.n,i)]) { mDone++; doneChecks++; } }); });
+    const mPct = mTotal ? Math.round((mDone/mTotal)*100) : 0;
+
+    monthEl.innerHTML = `
+      <div class="month-header">
+        <div class="month-num">0${m.month}</div>
+        <div class="month-title">
+          <div class="label">Month ${m.month} · ${m.label}</div>
+          <h2>${m.title.replace(/★+/g, s => `<em>${s}</em>`)}</h2>
+        </div>
+        <div class="month-progress">${mPct}%<div class="bar"><div style="width:${mPct}%"></div></div></div>
+      </div>
+      <p class="month-tagline">${m.tagline}</p>
+    `;
+
+    m.weeks.forEach((w, wi) => {
+      const wTotal = w.checks.length;
+      const wDone = w.checks.filter((_,i) => state[key(w.n,i)]).length;
+      const isComplete = wDone === wTotal;
+      const wEl = document.createElement("div");
+      wEl.className = "week" + (isComplete ? " complete" : "") + (w.isBuffer ? " buffer" : "");
+      wEl.style.animationDelay = `${wi * 0.05}s`;
+      const newBadge = w.isNew ? '<span class="new">UPDATED</span>' : '';
+      wEl.innerHTML = `
+        <div class="week-header">
+          <span class="week-num">Week ${w.n}${w.isBuffer ? ' · BUFFER' : ''}</span>
+          <div class="week-title">${w.t.replace(/★/g, '<span style="color:var(--accent);font-size:14px;vertical-align:super;margin-left:4px">★</span>')}${newBadge}</div>
+          <span class="week-hours">⏱ <strong>${w.hours || 16}</strong> hrs</span>
+        </div>
+        <div class="week-grid">
+          <div class="week-section"><h4>Focus</h4><ul>${w.focus.map(f=>`<li>${f}</li>`).join("")}</ul></div>
+          <div class="week-section"><h4>Deliverables</h4><ul>${w.deliv.map(d=>`<li>${d}</li>`).join("")}</ul></div>
+        </div>
+        ${w.resources ? `<div class="resources">
+          <h4>Top Resources</h4>
+          <div class="res-list">
+            ${w.resources.map(r => `<a class="res-item" href="${r.url}" target="_blank" rel="noopener noreferrer">
+              <span class="res-arrow">→</span>
+              <span class="res-name">${r.name}</span>
+              ${r.hrs ? `<span class="res-hrs">${r.hrs} hrs</span>` : ''}
+            </a>`).join("")}
+          </div>
+        </div>` : ''}
+        <div class="checklist">
+          <h4>Checklist · ${wDone}/${wTotal}</h4>
+          ${w.checks.map((c,i) => {
+            const done = state[key(w.n,i)];
+            return `<div class="check-item${done?' done':''}" data-week="${w.n}" data-idx="${i}">
+              <div class="check-box"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8L7 12L13 4" stroke="#0f1419" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="check-text">${c}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      `;
+      monthEl.appendChild(wEl);
+    });
+
+    const cp = document.createElement("div");
+    cp.className = "checkpoint";
+    cp.innerHTML = `<div class="checkpoint-icon">✓</div><div><strong>Month ${m.month} checkpoint</strong>${m.checkpoint}</div>`;
+    monthEl.appendChild(cp);
+
+    main.appendChild(monthEl);
+  });
+
+  // overall ring
+  const pct = totalChecks ? (doneChecks/totalChecks) : 0;
+  const circ = 2 * Math.PI * 48;
+  document.getElementById("ringFill").setAttribute("stroke-dashoffset", circ - (circ * pct));
+  document.getElementById("ringPct").textContent = Math.round(pct*100) + "%";
+  document.getElementById("doneCount").textContent = doneChecks;
+  document.getElementById("totalCount").textContent = totalChecks;
+
+  // attach listeners
+  document.querySelectorAll(".check-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const wN = el.dataset.week, idx = el.dataset.idx;
+      const k = key(wN, idx);
+      state[k] = !state[k];
+      saveState();
+      render();
+    });
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+function resetAll() {
+  if (!confirm("Reset all progress? This cannot be undone.")) return;
+  state = {};
+  saveState();
+  render();
+  showToast("Progress reset");
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ai-generalist-tracker-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Exported");
+}
+
+function importData() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json";
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      state = JSON.parse(text);
+      saveState();
+      render();
+      showToast("Imported");
+    } catch { showToast("Invalid file"); }
+  };
+  input.click();
+}
+
+loadState();
+render();
+</script>
+</body>
+</html>
