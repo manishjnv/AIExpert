@@ -42,7 +42,7 @@ async def test_non_admin_gets_403():
     _, token = await _user_token("regular@test.com", is_admin=False)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/api/dashboard", cookies={"session": token})
+        resp = await c.get("/admin/api/dashboard", cookies={"auth_token": token})
         assert resp.status_code == 403
     await close_db()
 
@@ -53,7 +53,7 @@ async def test_admin_dashboard_api():
     _, token = await _user_token("admin@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/api/dashboard", cookies={"session": token})
+        resp = await c.get("/admin/api/dashboard", cookies={"auth_token": token})
         assert resp.status_code == 200
         d = resp.json()
         assert "total_users" in d
@@ -69,7 +69,7 @@ async def test_admin_users_api():
     _, token = await _user_token("admin2@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/api/users", cookies={"session": token})
+        resp = await c.get("/admin/api/users", cookies={"auth_token": token})
         assert resp.status_code == 200
         d = resp.json()
         assert "users" in d
@@ -83,7 +83,7 @@ async def test_admin_proposals_api():
     _, token = await _user_token("admin3@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/api/proposals", cookies={"session": token})
+        resp = await c.get("/admin/api/proposals", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
     await close_db()
@@ -95,7 +95,7 @@ async def test_admin_dashboard_html():
     _, token = await _user_token("adminhtml@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/", cookies={"session": token})
+        resp = await c.get("/admin/", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert "Dashboard" in resp.text
         assert "Total Users" in resp.text
@@ -108,7 +108,7 @@ async def test_admin_users_html():
     _, token = await _user_token("adminhtml2@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/users", cookies={"session": token})
+        resp = await c.get("/admin/users", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert "Users" in resp.text
     await close_db()
@@ -120,7 +120,7 @@ async def test_admin_proposals_html():
     _, token = await _user_token("adminhtml3@test.com", is_admin=True)
     app = _app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.get("/admin/proposals", cookies={"session": token})
+        resp = await c.get("/admin/proposals", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert "Proposals" in resp.text
     await close_db()

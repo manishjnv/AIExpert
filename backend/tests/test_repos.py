@@ -125,9 +125,9 @@ async def test_link_repo_success():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         # Enroll first
-        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"session": token})
+        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
 
-        resp = await c.post("/api/repos/link", json={"week_num": 1, "repo": "octocat/Hello-World"}, cookies={"session": token})
+        resp = await c.post("/api/repos/link", json={"week_num": 1, "repo": "octocat/Hello-World"}, cookies={"auth_token": token})
         assert resp.status_code == 200
         data = resp.json()
         assert data["owner"] == "octocat"
@@ -144,9 +144,9 @@ async def test_link_nonexistent_repo():
     app = _app()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"session": token})
+        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
 
-        resp = await c.post("/api/repos/link", json={"week_num": 1, "repo": "nonexistent-user-xyz/no-such-repo-abc"}, cookies={"session": token})
+        resp = await c.post("/api/repos/link", json={"week_num": 1, "repo": "nonexistent-user-xyz/no-such-repo-abc"}, cookies={"auth_token": token})
         assert resp.status_code == 404
 
     await close_db()
@@ -160,10 +160,10 @@ async def test_unlink_repo():
     app = _app()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"session": token})
-        await c.post("/api/repos/link", json={"week_num": 1, "repo": "octocat/Hello-World"}, cookies={"session": token})
+        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
+        await c.post("/api/repos/link", json={"week_num": 1, "repo": "octocat/Hello-World"}, cookies={"auth_token": token})
 
-        resp = await c.delete("/api/repos/link?week_num=1", cookies={"session": token})
+        resp = await c.delete("/api/repos/link?week_num=1", cookies={"auth_token": token})
         assert resp.status_code == 204
 
     await close_db()

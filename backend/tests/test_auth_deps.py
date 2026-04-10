@@ -64,7 +64,7 @@ async def test_200_with_valid_cookie():
         user_id = user.id
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/protected", cookies={"session": token})
+        resp = await client.get("/protected", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert resp.json()["id"] == user_id
         assert resp.json()["email"] == "u@test.com"
@@ -85,7 +85,7 @@ async def test_403_non_admin_on_admin_route():
         await db.commit()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/admin-only", cookies={"session": token})
+        resp = await client.get("/admin-only", cookies={"auth_token": token})
         assert resp.status_code == 403
 
     await close_db()
@@ -104,7 +104,7 @@ async def test_200_admin_on_admin_route():
         await db.commit()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/admin-only", cookies={"session": token})
+        resp = await client.get("/admin-only", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert resp.json()["is_admin"] is True
 
@@ -116,6 +116,6 @@ async def test_401_with_garbage_cookie():
     await _setup()
     app = _make_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/protected", cookies={"session": "garbage.token.here"})
+        resp = await client.get("/protected", cookies={"auth_token": "garbage.token.here"})
         assert resp.status_code == 401
     await close_db()

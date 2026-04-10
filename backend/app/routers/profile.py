@@ -139,7 +139,7 @@ async def delete_profile(
     await db.flush()
 
     response = Response(status_code=204)
-    response.delete_cookie("session", path="/")
+    response.delete_cookie("auth_token", path="/")
     return response
 
 

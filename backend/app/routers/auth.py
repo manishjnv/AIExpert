@@ -103,7 +103,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     from fastapi.responses import RedirectResponse
     response = RedirectResponse(url=settings.public_base_url, status_code=302)
     response.set_cookie(
-        key="session",
+        key="auth_token",
         value=jwt_token,
         httponly=True,
         secure=True,
@@ -185,7 +185,7 @@ async def otp_verify(
         media_type="application/json",
     )
     response.set_cookie(
-        key="session",
+        key="auth_token",
         value=jwt_token,
         httponly=True,
         secure=settings.is_prod,
@@ -223,7 +223,7 @@ async def logout(
 ):
     """Revoke the current session and clear the cookie."""
     settings = get_settings()
-    token = request.cookies.get("session")
+    token = request.cookies.get("auth_token")
     if token:
         try:
             payload = jose_jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
@@ -234,5 +234,5 @@ async def logout(
             pass
 
     response = Response(status_code=204)
-    response.delete_cookie("session", path="/")
+    response.delete_cookie("auth_token", path="/")
     return response

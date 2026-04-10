@@ -62,7 +62,7 @@ async def test_chat_streams_sse():
             resp = await c.post(
                 "/api/chat",
                 json={"week_num": 1, "message": "hello"},
-                cookies={"session": token},
+                cookies={"auth_token": token},
             )
             assert resp.status_code == 200
             assert "text/event-stream" in resp.headers.get("content-type", "")
@@ -92,7 +92,7 @@ async def test_chat_rate_limit():
                 resp = await c.post(
                     "/api/chat",
                     json={"week_num": 1, "message": f"msg {i}"},
-                    cookies={"session": token},
+                    cookies={"auth_token": token},
                 )
                 assert resp.status_code == 200, f"Request {i} failed: {resp.status_code}"
 
@@ -100,7 +100,7 @@ async def test_chat_rate_limit():
             resp = await c.post(
                 "/api/chat",
                 json={"week_num": 1, "message": "one too many"},
-                cookies={"session": token},
+                cookies={"auth_token": token},
             )
             assert resp.status_code == 429
 

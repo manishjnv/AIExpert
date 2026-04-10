@@ -17,17 +17,17 @@ from app.models.user import User
 
 
 async def get_current_user(
-    session: str | None = Cookie(default=None),
+    auth_token: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Resolve the current user from the session cookie.
 
     Raises 401 if the cookie is missing, invalid, expired, or revoked.
     """
-    if not session:
+    if not auth_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    user = await verify_token(session, db)
+    user = await verify_token(auth_token, db)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 

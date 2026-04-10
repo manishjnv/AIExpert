@@ -40,7 +40,7 @@ async def test_me_returns_user():
         await db.commit()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        resp = await client.get("/api/auth/me", cookies={"session": token})
+        resp = await client.get("/api/auth/me", cookies={"auth_token": token})
         assert resp.status_code == 200
         data = resp.json()
         assert data["email"] == "me@test.com"
@@ -76,11 +76,11 @@ async def test_logout_then_me_returns_401():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Logout
-        resp = await client.post("/api/auth/logout", cookies={"session": token})
+        resp = await client.post("/api/auth/logout", cookies={"auth_token": token})
         assert resp.status_code == 204
 
         # /me should now fail
-        resp = await client.get("/api/auth/me", cookies={"session": token})
+        resp = await client.get("/api/auth/me", cookies={"auth_token": token})
         assert resp.status_code == 401
 
     await close_db()

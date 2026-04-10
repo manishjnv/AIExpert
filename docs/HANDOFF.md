@@ -4,31 +4,31 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Phase 11 complete (Tasks 11.1–11.2)
+**Last worked on:** Phase 12 complete (Tasks 12.1–12.3) — ALL PHASES DONE
 **Branch:** master
-**Commit:** 9e13284
+**Commit:** 5bea1c0
 
 ## What got done this session
 
-- 11.1: Quarterly sync script — fetches sources, extracts text, calls Gemini for proposals, writes to /proposals/ and DB
-- 11.2: Cron container already existed; scripts now mounted in backend too for testing
-- Codex test coverage analysis running in background
+- 12.1: E2E smoke test — full user journey (auth → enroll → tick → link → chat → share → logout) + admin flow
+- 12.2: Security hardening — slowapi rate limits on OTP endpoints (5/15min, 10/15min) + global 300/hr
+- 12.3: Full stack deployed to VPS — backend, cron, web all healthy
+- Codex security reviews done for Phases 7, 10 (6 issues found and fixed total)
 
 ## What is in progress (not committed)
 
-- Codex test coverage gap analysis (will address findings)
+- Nothing — all 12 phases complete
 
 ## Decisions made
 
-- HTML text extraction uses regex (no bs4/trafilatura dependency) — simple, good enough
-- AI fallback generates minimal proposal when Gemini unavailable
-- Scripts mounted read-only in backend container for testing
+- slowapi for rate limiting (in-memory, fine for single-worker)
+- E2E test mocks external services (GitHub, AI) but tests real app routing and DB
+- All three docker services running: backend (healthy), cron (quarterly sync), web (nginx)
 
 ## Tests
 
-**Passing:** 88 automated
+**Passing:** 90 automated
 **Failing:** none
-**New tests:** test_sync (5 — fetch success/failure, write proposal, fallback, load topics)
 
 ## Blockers
 
@@ -36,11 +36,14 @@
 
 ## Open questions for the user
 
-- None
+- Google OAuth credentials needed for real sign-in flow
+- Gemini/Groq API keys needed for real AI evaluation/chat
+- SMTP credentials needed for real OTP email sending
+- Caddy config needed to expose the site publicly via domain
 
 ## Next action
 
-Phase 12 from docs/TASKS.md — Polish and ship (end-to-end smoke test, security pass, deploy).
+Task 12.4 — Public soft launch. User needs to configure production secrets and domain.
 
 ---
 
@@ -59,3 +62,4 @@ Phase 12 from docs/TASKS.md — Polish and ship (end-to-end smoke test, security
 | 2026-04-10 | Phase 9    | LinkedIn sharing — OG tags, dynamic SVG, share buttons     |
 | 2026-04-10 | Phase 10   | Admin panel — dashboard, users, proposals, HTML pages      |
 | 2026-04-10 | Phase 11   | Quarterly sync — source fetch, AI proposals, cron          |
+| 2026-04-10 | Phase 12   | E2E smoke test, slowapi rate limits, full stack deploy     |

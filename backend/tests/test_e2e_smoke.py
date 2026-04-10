@@ -43,7 +43,7 @@ async def test_full_user_journey():
         user_id = user.id
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        cookies = {"session": token}
+        cookies = {"auth_token": token}
 
         # 2. GET /api/auth/me — verify signed in
         resp = await c.get("/api/auth/me", cookies=cookies)
@@ -178,16 +178,16 @@ async def test_admin_flow():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         # Admin can access
-        resp = await c.get("/admin/api/dashboard", cookies={"session": admin_token})
+        resp = await c.get("/admin/api/dashboard", cookies={"auth_token": admin_token})
         assert resp.status_code == 200
         assert resp.json()["total_users"] >= 2
 
         # Non-admin gets 403
-        resp = await c.get("/admin/api/dashboard", cookies={"session": user_token})
+        resp = await c.get("/admin/api/dashboard", cookies={"auth_token": user_token})
         assert resp.status_code == 403
 
         # Admin HTML pages load
-        resp = await c.get("/admin/", cookies={"session": admin_token})
+        resp = await c.get("/admin/", cookies={"auth_token": admin_token})
         assert resp.status_code == 200
         assert "Dashboard" in resp.text
 

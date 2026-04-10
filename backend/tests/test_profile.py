@@ -40,7 +40,7 @@ async def test_get_profile():
     await _setup()
     _, token = await _user_token()
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
-        resp = await c.get("/api/profile", cookies={"session": token})
+        resp = await c.get("/api/profile", cookies={"auth_token": token})
         assert resp.status_code == 200
         d = resp.json()
         assert d["email"] == "profile@test.com"
@@ -54,14 +54,14 @@ async def test_patch_profile():
     await _setup()
     _, token = await _user_token()
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
-        resp = await c.patch("/api/profile", json={"name": "New Name", "github_username": "ghuser"}, cookies={"session": token})
+        resp = await c.patch("/api/profile", json={"name": "New Name", "github_username": "ghuser"}, cookies={"auth_token": token})
         assert resp.status_code == 200
         d = resp.json()
         assert d["name"] == "New Name"
         assert d["github_username"] == "ghuser"
 
         # Persists
-        resp2 = await c.get("/api/profile", cookies={"session": token})
+        resp2 = await c.get("/api/profile", cookies={"auth_token": token})
         assert resp2.json()["name"] == "New Name"
     await close_db()
 
@@ -73,10 +73,10 @@ async def test_delete_profile_cascades():
 
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
         # Enroll in a plan first
-        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"session": token})
+        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
 
         # Delete
-        resp = await c.request("DELETE", "/api/profile", json={"confirm": "DELETE"}, cookies={"session": token})
+        resp = await c.request("DELETE", "/api/profile", json={"confirm": "DELETE"}, cookies={"auth_token": token})
         assert resp.status_code == 204
 
         # User gone
@@ -92,7 +92,7 @@ async def test_delete_profile_wrong_confirm():
     await _setup()
     _, token = await _user_token()
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
-        resp = await c.request("DELETE", "/api/profile", json={"confirm": "WRONG"}, cookies={"session": token})
+        resp = await c.request("DELETE", "/api/profile", json={"confirm": "WRONG"}, cookies={"auth_token": token})
         assert resp.status_code == 400
     await close_db()
 
@@ -103,11 +103,11 @@ async def test_export_profile():
     _, token = await _user_token("export@test.com")
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
         # Enroll
-        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"session": token})
+        await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
         # Tick
-        await c.patch("/api/progress", json={"week_num": 1, "check_idx": 0, "done": True}, cookies={"session": token})
+        await c.patch("/api/progress", json={"week_num": 1, "check_idx": 0, "done": True}, cookies={"auth_token": token})
 
-        resp = await c.get("/api/profile/export", cookies={"session": token})
+        resp = await c.get("/api/profile/export", cookies={"auth_token": token})
         assert resp.status_code == 200
         assert "attachment" in resp.headers.get("content-disposition", "")
         data = resp.json()
