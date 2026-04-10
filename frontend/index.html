@@ -78,6 +78,8 @@
   .conn-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; background: rgba(109,181,133,0.2); color: var(--success); border: 1px solid rgba(109,181,133,0.4); margin-left: 6px; opacity: 1 !important; vertical-align: middle; cursor: default; transition: background 0.2s; }
   .conn-badge:hover { background: rgba(109,181,133,0.35); }
   .conn-badge.unverified { background: rgba(74,82,96,0.3); color: var(--ink-soft); border-color: var(--line); }
+  .conn-badge.unlinked { background: transparent; color: var(--ink-soft); border: 1px dashed var(--line-soft); }
+  .conn-badge.unlinked:hover { border-color: var(--accent); color: var(--accent); }
 
   /* TOOLBAR (stats bar below nav) */
   .toolbar { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); background: var(--bg-2); }
@@ -1108,28 +1110,40 @@ function updateConnectionBadges() {
   gEl.onclick = null;
   gEl.style.cursor = "default";
 
-  // GitHub — clickable link to profile
+  // GitHub
   const ghEl = document.getElementById("badgeGithub");
+  ghEl.style.display = "inline";
   if (currentUser.github_username) {
-    ghEl.style.display = "inline";
     ghEl.className = "conn-badge";
     ghEl.innerHTML = "&#10003; GitHub";
     ghEl.title = "github.com/" + currentUser.github_username;
     ghEl.style.cursor = "pointer";
     ghEl.onclick = () => window.open("https://github.com/" + currentUser.github_username, "_blank");
-  } else { ghEl.style.display = "none"; }
+  } else {
+    ghEl.className = "conn-badge unlinked";
+    ghEl.innerHTML = "+ GitHub";
+    ghEl.title = "Click to link your GitHub account";
+    ghEl.style.cursor = "pointer";
+    ghEl.onclick = () => openProfileModal();
+  }
 
-  // LinkedIn — clickable link to profile
+  // LinkedIn
   const liEl = document.getElementById("badgeLinkedin");
+  liEl.style.display = "inline";
   if (currentUser.linkedin_url) {
     const liHref = currentUser.linkedin_url.startsWith("http") ? currentUser.linkedin_url : "https://" + currentUser.linkedin_url;
-    liEl.style.display = "inline";
     liEl.className = "conn-badge";
     liEl.innerHTML = "&#10003; LinkedIn";
     liEl.title = currentUser.linkedin_url;
     liEl.style.cursor = "pointer";
     liEl.onclick = () => window.open(liHref, "_blank");
-  } else { liEl.style.display = "none"; }
+  } else {
+    liEl.className = "conn-badge unlinked";
+    liEl.innerHTML = "+ LinkedIn";
+    liEl.title = "Click to link your LinkedIn profile";
+    liEl.style.cursor = "pointer";
+    liEl.onclick = () => openProfileModal();
+  }
 }
 
 function signIn() {
