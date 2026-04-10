@@ -6,6 +6,7 @@
 <title>AI Generalist Roadmap — 6-Month Interactive Tracker</title>
 <meta name="description" content="A free, interactive 24-week roadmap to become an AI generalist. Math, ML, deep learning, LLMs, RAG, agents, MLOps. With time estimates, top resources, and progress tracking that saves to your browser.">
 <meta name="theme-color" content="#0f1419">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230f1419'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Georgia,serif' font-size='20' font-weight='300' fill='%23e8a849'%3EAI%3C/text%3E%3C/svg%3E">
 <meta property="og:title" content="AI Generalist Roadmap — 6-Month Interactive Tracker">
 <meta property="og:description" content="Free, self-paced 24-week roadmap from Python fundamentals to deployed AI applications. Track progress, hand-picked resources, no signup.">
 <meta property="og:type" content="website">
@@ -70,7 +71,13 @@
   .habit-text strong { color: var(--paper); font-weight: 600; display: block; margin-bottom: 2px; font-size: 13.5px; }
 
   /* TOOLBAR */
-  .toolbar { padding: 20px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); background: rgba(22, 28, 36, 0.85); }
+  /* TOP NAV */
+  .topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15, 20, 25, 0.92); }
+  .topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; }
+  .topnav-brand span { color: var(--paper-dim); font-size: 13px; margin-left: 8px; opacity: 0.6; }
+
+  /* TOOLBAR (stats bar below nav) */
+  .toolbar { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); background: var(--bg-2); }
   .btn { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 16px; background: transparent; border: 1px solid var(--line-soft); color: var(--paper-dim); cursor: pointer; transition: all 0.2s; border-radius: 2px; }
   .btn:hover { border-color: var(--accent); color: var(--accent); }
   .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
@@ -204,8 +211,13 @@
   .checkpoint strong { color: var(--success); font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 4px; font-weight: 600; }
 
   /* FOOTER */
-  footer { padding: 48px; text-align: center; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-family: var(--mono); letter-spacing: 0.05em; }
+  footer { padding: 48px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-family: var(--mono); letter-spacing: 0.05em; }
   footer em { color: var(--accent); font-style: normal; }
+  .footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; margin-bottom: 24px; }
+  .footer-links { display: flex; flex-direction: column; gap: 4px; }
+  .footer-links a { color: var(--paper-dim); text-decoration: none; font-size: 12px; }
+  .footer-links a:hover { color: var(--accent); }
+  .footer-bottom { text-align: center; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11px; }
 
   /* TOAST */
   .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-3); border: 1px solid var(--accent); color: var(--paper); padding: 14px 24px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 100; }
@@ -224,7 +236,9 @@
     .meta-item strong { font-size: 18px; }
     .habits { padding: 24px 20px; }
     .habits-grid { grid-template-columns: 1fr; gap: 14px; }
-    .toolbar { padding: 14px 16px; gap: 8px; flex-wrap: wrap; }
+    .topnav { padding: 10px 16px; gap: 6px; flex-wrap: wrap; }
+    .topnav-brand span { display: none; }
+    .toolbar { padding: 10px 16px; gap: 6px; flex-wrap: wrap; }
     .btn { font-size: 10px; padding: 8px 10px; }
     .toolbar-stats { width: 100%; text-align: center; margin-left: 0; }
     main { padding: 24px 16px; }
@@ -261,10 +275,25 @@
 </head>
 <body>
 
+<!-- TOP NAVIGATION -->
+<nav class="topnav">
+  <div class="topnav-brand">AI Roadmap<span id="planBadge"></span></div>
+  <span id="anonButtons">
+    <button class="btn" onclick="exportData()">Export</button>
+    <button class="btn" onclick="importData()">Import</button>
+    <button class="btn danger" onclick="resetAll()">Reset</button>
+  </span>
+  <button class="btn" id="exportPlanBtn" style="display:none" onclick="exportPlanPDF()">Export Plan</button>
+  <button class="btn" id="profileBtn" style="display:none" onclick="openProfileModal()">Profile</button>
+  <button class="btn" id="adminBtn" style="display:none" onclick="window.open('/admin/','_blank')">Admin</button>
+  <button class="btn" id="authBtn" style="display:none" onclick="signIn()">Sign In</button>
+  <button class="btn" id="logoutBtn" style="display:none" onclick="logOut()">Sign Out</button>
+</nav>
+
 <header>
-  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span> <span id="planBadge" class="version-tag" style="display:none;background:rgba(109,181,133,0.15);border-color:rgba(109,181,133,0.3);color:var(--success)"></span></div>
-  <h1>Six Months. <em>One Generalist.</em></h1>
-  <p class="subtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
+  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span></div>
+  <h1 id="heroTitle">Six Months. <em>One Generalist.</em></h1>
+  <p class="subtitle" id="heroSubtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
   <div class="meta-bar">
     <div class="meta-item">Duration<strong id="metaDuration">24 weeks</strong></div>
     <div class="meta-item">Total hours<strong id="metaHours">~380 <em>hrs</em></strong></div>
@@ -296,15 +325,6 @@
 </section>
 
 <div class="toolbar">
-  <span id="anonButtons">
-    <button class="btn" onclick="exportData()">↓ Export JSON</button>
-    <button class="btn" onclick="importData()">↑ Import JSON</button>
-    <button class="btn danger" onclick="resetAll()">⟲ Reset</button>
-  </span>
-  <button class="btn" id="exportPlanBtn" style="display:none" onclick="exportPlanPDF()">↓ Export Plan</button>
-  <button class="btn" id="profileBtn" style="display:none" onclick="openProfileModal()">Profile</button>
-  <button class="btn" id="adminBtn" style="display:none" onclick="window.open('/admin/','_blank')">Admin</button>
-  <button class="btn" id="authBtn" style="display:none" onclick="signIn()">Sign In</button>
   <div class="toolbar-stats"><span id="syncBadge" class="sync-badge" style="display:none"></span> <span id="doneCount">0</span> / <span id="totalCount">0</span> complete</div>
 </div>
 
@@ -349,7 +369,29 @@
 
 <main id="content"></main>
 
-<footer>Build &gt; watch. Ship &gt; learn. Progress saves to your browser — use <em>Export JSON</em> to back up or move between devices. <em>One commit a day keeps drift away.</em></footer>
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:4px">AI Roadmap</div>
+      <div style="font-size:12px;color:var(--ink-soft)">A free, self-paced learning platform for AI/ML engineers.</div>
+    </div>
+    <div class="footer-links">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:6px">Platform</div>
+      <a href="/">Home</a>
+      <a href="/api/docs" target="_blank">API Docs</a>
+      <a href="/admin/">Admin</a>
+    </div>
+    <div class="footer-links">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:6px">Resources</div>
+      <a href="https://github.com/manishjnv/AIExpert" target="_blank">GitHub</a>
+      <a href="https://automateedge.cloud" target="_blank">automateedge.cloud</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <em>Build > watch. Ship > learn. One commit a day keeps drift away.</em>
+    <div style="margin-top:4px">&copy; 2026 AutomateEdge. All rights reserved.</div>
+  </div>
+</footer>
 
 <div class="toast" id="toast"></div>
 
@@ -1032,6 +1074,11 @@ function signIn() {
   window.location.href = "/api/auth/google/login";
 }
 
+async function logOut() {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  window.location.reload();
+}
+
 function openProfileModal() {
   if (!currentUser) return;
   document.getElementById("pName").value = currentUser.name || "";
@@ -1214,6 +1261,7 @@ async function checkAuth() {
       setSyncBadge("synced", "Synced");
       document.getElementById("profileBtn").style.display = "";
       document.getElementById("authBtn").style.display = "none";
+      document.getElementById("logoutBtn").style.display = "";
       document.getElementById("chatFab").style.display = "";
       document.getElementById("adminBtn").style.display = currentUser.is_admin ? "" : "none";
       document.getElementById("anonButtons").style.display = "none";
@@ -1310,8 +1358,17 @@ async function loadActivePlan() {
     // Show plan badge
     const badge = document.getElementById("planBadge");
     const label = PLAN_LABELS[plan.template_key] || plan.template_key;
-    badge.textContent = "Your plan: " + label;
-    badge.style.display = "inline-block";
+    badge.textContent = " · " + label;
+
+    // Update hero title based on plan duration
+    const DURATION_TITLES = {
+      "generalist_3mo_intermediate": { title: "Three Months.", sub: "twelve weeks" },
+      "generalist_6mo_intermediate": { title: "Six Months.", sub: "twenty-four weeks" },
+      "generalist_12mo_beginner": { title: "Twelve Months.", sub: "forty-eight weeks" },
+    };
+    const dt = DURATION_TITLES[plan.template_key] || { title: "Your Plan.", sub: totalWeeks + " weeks" };
+    document.getElementById("heroTitle").innerHTML = `${dt.title} <em>One Generalist.</em>`;
+    document.getElementById("heroSubtitle").textContent = `From Python fundamentals to deployed AI applications. ${dt.sub.charAt(0).toUpperCase() + dt.sub.slice(1)} of building, shipping, and learning to think like an engineer — not watch tutorials.`;
 
     // Update header stats
     const totalWeeks = DATA.reduce((s, m) => s + m.weeks.length, 0);
