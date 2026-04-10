@@ -262,7 +262,7 @@
 <body>
 
 <header>
-  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span></div>
+  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span> <span id="planBadge" class="version-tag" style="display:none;background:rgba(109,181,133,0.15);border-color:rgba(109,181,133,0.3);color:var(--success)"></span></div>
   <h1>Six Months. <em>One Generalist.</em></h1>
   <p class="subtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
   <div class="meta-bar">
@@ -1116,14 +1116,60 @@ function syncTick(weekN, idx, done) {
 loadState();
 render();
 
+// Plan name lookup
+const PLAN_LABELS = {
+  "generalist_3mo_intermediate": "3-Month Accelerated",
+  "generalist_6mo_intermediate": "6-Month Standard",
+  "generalist_12mo_beginner": "12-Month Beginner",
+};
+
+async function loadActivePlan() {
+  try {
+    const resp = await fetch("/api/plans/active", { credentials: "same-origin" });
+    if (!resp.ok) return;
+    const plan = resp.json ? await resp.json() : null;
+    if (!plan || !plan.months) return;
+
+    // Replace DATA with the server plan data
+    DATA.length = 0;
+    plan.months.forEach(m => {
+      DATA.push({
+        month: m.month, label: m.label, title: m.title,
+        tagline: m.tagline, checkpoint: m.checkpoint,
+        weeks: m.weeks.map(w => ({
+          n: w.n, t: w.t, hours: w.hours,
+          focus: w.focus, deliv: w.deliv,
+          resources: w.resources,
+          checks: w.checks.map(c => c.label),
+        }))
+      });
+    });
+
+    // Sync state from server progress
+    plan.months.forEach(m => m.weeks.forEach(w => {
+      w.checks.forEach(c => {
+        if (c.done) state[key(w.n, c.idx)] = true;
+      });
+    }));
+    saveState();
+
+    // Show plan badge
+    const badge = document.getElementById("planBadge");
+    const label = PLAN_LABELS[plan.template_key] || plan.template_key;
+    badge.textContent = "Your plan: " + label;
+    badge.style.display = "inline-block";
+
+    render();
+    DATA.forEach(m => m.weeks.forEach(w => renderRepoSection(w.n)));
+  } catch (e) { console.error("Failed to load active plan:", e); }
+}
+
 // Check auth and migrate on page load
 (async () => {
   const signedIn = await checkAuth();
   if (signedIn) {
     await migrateProgress();
-    render(); // Re-render to show repo sections
-    // Render empty repo sections for each week
-    DATA.forEach(m => m.weeks.forEach(w => renderRepoSection(w.n)));
+    await loadActivePlan();
   }
 })();
 </script>
