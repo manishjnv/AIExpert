@@ -266,8 +266,8 @@
   <h1>Six Months. <em>One Generalist.</em></h1>
   <p class="subtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
   <div class="meta-bar">
-    <div class="meta-item">Duration<strong>24 weeks</strong></div>
-    <div class="meta-item">Total hours<strong>~380 <em>hrs</em></strong></div>
+    <div class="meta-item">Duration<strong id="metaDuration">24 weeks</strong></div>
+    <div class="meta-item">Total hours<strong id="metaHours">~380 <em>hrs</em></strong></div>
     <div class="meta-item">Weekly load<strong>15–18 <em>hrs</em></strong></div>
     <div class="meta-item">Certifications<strong>2–3</strong></div>
     <div class="meta-item">Repos shipped<strong>6+</strong></div>
@@ -1158,6 +1158,12 @@ async function loadActivePlan() {
     const label = PLAN_LABELS[plan.template_key] || plan.template_key;
     badge.textContent = "Your plan: " + label;
     badge.style.display = "inline-block";
+
+    // Update header stats
+    const totalWeeks = DATA.reduce((s, m) => s + m.weeks.length, 0);
+    const totalHours = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
+    document.getElementById("metaDuration").textContent = totalWeeks + " weeks";
+    document.getElementById("metaHours").innerHTML = "~" + totalHours + " <em>hrs</em>";
 
     render();
     DATA.forEach(m => m.weeks.forEach(w => renderRepoSection(w.n)));
