@@ -35,5 +35,5 @@ USER app
 
 EXPOSE 8000
 
-# Run migrations then start the server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
+# Run migrations (if any exist) then start the server
+CMD ["sh", "-c", "if ls alembic/versions/*.py 1>/dev/null 2>&1; then alembic upgrade head; fi && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
