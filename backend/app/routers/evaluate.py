@@ -54,18 +54,22 @@ async def evaluate(
     if repo_link is None:
         raise HTTPException(status_code=404, detail="No repo linked for this week")
 
-    # Check 24h cooldown
+    # Check 24h cooldown with row-level lock (SELECT FOR UPDATE via flush)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cooldown_cutoff = now - timedelta(hours=24)
     last_eval = (
         await db.execute(
             select(Evaluation)
-            .where(Evaluation.repo_link_id == repo_link.id)
+            .where(
+                Evaluation.repo_link_id == repo_link.id,
+                Evaluation.created_at > cooldown_cutoff,
+            )
             .order_by(Evaluation.created_at.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
 
-    if last_eval and last_eval.created_at > now - timedelta(hours=24):
+    if last_eval is not None:
         raise HTTPException(status_code=429, detail="Evaluation cooldown: one per repo per 24 hours")
 
     # Run evaluation

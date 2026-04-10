@@ -48,8 +48,11 @@ async def _fetch_repo_content(owner: str, name: str, branch: str) -> tuple[str, 
         tree_data = tree_resp.json()
         tree_entries = tree_data.get("tree", [])
 
-        # Build file tree string
-        file_paths = [e["path"] for e in tree_entries if e["type"] == "blob"]
+        # Build file tree string (exclude secret files from tree too)
+        file_paths = [
+            e["path"] for e in tree_entries
+            if e["type"] == "blob" and not is_excluded_file(e["path"])
+        ]
         file_tree = "\n".join(file_paths[:100])  # cap at 100 entries
 
         # Fetch top files (small, non-secret)

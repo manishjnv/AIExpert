@@ -33,13 +33,15 @@ SECRET_CONTENT_PATTERNS = [
     re.compile(r"AIza[a-zA-Z0-9_-]{35}"),         # Google API key
     re.compile(r"GOCSPX-[a-zA-Z0-9_-]{28,}"),    # Google client secret
     re.compile(r"xox[bpsa]-[a-zA-Z0-9-]+"),      # Slack tokens
-    re.compile(r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----"),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(r"aws_secret_access_key\s*=\s*\S+", re.IGNORECASE),
     re.compile(r"AKIA[0-9A-Z]{16}"),              # AWS access key ID
+    re.compile(r"eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}"),  # JWT tokens
+    re.compile(r"(?:token|secret|password|api_key|apikey)\s*[:=]\s*['\"]?\S{8,}", re.IGNORECASE),
 ]
 
-# High-entropy string detector (base64-like blocks > 30 chars)
-_HIGH_ENTROPY = re.compile(r"[A-Za-z0-9+/=_-]{40,}")
+# High-entropy string detector — catches generic long tokens
+_HIGH_ENTROPY = re.compile(r"(?<![a-zA-Z0-9/])[A-Za-z0-9+/=_-]{48,}(?![a-zA-Z0-9/])")
 
 
 def is_excluded_file(filename: str) -> bool:
@@ -49,10 +51,12 @@ def is_excluded_file(filename: str) -> bool:
 
 
 def contains_secrets(content: str) -> bool:
-    """Check if content contains common secret patterns."""
+    """Check if content contains common secret patterns or high-entropy tokens."""
     for pat in SECRET_CONTENT_PATTERNS:
         if pat.search(content):
             return True
+    if _HIGH_ENTROPY.search(content):
+        return True
     return False
 
 
@@ -61,6 +65,7 @@ def redact_secrets(content: str) -> str:
     result = content
     for pat in SECRET_CONTENT_PATTERNS:
         result = pat.sub("[REDACTED]", result)
+    result = _HIGH_ENTROPY.sub("[REDACTED]", result)
     return result
 
 
