@@ -82,6 +82,14 @@
   .sync-badge.local { background: rgba(74,82,96,0.3); color: var(--ink-soft); }
   .sync-badge.error { background: rgba(217,119,87,0.15); color: var(--danger); }
 
+  /* Modals */
+  .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:center;justify-content:center; }
+  .modal { background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:24px;width:90%;max-width:400px;color:var(--paper); }
+  .modal-field { margin-bottom:12px; }
+  .modal-field label { display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px; }
+  .modal-field input, .modal-field select { width:100%;padding:8px 10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-family:var(--sans);font-size:13px;border-radius:3px; }
+  .modal-field input:focus, .modal-field select:focus { outline:none;border-color:var(--accent); }
+
   /* MAIN */
   main { max-width: 100%; margin: 0 auto; padding: 48px; }
 
@@ -241,7 +249,47 @@
   <button class="btn" onclick="exportData()">↓ Export JSON</button>
   <button class="btn" onclick="importData()">↑ Import JSON</button>
   <button class="btn danger" onclick="resetAll()">⟲ Reset</button>
+  <button class="btn" id="profileBtn" style="display:none" onclick="openProfileModal()">Profile</button>
+  <button class="btn" id="authBtn" style="display:none" onclick="signIn()">Sign In</button>
   <div class="toolbar-stats"><span id="syncBadge" class="sync-badge" style="display:none"></span> <span id="doneCount">0</span> / <span id="totalCount">0</span> complete</div>
+</div>
+
+<!-- Profile Modal -->
+<div id="profileModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeProfileModal()">
+  <div class="modal">
+    <h3 style="font-family:var(--serif);margin-bottom:16px">Profile</h3>
+    <div class="modal-field"><label>Name</label><input id="pName" type="text" placeholder="Your name"></div>
+    <div class="modal-field"><label>GitHub Username</label><input id="pGithub" type="text" placeholder="username"></div>
+    <div class="modal-field"><label>Learning Goal</label><input id="pGoal" type="text" placeholder="What do you want to learn?" maxlength="200"></div>
+    <div class="modal-field"><label>Experience Level</label>
+      <select id="pLevel"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn" onclick="saveProfile()" style="border-color:var(--success);color:var(--success)">Save</button>
+      <button class="btn" onclick="openPlanPicker()">Change Plan</button>
+      <button class="btn" onclick="closeProfileModal()">Close</button>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <button class="btn danger" onclick="deleteAccount()" style="font-size:10px">Delete Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Plan Picker Modal -->
+<div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePlanModal()">
+  <div class="modal">
+    <h3 style="font-family:var(--serif);margin-bottom:16px">Choose Your Plan</h3>
+    <div class="modal-field"><label>Duration</label>
+      <select id="planDuration"><option value="3mo">3 months (accelerated)</option><option value="6mo" selected>6 months (standard)</option><option value="12mo">12 months (beginner-paced)</option></select>
+    </div>
+    <div class="modal-field"><label>Level</label>
+      <select id="planLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option></select>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn" onclick="enrollPlan()" style="border-color:var(--success);color:var(--success)">Enroll</button>
+      <button class="btn" onclick="closePlanModal()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <main id="content"></main>
@@ -669,6 +717,60 @@ function importData() {
   input.click();
 }
 
+// ---- Auth & Profile UI ----
+function signIn() {
+  window.location.href = "/api/auth/google/login";
+}
+
+function openProfileModal() {
+  if (!currentUser) return;
+  document.getElementById("pName").value = currentUser.name || "";
+  document.getElementById("pGithub").value = currentUser.github_username || "";
+  document.getElementById("pGoal").value = currentUser.learning_goal || "";
+  document.getElementById("pLevel").value = currentUser.experience_level || "intermediate";
+  document.getElementById("profileModal").style.display = "flex";
+}
+
+function closeProfileModal() { document.getElementById("profileModal").style.display = "none"; }
+
+async function saveProfile() {
+  const body = {
+    name: document.getElementById("pName").value || null,
+    github_username: document.getElementById("pGithub").value || null,
+    learning_goal: document.getElementById("pGoal").value || null,
+    experience_level: document.getElementById("pLevel").value,
+  };
+  try {
+    const resp = await fetch("/api/profile", { method: "PATCH", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify(body) });
+    if (resp.ok) { currentUser = await resp.json(); showToast("Profile saved"); closeProfileModal(); }
+    else showToast("Save failed");
+  } catch { showToast("Save failed"); }
+}
+
+async function deleteAccount() {
+  if (!confirm("Delete your account and all data? This cannot be undone.")) return;
+  try {
+    await fetch("/api/profile", { method: "DELETE", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({confirm:"DELETE"}) });
+    window.location.reload();
+  } catch { showToast("Delete failed"); }
+}
+
+function openPlanPicker() {
+  closeProfileModal();
+  document.getElementById("planModal").style.display = "flex";
+}
+function closePlanModal() { document.getElementById("planModal").style.display = "none"; }
+
+async function enrollPlan() {
+  const duration = document.getElementById("planDuration").value;
+  const level = document.getElementById("planLevel").value;
+  try {
+    const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({goal:"generalist", duration, level}) });
+    if (resp.ok) { showToast("Enrolled in new plan"); closePlanModal(); window.location.reload(); }
+    else { const d = await resp.json(); showToast(d.message || "Enrollment failed"); }
+  } catch { showToast("Enrollment failed"); }
+}
+
 // ---- Backend sync layer ----
 let currentUser = null;
 let syncDebounceTimer = null;
@@ -686,11 +788,15 @@ async function checkAuth() {
     if (resp.ok) {
       currentUser = await resp.json();
       setSyncBadge("synced", "Synced");
+      document.getElementById("profileBtn").style.display = "";
+      document.getElementById("authBtn").style.display = "none";
       return true;
     }
   } catch {}
   currentUser = null;
   setSyncBadge("local", "Local only");
+  document.getElementById("profileBtn").style.display = "none";
+  document.getElementById("authBtn").style.display = "";
   return false;
 }
 
