@@ -76,6 +76,11 @@
   .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
   .toolbar-stats { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
   .toolbar-stats span { color: var(--accent); }
+  .sync-badge { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; margin-right: 8px; font-family: var(--mono); }
+  .sync-badge.synced { background: rgba(109,181,133,0.15); color: var(--success); }
+  .sync-badge.saving { background: rgba(232,168,73,0.15); color: var(--accent); }
+  .sync-badge.local { background: rgba(74,82,96,0.3); color: var(--ink-soft); }
+  .sync-badge.error { background: rgba(217,119,87,0.15); color: var(--danger); }
 
   /* MAIN */
   main { max-width: 100%; margin: 0 auto; padding: 48px; }
@@ -236,7 +241,7 @@
   <button class="btn" onclick="exportData()">↓ Export JSON</button>
   <button class="btn" onclick="importData()">↑ Import JSON</button>
   <button class="btn danger" onclick="resetAll()">⟲ Reset</button>
-  <div class="toolbar-stats"><span id="doneCount">0</span> / <span id="totalCount">0</span> complete</div>
+  <div class="toolbar-stats"><span id="syncBadge" class="sync-badge" style="display:none"></span> <span id="doneCount">0</span> / <span id="totalCount">0</span> complete</div>
 </div>
 
 <main id="content"></main>
@@ -614,6 +619,7 @@ function render() {
       const k = key(wN, idx);
       state[k] = !state[k];
       saveState();
+      syncTick(wN, idx, !!state[k]);
       render();
     });
   });
@@ -663,8 +669,80 @@ function importData() {
   input.click();
 }
 
+// ---- Backend sync layer ----
+let currentUser = null;
+let syncDebounceTimer = null;
+
+function setSyncBadge(status, text) {
+  const badge = document.getElementById("syncBadge");
+  badge.style.display = "inline-block";
+  badge.className = "sync-badge " + status;
+  badge.textContent = text;
+}
+
+async function checkAuth() {
+  try {
+    const resp = await fetch("/api/auth/me", { credentials: "same-origin" });
+    if (resp.ok) {
+      currentUser = await resp.json();
+      setSyncBadge("synced", "Synced");
+      return true;
+    }
+  } catch {}
+  currentUser = null;
+  setSyncBadge("local", "Local only");
+  return false;
+}
+
+async function migrateProgress() {
+  if (!currentUser) return;
+  const keys = Object.keys(state).filter(k => k.startsWith("w") && state[k]);
+  if (keys.length === 0) return;
+  try {
+    setSyncBadge("saving", "Syncing…");
+    const resp = await fetch("/api/progress/migrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ progress: state }),
+    });
+    if (resp.ok) {
+      setSyncBadge("synced", "Synced");
+    }
+  } catch { setSyncBadge("error", "Sync failed"); }
+}
+
+function syncTick(weekN, idx, done) {
+  if (!currentUser) return;
+  clearTimeout(syncDebounceTimer);
+  setSyncBadge("saving", "Saving…");
+  syncDebounceTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch("/api/progress", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ week_num: parseInt(weekN), check_idx: parseInt(idx), done }),
+      });
+      if (resp.ok || resp.status === 204) {
+        setSyncBadge("synced", "Synced");
+      } else {
+        setSyncBadge("error", "Sync failed");
+      }
+    } catch { setSyncBadge("error", "Sync failed"); }
+  }, 800);
+}
+
 loadState();
 render();
+
+// Check auth and migrate on page load
+(async () => {
+  const signedIn = await checkAuth();
+  if (signedIn) {
+    await migrateProgress();
+  }
+})();
 </script>
 </body>
 </html>

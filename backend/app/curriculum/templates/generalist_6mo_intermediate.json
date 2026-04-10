@@ -1,0 +1,328 @@
+{
+  "key": "generalist_6mo_intermediate",
+  "version": "1.0",
+  "title": "AI Generalist — 6-Month Roadmap",
+  "level": "intermediate",
+  "goal": "generalist",
+  "duration_months": 6,
+  "months": [
+    {
+      "month": 1,
+      "label": "Foundations",
+      "title": "Python, SQL, math, first ML",
+      "tagline": "Remove friction. By the end of this month, opening a Jupyter notebook should feel as natural as opening a terminal.",
+      "checkpoint": "Comfortable in Pandas/NumPy/SQL · 4 notebooks shipped · Stats vocab nailed · Repo public",
+      "weeks": [
+        {
+          "n": 1, "t": "Python, SQL & Dev Environment", "hours": 16,
+          "focus": ["Python: NumPy, Pandas, Matplotlib", "SQL: joins, CTEs, window functions", "Dev setup: VS Code, Jupyter, Git, GitHub", "Repo `ai-journey` created"],
+          "deliv": ["EDA notebook on a public dataset", "30+ SQL exercises completed", "Repo live with README"],
+          "resources": [
+            {"name": "Pandas — Getting Started Tutorials", "url": "https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html", "hrs": 5},
+            {"name": "SQLBolt — Interactive SQL Lessons", "url": "https://sqlbolt.com", "hrs": 4},
+            {"name": "Kaggle Learn — Pandas", "url": "https://www.kaggle.com/learn/pandas", "hrs": 4}
+          ],
+          "checks": ["Repo `ai-journey` created with README", "Python + Jupyter + VS Code set up cleanly", "30+ SQLBolt or Mode Analytics exercises done", "EDA notebook on Titanic or California housing pushed", "Subscribed to The Batch, Import AI, Latent Space"]
+        },
+        {
+          "n": 2, "t": "Math + Statistics Refresh", "hours": 15,
+          "focus": ["Linear algebra: vectors, matrices, dot products", "Probability + Bayes + distributions", "Calculus: gradients, chain rule", "Statistics: hypothesis testing, p-values, CI"],
+          "deliv": ["Gradient descent from scratch in NumPy", "A/B test simulation notebook", "Statistics cheat sheet"],
+          "resources": [
+            {"name": "3Blue1Brown — Essence of Linear Algebra", "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab", "hrs": 4},
+            {"name": "StatQuest — Statistics Fundamentals", "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9", "hrs": 5},
+            {"name": "Khan Academy — Statistics & Probability", "url": "https://www.khanacademy.org/math/statistics-probability", "hrs": 5}
+          ],
+          "checks": ["Watched 3Blue1Brown linear algebra series", "StatQuest hypothesis testing playlist watched", "Notebook: gradient descent from scratch (NumPy)", "A/B test simulation notebook published", "Statistics terminology cheat sheet committed"]
+        },
+        {
+          "n": 3, "t": "First ML Models", "hours": 16,
+          "focus": ["Supervised learning concepts", "Train/test split", "Linear & logistic regression", "k-Nearest Neighbors"],
+          "deliv": ["3-model comparison notebook with explanation"],
+          "resources": [
+            {"name": "Andrew Ng — ML Specialization (audit free)", "url": "https://www.coursera.org/specializations/machine-learning-introduction", "hrs": 8},
+            {"name": "scikit-learn — User Guide", "url": "https://scikit-learn.org/stable/user_guide.html", "hrs": 4},
+            {"name": "StatQuest — Machine Learning Playlist", "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF", "hrs": 3}
+          ],
+          "checks": ["Andrew Ng ML Specialization Course 1 watched", "Linear regression: from scratch + sklearn", "Logistic regression on a classification dataset", "3-model comparison notebook pushed", "README explains which won and why"]
+        },
+        {
+          "n": 4, "t": "Evaluation Done Right", "hours": 15,
+          "focus": ["Cross-validation", "Confusion matrix, precision/recall/F1", "ROC/AUC, calibration", "Overfitting, data leakage"],
+          "deliv": ["Model evaluation cheat sheet notebook"],
+          "resources": [
+            {"name": "Google ML Crash Course — Classification", "url": "https://developers.google.com/machine-learning/crash-course/classification/video-lecture", "hrs": 5},
+            {"name": "scikit-learn — Model Evaluation", "url": "https://scikit-learn.org/stable/modules/model_evaluation.html", "hrs": 5},
+            {"name": "StatQuest — ROC and AUC explained", "url": "https://www.youtube.com/watch?v=4jRBRDbJemM", "hrs": 2}
+          ],
+          "checks": ["Cross-validation implemented from scratch", "ROC curve + confusion matrix plotted", "F1, precision, recall vocabulary fluent", "Cheat sheet notebook published", "Identified one data leakage example with fix"]
+        }
+      ]
+    },
+    {
+      "month": 2,
+      "label": "Classical ML",
+      "title": "Features, trees, time series, Kaggle",
+      "tagline": "Most real-world ML in industry is still classical ML on tabular data. Don't skip this. Ship one real project by month-end.",
+      "checkpoint": "First real portfolio project shipped · Kaggle profile active · Feature engineering muscle built",
+      "weeks": [
+        {
+          "n": 5, "t": "Feature Engineering & Pipelines", "hours": 16,
+          "focus": ["Encoding categoricals, missing values", "Scaling, feature selection", "sklearn Pipeline & ColumnTransformer", "Feature engineering BEFORE modeling"],
+          "deliv": ["End-to-end pipeline that ingests raw CSV"],
+          "resources": [
+            {"name": "Kaggle Learn — Feature Engineering", "url": "https://www.kaggle.com/learn/feature-engineering", "hrs": 5},
+            {"name": "scikit-learn — Pipelines & Composite Estimators", "url": "https://scikit-learn.org/stable/modules/compose.html", "hrs": 5},
+            {"name": "Kaggle Learn — Data Cleaning", "url": "https://www.kaggle.com/learn/data-cleaning", "hrs": 5}
+          ],
+          "checks": ["ColumnTransformer pipeline built", "Missing value strategies compared", "Feature importance computed", "Pipeline runs end-to-end on raw CSV", "README shows feature engineering improving baseline"]
+        },
+        {
+          "n": 6, "t": "Tree-Based Models + Kaggle Kickoff", "hours": 16,
+          "focus": ["Decision trees, random forests", "XGBoost, LightGBM", "Hyperparameter tuning", "Kaggle Getting Started competition"],
+          "deliv": ["XGBoost notebook with tuning", "First Kaggle submission"],
+          "resources": [
+            {"name": "XGBoost — Get Started", "url": "https://xgboost.readthedocs.io/en/stable/get_started.html", "hrs": 4},
+            {"name": "Kaggle — Titanic Getting Started", "url": "https://www.kaggle.com/c/titanic", "hrs": 7},
+            {"name": "Kaggle Learn — Intermediate ML", "url": "https://www.kaggle.com/learn/intermediate-machine-learning", "hrs": 4}
+          ],
+          "checks": ["XGBoost notebook with hyperparameter tuning", "Joined Kaggle, picked Getting Started competition", "First submission made on Kaggle leaderboard", "LightGBM compared with XGBoost", "README documents tuning approach"]
+        },
+        {
+          "n": 7, "t": "Unsupervised + Recommender Systems", "hours": 15,
+          "focus": ["k-means, DBSCAN", "PCA, t-SNE, UMAP", "Collaborative filtering basics", "Matrix factorization concepts"],
+          "deliv": ["Clustering notebook + simple recommender"],
+          "resources": [
+            {"name": "scikit-learn — Clustering Guide", "url": "https://scikit-learn.org/stable/modules/clustering.html", "hrs": 5},
+            {"name": "Google — Recommendation Systems Crash Course", "url": "https://developers.google.com/machine-learning/recommendation", "hrs": 5},
+            {"name": "Surprise — Python recsys library docs", "url": "https://surpriselib.com", "hrs": 4}
+          ],
+          "checks": ["k-means + DBSCAN compared on a real dataset", "PCA visualization in 2D", "t-SNE or UMAP visualization", "Collaborative filtering recommender built", "Both notebooks pushed with write-ups"]
+        },
+        {
+          "n": 8, "t": "Time Series + End-to-End Project", "hours": 16,
+          "focus": ["Time series basics, stationarity", "ARIMA conceptually, Prophet practically", "First complete end-to-end project", "Project compounding starts here"],
+          "deliv": ["Time series notebook", "First complete portfolio project"],
+          "resources": [
+            {"name": "Kaggle Learn — Time Series", "url": "https://www.kaggle.com/learn/time-series", "hrs": 5},
+            {"name": "Facebook Prophet — Quick Start", "url": "https://facebook.github.io/prophet/docs/quick_start.html", "hrs": 4},
+            {"name": "Forecasting: Principles and Practice (free book)", "url": "https://otexts.com/fpp3/", "hrs": 6}
+          ],
+          "checks": ["Prophet forecast on a real time series", "ARIMA concepts understood", "End-to-end project: data → cleaning → features → model → eval", "Project README explains problem, approach, results", "Kaggle submission improved (2nd attempt)"]
+        }
+      ]
+    },
+    {
+      "month": 3,
+      "label": "Deep Learning",
+      "title": "Neural nets, vision, transformers",
+      "tagline": "Understand how modern AI models work internally — at code level, not just slides. Portfolio site goes live this month.",
+      "checkpoint": "Deep learning solid · Transformer internals understood · Portfolio site live",
+      "weeks": [
+        {
+          "n": 9, "t": "NN Fundamentals + Portfolio Site", "hours": 16,
+          "focus": ["Perceptrons → MLPs → backprop", "Karpathy's NN Zero to Hero", "Activation functions, loss", "GitHub Pages portfolio site live"],
+          "deliv": ["NN from scratch in NumPy + PyTorch", "Portfolio site live"],
+          "resources": [
+            {"name": "Karpathy — Neural Networks: Zero to Hero", "url": "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ", "hrs": 8},
+            {"name": "3Blue1Brown — Neural Networks series", "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi", "hrs": 3},
+            {"name": "GitHub Pages — Get Started", "url": "https://pages.github.com", "hrs": 3}
+          ],
+          "checks": ["Karpathy NN Zero to Hero Ep 1–2 watched", "Micrograd-style NN built from scratch in NumPy", "Same NN re-implemented in PyTorch", "GitHub Pages portfolio site live (even barebones)", "All earlier projects linked from portfolio"]
+        },
+        {
+          "n": 10, "t": "PyTorch Fluency", "hours": 16,
+          "focus": ["Tensors, autograd", "Datasets, dataloaders", "Training loops, checkpoints", "Early stopping"],
+          "deliv": ["MNIST or Fashion-MNIST classifier >95%"],
+          "resources": [
+            {"name": "PyTorch — 60 Minute Blitz", "url": "https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html", "hrs": 4},
+            {"name": "PyTorch — Official Tutorials", "url": "https://pytorch.org/tutorials/", "hrs": 7},
+            {"name": "Daniel Bourke — Learn PyTorch", "url": "https://www.learnpytorch.io", "hrs": 5}
+          ],
+          "checks": ["Official PyTorch tutorials completed", "MNIST classifier achieving >95% accuracy", "Train/val/test split with early stopping", "Model checkpoints saved correctly", "Pushed with metrics in README"]
+        },
+        {
+          "n": 11, "t": "Computer Vision (CNNs)", "hours": 16,
+          "focus": ["Convolutions, pooling", "ResNet conceptually", "Transfer learning", "Fine-tuning a pretrained model"],
+          "deliv": ["Fine-tuned ResNet on a custom image task"],
+          "resources": [
+            {"name": "PyTorch — Transfer Learning Tutorial", "url": "https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html", "hrs": 5},
+            {"name": "Stanford CS231n — Course Notes", "url": "https://cs231n.github.io", "hrs": 6},
+            {"name": "fast.ai — Practical Deep Learning", "url": "https://course.fast.ai", "hrs": 5}
+          ],
+          "checks": ["CNN built from scratch on CIFAR-10", "Pretrained ResNet fine-tuned on custom task", "Train/val curves plotted", "Comparison: from scratch vs transfer learning", "Demo screenshot in README"]
+        },
+        {
+          "n": 12, "t": "Sequences & Transformers", "hours": 17,
+          "focus": ["RNN/LSTM (briefly — historical)", "Attention mechanism", "Transformer architecture", "Karpathy's Let's Build GPT"],
+          "deliv": ["Tiny GPT trained on a chosen text corpus"],
+          "resources": [
+            {"name": "Karpathy — Let's build GPT (from scratch)", "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY", "hrs": 6},
+            {"name": "Jay Alammar — The Illustrated Transformer", "url": "https://jalammar.github.io/illustrated-transformer/", "hrs": 4},
+            {"name": "The Annotated Transformer (Harvard)", "url": "https://nlp.seas.harvard.edu/annotated-transformer/", "hrs": 7}
+          ],
+          "checks": ["Watched Karpathy 'Let's Build GPT' (twice)", "Skim of Annotated Transformer", "Tiny GPT trained on Shakespeare/lyrics/whatever", "Generated samples in README", "Can explain self-attention to a non-ML person in 3 min"]
+        }
+      ]
+    },
+    {
+      "month": 4,
+      "label": "LLMs & GenAI",
+      "title": "Prompts, RAG, agents, evals",
+      "tagline": "Where the modern job market lives. Spend it wisely. Interview prep starts as a background activity this month.",
+      "checkpoint": "2 LLM apps shipped · Interview prep underway · RAG + agent fluency",
+      "weeks": [
+        {
+          "n": 13, "t": "Classical NLP + LLM Internals + Interview Prep Begins", "hours": 17,
+          "focus": ["TF-IDF, word2vec/GloVe", "spaCy NER", "Tokens, embeddings, sampling (temp, top-k, top-p)", "Interview prep kicks off"],
+          "deliv": ["NLP exploration notebook", "Interview prep schedule live"],
+          "resources": [
+            {"name": "Hugging Face — NLP Course", "url": "https://huggingface.co/learn/nlp-course", "hrs": 8},
+            {"name": "spaCy — Advanced NLP with spaCy course", "url": "https://course.spacy.io", "hrs": 5},
+            {"name": "Tiktokenizer — explore tokenizers visually", "url": "https://tiktokenizer.vercel.app", "hrs": 2}
+          ],
+          "checks": ["TF-IDF + word2vec exploration notebook", "spaCy NER on a small project", "Tokenization explored across multiple models", "Sampling strategies notebook with side-by-side outputs", "Interview prep started: 2 hrs/week LeetCode easy/medium"]
+        },
+        {
+          "n": 14, "t": "LLM APIs + Multi-Modal Awareness", "hours": 16,
+          "focus": ["Claude API + OpenAI API hands-on", "Few-shot, chain-of-thought, structured output", "Multi-modal awareness: CLIP, Whisper, Stable Diffusion", "System prompts"],
+          "deliv": ["First LLM-powered app with Streamlit UI", "Multi-modal exploration notebook"],
+          "resources": [
+            {"name": "Anthropic — Claude API docs", "url": "https://docs.anthropic.com", "hrs": 5},
+            {"name": "OpenAI — API Reference", "url": "https://platform.openai.com/docs", "hrs": 5},
+            {"name": "Hugging Face — Transformers docs", "url": "https://huggingface.co/docs/transformers", "hrs": 5}
+          ],
+          "checks": ["Hands-on with Claude API", "Hands-on with OpenAI API", "Streamlit chatbot working locally", "Multi-modal models surveyed (CLIP, Whisper, SD)", "Half-day playing with Whisper or CLIP"]
+        },
+        {
+          "n": 15, "t": "RAG + Vector Databases", "hours": 17,
+          "focus": ["Embeddings deep dive", "Chroma or FAISS (free, local)", "Chunking strategies", "Hybrid search basics"],
+          "deliv": ["'Chat with your PDF' app with citations"],
+          "resources": [
+            {"name": "LangChain — RAG Tutorial", "url": "https://python.langchain.com/docs/tutorials/rag/", "hrs": 6},
+            {"name": "Chroma — Getting Started", "url": "https://docs.trychroma.com", "hrs": 5},
+            {"name": "Pinecone Learn — Vector DB primer", "url": "https://www.pinecone.io/learn/", "hrs": 5}
+          ],
+          "checks": ["Embeddings explored hands-on", "Chroma or FAISS vector DB used", "'Chat with your PDF' app built", "Citations added to grounded answers", "Streamlit UI deployed locally"]
+        },
+        {
+          "n": 16, "t": "Agents + Tool Use + LLM Evaluation", "hours": 17,
+          "focus": ["Function calling, tool use, multi-step reasoning", "LangChain, LlamaIndex, or Claude Agent SDK", "LLM evaluation: Ragas or homegrown harness", "Golden datasets"],
+          "deliv": ["Working agent with traced execution", "Eval harness for RAG app"],
+          "resources": [
+            {"name": "Anthropic — Tool Use docs", "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use", "hrs": 5},
+            {"name": "LangGraph — Tutorials", "url": "https://langchain-ai.github.io/langgraph/", "hrs": 6},
+            {"name": "Ragas — Evaluation framework docs", "url": "https://docs.ragas.io", "hrs": 5}
+          ],
+          "checks": ["Agent with 3+ tools built", "Multi-step task completed autonomously", "Trace logged and reviewed", "20+ golden Q&A pairs created for RAG app", "Ragas or simple eval harness running"]
+        }
+      ]
+    },
+    {
+      "month": 5,
+      "label": "MLOps & Deploy",
+      "title": "FastAPI, Docker, cloud, responsible AI",
+      "tagline": "Knowing how to ship AI is what separates hobbyists from professionals. Buffer week built in — life happens.",
+      "checkpoint": "Deployed cloud app · Open-source contributor · Backlog cleared · Interview ready",
+      "weeks": [
+        {
+          "n": 17, "t": "FastAPI + Streamlit", "hours": 15,
+          "focus": ["REST APIs, request/response schemas", "Async endpoints", "FastAPI standard", "Streamlit front-end"],
+          "deliv": ["Earlier project exposed as FastAPI service"],
+          "resources": [
+            {"name": "FastAPI — Official Tutorial", "url": "https://fastapi.tiangolo.com/tutorial/", "hrs": 6},
+            {"name": "Streamlit — Documentation", "url": "https://docs.streamlit.io", "hrs": 5},
+            {"name": "Real Python — FastAPI Web APIs", "url": "https://realpython.com/fastapi-python-web-apis/", "hrs": 4}
+          ],
+          "checks": ["FastAPI service wraps an earlier model", "OpenAPI docs auto-generated", "Async endpoints working", "Streamlit front-end calling the API", "Local demo recorded as a GIF"]
+        },
+        {
+          "n": 18, "t": "Docker + Containerization", "hours": 14,
+          "focus": ["Dockerfiles, images, containers", "docker-compose", "Multi-stage builds", "Image size optimization"],
+          "deliv": ["Dockerized FastAPI service"],
+          "resources": [
+            {"name": "Docker — Get Started Guide", "url": "https://docs.docker.com/get-started/", "hrs": 6},
+            {"name": "Play with Docker — browser playground", "url": "https://labs.play-with-docker.com", "hrs": 4},
+            {"name": "Docker Curriculum (free tutorial)", "url": "https://docker-curriculum.com", "hrs": 4}
+          ],
+          "checks": ["Dockerfile written and building", "Image builds successfully", "docker-compose.yml for multi-service setup", "README explains build/run steps", "Container size optimized"]
+        },
+        {
+          "n": 19, "t": "Cloud Deployment (AWS)", "hours": 17,
+          "focus": ["EC2, S3, IAM", "One managed AI service (SageMaker or Bedrock)", "Public deployment with URL", "Optional: AIF-C01 cert booked"],
+          "deliv": ["Cloud-deployed app with public URL"],
+          "resources": [
+            {"name": "AWS Skill Builder — free training catalog", "url": "https://skillbuilder.aws", "hrs": 6},
+            {"name": "Stéphane Maarek — AIF-C01 (Udemy)", "url": "https://www.udemy.com/course/aws-ai-practitioner-certified/", "hrs": 8},
+            {"name": "AWS — Bedrock User Guide", "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html", "hrs": 3}
+          ],
+          "checks": ["AWS account set up + IAM configured properly", "Dockerized app deployed to EC2 or ECS", "Public URL working and shared", "S3 bucket used for storage", "AIF-C01 cert booked (optional)"]
+        },
+        {
+          "n": 20, "t": "BUFFER + Responsible AI + Open Source", "hours": 15,
+          "focus": ["Catch-up time for any slipped weeks", "Responsible AI: bias, fairness, model cards", "One open-source PR — even docs counts", "Interview prep ramps up"],
+          "deliv": ["Backlog cleared", "1 open-source PR submitted", "Responsible AI write-up"],
+          "resources": [
+            {"name": "Google — Responsible AI Practices", "url": "https://ai.google/responsibility/responsible-ai-practices/", "hrs": 3},
+            {"name": "First Contributions — beginner OSS guide", "url": "https://github.com/firstcontributions/first-contributions", "hrs": 4},
+            {"name": "Chip Huyen — ML Interviews Book (free)", "url": "https://github.com/chiphuyen/ml-interviews-book", "hrs": 6}
+          ],
+          "checks": ["All earlier weeks' loose ends closed", "Responsible AI half-day done (bias, fairness, model cards)", "One open-source PR submitted (sklearn, HF, LangChain, docs OK)", "Interview prep ramps to 4 hrs/week", "ML system design questions practiced (3+)"]
+        }
+      ]
+    },
+    {
+      "month": 6,
+      "label": "Capstone & Job Hunt",
+      "title": "Ship, publish, apply",
+      "tagline": "Months 1–5 collapse into one ambitious project. By Week 24 you're not starting interviews — you're already in them.",
+      "checkpoint": "Capstone deployed + blogged · Portfolio live · 15+ applications out · Mock interviews done",
+      "weeks": [
+        {
+          "n": 21, "t": "Capstone Planning + Build Kickoff", "hours": 16,
+          "focus": ["Pick ambitious project combining skills", "Should compound with earlier work", "Architecture sketched", "Tech stack chosen"],
+          "deliv": ["Capstone repo created with architecture doc"],
+          "resources": [
+            {"name": "Awesome Machine Learning (project ideas)", "url": "https://github.com/josephmisiti/awesome-machine-learning", "hrs": 4},
+            {"name": "Hugging Face Spaces — examples", "url": "https://huggingface.co/spaces", "hrs": 4},
+            {"name": "Made With ML — applied ML examples", "url": "https://madewithml.com", "hrs": 6}
+          ],
+          "checks": ["Capstone idea chosen (compounds with earlier projects)", "Architecture sketched (whiteboard OK)", "Tech stack chosen and justified", "Repo created with README", "Core feature scoped for Week 22"]
+        },
+        {
+          "n": 22, "t": "Capstone Build", "hours": 18,
+          "focus": ["Heads down build", "Core features end-to-end", "Tests for critical paths", "Daily commits"],
+          "deliv": ["Working capstone with core functionality"],
+          "resources": [
+            {"name": "Anthropic — Claude API docs (reference)", "url": "https://docs.anthropic.com", "hrs": 4},
+            {"name": "Hugging Face — Models hub", "url": "https://huggingface.co/models", "hrs": 4},
+            {"name": "GitHub — Issues & Projects (your own)", "url": "https://github.com", "hrs": 10}
+          ],
+          "checks": ["Core feature working end-to-end", "At least 1 LLM/ML model integrated", "Data pipeline working", "Tests for critical paths", "Daily commits visible in repo"]
+        },
+        {
+          "n": 23, "t": "Polish, Deploy, Document, Publish", "hours": 14,
+          "focus": ["UI polish (Streamlit fastest)", "Cloud deployment with public URL", "README + screenshots + demo GIF", "Blog post on Medium or Dev.to"],
+          "deliv": ["Deployed capstone + blog post live"],
+          "resources": [
+            {"name": "Streamlit Community Cloud (free hosting)", "url": "https://streamlit.io/cloud", "hrs": 4},
+            {"name": "Hugging Face Spaces (free hosting)", "url": "https://huggingface.co/spaces", "hrs": 4},
+            {"name": "Dev.to — write & publish", "url": "https://dev.to", "hrs": 6}
+          ],
+          "checks": ["UI polished and clickable", "Deployed with public URL", "README has screenshots + demo GIF", "Blog post drafted and reviewed", "Blog post published on Medium or Dev.to"]
+        },
+        {
+          "n": 24, "t": "Resume, Portfolio, Applications, Interviews", "hours": 14,
+          "focus": ["Resume polished for AI/ML roles", "LinkedIn About + Featured updated", "Mock interviews done", "Apply to 15–20 roles"],
+          "deliv": ["15–20 applications submitted", "Mock interviews completed"],
+          "resources": [
+            {"name": "Chip Huyen — ML Interviews Book (free)", "url": "https://github.com/chiphuyen/ml-interviews-book", "hrs": 5},
+            {"name": "Pramp — free peer mock interviews", "url": "https://www.pramp.com", "hrs": 4},
+            {"name": "LinkedIn Jobs — AI/ML filter", "url": "https://www.linkedin.com/jobs/", "hrs": 5}
+          ],
+          "checks": ["Resume rewritten for AI/ML roles", "LinkedIn About + Featured section updated", "15–20 applications submitted", "2+ mock interviews done with peer or coach", "Cert exam taken (AIF-C01 or MLA-C01)"]
+        }
+      ]
+    }
+  ]
+}
