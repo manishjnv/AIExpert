@@ -343,29 +343,24 @@
         <select id="pLevel"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select>
       </div>
     </div>
-    <div style="margin-top:14px;display:flex;gap:8px">
-      <button class="btn" onclick="saveProfile()" style="border-color:var(--success);color:var(--success)">Save</button>
-      <button class="btn" onclick="closeProfileModal()">Cancel</button>
-    </div>
-
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:8px">Plan</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <select id="planDurationInline" style="flex:1;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px">
-          <option value="3mo|intermediate">3 months — Accelerated</option>
-          <option value="6mo|intermediate">6 months — Standard</option>
-          <option value="12mo|beginner">12 months — Beginner</option>
-        </select>
-        <button class="btn" onclick="enrollPlanInline()" style="font-size:10px;padding:5px 10px;border-color:var(--accent);color:var(--accent)">Switch</button>
+      <div class="modal-field"><label>Plan</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="planDurationInline" style="flex:1;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px">
+            <option value="3mo|intermediate">3 months — Accelerated</option>
+            <option value="6mo|intermediate">6 months — Standard</option>
+            <option value="12mo|beginner">12 months — Beginner</option>
+          </select>
+          <button class="btn" onclick="enrollPlanInline()" style="font-size:10px;padding:5px 10px;border-color:var(--accent);color:var(--accent)">Switch</button>
+        </div>
       </div>
     </div>
 
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:8px">Data & Account</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:4px 10px">Export Plan PDF</button>
-        <a onclick="deleteAccount()" style="font-size:10px;color:var(--danger);cursor:pointer;margin-left:auto">Delete account</a>
-      </div>
+    <button class="btn" onclick="saveProfile()" style="margin-top:16px;width:100%;padding:10px;border-color:var(--success);color:var(--success);font-size:12px">Save Changes</button>
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+      <button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:4px 10px">Export Plan PDF</button>
+      <a onclick="deleteAccount()" style="font-size:10px;color:var(--danger);cursor:pointer">Delete account</a>
     </div>
   </div>
 </div>
