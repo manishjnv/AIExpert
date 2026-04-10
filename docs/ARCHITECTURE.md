@@ -232,6 +232,107 @@ This is subtle and worth writing down so we get it right:
 
 Do not delete localStorage data until the merge returns success.
 
+## External Integrations
+
+Complete list of every external service the platform integrates with, how it's configured, and what it's used for.
+
+### 1. Google OAuth 2.0 (Authentication)
+
+| Field | Value |
+|-------|-------|
+| Purpose | "Sign in with Google" — primary sign-in method |
+| Provider | Google Cloud Console → APIs & Services → Credentials |
+| Type | OAuth 2.0 Web Application |
+| Scopes | `openid email profile` |
+| Redirect URI | `https://automateedge.cloud/api/auth/google/callback` |
+| Env vars | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` |
+| Backend files | `auth/google.py` (Authlib client), `routers/auth.py` (login/callback endpoints) |
+| Cookie | `auth_token` (httpOnly, Secure, SameSite=Lax, 30-day expiry) |
+| Notes | Authlib's `SessionMiddleware` uses a separate `session` cookie for OAuth state. Our JWT uses `auth_token` to avoid collision. |
+
+### 2. Google Gemini API (AI Evaluation + Chat)
+
+| Field | Value |
+|-------|-------|
+| Purpose | AI-powered repo evaluation scoring and conversational chat mentor |
+| Provider | Google AI Studio → API Keys |
+| Model | `gemini-1.5-flash` (free tier: 15 RPM, 1M tokens/day) |
+| Endpoints used | `generateContent` (evaluation), `streamGenerateContent` (chat SSE) |
+| Env vars | `GEMINI_API_KEY`, `GEMINI_MODEL` |
+| Backend files | `ai/gemini.py` (REST client), `ai/stream.py` (SSE streaming), `ai/provider.py` (fallback routing) |
+| Prompts | `prompts/evaluate.txt`, `prompts/chat.txt`, `prompts/quarterly_sync.txt` |
+| Rate limits | 24h cooldown per repo per user (evaluation), 20 msg/hr per user (chat) |
+| Security | Repo content is sanitized via `ai/sanitize.py` before sending — strips secrets, redacts API keys, excludes `.env`/`.pem`/`id_rsa` files |
+
+### 3. Groq API (AI Fallback)
+
+| Field | Value |
+|-------|-------|
+| Purpose | Fallback when Gemini is rate-limited or down |
+| Provider | Groq Console → API Keys |
+| Model | `llama-3.3-70b-versatile` (free tier) |
+| Interface | OpenAI-compatible `/v1/chat/completions` |
+| Env vars | `GROQ_API_KEY`, `GROQ_MODEL` |
+| Backend files | `ai/groq.py` (client), `ai/provider.py` (tries Gemini → Groq with exponential backoff) |
+
+### 4. GitHub REST API (Repo Validation + Content Fetch)
+
+| Field | Value |
+|-------|-------|
+| Purpose | Validate linked repos exist, fetch file tree and content for AI evaluation |
+| Auth | Optional `GITHUB_TOKEN` for higher rate limits (60/hr unauthenticated, 5000/hr with token) |
+| Endpoints used | `GET /repos/{owner}/{name}`, `GET /repos/.../commits/{branch}`, `GET /repos/.../git/trees/{branch}`, raw content via `raw.githubusercontent.com` |
+| Env vars | `GITHUB_TOKEN` (optional) |
+| Backend files | `services/github_client.py` (fetch_repo, parse_repo_input), `services/evaluate.py` (content fetch for AI eval) |
+| Security | Only public repos supported. File tree filtered through `sanitize.is_excluded_file()`. Content redacted via `sanitize.redact_secrets()`. |
+
+### 5. Gmail SMTP (OTP Email)
+
+| Field | Value |
+|-------|-------|
+| Purpose | Send 6-digit OTP codes for email sign-in |
+| Provider | Gmail SMTP via Google App Password (2FA required) |
+| SMTP server | `smtp.gmail.com:587` (STARTTLS) |
+| From address | `contact@automateedge.cloud` (Gmail "Send mail as" alias) |
+| Env vars | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME` |
+| Backend files | `services/email_sender.py` (aiosmtplib), `auth/otp.py` (code generation + verification) |
+| Dev mode | When `SMTP_HOST` is empty, logs the OTP code instead of sending |
+| Rate limits | 5 OTP requests per IP per 15 min (slowapi) |
+| Security | OTP codes hashed with SHA-256 + per-row salt. Max 5 attempts. 10-minute expiry. Single-use. |
+
+### 6. Cloudflare (DNS + CDN + Email Routing)
+
+| Field | Value |
+|-------|-------|
+| Purpose | DNS management, HTTPS termination (proxy mode), email forwarding |
+| Domain | `automateedge.cloud` |
+| DNS records | A record `@` → `72.61.227.64` (proxied), CNAME `www` → `automateedge.cloud` (proxied) |
+| SSL mode | Full (Cloudflare → Caddy with internal/self-signed cert) |
+| Email routing | `contact@automateedge.cloud` → forwards to `manishjnvk@gmail.com` |
+| Configuration | Cloudflare Dashboard → automateedge.cloud → DNS / SSL/TLS / Email Routing |
+
+### 7. Caddy (Reverse Proxy on VPS)
+
+| Field | Value |
+|-------|-------|
+| Purpose | Reverse proxy from port 443 to the Docker stack on port 8090 |
+| Runs as | Docker container in the `ti-platform` stack |
+| Config file | `/opt/ti-platform/caddy/Caddyfile` |
+| TLS | `tls internal` (self-signed, Cloudflare handles public TLS) |
+| Proxy target | `172.17.0.1:8090` (Docker bridge to roadmap-web nginx) |
+| Security headers | HSTS, X-Frame-Options DENY, CSP, Referrer-Policy, Permissions-Policy |
+
+### Integration dependency chain
+
+```
+User → Cloudflare CDN → Caddy (VPS) → nginx (Docker) → FastAPI backend
+                                                              │
+                                    ┌───────────────┬─────────┼──────────┐
+                                    ▼               ▼         ▼          ▼
+                              Google OAuth    Gemini API   GitHub API   Gmail SMTP
+                                              (+ Groq)
+```
+
 ## Deployment topology
 
 - **Dev:** `docker compose up` on the developer's laptop, SQLite file in `./data/`, hot reload via `uvicorn --reload`
