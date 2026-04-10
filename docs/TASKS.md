@@ -336,8 +336,8 @@ Claude Code: update this section as tasks complete.
 
 | Phase | Task | Status | Commit | Notes |
 |---|---|---|---|---|
-| 1 | 1.1 | pending | — | |
-| 1 | 1.2 | pending | — | |
-| 1 | 1.3 | pending | — | |
-| 1 | 1.4 | pending | — | |
-| 1 | 1.5 | pending | — | |
+| 1 | 1.1 | done | cb40943 | HTTPException handler added for API_SPEC error format |
+| 1 | 1.2 | done | cb40943 | Skeleton existed; prod validation verified |
+| 1 | 1.3 | done | cb40943 | docker compose up works; all 3 containers healthy |
+| 1 | 1.4 | done | cb40943 | Stub returns {"count":0}; wired to DB in Phase 2 |
+| 1 | 1.5 | done | cb40943 | Frontend loads at /; checkboxes work via localStorage |

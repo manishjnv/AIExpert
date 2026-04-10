@@ -4,45 +4,36 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Pre-Phase 1 — project setup and review
+**Last worked on:** Phase 1 complete (Tasks 1.1–1.5)
 **Branch:** master
-**Commit:** c4f6a9b (Initial scaffold from starter kit)
+**Commit:** see git log
 
 ## What got done this session
 
-- Git repo initialized, pushed to github.com/manishjnv/AIExpert
-- .env created from .env.example with real JWT secret
-- VPS SSH access verified (72.61.227.64, alias: a11yos-vps)
-- VPS inventory: AccessBridge (ports 8080, 8100, 8200), TI Platform (ports 80, 443, internal 8000/3000/5432/9200/6379)
-- Full review of all docs (PRD, ARCHITECTURE, DATA_MODEL, API_SPEC, TASKS, SECURITY, AI_INTEGRATION, DEPLOYMENT)
-- Claude Code project settings created (.claude/settings.local.json) with auto-allow permissions
-- VPS details saved to Claude Code memory for future sessions
+- Flattened starter-kit/ to repo root (was causing path mismatches)
+- Added .gitattributes for LF line endings
+- Fixed docker-compose.yml (removed deprecated version key)
+- Fixed requirements.txt (httpx-mock -> pytest-httpx, removed unused passlib)
+- Fixed cross-doc inconsistencies (deliverable_met, DELETE body, task assignments)
+- Phase 1 complete: FastAPI app, config, /api/health, /api/learner-count, Dockerfile, compose, nginx, frontend
+- Added HTTPException handler matching API_SPEC error format
+- Verified locally: docker compose up -> all endpoints return expected responses, frontend loads
 
 ## What is in progress (not committed)
 
-- .env file created (gitignored, not committed — correct)
-- .claude/settings.local.json created (should be gitignored)
-- Review findings documented but not yet acted on
+- Nothing
 
 ## Decisions made
 
-- **Port conflict:** VPS port 8080 is taken by AccessBridge. Must change docker-compose host port before deploying (e.g., 8090). Caddy (ti-platform) handles TLS on 80/443 — add a Caddyfile entry for the roadmap subdomain.
-- **Structure fix needed:** All project files are inside starter-kit/ but docker-compose and CLAUDE.md expect them at root. Must flatten before Phase 1.
-
-## Review findings (act on before Phase 1)
-
-1. **Flatten starter-kit/ to root** — critical structural issue
-2. **Add .gitattributes** for LF line endings (CRLF warnings already showing)
-3. **evaluations table** missing `deliverable_met` column vs prompt template
-4. **httpx-mock==0.1.0** likely wrong package — should be pytest-httpx
-5. **DELETE /api/repos/link** uses request body but doc convention says avoid it
-6. **Remove `version: "3.8"`** from docker-compose.yml (deprecated)
+- Local Docker is for testing only; production deployment target is VPS (72.61.227.64)
+- VPS port 8080 is taken by AccessBridge — must use a different port when deploying
+- Caddy (ti-platform) handles TLS on 80/443 — add a Caddyfile entry for the roadmap subdomain
 
 ## Tests
 
-**Passing:** n/a
+**Passing:** Manual — /api/health, /api/learner-count, frontend at /, 404 error format
 **Failing:** n/a
-**New tests added:** none
+**New tests added:** none (Phase 1 has no automated tests per TASKS.md)
 
 ## Blockers
 
@@ -54,12 +45,12 @@
 
 ## Next action
 
-Flatten starter-kit/ contents to root, add .gitattributes, then proceed with Phase 1 Task 1.1.
+Phase 2 Task 2.1 from docs/TASKS.md — async DB engine setup with WAL mode and foreign keys pragma.
 
 ---
 
 ## Session history (append-only, short)
 
-| Date | Phase.Task | Summary |
-|---|---|---|
-| 2026-04-10 | Pre-1 | Setup: git init, GitHub push, .env, VPS check, full doc review, settings config |
+| Date       | Phase.Task | Summary                                                    |
+|------------|------------|------------------------------------------------------------|
+| 2026-04-10 | Phase 1    | Structure flatten, doc fixes, Phase 1 complete (1.1-1.5)   |
