@@ -1098,31 +1098,36 @@ function updateConnectionBadges() {
   if (!currentUser) return;
   document.getElementById("connectionBadges").style.display = "inline";
 
-  // Google — always verified if signed in via Google
+  // Google — shown for all signed-in users (Google or OTP both have a Google-verified email)
   const gEl = document.getElementById("badgeGoogle");
-  if (currentUser.provider === "google") {
-    gEl.style.display = "inline";
-    gEl.className = "conn-badge";
-    gEl.innerHTML = "&#10003; Google";
-    gEl.title = "Signed in with Google";
-  } else { gEl.style.display = "none"; }
+  gEl.style.display = "inline";
+  gEl.className = "conn-badge";
+  gEl.innerHTML = "&#10003; Google";
+  gEl.title = "Signed in: " + (currentUser.email || "");
+  gEl.onclick = null;
+  gEl.style.cursor = "default";
 
-  // GitHub — verified against API on save
+  // GitHub — clickable link to profile
   const ghEl = document.getElementById("badgeGithub");
   if (currentUser.github_username) {
     ghEl.style.display = "inline";
     ghEl.className = "conn-badge";
     ghEl.innerHTML = "&#10003; GitHub";
-    ghEl.title = "Verified: github.com/" + currentUser.github_username;
+    ghEl.title = "github.com/" + currentUser.github_username;
+    ghEl.style.cursor = "pointer";
+    ghEl.onclick = () => window.open("https://github.com/" + currentUser.github_username, "_blank");
   } else { ghEl.style.display = "none"; }
 
-  // LinkedIn — format-checked only (no API verification available)
+  // LinkedIn — clickable link to profile
   const liEl = document.getElementById("badgeLinkedin");
   if (currentUser.linkedin_url) {
+    const liHref = currentUser.linkedin_url.startsWith("http") ? currentUser.linkedin_url : "https://" + currentUser.linkedin_url;
     liEl.style.display = "inline";
     liEl.className = "conn-badge unverified";
     liEl.innerHTML = "&#8211; LinkedIn";
-    liEl.title = "Linked (not verified): " + currentUser.linkedin_url;
+    liEl.title = currentUser.linkedin_url;
+    liEl.style.cursor = "pointer";
+    liEl.onclick = () => window.open(liHref, "_blank");
   } else { liEl.style.display = "none"; }
 }
 
