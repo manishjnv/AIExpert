@@ -19,7 +19,7 @@ services:
     container_name: roadmap-web
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8090:80"
+      - "0.0.0.0:8090:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
