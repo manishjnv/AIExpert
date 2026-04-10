@@ -345,14 +345,11 @@
     </div>
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
       <div class="modal-field"><label>Plan</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <select id="planDurationInline" style="flex:1;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px">
-            <option value="3mo|intermediate">3 months — Accelerated</option>
-            <option value="6mo|intermediate">6 months — Standard</option>
-            <option value="12mo|beginner">12 months — Beginner</option>
-          </select>
-          <button class="btn" onclick="enrollPlanInline()" style="font-size:10px;padding:5px 10px;border-color:var(--accent);color:var(--accent)">Switch</button>
-        </div>
+        <select id="planDurationInline" style="width:100%;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px">
+          <option value="3mo|intermediate">3 months — Accelerated</option>
+          <option value="6mo|intermediate">6 months — Standard</option>
+          <option value="12mo|beginner">12 months — Beginner</option>
+        </select>
       </div>
     </div>
 
@@ -1106,6 +1103,7 @@ function openProfileModal() {
   const badge = document.getElementById("planBadge")?.textContent?.replace(' · ','') || "";
   const sel = document.getElementById("planDurationInline");
   if (planMap[badge]) sel.value = planMap[badge];
+  sel.dataset.original = sel.value; // track original to detect change
   document.getElementById("profileModal").style.display = "flex";
 }
 
@@ -1119,9 +1117,30 @@ async function saveProfile() {
     experience_level: document.getElementById("pLevel").value,
   };
   try {
+    // Save profile fields
     const resp = await fetch("/api/profile", { method: "PATCH", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify(body) });
-    if (resp.ok) { currentUser = await resp.json(); showToast("Profile saved"); closeProfileModal(); }
-    else showToast("Save failed");
+    if (!resp.ok) { showToast("Save failed"); return; }
+    currentUser = await resp.json();
+
+    // Check if plan changed
+    const sel = document.getElementById("planDurationInline");
+    if (sel.value !== sel.dataset.original) {
+      const [duration, level] = sel.value.split("|");
+      const planResp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({goal:"generalist", duration, level}) });
+      if (planResp.ok) {
+        showToast("Settings saved & plan switched");
+        closeProfileModal();
+        window.location.reload();
+        return;
+      } else {
+        const d = await planResp.json();
+        showToast(d.detail || "Plan switch failed");
+        return;
+      }
+    }
+
+    showToast("Settings saved");
+    closeProfileModal();
   } catch { showToast("Save failed"); }
 }
 
