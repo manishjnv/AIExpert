@@ -714,7 +714,11 @@ function render() {
 
     const cp = document.createElement("div");
     cp.className = "checkpoint";
-    cp.innerHTML = `<div class="checkpoint-icon">✓</div><div><strong>Month ${m.month} checkpoint</strong>${m.checkpoint}</div>`;
+    const monthComplete = mDone === mTotal && mTotal > 0;
+    const shareBtn = monthComplete && currentUser
+      ? `<button class="btn" onclick="shareOnLinkedIn(${currentUser.id},'month-${m.month}')" style="font-size:10px;padding:4px 10px;margin-left:12px;border-color:var(--info);color:var(--info)">Share on LinkedIn</button>`
+      : '';
+    cp.innerHTML = `<div class="checkpoint-icon">${monthComplete ? '✓' : '○'}</div><div><strong>Month ${m.month} checkpoint</strong>${m.checkpoint}${shareBtn}</div>`;
     monthEl.appendChild(cp);
 
     main.appendChild(monthEl);
@@ -783,6 +787,12 @@ function importData() {
     } catch { showToast("Invalid file"); }
   };
   input.click();
+}
+
+// ---- Sharing ----
+function shareOnLinkedIn(userId, milestoneId) {
+  const shareUrl = `${window.location.origin}/share/${userId}/${milestoneId}`;
+  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
 }
 
 // ---- Chat ----
