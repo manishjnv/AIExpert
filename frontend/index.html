@@ -331,10 +331,11 @@
   <div class="modal">
     <h3 style="font-family:var(--serif);margin-bottom:16px">Choose Your Plan</h3>
     <div class="modal-field"><label>Duration</label>
-      <select id="planDuration"><option value="3mo">3 months (accelerated)</option><option value="6mo" selected>6 months (standard)</option><option value="12mo">12 months (beginner-paced)</option></select>
-    </div>
-    <div class="modal-field"><label>Level</label>
-      <select id="planLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option></select>
+      <select id="planDuration">
+        <option value="3mo|intermediate">3 months — Accelerated (intermediate)</option>
+        <option value="6mo|intermediate" selected>6 months — Standard (intermediate)</option>
+        <option value="12mo|beginner">12 months — Beginner-paced</option>
+      </select>
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
       <button class="btn" onclick="enrollPlan()" style="border-color:var(--success);color:var(--success)">Enroll</button>
@@ -919,8 +920,7 @@ function openPlanPicker() {
 function closePlanModal() { document.getElementById("planModal").style.display = "none"; }
 
 async function enrollPlan() {
-  const duration = document.getElementById("planDuration").value;
-  const level = document.getElementById("planLevel").value;
+  const [duration, level] = document.getElementById("planDuration").value.split("|");
   try {
     const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({goal:"generalist", duration, level}) });
     if (resp.ok) { showToast("Enrolled in new plan"); closePlanModal(); window.location.reload(); }
