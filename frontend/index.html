@@ -291,7 +291,7 @@
 </nav>
 
 <header>
-  <div class="eyebrow">Generalist track · Broad coverage · CS grad → AI engineer<span class="version-tag">free · no signup</span></div>
+  <div class="eyebrow" id="eyebrowText">Free AI learning roadmap · No signup required · Start below</div>
   <h1 id="heroTitle">Six Months. <em>One Generalist.</em></h1>
   <p class="subtitle" id="heroSubtitle">From Python fundamentals to deployed AI applications. Twenty-four weeks of building, shipping, and learning to think like an engineer — not watch tutorials.</p>
   <div class="meta-bar">
@@ -1312,6 +1312,8 @@ async function checkAuth() {
       document.getElementById("adminBtn").style.display = currentUser.is_admin ? "" : "none";
       document.getElementById("anonButtons").style.display = "none";
       document.getElementById("exportPlanBtn").style.display = "";
+      const firstName = (currentUser.name || "").split(" ")[0] || "there";
+      document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · Choose a plan to get started`;
       return true;
     }
   } catch {}
@@ -1405,6 +1407,10 @@ async function loadActivePlan() {
     const badge = document.getElementById("planBadge");
     const label = PLAN_LABELS[plan.template_key] || plan.template_key;
     badge.textContent = " · " + label;
+
+    // Update eyebrow with personalized text
+    const firstName = (currentUser?.name || "").split(" ")[0] || "there";
+    document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · ${label} · ${pct}% complete`;
 
     // Update hero title based on plan duration
     const DURATION_TITLES = {
