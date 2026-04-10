@@ -19,6 +19,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.sessions import SessionMiddleware
 
 from sqlalchemy import func, select
 
@@ -51,7 +52,21 @@ async def lifespan(app: FastAPI):
     """Runs on app startup and shutdown."""
     logger.info("Starting AI Roadmap Platform backend (env=%s)", settings.env)
     await init_db()
+    from app.auth.google import register_google_oauth
+    register_google_oauth()
+
+    # Start background cleanup tasks
+    import asyncio
+    from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions
+    import app.db as _db
+    otp_task = asyncio.create_task(cleanup_expired_otps(_db.async_session_factory))
+    session_task = asyncio.create_task(cleanup_expired_sessions(_db.async_session_factory))
+
     yield
+
+    # Cancel cleanup tasks
+    otp_task.cancel()
+    session_task.cancel()
     logger.info("Shutting down")
     await close_db()
 
@@ -67,6 +82,9 @@ app = FastAPI(
 )
 
 # ----- Middleware -----
+
+# SessionMiddleware is required by Authlib for OAuth state cookies
+app.add_middleware(SessionMiddleware, secret_key=settings.jwt_secret)
 
 app.add_middleware(
     CORSMiddleware,
@@ -128,15 +146,6 @@ async def learner_count():
     return {"count": count}
 
 
-# ----- Router registration (Phase 3+) -----
-# Claude Code: register routers here as they are built.
-# Example (uncomment when routers/auth.py exists):
-#
-# from app.routers import auth, profile, progress, evaluate, chat, admin, share
-# app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-# app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
-# app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
-# app.include_router(evaluate.router, prefix="/api/evaluate", tags=["evaluate"])
-# app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
-# app.include_router(admin.router, prefix="/admin", tags=["admin"])
-# app.include_router(share.router, prefix="/share", tags=["share"])
+# ----- Router registration -----
+from app.routers import auth
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

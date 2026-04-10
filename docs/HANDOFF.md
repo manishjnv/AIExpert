@@ -4,20 +4,18 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Phase 1 complete (Tasks 1.1–1.5)
+**Last worked on:** Phase 2 complete (Tasks 2.1–2.4)
 **Branch:** master
-**Commit:** see git log
+**Commit:** df17e2f
 
 ## What got done this session
 
-- Flattened starter-kit/ to repo root (was causing path mismatches)
-- Added .gitattributes for LF line endings
-- Fixed docker-compose.yml (removed deprecated version key)
-- Fixed requirements.txt (httpx-mock -> pytest-httpx, removed unused passlib)
-- Fixed cross-doc inconsistencies (deliverable_met, DELETE body, task assignments)
-- Phase 1 complete: FastAPI app, config, /api/health, /api/learner-count, Dockerfile, compose, nginx, frontend
-- Added HTTPException handler matching API_SPEC error format
-- Verified locally: docker compose up -> all endpoints return expected responses, frontend loads
+- 2.1: async DB engine (db.py) with WAL + foreign_keys pragmas, init_db/close_db lifecycle, get_db() dependency
+- 2.2: All 10 ORM models matching DATA_MODEL.md with PrimaryKey + Timestamp mixins
+- 2.3: Alembic wired to Base.metadata, initial migration generated and verified
+- 2.4: /api/learner-count wired to real DB query (SELECT count(*) FROM users), 60s cache
+- Dockerfile updated to include tests/ and pytest.ini
+- Deployed to VPS — had to fix /srv/roadmap/data/ permissions (chmod 777) for container's app user
 
 ## What is in progress (not committed)
 
@@ -25,15 +23,15 @@
 
 ## Decisions made
 
-- Local Docker is for testing only; production deployment target is VPS (72.61.227.64)
-- VPS port 8080 is taken by AccessBridge — must use a different port when deploying
-- Caddy (ti-platform) handles TLS on 80/443 — add a Caddyfile entry for the roadmap subdomain
+- data/ dir on VPS needs 777 permissions since container runs as non-root `app` user
+- Tests use in-memory SQLite with StaticPool for async compatibility
+- Module-level engine/session_factory are None until init_db() — import via `app.db` module reference
 
 ## Tests
 
-**Passing:** Manual — /api/health, /api/learner-count, frontend at /, 404 error format
-**Failing:** n/a
-**New tests added:** none (Phase 1 has no automated tests per TASKS.md)
+**Passing:** 5 automated (test_db: insert/read, WAL, FK; test_models: create_all, FK enforcement)
+**Failing:** none
+**New tests added:** tests/test_db.py (3), tests/test_models.py (2)
 
 ## Blockers
 
@@ -45,7 +43,7 @@
 
 ## Next action
 
-Phase 2 Task 2.1 from docs/TASKS.md — async DB engine setup with WAL mode and foreign keys pragma.
+Phase 3 Task 3.1 from docs/TASKS.md — JWT helpers (issue_token, verify_token, revoke).
 
 ---
 
@@ -54,3 +52,4 @@ Phase 2 Task 2.1 from docs/TASKS.md — async DB engine setup with WAL mode and 
 | Date       | Phase.Task | Summary                                                    |
 |------------|------------|------------------------------------------------------------|
 | 2026-04-10 | Phase 1    | Structure flatten, doc fixes, Phase 1 complete (1.1-1.5)   |
+| 2026-04-10 | Phase 2    | DB engine, ORM models, Alembic migration, learner count    |
