@@ -7,6 +7,7 @@ All endpoints under /admin (prefix set in main.py). Protected by get_current_adm
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from html import escape as esc
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -20,6 +21,14 @@ from app.models.plan import UserPlan
 from app.models.user import User
 
 router = APIRouter()
+
+
+def _check_origin(request: Request) -> None:
+    """Basic CSRF mitigation: verify Origin/Referer matches our host."""
+    origin = request.headers.get("origin") or request.headers.get("referer", "")
+    host = request.headers.get("host", "")
+    if origin and host and host not in origin:
+        raise HTTPException(status_code=403, detail="Origin mismatch")
 
 
 # ---- API endpoints ----
@@ -151,10 +160,12 @@ async def list_proposals(
 @router.post("/api/proposals/{proposal_id}/apply")
 async def apply_proposal(
     proposal_id: int,
+    request: Request,
     user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a proposal as applied."""
+    _check_origin(request)
     proposal = await db.get(CurriculumProposal, proposal_id)
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
@@ -170,10 +181,12 @@ async def apply_proposal(
 @router.post("/api/proposals/{proposal_id}/reject")
 async def reject_proposal(
     proposal_id: int,
+    request: Request,
     user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a proposal as rejected."""
+    _check_origin(request)
     proposal = await db.get(CurriculumProposal, proposal_id)
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
@@ -241,7 +254,7 @@ async def admin_dashboard_page(
     )).scalars().all()
 
     signups_html = "".join(
-        f"<tr><td>{u.id}</td><td>{u.email}</td><td>{u.name or '-'}</td><td>{u.created_at}</td></tr>"
+        f"<tr><td>{u.id}</td><td>{esc(u.email)}</td><td>{esc(u.name or '-')}</td><td>{u.created_at}</td></tr>"
         for u in recent
     )
 
@@ -273,16 +286,16 @@ async def admin_users_page(
     rows = (await db.execute(query.order_by(User.created_at.desc()).offset((page-1)*20).limit(20))).scalars().all()
 
     rows_html = "".join(
-        f"<tr><td>{u.id}</td><td>{u.email}</td><td>{u.name or '-'}</td><td>{u.provider}</td><td>{'Yes' if u.is_admin else ''}</td><td>{u.created_at}</td></tr>"
+        f"<tr><td>{u.id}</td><td>{esc(u.email)}</td><td>{esc(u.name or '-')}</td><td>{esc(u.provider)}</td><td>{'Yes' if u.is_admin else ''}</td><td>{u.created_at}</td></tr>"
         for u in rows
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
 <nav><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
 <h1>Users ({total})</h1>
-<form style="margin-bottom:12px"><input name="q" value="{q}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
+<form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
 <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Provider</th><th>Admin</th><th>Created</th></tr>{rows_html}</table>
-<div style="margin-top:12px">{'<a href="/admin/users?page='+str(page-1)+'&q='+q+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/users?page='+str(page+1)+'&q='+q+'" class="btn">Next</a>' if page*20<total else ''}</div>
+<div style="margin-top:12px">{'<a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}</div>
 </body></html>"""
 
 
@@ -301,7 +314,7 @@ async def admin_proposals_page(
         actions = ""
         if p.status == "pending":
             actions = f'<form method="post" action="/admin/api/proposals/{p.id}/apply" style="display:inline"><button class="btn success">Apply</button></form> <form method="post" action="/admin/api/proposals/{p.id}/reject" style="display:inline"><button class="btn danger">Reject</button></form>'
-        rows_html += f"<tr><td>{p.id}</td><td>{p.source_run}</td><td>{p.status}</td><td>{p.notes or '-'}</td><td>{p.created_at}</td><td>{actions}</td></tr>"
+        rows_html += f"<tr><td>{p.id}</td><td>{esc(p.source_run)}</td><td>{esc(p.status)}</td><td>{esc(p.notes or '-')}</td><td>{p.created_at}</td><td>{actions}</td></tr>"
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title><style>{ADMIN_CSS}</style></head><body>
 <nav><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
