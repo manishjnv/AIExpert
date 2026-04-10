@@ -21,6 +21,7 @@ class User(PrimaryKeyMixin, TimestampMixin, Base):
     provider: Mapped[str] = mapped_column(String, nullable=False)  # "google" or "otp"
     provider_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     github_username: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    linkedin_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     learning_goal: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     experience_level: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # beginner/intermediate/advanced
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

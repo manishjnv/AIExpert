@@ -75,6 +75,7 @@
   .topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15, 20, 25, 0.92); }
   .topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; }
   .topnav-brand span { color: var(--paper-dim); font-size: 13px; margin-left: 8px; opacity: 0.6; }
+  .conn-badge { display: inline-block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; background: rgba(109,181,133,0.15); color: var(--success); border: 1px solid rgba(109,181,133,0.3); margin-left: 4px; opacity: 1 !important; vertical-align: middle; }
 
   /* TOOLBAR (stats bar below nav) */
   .toolbar { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); background: var(--bg-2); }
@@ -277,7 +278,13 @@
 
 <!-- TOP NAVIGATION -->
 <nav class="topnav">
-  <div class="topnav-brand">AI Roadmap<span id="planBadge"></span></div>
+  <div class="topnav-brand">AI Roadmap<span id="planBadge"></span>
+    <span id="connectionBadges" style="display:none;margin-left:8px">
+      <span id="badgeGithub" class="conn-badge" style="display:none" title="GitHub connected">GH</span>
+      <span id="badgeLinkedin" class="conn-badge" style="display:none" title="LinkedIn connected">LI</span>
+      <span id="badgeGoogle" class="conn-badge" style="display:none" title="Google connected">G</span>
+    </span>
+  </div>
   <span id="anonButtons">
     <button class="btn" onclick="exportData()">Export</button>
     <button class="btn" onclick="importData()">Import</button>
@@ -336,7 +343,10 @@
       <span onclick="closeProfileModal()" style="cursor:pointer;color:var(--ink-soft);font-size:18px">✕</span>
     </div>
     <div class="modal-field"><label>Name</label><input id="pName" type="text" placeholder="Your name"></div>
-    <div class="modal-field"><label>GitHub Username</label><input id="pGithub" type="text" placeholder="username"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="modal-field"><label>GitHub Username</label><input id="pGithub" type="text" placeholder="username"></div>
+      <div class="modal-field"><label>LinkedIn URL</label><input id="pLinkedin" type="text" placeholder="linkedin.com/in/username"></div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="modal-field"><label>Learning Goal</label><input id="pGoal" type="text" placeholder="e.g. AI/ML Engineer" maxlength="200"></div>
       <div class="modal-field"><label>Experience Level</label>
@@ -1083,6 +1093,14 @@ async function sendChat() {
 }
 
 // ---- Auth & Profile UI ----
+function updateConnectionBadges() {
+  if (!currentUser) return;
+  document.getElementById("connectionBadges").style.display = "inline";
+  document.getElementById("badgeGoogle").style.display = currentUser.provider === "google" ? "inline" : "none";
+  document.getElementById("badgeGithub").style.display = currentUser.github_username ? "inline" : "none";
+  document.getElementById("badgeLinkedin").style.display = currentUser.linkedin_url ? "inline" : "none";
+}
+
 function signIn() {
   window.location.href = "/api/auth/google/login";
 }
@@ -1096,6 +1114,7 @@ function openProfileModal() {
   if (!currentUser) return;
   document.getElementById("pName").value = currentUser.name || "";
   document.getElementById("pGithub").value = currentUser.github_username || "";
+  document.getElementById("pLinkedin").value = currentUser.linkedin_url || "";
   document.getElementById("pGoal").value = currentUser.learning_goal || "";
   document.getElementById("pLevel").value = currentUser.experience_level || "intermediate";
   // Pre-select current plan in the inline dropdown
@@ -1113,6 +1132,7 @@ async function saveProfile() {
   const body = {
     name: document.getElementById("pName").value || null,
     github_username: document.getElementById("pGithub").value || null,
+    linkedin_url: document.getElementById("pLinkedin").value || null,
     learning_goal: document.getElementById("pGoal").value || null,
     experience_level: document.getElementById("pLevel").value,
   };
@@ -1139,6 +1159,7 @@ async function saveProfile() {
       }
     }
 
+    updateConnectionBadges();
     showToast("Settings saved");
     closeProfileModal();
   } catch { showToast("Save failed"); }
@@ -1314,6 +1335,7 @@ async function checkAuth() {
       document.getElementById("exportPlanBtn").style.display = "";
       const firstName = (currentUser.name || "").split(" ")[0] || "there";
       document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · Choose a plan to get started`;
+      updateConnectionBadges();
       return true;
     }
   } catch {}

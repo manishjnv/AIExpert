@@ -26,6 +26,7 @@ router = APIRouter()
 class ProfilePatch(BaseModel):
     name: Optional[str] = None
     github_username: Optional[str] = None
+    linkedin_url: Optional[str] = None
     learning_goal: Optional[str] = Field(None, max_length=200)
     experience_level: Optional[str] = None
 
@@ -81,6 +82,7 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         "name": user.name,
         "avatar_url": user.avatar_url,
         "github_username": user.github_username,
+        "linkedin_url": user.linkedin_url,
         "learning_goal": user.learning_goal,
         "experience_level": user.experience_level,
         "is_admin": user.is_admin,
