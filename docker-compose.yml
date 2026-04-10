@@ -42,6 +42,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./data:/data
+      - ./scripts:/app/scripts:ro
     networks:
       - roadmap-net
     mem_limit: 512m

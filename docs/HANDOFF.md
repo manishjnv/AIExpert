@@ -4,32 +4,31 @@
 
 ## Current state as of 2026-04-10
 
-**Last worked on:** Phase 9 complete (Tasks 9.1–9.3)
+**Last worked on:** Phase 10 complete (Tasks 10.1–10.2)
 **Branch:** master
-**Commit:** 0dd2889
+**Commit:** 01e236a
 
 ## What got done this session
 
-- 9.1: Public share page with OG meta tags (first name only, no private data)
-- 9.2: Dynamic 1200x630 SVG for social cards, cached 1 hour
-- 9.3: Share button on completed month checkpoints → opens LinkedIn share intent
+- 10.1: Admin API (dashboard stats, paginated users, proposal apply/reject) protected by get_current_admin
+- 10.2: Server-rendered admin HTML pages (dashboard, users list, proposals list)
+- Codex security review running in background
 
 ## What is in progress (not committed)
 
-- Nothing
+- Codex security review findings (will fix if any)
 
 ## Decisions made
 
-- 7 milestones defined: month-1 through month-6 + capstone
-- Only first name shown on share pages for privacy
-- SVG is generated server-side (no image rendering dependency)
-- Share buttons only appear when month is 100% complete AND user is signed in
+- Admin UI uses f-string HTML (not Jinja2 templates) — keeps it simple, single file
+- DAU/WAU/MAU approximated from session issued_at timestamps
+- Proposal apply/reject only changes status — curriculum JSON edits are manual
 
 ## Tests
 
-**Passing:** 76 automated
+**Passing:** 83 automated
 **Failing:** none
-**New tests:** test_share (4 — page loads, 404 bad milestone, SVG valid + cached, no auth required)
+**New tests:** test_admin (7 — 403 non-admin, API endpoints, HTML pages)
 
 ## Blockers
 
@@ -41,7 +40,7 @@
 
 ## Next action
 
-Phase 10 Task 10.1 from docs/TASKS.md — Admin panel.
+Phase 11 Task 11.1 from docs/TASKS.md — Quarterly curriculum sync script.
 
 ---
 
@@ -58,3 +57,4 @@ Phase 10 Task 10.1 from docs/TASKS.md — Admin panel.
 | 2026-04-10 | Phase 7    | AI evaluation — sanitizer, Gemini/Groq, eval service, UI   |
 | 2026-04-10 | Phase 8    | AI chat — SSE streaming, rate limit, floating chat panel   |
 | 2026-04-10 | Phase 9    | LinkedIn sharing — OG tags, dynamic SVG, share buttons     |
+| 2026-04-10 | Phase 10   | Admin panel — dashboard, users, proposals, HTML pages      |
