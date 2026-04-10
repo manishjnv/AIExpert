@@ -796,86 +796,131 @@ function importData() {
 
 // ---- Export Plan PDF ----
 function exportPlanPDF() {
-  const totalWeeks = DATA.reduce((s, m) => s + m.weeks.length, 0);
-  const totalChecks = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + w.checks.length, 0), 0);
-  const doneChecks = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + w.checks.filter((_, i) => state[key(w.n, i)]).length, 0), 0);
-  const pct = totalChecks ? Math.round((doneChecks / totalChecks) * 100) : 0;
-  const planLabel = document.getElementById("planBadge")?.textContent || "AI Generalist Roadmap";
+  const tw = DATA.reduce((s, m) => s + m.weeks.length, 0);
+  const tc = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + w.checks.length, 0), 0);
+  const dc = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + w.checks.filter((_, i) => state[key(w.n, i)]).length, 0), 0);
+  const pct = tc ? Math.round((dc / tc) * 100) : 0;
+  const totalWeeks = tw, totalChecks = tc, doneChecks = dc;
+  const planLabel = document.getElementById("planBadge")?.textContent?.replace('Your plan: ','') || "AI Generalist Roadmap";
   const userName = currentUser?.name || "Learner";
+  const userEmail = currentUser?.email || "";
+  const userGithub = currentUser?.github_username || "";
   const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const totalHours = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
+  const allResources = [];
+  DATA.forEach(m => m.weeks.forEach(w => (w.resources||[]).forEach(r => { if(r.name && !allResources.find(x=>x.name===r.name)) allResources.push(r); })));
 
+  // Per-month stats
+  const monthStats = DATA.map(m => {
+    const mTotal = m.weeks.reduce((s,w) => s + w.checks.length, 0);
+    const mDone = m.weeks.reduce((s,w) => s + w.checks.filter((_,i) => state[key(w.n,i)]).length, 0);
+    return { month: m.month, label: m.label, title: m.title, total: mTotal, done: mDone, pct: mTotal ? Math.round((mDone/mTotal)*100) : 0, weeks: m.weeks.length };
+  });
+
+  // Table of Contents
+  const tocHtml = monthStats.map(ms =>
+    `<tr><td style="padding:4px 8px;font-size:12px">Month ${ms.month}</td><td style="padding:4px 8px;font-size:12px">${ms.label}</td><td style="padding:4px 8px;font-size:12px">${ms.title}</td><td style="padding:4px 8px;font-size:12px;text-align:center">${ms.weeks}</td><td style="padding:4px 8px;font-size:12px;text-align:center;color:${ms.pct===100?'#2d7a4a':'#1a1a1a'}">${ms.pct}%</td></tr>`
+  ).join("");
+
+  // Progress bar
+  const progBar = `<div style="background:#e8e8e8;border-radius:4px;height:8px;margin:8px 0 16px"><div style="background:#c98e2f;height:8px;border-radius:4px;width:${pct}%"></div></div>`;
+
+  // Month content
   let monthsHtml = "";
   DATA.forEach(m => {
     let weeksHtml = "";
     m.weeks.forEach(w => {
-      const wDone = w.checks.filter((_, i) => state[key(w.n, i)]).length;
+      const wDone = w.checks.filter((_,i) => state[key(w.n,i)]).length;
       const wTotal = w.checks.length;
-      const checksHtml = w.checks.map((c, i) => {
-        const done = state[key(w.n, i)];
-        return `<div style="padding:3px 0;color:${done ? '#2d7a4a' : '#444'}">
-          <span style="font-size:14px;margin-right:6px">${done ? '✓' : '○'}</span>${typeof c === 'string' ? c : c}
-        </div>`;
+      const checksHtml = w.checks.map((c,i) => {
+        const done = state[key(w.n,i)];
+        return `<div style="padding:2px 0;font-size:11px;color:${done?'#2d7a4a':'#444'}"><span style="margin-right:4px">${done?'✓':'○'}</span>${typeof c==='string'?c:c}</div>`;
       }).join("");
-      const resourcesHtml = (w.resources || []).map(r =>
-        `<div style="padding:2px 0;font-size:11px"><span style="color:#c98e2f">→</span> ${r.name || r} ${r.url ? '' : ''}</div>`
-      ).join("");
+      const resHtml = (w.resources||[]).map(r => `<div style="font-size:10px;padding:1px 0;color:#555">→ ${r.name||r}</div>`).join("");
       weeksHtml += `
-        <div style="margin:16px 0;padding:16px;border:1px solid #e0e0e0;border-radius:6px;${wDone === wTotal && wTotal > 0 ? 'border-left:4px solid #2d7a4a;' : ''}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div><span style="font-family:monospace;font-size:11px;color:#999;text-transform:uppercase">Week ${w.n}</span>
-              <div style="font-size:16px;font-weight:600;color:#1a1a1a">${w.t}</div></div>
-            <div style="font-family:monospace;font-size:12px;color:#999">${wDone}/${wTotal} · ${w.hours || 16} hrs</div>
+        <div style="margin:8px 0;padding:10px 12px;border:1px solid #e0e0e0;border-radius:4px;${wDone===wTotal&&wTotal>0?'border-left:3px solid #2d7a4a;':''}page-break-inside:avoid">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <div><span style="font-family:monospace;font-size:9px;color:#999;text-transform:uppercase">Week ${w.n}</span> <strong style="font-size:13px">${w.t}</strong></div>
+            <span style="font-family:monospace;font-size:10px;color:#999">${wDone}/${wTotal} · ${w.hours||16}h</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
-            <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:4px">Focus</div>
-              ${w.focus.map(f => `<div style="font-size:11px;color:#444;padding:1px 0">• ${f}</div>`).join("")}</div>
-            <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:4px">Deliverables</div>
-              ${w.deliv.map(d => `<div style="font-size:11px;color:#444;padding:1px 0">• ${d}</div>`).join("")}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+            <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:2px">Focus</div>${w.focus.map(f=>`<div style="font-size:10px;color:#444;padding:1px 0">• ${f}</div>`).join("")}</div>
+            <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:2px">Deliverables</div>${w.deliv.map(d=>`<div style="font-size:10px;color:#444;padding:1px 0">• ${d}</div>`).join("")}</div>
           </div>
-          ${resourcesHtml ? `<div style="margin-bottom:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:4px">Resources</div>${resourcesHtml}</div>` : ''}
-          <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#999;margin-bottom:4px">Checklist</div>${checksHtml}</div>
+          ${resHtml?`<div style="margin-bottom:4px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:2px">Resources</div>${resHtml}</div>`:''}
+          <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:2px">Checklist</div>${checksHtml}</div>
         </div>`;
     });
-
-    const mTotal = m.weeks.reduce((s, w) => s + w.checks.length, 0);
-    const mDone = m.weeks.reduce((s, w) => s + w.checks.filter((_, i) => state[key(w.n, i)]).length, 0);
-    const mPct = mTotal ? Math.round((mDone / mTotal) * 100) : 0;
-
+    const mTotal = m.weeks.reduce((s,w) => s + w.checks.length, 0);
+    const mDone = m.weeks.reduce((s,w) => s + w.checks.filter((_,i) => state[key(w.n,i)]).length, 0);
+    const mPct = mTotal ? Math.round((mDone/mTotal)*100) : 0;
     monthsHtml += `
-      <div style="page-break-inside:avoid;margin-bottom:32px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;border-bottom:2px solid #c98e2f;padding-bottom:8px">
-          <span style="font-size:36px;font-weight:300;color:#c98e2f;font-family:Georgia,serif">0${m.month}</span>
-          <div>
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#999">Month ${m.month} · ${m.label}</div>
-            <div style="font-size:22px;font-weight:600;color:#1a1a1a">${m.title}</div>
-          </div>
-          <div style="margin-left:auto;font-family:monospace;font-size:13px;color:#999">${mPct}%</div>
+      <div style="margin-bottom:20px;page-break-before:always">
+        <div style="display:flex;align-items:center;gap:10px;border-bottom:2px solid #c98e2f;padding-bottom:6px;margin-bottom:6px">
+          <span style="font-size:28px;font-weight:300;color:#c98e2f;font-family:Georgia,serif">0${m.month}</span>
+          <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:#999">Month ${m.month} · ${m.label}</div>
+            <div style="font-size:18px;font-weight:600">${m.title}</div></div>
+          <span style="margin-left:auto;font-family:monospace;font-size:12px;color:#999">${mPct}%</span>
         </div>
-        <p style="font-style:italic;color:#666;font-size:13px;margin-bottom:12px">${m.tagline}</p>
+        <p style="font-style:italic;color:#666;font-size:11px;margin-bottom:8px">${m.tagline}</p>
         ${weeksHtml}
-        <div style="background:#f5f1e8;padding:10px 14px;border-radius:4px;font-size:12px;margin-top:8px">
-          <strong>Checkpoint:</strong> ${m.checkpoint}
-        </div>
+        <div style="background:#f5f1e8;padding:6px 10px;border-radius:3px;font-size:10px;margin-top:6px"><strong>Checkpoint:</strong> ${m.checkpoint}</div>
       </div>`;
   });
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${planLabel}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${planLabel} — AI Roadmap</title>
 <style>
-  @media print { body { margin: 0; } @page { margin: 20mm 15mm; } }
-  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; color: #1a1a1a; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.5; }
+  @media print { @page { margin: 15mm 12mm; } }
+  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; color: #1a1a1a; max-width: 780px; margin: 0 auto; padding: 24px 16px; line-height: 1.4; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 4px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #999; border-bottom: 1px solid #ddd; }
+  .stat { display: inline-block; text-align: center; padding: 8px 16px; }
+  .stat .n { font-size: 22px; font-weight: bold; color: #c98e2f; }
+  .stat .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #999; }
 </style></head><body>
-<div style="text-align:center;margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid #e0e0e0">
-  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.2em;color:#c98e2f;margin-bottom:8px">AI GENERALIST ROADMAP</div>
-  <h1 style="font-family:Georgia,serif;font-size:32px;font-weight:300;margin:0 0 8px">${planLabel.replace('Your plan: ', '')}</h1>
-  <div style="font-size:14px;color:#666">${userName} · Generated ${date}</div>
-  <div style="margin-top:16px;display:flex;justify-content:center;gap:24px;font-family:monospace;font-size:13px;color:#999">
-    <span><strong style="font-size:20px;color:#1a1a1a">${totalWeeks}</strong> weeks</span>
-    <span><strong style="font-size:20px;color:#1a1a1a">${doneChecks}/${totalChecks}</strong> done</span>
-    <span><strong style="font-size:20px;color:#c98e2f">${pct}%</strong> complete</span>
+
+<!-- HEADER -->
+<div style="text-align:center;margin-bottom:20px">
+  <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:#c98e2f;margin-bottom:6px">AI GENERALIST ROADMAP</div>
+  <h1 style="font-family:Georgia,serif;font-size:28px;font-weight:300;margin:0 0 4px">${planLabel}</h1>
+  <div style="font-size:12px;color:#666">${userName} · ${date}</div>
+</div>
+
+<!-- STATS -->
+<div style="text-align:center;margin-bottom:6px">
+  <div class="stat"><div class="n">${totalWeeks}</div><div class="l">Weeks</div></div>
+  <div class="stat"><div class="n">~${totalHours}</div><div class="l">Total Hours</div></div>
+  <div class="stat"><div class="n">${doneChecks}/${totalChecks}</div><div class="l">Tasks Done</div></div>
+  <div class="stat"><div class="n" style="color:${pct>=75?'#2d7a4a':pct>=25?'#c98e2f':'#999'}">${pct}%</div><div class="l">Complete</div></div>
+</div>
+${progBar}
+
+<!-- PROFILE -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;padding:10px;background:#fafafa;border-radius:4px;border:1px solid #eee">
+  <div style="font-size:11px"><span style="color:#999">Email:</span> ${userEmail}</div>
+  <div style="font-size:11px"><span style="color:#999">GitHub:</span> ${userGithub || '—'}</div>
+  <div style="font-size:11px"><span style="color:#999">Level:</span> ${currentUser?.experience_level || '—'}</div>
+  <div style="font-size:11px"><span style="color:#999">Goal:</span> ${currentUser?.learning_goal || '—'}</div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div style="margin-bottom:16px">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:4px">Table of Contents</div>
+  <table><tr><th>Month</th><th>Phase</th><th>Title</th><th style="text-align:center">Weeks</th><th style="text-align:center">Progress</th></tr>${tocHtml}</table>
+</div>
+
+<!-- RESOURCES SUMMARY -->
+<div style="margin-bottom:16px;page-break-after:always">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:4px">All Resources (${allResources.length})</div>
+  <div style="column-count:2;column-gap:16px;font-size:10px">
+    ${allResources.map(r => `<div style="padding:1px 0;break-inside:avoid">→ ${r.name}</div>`).join("")}
   </div>
 </div>
+
+<!-- MONTHS -->
 ${monthsHtml}
-<div style="text-align:center;margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:11px;color:#999">
+
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:9px;color:#999">
   Generated from automateedge.cloud · ${date}
 </div>
 </body></html>`;
