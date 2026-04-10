@@ -826,11 +826,11 @@ function showToast(msg) {
 }
 
 function resetAll() {
-  if (!confirm("Reset all progress? This cannot be undone.")) return;
+  if (!confirm("Reset local progress? This clears your browser data. Sign in to save progress to the cloud.")) return;
   state = {};
   saveState();
   render();
-  showToast("Progress reset");
+  showToast("Local progress reset");
 }
 
 function exportData() {
@@ -1151,6 +1151,9 @@ function signIn() {
 
 async function logOut() {
   await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  // Clear local state so stale progress doesn't linger after logout
+  state = {};
+  saveState();
   window.location.reload();
 }
 
