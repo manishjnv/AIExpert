@@ -897,12 +897,22 @@ function exportPlanPDF() {
 </div>
 ${progBar}
 
+<!-- ABOUT THIS COURSE -->
+<div style="margin-bottom:14px;padding:12px 14px;background:#fafaf5;border-radius:4px;border:1px solid #e8e2d3">
+  <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px">About This Course</div>
+  <div style="font-size:12px;color:#333;margin-bottom:6px"><strong>AI Generalist Roadmap</strong> — A structured, self-paced study plan to go from Python fundamentals to deployed AI applications. Covers math foundations, classical ML, deep learning, LLMs, RAG, agents, MLOps, and a capstone project.</div>
+  <div style="font-size:11px;color:#555;margin-bottom:4px"><strong>Purpose:</strong> Replace scattered tutorials with a single accountable roadmap. Every week has deliverables, every month has a checkpoint, and every project compounds on the last.</div>
+  <div style="font-size:11px;color:#555"><strong>After completion you will:</strong> Have 6+ shipped repos, a deployed capstone, a portfolio site, Kaggle experience, familiarity with LLM APIs and RAG, and be interview-ready for AI/ML engineering roles.</div>
+</div>
+
 <!-- PROFILE -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;padding:10px;background:#fafafa;border-radius:4px;border:1px solid #eee">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;padding:10px;background:#fafafa;border-radius:4px;border:1px solid #eee">
+  <div style="font-size:11px"><span style="color:#999">Name:</span> ${userName}</div>
   <div style="font-size:11px"><span style="color:#999">Email:</span> ${userEmail}</div>
-  <div style="font-size:11px"><span style="color:#999">GitHub:</span> ${userGithub || '—'}</div>
+  <div style="font-size:11px"><span style="color:#999">GitHub:</span> ${userGithub ? '<a href="https://github.com/'+userGithub+'" style="color:#1a6fb5">'+userGithub+'</a>' : '—'}</div>
   <div style="font-size:11px"><span style="color:#999">Level:</span> ${currentUser?.experience_level || '—'}</div>
-  <div style="font-size:11px"><span style="color:#999">Goal:</span> ${currentUser?.learning_goal || '—'}</div>
+  <div style="font-size:11px"><span style="color:#999">Learning Goal:</span> ${currentUser?.learning_goal || '—'}</div>
+  <div style="font-size:11px"><span style="color:#999">Plan:</span> ${planLabel}</div>
 </div>
 
 <!-- TABLE OF CONTENTS -->
