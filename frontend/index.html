@@ -1123,8 +1123,8 @@ function updateConnectionBadges() {
   if (currentUser.linkedin_url) {
     const liHref = currentUser.linkedin_url.startsWith("http") ? currentUser.linkedin_url : "https://" + currentUser.linkedin_url;
     liEl.style.display = "inline";
-    liEl.className = "conn-badge unverified";
-    liEl.innerHTML = "&#8211; LinkedIn";
+    liEl.className = "conn-badge";
+    liEl.innerHTML = "&#10003; LinkedIn";
     liEl.title = currentUser.linkedin_url;
     liEl.style.cursor = "pointer";
     liEl.onclick = () => window.open(liHref, "_blank");
