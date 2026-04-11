@@ -134,7 +134,7 @@
   .eval-badge.notmet { background:rgba(217,119,87,0.15);color:var(--danger); }
 
   /* Chat panel */
-  .chat-fab { position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--ink);border:none;font-size:22px;cursor:pointer;z-index:90;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none; }
+  .chat-fab { position:fixed;bottom:24px;right:24px;height:48px;border-radius:24px;background:var(--accent);color:var(--ink);border:none;font-size:14px;font-weight:600;font-family:var(--sans);cursor:pointer;z-index:90;box-shadow:0 4px 16px rgba(0,0,0,0.4);display:none;padding:0 20px;gap:6px;align-items:center; }
   .chat-fab:hover { background:var(--accent-soft); }
   .chat-panel { position:fixed;bottom:84px;right:24px;width:380px;max-height:500px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;z-index:90;display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4); }
   .chat-header { padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center; }
@@ -425,7 +425,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- Chat -->
-<button class="chat-fab" id="chatFab" onclick="toggleChat()">💬</button>
+<button class="chat-fab" id="chatFab" onclick="toggleChat()">💬 AI Mentor</button>
 <div class="chat-panel" id="chatPanel">
   <div class="chat-header">
     <h4>AI Mentor — <span id="chatWeekLabel">Week 1</span></h4>
@@ -1396,7 +1396,7 @@ async function checkAuth() {
       setSyncBadge("synced", "Synced");
       document.getElementById("anonButtons").style.display = "none";
       document.getElementById("authButtons").style.display = "inline";
-      document.getElementById("chatFab").style.display = "";
+      document.getElementById("chatFab").style.display = "flex";
       document.getElementById("adminBtn").style.display = currentUser.is_admin ? "" : "none";
       const firstName = (currentUser.name || "").split(" ")[0] || "there";
       document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · Loading plan...`;
