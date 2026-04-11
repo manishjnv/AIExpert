@@ -95,6 +95,17 @@ def _check_origin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Origin mismatch")
 
 
+def _topic_quality_cell(score_data: dict) -> str:
+    """Render topic quality score as a colored number with tooltip."""
+    s = score_data.get("composite_score", 0)
+    if not s:
+        return '<span style="color:#8a92a0">—</span>'
+    color = "#6db585" if s >= 80 else "#e8a849" if s >= 60 else "#d97757"
+    issues = score_data.get("issues", [])
+    tooltip = " · ".join(issues[:3]) if issues else "No issues"
+    return f'<span style="color:{color};font-weight:600;cursor:help" title="{esc(tooltip)}">{s}</span>'
+
+
 async def _get_settings(db: AsyncSession) -> CurriculumSettings:
     result = await db.execute(select(CurriculumSettings).limit(1))
     settings = result.scalar_one_or_none()
@@ -234,6 +245,18 @@ async def list_topics(
         }
         for t in rows
     ]
+
+
+@router.get("/api/topics/quality")
+async def get_topic_quality_scores(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Score all topics on 7 quality dimensions."""
+    from app.services.quality_scorer import score_topic
+    result = await db.execute(select(DiscoveredTopic).order_by(DiscoveredTopic.created_at.desc()))
+    topics = result.scalars().all()
+    return [score_topic(t) for t in topics]
 
 
 @router.get("/api/topics/{topic_id}")
@@ -737,6 +760,10 @@ async def pipeline_topics_page(
     total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = (await db.execute(query.offset((page - 1) * 50).limit(50))).scalars().all()
 
+    # Compute quality scores for each topic
+    from app.services.quality_scorer import score_topic
+    topic_scores = {score_topic(t)["id"]: score_topic(t) for t in rows}
+
     # Status filter links
     statuses = ["", "pending", "approved", "generating", "generated", "rejected"]
     filter_html = " ".join(
@@ -773,6 +800,7 @@ async def pipeline_topics_page(
 <td><strong><a href="#" onclick="viewTopic({t.id});return false" style="color:#e8a849">{esc(t.topic_name)}</a></strong><div style="font-size:12px;color:#8a92a0">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
 <td style="font-size:12px;max-width:300px">{esc(t.justification[:150])}{'...' if len(t.justification) > 150 else ''}</td>
 <td>{t.confidence_score}</td>
+<td style="text-align:center">{_topic_quality_cell(topic_scores.get(t.id, {}))}</td>
 <td><span class="badge {t.status}">{t.status}</span>{error_html}</td>
 <td>{t.templates_generated}</td>
 <td style="font-size:12px">{t.created_at.strftime('%Y-%m-%d') if t.created_at else ''}</td>
@@ -792,7 +820,7 @@ async def pipeline_topics_page(
 <div style="margin-bottom:16px">{filter_html}</div>
 
 <table>
-<tr><th>ID</th><th>Topic</th><th>Justification</th><th>Score</th><th>Status</th><th>Templates</th><th>Discovered</th><th>Actions</th></tr>
+<tr><th>ID</th><th>Topic</th><th>Justification</th><th>Confidence</th><th>Quality</th><th>Status</th><th>Templates</th><th>Discovered</th><th>Actions</th></tr>
 {rows_html}
 </table>
 

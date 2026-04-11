@@ -1087,3 +1087,295 @@ async def score_all_templates(db: AsyncSession) -> list[dict]:
 
     results.sort(key=lambda r: r["composite_score"])
     return results
+
+
+# ---- Topic Scoring (7 dimensions, zero AI cost) ----
+
+# Reputable evidence sources
+REPUTABLE_EVIDENCE = [
+    "stanford", "mit", "cmu", "berkeley", "harvard", "oxford", "cambridge",
+    "neurips", "icml", "iclr", "cvpr", "aaai", "acl", "emnlp",
+    "arxiv", "paperswithcode", "huggingface", "google research", "deepmind",
+    "openai", "anthropic", "meta ai", "microsoft research",
+    "coursera", "edx", "fast.ai", "deeplearning.ai",
+]
+
+# Current AI trends (2024-2026)
+CURRENT_TRENDS = [
+    "llm", "large language model", "gpt", "agent", "rag", "retrieval",
+    "fine-tun", "rlhf", "dpo", "multimodal", "diffusion", "transformer",
+    "few-shot", "zero-shot", "prompt", "embedding", "vector",
+    "mlops", "edge ai", "federated", "synthetic data", "responsible ai",
+    "vision-language", "code generation", "reasoning",
+]
+
+# Overly broad topics that shouldn't be a single curriculum
+OVERLY_BROAD = [
+    r"^ai$", r"^machine learning$", r"^deep learning$", r"^data science$",
+    r"^python$", r"^programming$", r"^computer science$",
+]
+
+# Overly narrow / niche
+OVERLY_NARROW_SIGNALS = [
+    r"specific.*version", r"v\d+\.\d+", r"bug\b", r"patch\b", r"hotfix\b",
+]
+
+
+def score_topic_evidence(topic) -> dict:
+    """Score quality of evidence sources (0-100)."""
+    sources = []
+    try:
+        import json
+        sources = json.loads(topic.evidence_sources) if topic.evidence_sources else []
+    except Exception:
+        pass
+
+    if not sources:
+        return {"score": 20, "issues": ["No evidence sources provided"]}
+
+    score = 50
+    reputable_count = 0
+    for src in sources:
+        src_lower = src.lower()
+        if any(rep in src_lower for rep in REPUTABLE_EVIDENCE):
+            reputable_count += 1
+
+    reputable_pct = reputable_count / len(sources) * 100 if sources else 0
+    score += int(reputable_pct * 0.3)  # up to +30
+
+    if len(sources) >= 3:
+        score += 10
+    elif len(sources) == 1:
+        score -= 10
+
+    issues = []
+    if reputable_pct < 30:
+        issues.append(f"Only {int(reputable_pct)}% from reputable sources")
+    if len(sources) < 2:
+        issues.append("Only 1 evidence source — need more validation")
+
+    return {"score": max(0, min(100, score)), "issues": issues, "reputable_pct": int(reputable_pct)}
+
+
+def score_topic_specificity(topic) -> dict:
+    """Score topic focus — not too broad, not too narrow (0-100)."""
+    name = topic.topic_name.strip()
+    word_count = len(name.split())
+    name_lower = name.lower()
+
+    score = 80
+    issues = []
+
+    # Too broad
+    if any(re.match(pat, name_lower) for pat in OVERLY_BROAD):
+        score -= 40
+        issues.append(f"'{name}' is too broad for a single curriculum")
+
+    # Too short (likely broad)
+    if word_count <= 1:
+        score -= 20
+        issues.append("Single-word topic — likely too broad")
+    elif word_count == 2:
+        score -= 5
+
+    # Ideal: 3-6 words
+    if 3 <= word_count <= 6:
+        score += 15
+
+    # Too long (likely too narrow or a sentence)
+    if word_count > 8:
+        score -= 15
+        issues.append(f"Topic name is {word_count} words — may be too specific")
+
+    # Too narrow signals
+    if any(re.search(pat, name_lower) for pat in OVERLY_NARROW_SIGNALS):
+        score -= 20
+        issues.append("Topic appears overly narrow or version-specific")
+
+    return {"score": max(0, min(100, score)), "issues": issues, "word_count": word_count}
+
+
+def score_topic_differentiation(topic) -> dict:
+    """Score how different this topic is from existing templates (0-100)."""
+    from app.curriculum.loader import list_templates
+
+    existing_keys = list_templates()
+    topic_words = set(topic.normalized_name.lower().replace("_", " ").split())
+
+    max_overlap = 0
+    most_similar = ""
+    for key in existing_keys:
+        key_words = set(key.replace("_", " ").split())
+        # Remove duration/level words
+        key_words -= {"3mo", "6mo", "9mo", "12mo", "beginner", "intermediate", "advanced"}
+        if not key_words:
+            continue
+        overlap = len(topic_words & key_words) / max(len(topic_words), 1)
+        if overlap > max_overlap:
+            max_overlap = overlap
+            most_similar = key
+
+    score = 90
+    issues = []
+
+    if max_overlap > 0.7:
+        score -= 40
+        issues.append(f"Very similar to existing template '{most_similar}' ({int(max_overlap*100)}% word overlap)")
+    elif max_overlap > 0.4:
+        score -= 15
+        issues.append(f"Partially overlaps with '{most_similar}' ({int(max_overlap*100)}%)")
+
+    return {"score": max(0, min(100, score)), "issues": issues, "max_overlap": int(max_overlap * 100)}
+
+
+def score_topic_market_demand(topic) -> dict:
+    """Score whether jobs require this skill (0-100)."""
+    all_text = (topic.topic_name + " " + topic.justification).lower()
+
+    hits = 0
+    for tool in INDUSTRY_TOOLS:
+        if re.search(tool, all_text):
+            hits += 1
+
+    # Also check for job-related keywords in justification
+    job_keywords = ["industry", "job", "hiring", "demand", "production", "enterprise",
+                    "deployment", "startup", "company", "commercial", "applied"]
+    job_hits = sum(1 for kw in job_keywords if kw in all_text)
+
+    score = 50 + min(30, hits * 5) + min(20, job_hits * 5)
+    issues = []
+    if hits == 0 and job_hits == 0:
+        issues.append("No industry tools or job-market signals in topic/justification")
+
+    return {"score": max(0, min(100, score)), "issues": issues}
+
+
+def score_topic_freshness(topic) -> dict:
+    """Score whether topic is a current trend (0-100)."""
+    all_text = (topic.topic_name + " " + topic.justification).lower()
+
+    trend_hits = sum(1 for t in CURRENT_TRENDS if t in all_text)
+
+    score = 50 + min(40, trend_hits * 8)
+    issues = []
+
+    # Check for deprecated tech
+    deprecated_hits = sum(1 for m in DEPRECATED_MARKERS if re.search(m, all_text))
+    if deprecated_hits:
+        score -= 25
+        issues.append("References deprecated technology")
+
+    if trend_hits == 0:
+        issues.append("No current AI trend signals found")
+        score -= 10
+
+    return {"score": max(0, min(100, score)), "issues": issues, "trend_hits": trend_hits}
+
+
+def score_topic_justification(topic) -> dict:
+    """Score depth and quality of AI justification (0-100)."""
+    text = topic.justification or ""
+    word_count = len(text.split())
+
+    score = 50
+    issues = []
+
+    # Length
+    if word_count >= 80:
+        score += 20
+    elif word_count >= 40:
+        score += 10
+    elif word_count < 20:
+        score -= 20
+        issues.append(f"Justification too short ({word_count} words)")
+
+    # Specificity: mentions specific papers, courses, tools
+    specificity_signals = [r"arxiv", r"\d{4}", r"university", r"course", r"paper",
+                           r"benchmark", r"state-of-the-art", r"sota", r"framework"]
+    specificity_hits = sum(1 for s in specificity_signals if re.search(s, text.lower()))
+    score += min(20, specificity_hits * 5)
+
+    if specificity_hits == 0:
+        issues.append("Justification lacks specific references (papers, benchmarks, dates)")
+
+    # Confidence score from AI
+    if topic.confidence_score >= 90:
+        score += 10
+    elif topic.confidence_score < 50:
+        score -= 10
+        issues.append(f"Low AI confidence: {topic.confidence_score}%")
+
+    return {"score": max(0, min(100, score)), "issues": issues, "word_count": word_count}
+
+
+def score_topic_category(topic) -> dict:
+    """Score category assignment quality (0-100)."""
+    valid_categories = {"nlp", "cv", "rl", "mlops", "generative", "multimodal",
+                        "agents", "tabular", "time_series", "graph", "optimization",
+                        "security", "ethics", "edge", "robotics", "audio", "accel"}
+
+    score = 80
+    issues = []
+
+    cat = (topic.category or "").lower().strip()
+    if cat in valid_categories:
+        score += 15
+    elif cat:
+        score -= 10
+        issues.append(f"Unknown category '{cat}' — may need normalization")
+    else:
+        score -= 30
+        issues.append("No category assigned")
+
+    if topic.subcategory:
+        score += 5
+
+    return {"score": max(0, min(100, score)), "issues": issues}
+
+
+def score_topic(topic) -> dict:
+    """Score a discovered topic across 7 dimensions."""
+    evidence = score_topic_evidence(topic)
+    specificity = score_topic_specificity(topic)
+    differentiation = score_topic_differentiation(topic)
+    market = score_topic_market_demand(topic)
+    freshness = score_topic_freshness(topic)
+    justification = score_topic_justification(topic)
+    category = score_topic_category(topic)
+
+    composite = round(
+        evidence["score"] * 0.20 +
+        specificity["score"] * 0.15 +
+        differentiation["score"] * 0.15 +
+        market["score"] * 0.15 +
+        freshness["score"] * 0.15 +
+        justification["score"] * 0.10 +
+        category["score"] * 0.10
+    )
+
+    all_issues = (
+        [f"[Evidence] {i}" for i in evidence["issues"]] +
+        [f"[Specificity] {i}" for i in specificity["issues"]] +
+        [f"[Differentiation] {i}" for i in differentiation["issues"]] +
+        [f"[Market] {i}" for i in market["issues"]] +
+        [f"[Freshness] {i}" for i in freshness["issues"]] +
+        [f"[Justification] {i}" for i in justification["issues"]] +
+        [f"[Category] {i}" for i in category["issues"]]
+    )
+
+    return {
+        "id": topic.id,
+        "topic_name": topic.topic_name,
+        "status": topic.status,
+        "composite_score": composite,
+        "scores": {
+            "evidence": evidence["score"],
+            "specificity": specificity["score"],
+            "differentiation": differentiation["score"],
+            "market_demand": market["score"],
+            "freshness": freshness["score"],
+            "justification": justification["score"],
+            "category": category["score"],
+        },
+        "issues": all_issues,
+    }
