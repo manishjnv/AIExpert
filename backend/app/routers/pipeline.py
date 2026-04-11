@@ -509,16 +509,30 @@ async def pipeline_dashboard_page(
           <div style="font-size:12px;color:#8a92a0">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
         </td>
         <td style="text-align:center"><span style="font-size:20px;font-family:'Fraunces',serif;color:${{scoreColor(c)}}">${{c}}</span></td>
-        <td style="min-width:180px">
+        <td style="min-width:200px">
+          ${{bar(s.blooms_progression || 0, "Bloom's")}}
+          ${{bar(s.theory_practice || 0, 'Theory/Practice')}}
+          ${{bar(s.project_density || 0, 'Projects')}}
+          ${{bar(s.assessment_quality || 0, 'Assessment')}}
+          ${{bar(s.completeness || 0, 'Completeness')}}
+          ${{bar(s.difficulty_calibration || 0, 'Difficulty')}}
+          ${{bar(s.industry_alignment || 0, 'Industry')}}
+          ${{bar(s.freshness || 0, 'Freshness')}}
+          ${{bar(s.prerequisites_clarity || 0, 'Prerequisites')}}
+          ${{bar(s.real_world_readiness || 0, 'Readiness')}}
+          <div style="border-top:1px solid #333;margin:4px 0;padding-top:4px">
           ${{bar(s.structure || 0, 'Structure')}}
           ${{bar(s.resources || 0, 'Resources')}}
           ${{bar(s.checklist || 0, 'Checklist')}}
           ${{bar(s.progression || 0, 'Progression')}}
           ${{bar(s.links || 0, 'Links')}}
+          </div>
         </td>
         <td style="font-size:12px">
-          ${{d.total_resources || 0}} resources · ${{d.unique_domains || 0}} domains · ${{d.reputable_pct || 0}}% reputable
-          <div style="color:#8a92a0">${{d.vague_checks_pct || 0}}% vague checks · ${{d.links_broken || 0}} broken links</div>
+          ${{d.practice_pct || 0}}% practice · ${{d.project_density_pct || 0}}% projects
+          <div style="color:#8a92a0">${{d.total_resources || 0}} resources · ${{d.unique_domains || 0}} domains · ${{d.reputable_pct || 0}}% reputable</div>
+          <div style="color:#8a92a0">${{d.completeness_pct || 0}}% topics · ${{d.measurable_pct || 0}}% measurable</div>
+          <div style="color:#6db585;font-size:11px">${{(d.industry_tools || []).slice(0,5).join(', ')}}</div>
         </td>
         <td style="max-width:250px">${{issueList || '<span style="color:#6db585;font-size:12px">No issues</span>'}}</td>
       </tr>`;
