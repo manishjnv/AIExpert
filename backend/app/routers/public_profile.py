@@ -55,16 +55,16 @@ body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0f1419;
 .container { max-width: 1100px; margin: 0 auto; padding: 32px 48px; }
 h1 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 28px; font-weight: 300; margin-bottom: 4px; }
 h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
-.subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
+.subtitle { color: #8a92a0; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
 .stat-row { display: flex; gap: 16px; margin: 16px 0 24px; flex-wrap: wrap; }
 .stat { background: #1d242e; padding: 16px 20px; border-radius: 6px; text-align: center; flex: 1; min-width: 80px; }
 .stat .n { font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 400; color: #e8a849; }
-.stat .l { font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; margin-top: 2px; }
+.stat .l { font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #8a92a0; margin-top: 2px; }
 .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 12px; background: rgba(109,181,133,0.2); color: #6db585; margin-right: 6px; }
 .progress-bar { background: #2a323d; border-radius: 4px; height: 6px; }
 .progress-bar > div { height: 6px; border-radius: 4px; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; border-bottom: 1px solid #2a323d; }
+th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #8a92a0; border-bottom: 1px solid #2a323d; }
 td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
 .container a { color: #6fa8d6; text-decoration: none; }
@@ -222,15 +222,15 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             <td class="rank" style="font-size:20px;text-align:center">{medal}</td>
             <td>
               <a href="/profile/{e['id']}" style="font-weight:600;font-size:14px">{e['name']}</a>
-              <div style="font-size:10px;color:#4a5260">Joined {e['joined']} · {e['lifetime_done']} lifetime tasks</div>
+              <div style="font-size:12px;color:#8a92a0">Joined {e['joined']} · {e['lifetime_done']} lifetime tasks</div>
             </td>
-            <td><span style="font-size:11px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
+            <td><span style="font-size:12px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
             <td>
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="flex:1">
                   <div class="progress-bar" style="width:100%;height:8px"><div style="width:{e['pct']}%;background:{bar_color}"></div></div>
                 </div>
-                <span style="font-size:11px;color:#4a5260;min-width:50px">{e['done']}/{e['total']}</span>
+                <span style="font-size:12px;color:#8a92a0;min-width:50px">{e['done']}/{e['total']}</span>
               </div>
             </td>
             <td style="color:#e8a849;font-weight:bold;font-size:20px;text-align:center">{e['pct']}%</td>
@@ -239,7 +239,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         </tr>"""
 
     if not rows:
-        rows = '<tr><td colspan="7" style="text-align:center;color:#4a5260;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
+        rows = '<tr><td colspan="7" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
 
     # Summary stats
     total_learners = len(entries)

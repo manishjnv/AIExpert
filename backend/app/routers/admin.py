@@ -350,7 +350,7 @@ async def admin_dashboard_page(
     )).scalars().all()
 
     signups_html = "".join(
-        f'<tr><td>{esc(u.name or "-")}</td><td style="color:#4a5260">{esc(u.email)}</td><td>{esc(u.provider)}</td><td>{u.created_at.strftime("%b %d, %H:%M") if u.created_at else "-"}</td></tr>'
+        f'<tr><td>{esc(u.name or "-")}</td><td style="color:#8a92a0">{esc(u.email)}</td><td>{esc(u.provider)}</td><td>{u.created_at.strftime("%b %d, %H:%M") if u.created_at else "-"}</td></tr>'
         for u in recent
     )
 
@@ -374,7 +374,7 @@ async def admin_dashboard_page(
 
 <div>
 <h2>Recent Signups</h2>
-{f'<table><tr><th>Name</th><th>Email</th><th>Auth</th><th>Joined</th></tr>{signups_html}</table>' if signups_html else '<p style="color:#4a5260;font-size:13px">No signups this week</p>'}
+{f'<table><tr><th>Name</th><th>Email</th><th>Auth</th><th>Joined</th></tr>{signups_html}</table>' if signups_html else '<p style="color:#8a92a0;font-size:13px">No signups this week</p>'}
 </div>
 
 <div>
@@ -478,10 +478,10 @@ async def admin_users_page(
         device = _parse_device(ua_raw)
 
         plan = user_plans.get(u.id, "")
-        plan_badge = f'<span style="color:#6db585;font-size:11px">{esc(plan)}</span>' if plan else '<span style="color:#4a5260;font-size:11px">No plan</span>'
+        plan_badge = f'<span style="color:#6db585;font-size:12px">{esc(plan)}</span>' if plan else '<span style="color:#8a92a0;font-size:12px">No plan</span>'
 
         provider_icon = "G" if u.provider == "google" else "✉"
-        admin_badge = ' <span style="color:#e8a849;font-size:10px">ADMIN</span>' if u.is_admin else ""
+        admin_badge = ' <span style="color:#e8a849;font-size:12px">ADMIN</span>' if u.is_admin else ""
 
         created = u.created_at.strftime("%b %d, %Y") if u.created_at else "-"
 
@@ -489,15 +489,15 @@ async def admin_users_page(
 <td>{u.id}</td>
 <td>
   <div><strong>{esc(u.name or '-')}</strong>{admin_badge}</div>
-  <div style="font-size:11px;color:#4a5260">{esc(u.email)}</div>
+  <div style="font-size:12px;color:#8a92a0">{esc(u.email)}</div>
 </td>
 <td><span title="{esc(u.provider)}">{provider_icon}</span></td>
 <td>{plan_badge}</td>
-<td style="font-size:11px">{last_login}</td>
-<td style="font-size:11px;color:#4a5260">{last_ip}</td>
-<td style="font-size:11px;color:#4a5260" data-ip="{esc(sess.ip or '') if sess else ''}" class="loc-cell">—</td>
-<td style="font-size:11px;color:#4a5260" title="{esc(ua_raw[:100])}">{esc(device)}</td>
-<td style="font-size:11px">{created}</td>
+<td style="font-size:12px">{last_login}</td>
+<td style="font-size:12px;color:#8a92a0">{last_ip}</td>
+<td style="font-size:12px;color:#8a92a0" data-ip="{esc(sess.ip or '') if sess else ''}" class="loc-cell">—</td>
+<td style="font-size:12px;color:#8a92a0" title="{esc(ua_raw[:100])}">{esc(device)}</td>
+<td style="font-size:12px">{created}</td>
 </tr>"""
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
@@ -529,7 +529,7 @@ async def admin_users_page(
 <tr><th>ID</th><th>User</th><th>Auth</th><th>Plan</th><th>Last Login</th><th>IP</th><th>Location</th><th>Device</th><th>Joined</th></tr>
 {rows_html}
 </table>
-<div style="margin-top:12px;font-size:12px;color:#4a5260">
+<div style="margin-top:12px;font-size:12px;color:#8a92a0">
   Showing {len(rows)} of {total} users
   {'  <a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a>' if page>1 else ''}
   {'  <a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}
@@ -655,17 +655,17 @@ async def admin_templates_page(
 {ADMIN_NAV}
 <div class="page">
 <h1>Plan Templates</h1>
-<p style="color:#4a5260;font-size:13px;margin-bottom:16px">Add new templates by topic. AI generates the full curriculum automatically.</p>
+<p style="color:#8a92a0;font-size:13px;margin-bottom:16px">Add new templates by topic. AI generates the full curriculum automatically.</p>
 
 <div style="background:#1d242e;padding:16px;border-radius:6px;margin-bottom:24px">
   <h2 style="font-size:16px;margin-bottom:12px">Generate New Template</h2>
   <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end">
-    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Topic</label><input id="genTopic" placeholder="e.g. NLP, Computer Vision, MLOps" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"></div>
-    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Duration</label><select id="genDuration" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="9">9 months</option><option value="12">12 months</option></select></div>
-    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Level</label><select id="genLevel" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select></div>
+    <div><label style="font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Topic</label><input id="genTopic" placeholder="e.g. NLP, Computer Vision, MLOps" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"></div>
+    <div><label style="font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Duration</label><select id="genDuration" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="9">9 months</option><option value="12">12 months</option></select></div>
+    <div><label style="font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Level</label><select id="genLevel" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select></div>
     <button class="btn success" onclick="generateTemplate()" id="genBtn" style="padding:8px 16px">Generate</button>
   </div>
-  <div id="genStatus" style="margin-top:8px;font-size:12px;color:#4a5260"></div>
+  <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
 <table><tr><th>Title</th><th>Goal</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Actions</th></tr>{rows_html}</table>

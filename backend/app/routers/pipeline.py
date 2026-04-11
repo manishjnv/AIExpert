@@ -64,7 +64,7 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; color
 .card { background: #1d242e; padding: 16px; border-radius: 6px; margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
-.form-group label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
+.form-group label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8a92a0; }
 .form-group input, .form-group select { padding: 8px; background: #0f1419; border: 1px solid #2a323d; color: #f5f1e8; border-radius: 3px; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .badge.pending { background: #3d3520; color: #e8a849; }
@@ -345,7 +345,7 @@ async def pipeline_dashboard_page(
 
 <div class="card">
   <h3>1. Discover Topics</h3>
-  <p style="font-size:12px;color:#4a5260">AI finds trending AI/ML topics from universities, papers, and industry.</p>
+  <p style="font-size:12px;color:#8a92a0">AI finds trending AI/ML topics from universities, papers, and industry.</p>
   <p style="font-size:12px">Last run: {esc(last_discovery)}</p>
   <p style="font-size:12px">Discovers: {s.max_topics_per_discovery} topic(s) per run</p>
   <button class="btn primary" onclick="runAction('run-discovery', this)">Run Discovery Now</button>
@@ -354,7 +354,7 @@ async def pipeline_dashboard_page(
 
 <div class="card">
   <h3>2. Generate Curricula</h3>
-  <p style="font-size:12px;color:#4a5260">Creates study plans (3mo/6mo, beginner/intermediate/advanced) for approved topics.</p>
+  <p style="font-size:12px;color:#8a92a0">Creates study plans (3mo/6mo, beginner/intermediate/advanced) for approved topics.</p>
   <p style="font-size:12px">Last run: {esc(last_generation)}</p>
   <p style="font-size:12px">Ready to generate: <strong>{approved}</strong> approved topic(s)</p>
   <button class="btn primary" onclick="runAction('run-generation', this)" {'disabled' if approved == 0 else ''}>Generate Curricula</button>
@@ -363,7 +363,7 @@ async def pipeline_dashboard_page(
 
 <div class="card">
   <h3>3. Refresh Content</h3>
-  <p style="font-size:12px;color:#4a5260">Checks resource links and reviews if content is still current.</p>
+  <p style="font-size:12px;color:#8a92a0">Checks resource links and reviews if content is still current.</p>
   <p style="font-size:12px">Last run: {esc(last_refresh)}</p>
   <p style="font-size:12px">Templates to check: <strong>{template_count}</strong></p>
   <button class="btn primary" onclick="runAction('run-refresh', this)">Run Refresh Now</button>
@@ -373,10 +373,10 @@ async def pipeline_dashboard_page(
 </div>
 
 <h2>Pipeline Status</h2>
-<div id="norm-data"><em style="color:#4a5260">Loading pipeline stats...</em></div>
+<div id="norm-data"><em style="color:#8a92a0">Loading pipeline stats...</em></div>
 
 <h2>Template Quality Scores</h2>
-<div id="quality-data"><em style="color:#4a5260">Scoring templates...</em></div>
+<div id="quality-data"><em style="color:#8a92a0">Scoring templates...</em></div>
 
 <script>
 // Load normalization stats inline
@@ -388,7 +388,7 @@ async def pipeline_dashboard_page(
 
     const linkPct = ref.total_links > 0 ? Math.round(ref.ok_links / ref.total_links * 100) : 100;
     const catHtml = disc.categories.map(c =>
-      `<span style="display:inline-block;background:#0f1419;padding:2px 8px;border-radius:10px;font-size:11px;margin:2px">${{c.category}} <strong>${{c.count}}</strong></span>`
+      `<span style="display:inline-block;background:#0f1419;padding:2px 8px;border-radius:10px;font-size:12px;margin:2px">${{c.category}} <strong>${{c.count}}</strong></span>`
     ).join('');
 
     let topicRows = '';
@@ -398,7 +398,7 @@ async def pipeline_dashboard_page(
         <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${{t.topic}}</td>
         <td>${{t.variants}}/5</td>
         <td><span class="badge ${{cls}}">${{t.status}}</span></td>
-        <td style="font-size:10px;color:#d97757;max-width:250px;overflow:hidden;text-overflow:ellipsis">${{t.error}}</td>
+        <td style="font-size:12px;color:#d97757;max-width:250px;overflow:hidden;text-overflow:ellipsis">${{t.error}}</td>
       </tr>`;
     }}
 
@@ -417,7 +417,7 @@ async def pipeline_dashboard_page(
       ${{topicRows ? '<h3 style="margin-top:8px">Generation by Topic</h3><div style="max-height:300px;overflow-y:auto"><table><tr><th>Topic</th><th>Variants</th><th>Status</th><th>Errors</th></tr>' + topicRows + '</table></div>' : ''}}
 
       <h2 style="margin-top:32px;font-family:Fraunces,Georgia,serif;color:#e8a849;font-size:18px">Pipeline Stages</h2>
-      <p style="font-size:12px;color:#4a5260;margin-bottom:4px">Every topic goes through these stages before becoming a course. Stages marked with <span style="color:#e8a849">AI</span> use AI providers and consume budget.</p>
+      <p style="font-size:12px;color:#8a92a0;margin-bottom:4px">Every topic goes through these stages before becoming a course. Stages marked with <span style="color:#e8a849">AI</span> use AI providers and consume budget.</p>
       <p style="font-size:12px;color:#6a7280;margin-bottom:14px"><span style="color:#e8a849">■</span> Data cleanup · <span style="color:#5d9be8">■</span> AI enrichment · <span style="color:#6db585">■</span> Process control · <span style="color:#d97757">■</span> Maintenance</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #e8a849">
@@ -473,7 +473,7 @@ async def pipeline_dashboard_page(
     const resp = await fetch('/admin/pipeline/api/quality', {{credentials: 'same-origin'}});
     const data = await resp.json();
     if (!data.length) {{
-      document.getElementById('quality-data').innerHTML = '<p style="color:#4a5260">No templates to score yet.</p>';
+      document.getElementById('quality-data').innerHTML = '<p style="color:#8a92a0">No templates to score yet.</p>';
       return;
     }}
 
@@ -486,11 +486,11 @@ async def pipeline_dashboard_page(
     function scoreColor(s) {{ return s >= 70 ? '#6db585' : s >= 40 ? '#e8a849' : '#d97757'; }}
     function bar(score, label) {{
       return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">
-        <span style="font-size:10px;color:#4a5260;width:70px">${{label}}</span>
+        <span style="font-size:12px;color:#8a92a0;width:70px">${{label}}</span>
         <div style="flex:1;background:#0f1419;border-radius:2px;height:8px;max-width:120px">
           <div style="width:${{score}}%;height:100%;background:${{scoreColor(score)}};border-radius:2px"></div>
         </div>
-        <span style="font-size:11px;color:${{scoreColor(score)}}">${{score}}</span>
+        <span style="font-size:12px;color:${{scoreColor(score)}}">${{score}}</span>
       </div>`;
     }}
 
@@ -500,12 +500,12 @@ async def pipeline_dashboard_page(
       const s = t.scores || {{}};
       const d = t.details || {{}};
       const issueList = (t.issues || []).slice(0, 3).map(i =>
-        `<div style="font-size:10px;color:#d97757">• ${{i}}</div>`
+        `<div style="font-size:12px;color:#d97757">• ${{i}}</div>`
       ).join('');
       rows += `<tr>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
           <strong>${{t.title || t.key}}</strong>
-          <div style="font-size:10px;color:#4a5260">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
+          <div style="font-size:12px;color:#8a92a0">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
         </td>
         <td style="text-align:center"><span style="font-size:20px;font-family:'Fraunces',serif;color:${{scoreColor(c)}}">${{c}}</span></td>
         <td style="min-width:180px">
@@ -515,11 +515,11 @@ async def pipeline_dashboard_page(
           ${{bar(s.progression || 0, 'Progression')}}
           ${{bar(s.links || 0, 'Links')}}
         </td>
-        <td style="font-size:11px">
+        <td style="font-size:12px">
           ${{d.total_resources || 0}} resources · ${{d.unique_domains || 0}} domains · ${{d.reputable_pct || 0}}% reputable
-          <div style="color:#4a5260">${{d.vague_checks_pct || 0}}% vague checks · ${{d.links_broken || 0}} broken links</div>
+          <div style="color:#8a92a0">${{d.vague_checks_pct || 0}}% vague checks · ${{d.links_broken || 0}} broken links</div>
         </td>
-        <td style="max-width:250px">${{issueList || '<span style="color:#6db585;font-size:11px">No issues</span>'}}</td>
+        <td style="max-width:250px">${{issueList || '<span style="color:#6db585;font-size:12px">No issues</span>'}}</td>
       </tr>`;
     }}
 
@@ -623,16 +623,16 @@ async def pipeline_topics_page(
 
         error_html = ""
         if t.generation_error:
-            error_html = f'<div style="color:#d97757;font-size:11px;margin-top:2px">{esc(t.generation_error[:100])}</div>'
+            error_html = f'<div style="color:#d97757;font-size:12px;margin-top:2px">{esc(t.generation_error[:100])}</div>'
 
         rows_html += f"""<tr>
 <td>{t.id}</td>
-<td><strong>{esc(t.topic_name)}</strong><div style="font-size:11px;color:#4a5260">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
+<td><strong>{esc(t.topic_name)}</strong><div style="font-size:12px;color:#8a92a0">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
 <td style="font-size:12px;max-width:300px">{esc(t.justification[:150])}{'...' if len(t.justification) > 150 else ''}</td>
 <td>{t.confidence_score}</td>
 <td><span class="badge {t.status}">{t.status}</span>{error_html}</td>
 <td>{t.templates_generated}</td>
-<td style="font-size:11px">{t.created_at.strftime('%Y-%m-%d') if t.created_at else ''}</td>
+<td style="font-size:12px">{t.created_at.strftime('%Y-%m-%d') if t.created_at else ''}</td>
 <td>{actions}</td>
 </tr>"""
 
@@ -670,7 +670,7 @@ async function deleteTopic(id) {{
 }}
 
 </script>
-<div style="margin-top:12px">{'<a href="/admin/pipeline/topics?page='+str(page-1)+'&status='+esc(status)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/pipeline/topics?page='+str(page+1)+'&status='+esc(status)+'" class="btn">Next</a>' if page*50<total else ''} <span style="font-size:12px;color:#4a5260">{total} total</span></div>
+<div style="margin-top:12px">{'<a href="/admin/pipeline/topics?page='+str(page-1)+'&status='+esc(status)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/pipeline/topics?page='+str(page+1)+'&status='+esc(status)+'" class="btn">Next</a>' if page*50<total else ''} <span style="font-size:12px;color:#8a92a0">{total} total</span></div>
 </div>
 </body></html>"""
 
@@ -1002,7 +1002,7 @@ async def ai_usage_page(
 
         reset_btn = ""
         if permanent or not available:
-            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:10px" onclick="resetProvider(\'{p}\')">Retry This Provider</button>'
+            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:12px" onclick="resetProvider(\'{p}\')">Retry This Provider</button>'
 
         provider_cards += f"""<div class="card" style="flex:1;min-width:170px">
   <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1010,8 +1010,8 @@ async def ai_usage_page(
     <span style="font-size:13px">{dot}</span>
   </div>
   <div style="font-size:13px;margin:6px 0;color:#f5f1e8">{status_text}</div>
-  <div style="font-size:11px;color:#4a5260">{esc(reason)}</div>
-  <div style="font-size:10px;color:#3a4452;margin-top:4px">Model: {esc(model)}</div>
+  <div style="font-size:12px;color:#8a92a0">{esc(reason)}</div>
+  <div style="font-size:12px;color:#8a92a0;margin-top:4px">Model: {esc(model)}</div>
   {reset_btn}
 </div>"""
 
@@ -1036,13 +1036,13 @@ async def ai_usage_page(
 </div>
 
 <h2>Usage by Provider</h2>
-<div id="provider-stats"><em style="color:#4a5260">Loading...</em></div>
+<div id="provider-stats"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2>Usage by Task</h2>
-<div id="task-stats"><em style="color:#4a5260">Loading...</em></div>
+<div id="task-stats"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2>Recent Calls (last 50)</h2>
-<div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#4a5260">Loading...</em></div>
+<div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
 
 <script>
 async function resetProvider(name) {{
@@ -1077,7 +1077,7 @@ async function loadUsageData() {{
       html += '</table>';
       document.getElementById('provider-stats').innerHTML = html;
     }} else {{
-      document.getElementById('provider-stats').innerHTML = '<p style="color:#4a5260">No usage data yet. Run a pipeline task to generate data.</p>';
+      document.getElementById('provider-stats').innerHTML = '<p style="color:#8a92a0">No usage data yet. Run a pipeline task to generate data.</p>';
     }}
 
     // Task stats table
@@ -1086,7 +1086,7 @@ async function loadUsageData() {{
       for (const t of data.task_stats) {{
         html += `<tr>
           <td>${{t.task}}</td>
-          <td style="font-size:11px;color:#4a5260;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{t.subtask}}</td>
+          <td style="font-size:12px;color:#8a92a0;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{t.subtask}}</td>
           <td>${{t.total_calls}}</td>
           <td style="color:#6db585">${{t.success}}</td>
           <td style="color:#d97757">${{t.failures}}</td>
@@ -1096,7 +1096,7 @@ async function loadUsageData() {{
       html += '</table>';
       document.getElementById('task-stats').innerHTML = html;
     }} else {{
-      document.getElementById('task-stats').innerHTML = '<p style="color:#4a5260">No task data yet.</p>';
+      document.getElementById('task-stats').innerHTML = '<p style="color:#8a92a0">No task data yet.</p>';
     }}
 
     // Recent calls
@@ -1115,9 +1115,9 @@ async function loadUsageData() {{
       let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Result</th><th>Speed</th></tr>';
       for (const r of data.recent) {{
         html += `<tr>
-          <td style="font-size:11px;white-space:nowrap">${{r.called_at.slice(11)}}</td>
+          <td style="font-size:12px;white-space:nowrap">${{r.called_at.slice(11)}}</td>
           <td style="text-transform:capitalize">${{r.provider}}</td>
-          <td>${{r.task}}${{r.subtask ? ' <span style="color:#4a5260;font-size:10px">(' + r.subtask.slice(0,30) + ')</span>' : ''}}</td>
+          <td>${{r.task}}${{r.subtask ? ' <span style="color:#8a92a0;font-size:12px">(' + r.subtask.slice(0,30) + ')</span>' : ''}}</td>
           <td>${{friendlyStatus(r.status, r.error_message)}}</td>
           <td>${{friendlyTime(r.latency_ms)}}</td>
         </tr>`;
@@ -1125,7 +1125,7 @@ async function loadUsageData() {{
       html += '</table>';
       document.getElementById('recent-calls').innerHTML = html;
     }} else {{
-      document.getElementById('recent-calls').innerHTML = '<p style="color:#4a5260">No recent calls.</p>';
+      document.getElementById('recent-calls').innerHTML = '<p style="color:#8a92a0">No recent calls.</p>';
     }}
   }} catch(e) {{
     document.getElementById('provider-stats').innerHTML = '<p style="color:#d97757">Failed to load: ' + e.message + '</p>';
