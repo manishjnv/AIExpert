@@ -320,6 +320,7 @@
   </span>
   <span id="authButtons" style="display:none">
     <button class="btn" onclick="window.location='/leaderboard'">Leaderboard</button>
+    <button class="btn" onclick="openPlanPicker()">Switch Plan</button>
     <button class="btn" id="exportPlanBtn" onclick="exportPlanPDF()">Export Plan</button>
     <button class="btn" id="profileBtn" onclick="window.location='/account'">Account</button>
     <button class="btn" id="adminBtn" style="display:none" onclick="window.open('/admin/','_blank')">Admin</button>
@@ -1369,7 +1370,12 @@ async function loadTemplateOptions() {
   } catch {}
   updatePlanLabels();
 }
-loadTemplateOptions();
+loadTemplateOptions().then(() => {
+  if (new URLSearchParams(window.location.search).has('switch')) {
+    openPlanPicker();
+    history.replaceState(null, '', '/');
+  }
+});
 
 function _getTopics() {
   const topics = new Map();
