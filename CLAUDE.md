@@ -120,10 +120,10 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-11 (session 3)
-**Last session summary:** Major admin + infrastructure session. 4 new AI providers (Cerebras/Mistral/DeepSeek/Sambanova) with 6-provider fallback chain + circuit breaker. AI Usage dashboard (provider health, per-task stats, recent calls). Normalization stages merged into Pipeline page with AI markers. Resend email (DKIM, no "via gmail.com"). Admin Dashboard vs Users separation. Users page: location geo-lookup, anonymous visitor tracking, device/IP/plan columns. Favicon on all pages. 11 commits.
-**Tests passing:** 88 (2 flaky from GitHub API rate limit, not our code)
-**Tests failing:** 2 flaky (test_repos — external GitHub rate limit)
-**Blockers:** DeepSeek 402 insufficient balance. 2 topics still have failed generation variants.
-**Next action:** Re-run generation. Review template quality. P4 specialist templates. Wire up Claude if approved.
-**Open questions for the user:** Permission to wire up Claude API for curriculum generation? Top up DeepSeek or remove?
+**Last session date:** 2026-04-12 (session 4)
+**Last session summary:** AI Quality Pipeline built (Generate→Review→Refine→Validate). Gemini cost optimizations (context caching, right-sized tokens, structured output, system instructions). Claude wired for surgical refinement only (prompt caching). Improved generation prompt (Bloom's taxonomy, action verbs, theory-practice ratio). Quality scorer (5 heuristic + 10 AI-reviewed dimensions). All admin UI readability fixed (37 inline color fixes, 31 font size fixes). Pipeline Settings full-width. Templates volume issue identified (generated templates lost on rebuild).
+**Tests passing:** 88 (2 flaky from GitHub API rate limit)
+**Tests failing:** 2 flaky (test_repos — external)
+**Blockers:** DeepSeek 402. Generated templates lost on container rebuild (need volume mount). 
+**Next action:** Fix template volume mount. Run discovery + generation with quality pipeline. Implement 10 new scoring dimensions in heuristic scorer.
+**Open questions for the user:** None — Claude approved for refinement.
