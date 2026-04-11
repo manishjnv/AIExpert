@@ -4,79 +4,96 @@
 
 ## Current state as of 2026-04-12 (session 5)
 
-**Last worked on:** Template volume persistence, 15-dimension quality scorer, Gemini structured output schemas, Claude Batch API
+**Last worked on:** Template persistence, 15-dim scorer, quality gate, proposals page, clickable admin, content lifecycle
 **Branch:** master
 **Live site:** https://automateedge.cloud
 
 ## What got done this session (2026-04-12, session 5)
 
 ### 1. Template Volume Mount (CRITICAL fix)
-- `docker-compose.yml`: Added `./data/templates:/app/app/curriculum/templates` volume for both backend and cron services
-- `Dockerfile`: Added seed template copy to `/app/seed_templates`, startup logic seeds empty volume from built-in templates
-- `data/templates/`: Seeded with 3 generalist templates locally
-- **Result:** Generated templates now persist across container rebuilds
+- `docker-compose.yml`: `./data/templates:/app/app/curriculum/templates` volume for backend + cron
+- `Dockerfile`: seed templates layer + startup seeding logic
+- Templates now persist across container rebuilds
 
 ### 2. Quality Scorer — 15 Dimensions (was 5)
-- `quality_scorer.py`: Added 10 new heuristic dimensions (all regex, zero AI cost):
-  - Bloom's taxonomy progression (verb classification across months)
-  - Theory-to-practice ratio (resource URL/name classification)
-  - Project density (deliverable keyword analysis)
-  - Assessment quality (measurable outcome detection)
-  - Completeness (essential topic coverage by level)
-  - Difficulty calibration (cliff/plateau detection)
-  - Industry alignment (modern tool coverage)
-  - Freshness (deprecated tech detection)
-  - Prerequisites clarity (dependency chain validation)
-  - Real-world readiness (portfolio/production markers)
-- Updated composite weights to distribute across 15 dimensions (content > infrastructure)
+- 10 new heuristic dimensions (all regex, zero AI cost): Bloom's progression, theory/practice ratio, project density, assessment quality, completeness, difficulty calibration, industry alignment, freshness, prerequisites clarity, real-world readiness
+- Scorer calibration: Bloom's strips "Reviewed:" prefixes, project keywords include checks, completeness adjusted for specialized topics, links excluded when unchecked, plateau threshold relaxed
+- Pipeline quality table shows all 15 bar charts
 
-### 3. Gemini Structured Output Schemas
-- `ai/schemas.py`: NEW — defines `PLAN_TEMPLATE_SCHEMA` and `QUALITY_REVIEW_SCHEMA` in Gemini's OpenAPI format
-- `provider.py`: Passes `PLAN_TEMPLATE_SCHEMA` to Gemini when task=generation (guarantees valid JSON shape, eliminates retry loops)
-- `quality_pipeline.py`: Passes `QUALITY_REVIEW_SCHEMA` to Gemini review calls
+### 3. Quality Gate — Publish Model
+- `_meta.json` manifest tracks draft/published status per template
+- User-facing `/api/templates` returns published only (score >= 90)
+- 3 generalist templates grandfathered (always published)
+- Publish/Unpublish buttons on Pipeline quality table
+- Templates admin page: Status + Quality + Subscribers columns
 
-### 4. Claude Batch API (50% discount)
-- `ai/anthropic.py`: Added `create_batch()`, `poll_batch()`, `get_batch_results()` for Message Batches API
-- `quality_pipeline.py`: Added `create_batch_refinement()` and `apply_batch_results()` for bulk refinement
-- Threshold: 5+ items triggers batch mode (otherwise individual calls)
+### 4. Gemini 2.5 Migration
+- Model updated from `gemini-2.0-flash-lite` (deprecated) to `gemini-2.5-flash`
+- Thinking disabled (`thinkingBudget: 0`), multi-part response handling, code block extraction
+- All providers bumped to 8192 max_tokens + 60s timeout for generation
+
+### 5. Content Lifecycle (Proposals + Auto-unpublish)
+- Proposals page (`/admin/pipeline/proposals`): view, approve, reject quarterly sync proposals
+- Auto-unpublish: content refresh unpublishes templates when AI currency score < 40
+- Refine Existing button on Pipeline page: runs AI review+refine on templates below 90
+
+### 6. Clickable Admin (Templates + Topics)
+- Template detail page (`/admin/templates/{key}`): full curriculum view with months, weeks, resources, deliverables, checklists
+- Template names clickable in Templates table + Pipeline quality table
+- Topic detail modal: full justification, evidence sources, approve/reject buttons
+- Workflow banner on Topics page explaining the pipeline
+
+### 7. UI Fixes
+- Restored connection badges (GitHub/LinkedIn/Google) in nav — lost during unified nav refactor
+- Fixed "Loading plan..." stuck — `planBadge` element was missing, crashing eyebrow update
+- Badges left-aligned next to logo
+
+### 8. Claude Batch API + Gemini Structured Schemas
+- `ai/anthropic.py`: `create_batch()`, `poll_batch()`, `get_batch_results()`
+- `ai/schemas.py`: `PLAN_TEMPLATE_SCHEMA` + `QUALITY_REVIEW_SCHEMA` (disabled pending Gemini 2.5 testing)
+- Batch refinement: `create_batch_refinement()` + `apply_batch_results()` for 50% discount on 5+ items
 
 ## Credentials status
 
 | Credential | Status |
 |-----------|--------|
-| SMTP (Resend) | Verified, DKIM active |
-| Gemini | On VPS, context caching + structured output enabled |
-| Groq | On VPS, max_tokens bumped to 4096 |
-| Cerebras | On VPS, llama3.1-8b |
-| Mistral | On VPS, JSON code block parsing |
+| Gemini | gemini-2.5-flash on VPS, thinking disabled |
+| Groq | On VPS, 8192 max_tokens |
+| Cerebras | On VPS, 8192 max_tokens |
+| Mistral | On VPS, 8192 max_tokens |
+| Sambanova | On VPS, 8192 max_tokens |
 | DeepSeek | 402 insufficient balance |
-| Sambanova | On VPS, 4096 max_tokens |
 | Anthropic | On VPS, prompt caching + batch API, refinement only |
+| SMTP (Resend) | Verified, DKIM active |
 
 ## Tests
 
 **Passing:** 88 (2 repo tests flaky from GitHub API rate limit)
 
-## Key files created/changed this session
+## Templates on disk (5)
 
-| File | Change |
-|------|--------|
-| `docker-compose.yml` | Template volume mount for backend + cron |
-| `backend/Dockerfile` | Seed templates layer + startup seeding logic |
-| `backend/app/services/quality_scorer.py` | 10 new scoring dimensions (15 total) |
-| `backend/app/ai/schemas.py` | NEW — Gemini structured output schemas |
-| `backend/app/ai/provider.py` | Wire generation schema to Gemini |
-| `backend/app/services/quality_pipeline.py` | Review schema + batch refinement API |
-| `backend/app/ai/anthropic.py` | Batch API (create, poll, results) |
+| Template | Composite Score | Status |
+|----------|----------------|--------|
+| generalist_12mo_beginner | 89 | Published (grandfathered) |
+| generalist_6mo_intermediate | 92 | Published (grandfathered) |
+| generalist_3mo_intermediate | 89 | Published (grandfathered) |
+| multimodal_few_shot_learning_3mo_intermediate | 87 | Draft |
+| multimodal_few_shot_learning_3mo_beginner | 87 | Draft |
+
+## Topics (12 in DB)
+
+- 10 generated (errors cleared, ready for re-generation later)
+- 1 pending (Agentic AI and Tool-Using LLMs)
+- Topic #5 (Adversarial Robustness) was the only clean 5/5 generation
 
 ## Next session priorities
 
-1. **Deploy to VPS** — `git pull && docker compose up -d --build` (seed templates auto-created)
-2. **Run full generation cycle** on live: discovery → approve → generate with quality pipeline
-3. **Verify quality scores** in admin UI with new 15-dimension scorer
-4. **Wire batch refinement into admin UI** — "Batch Refine" button when 5+ templates below threshold
-5. **URL validation during generation** — catch hallucinated URLs before saving
-6. **Admin UI for batch status** — show batch progress, apply results
+1. **Re-run generation** for topics with missing variants (when rate limits allow)
+2. **Approve topic #11** (Agentic AI) and generate
+3. **Run Content Refresh** to check links + currency scores
+4. **Test Gemini structured output schemas** with 2.5-flash
+5. **Wire batch refinement into admin UI** — button when 5+ templates below threshold
+6. **URL validation during generation** — catch hallucinated URLs before saving
 
 ---
 
@@ -90,4 +107,4 @@
 | 2026-04-11 | P1 pipeline, P2 UX, security hardening, unified nav, account page. |
 | 2026-04-11 | P1 live test, 4 new AI providers, Resend email, AI usage dashboard. |
 | 2026-04-12 | AI quality pipeline, Gemini optimizations, Claude refinement, scoring engine. |
-| 2026-04-12 | Template persistence, 15-dim scorer, Gemini schemas, Claude Batch API. |
+| 2026-04-12 | Template persistence, 15-dim scorer, quality gate, proposals, clickable admin. |
