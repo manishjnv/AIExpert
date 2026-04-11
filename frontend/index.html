@@ -239,14 +239,18 @@
     .progress-overall { position: static; margin: 20px auto 0; width: 90px; height: 90px; }
     .progress-label .pct { font-size: 22px; }
     .subtitle { font-size: 16px; }
-    .meta-bar { gap: 16px; }
+    .meta-bar { gap: 12px; flex-wrap: wrap; }
+    .meta-item { font-size: 10px; }
     .meta-item strong { font-size: 18px; }
     .habits { padding: 24px 20px; }
     .habits-grid { grid-template-columns: 1fr; gap: 14px; }
     .topnav { padding: 10px 16px; gap: 6px; flex-wrap: wrap; }
-    .topnav-brand span { display: none; }
+    .topnav-brand { font-size: 14px; margin-right: 0; width: 100%; margin-bottom: 4px; }
+    .topnav-brand svg { width: 20px; height: 20px; }
+    .conn-badge { font-size: 9px; padding: 2px 6px; margin-left: 3px; }
     .toolbar { padding: 10px 16px; gap: 6px; flex-wrap: wrap; }
     .btn { font-size: 10px; padding: 8px 10px; }
+    .btn.signin-btn { padding: 8px 14px; }
     .toolbar-stats { width: 100%; text-align: center; margin-left: 0; }
     main { padding: 24px 16px; }
     .month-header { flex-direction: column; gap: 8px; }
@@ -255,28 +259,41 @@
     .month-progress { text-align: left; }
     .month-progress .bar { width: 100%; }
     .week { padding: 20px 16px; }
-    .week-header { gap: 10px; }
-    .week-title { font-size: 18px; min-width: unset; }
+    .week-header { flex-wrap: wrap; gap: 6px; }
+    .week-title { font-size: 18px; min-width: unset; width: 100%; }
     .week-grid { grid-template-columns: 1fr; gap: 16px; }
+    .res-list { grid-template-columns: 1fr; }
     .res-item { font-size: 12px; padding: 8px 10px; }
     .checkpoint { flex-direction: column; gap: 10px; padding: 16px 20px; }
+    .footer-inner { grid-template-columns: 1fr; gap: 20px; }
     footer { padding: 32px 20px; font-size: 11px; }
     .month-tagline { font-size: 14px; }
-    .eyebrow { font-size: 10px; }
+    .eyebrow { font-size: 9px; letter-spacing: 0.12em; }
+    .modal { width: 95%; max-width: 380px; padding: 20px; }
+    .chat-panel { width: calc(100vw - 32px); right: 16px; bottom: 76px; max-height: 70vh; }
+    .chat-fab { bottom: 16px; right: 16px; height: 42px; padding: 0 14px; font-size: 12px; }
+    .repo-input-row { flex-direction: column; }
+    .repo-input-row input { width: 100%; }
+    .eval-cols { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 480px) {
-    h1 { font-size: 28px; }
-    .meta-bar { gap: 12px; }
-    .meta-item { font-size: 10px; }
-    .meta-item strong { font-size: 16px; }
+    h1 { font-size: 24px; }
+    .meta-bar { gap: 8px; }
+    .meta-item { font-size: 9px; }
+    .meta-item strong { font-size: 14px; }
     .month-num { font-size: 44px; }
     .month-title h2 { font-size: 20px; }
-    .week-title { font-size: 16px; }
-    .week-header { gap: 8px; }
+    .week-title { font-size: 15px; }
+    .week-header { gap: 4px; }
     .week-hours { font-size: 10px; padding: 3px 8px; }
-    .week-num { font-size: 10px; padding: 3px 8px; }
-    .btn { font-size: 9px; padding: 7px 8px; letter-spacing: 0.05em; }
+    .week-num { font-size: 9px; padding: 3px 6px; }
+    .btn { font-size: 9px; padding: 6px 8px; letter-spacing: 0.05em; }
+    .topnav-brand { font-size: 13px; }
+    .conn-badge { font-size: 8px; padding: 2px 5px; }
+    .check-text { font-size: 12px; }
+    .subtitle { font-size: 14px; }
+    header { padding: 24px 16px 20px; }
   }
 </style>
 </head>
