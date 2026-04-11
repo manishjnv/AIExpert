@@ -33,6 +33,7 @@
         <a href="/"${activeClass('/')}>Home</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
         <span id="navAuth" style="display:${authDisplay}">
+          <a href="#" onclick="navExportPlan();return false" class="nav-action">Export Learning Plan</a>
           <a href="/account"${activeClass('/account')}>Account</a>
           <a href="/admin/" id="navAdminLink" style="display:${adminDisplay}"${activeClass('/admin')}>Admin</a>
           <a href="#" onclick="navSignOut();return false">Sign Out</a>
@@ -91,6 +92,14 @@
       window.signIn();
     } else {
       window.location = '/';
+    }
+  };
+  // Export learning plan — uses page function if on home, otherwise navigates
+  window.navExportPlan = function() {
+    if (typeof window.exportPlanPDF === 'function') {
+      window.exportPlanPDF();
+    } else {
+      window.location = '/?export=1';
     }
   };
 })();

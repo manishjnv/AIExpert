@@ -1348,8 +1348,13 @@ async function loadTemplateOptions() {
   updatePlanLabels();
 }
 loadTemplateOptions().then(() => {
-  if (new URLSearchParams(window.location.search).has('switch')) {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('switch')) {
     openPlanPicker();
+    history.replaceState(null, '', '/');
+  }
+  if (params.has('export')) {
+    setTimeout(() => exportPlanPDF(), 500);
     history.replaceState(null, '', '/');
   }
 });

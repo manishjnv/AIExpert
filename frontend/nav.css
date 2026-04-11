@@ -51,6 +51,14 @@
   color: #e8a849;
   border-bottom-color: #e8a849;
 }
+.topnav-links a.nav-action {
+  border: 1px solid #3a4452;
+  border-radius: 3px;
+  padding: 6px 14px;
+}
+.topnav-links a.nav-action:hover {
+  border-color: #e8a849;
+}
 .topnav-links a.signin-link {
   background: #e8a849;
   color: #0f1419;
