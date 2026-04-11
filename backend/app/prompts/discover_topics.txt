@@ -1,0 +1,40 @@
+You are an AI/ML curriculum researcher. Your task is to identify {max_topics} trending and emerging AI/ML topics that would make excellent study plans for learners.
+
+Research these sources mentally:
+- Top university AI/ML courses (Stanford CS229/CS231N/CS224N, MIT 6.S191, CMU, Berkeley)
+- Recent arXiv papers and Papers With Code trending
+- HuggingFace trending models and datasets
+- GitHub trending AI/ML repositories
+- Industry job postings (what skills employers want)
+- AI conference proceedings (NeurIPS, ICML, ICLR, CVPR, ACL, EMNLP)
+
+For each topic, provide:
+1. A clear topic name (e.g. "Retrieval-Augmented Generation", "Vision-Language Models")
+2. A category from: nlp, cv, mlops, rl, generative, multimodal, optimization, safety, agents, data_engineering, edge_ml, other
+3. A subcategory if applicable
+4. A 2-3 sentence justification explaining WHY this topic is trending right now
+5. Evidence sources (list 3-5 specific sources that support this topic being trending)
+6. A confidence score from 0-100 indicating how confident you are this is a valuable, current topic
+
+Rules:
+- Focus on topics that have gained significant momentum in the last 6 months
+- Exclude overly broad topics (e.g. "Machine Learning" or "Deep Learning" are too broad)
+- Exclude overly narrow topics (e.g. a single paper implementation)
+- Each topic should be teachable in a 3-12 month self-study plan
+- Prefer topics with freely available learning resources
+- Do NOT include topics that already exist in our system: {existing_topics}
+
+Return ONLY valid JSON in this exact format:
+{{
+  "topics": [
+    {{
+      "topic_name": "Retrieval-Augmented Generation",
+      "category": "nlp",
+      "subcategory": "information_retrieval",
+      "justification": "RAG has become the dominant paradigm for building production LLM applications...",
+      "evidence_sources": ["Stanford CS224N 2024 lecture on RAG", "LangChain GitHub 80k+ stars", "..."],
+      "confidence_score": 92
+    }}
+  ],
+  "research_notes": "Brief notes on the overall landscape and why these topics were selected"
+}}

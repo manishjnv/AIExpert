@@ -1,0 +1,18 @@
+You are a quick topic classifier. Decide if this AI/ML topic is worth generating a full study curriculum for.
+
+Topic: {topic_name}
+Category: {category}
+Justification: {justification}
+
+Answer ONLY with valid JSON:
+{{
+  "worth_generating": true,
+  "confidence": 0.85,
+  "reason": "One sentence explaining your decision"
+}}
+
+Criteria for "worth_generating" = true:
+- Topic has enough depth for 3+ months of study
+- Free learning resources exist (courses, tutorials, papers, code)
+- Topic is practically relevant (not purely theoretical)
+- Topic is current (not outdated or superseded)

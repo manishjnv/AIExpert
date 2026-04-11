@@ -61,10 +61,12 @@ async def lifespan(app: FastAPI):
     # Start background cleanup tasks
     import asyncio
     from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions, send_weekly_reminders
+    from app.services.pipeline_scheduler import pipeline_scheduler
     import app.db as _db
     otp_task = asyncio.create_task(cleanup_expired_otps(_db.async_session_factory))
     session_task = asyncio.create_task(cleanup_expired_sessions(_db.async_session_factory))
     reminder_task = asyncio.create_task(send_weekly_reminders(_db.async_session_factory))
+    pipeline_task = asyncio.create_task(pipeline_scheduler(_db.async_session_factory))
 
     yield
 
@@ -72,6 +74,7 @@ async def lifespan(app: FastAPI):
     otp_task.cancel()
     session_task.cancel()
     reminder_task.cancel()
+    pipeline_task.cancel()
     logger.info("Shutting down")
     await close_db()
 
@@ -165,7 +168,7 @@ async def learner_count():
 
 
 # ----- Router registration -----
-from app.routers import auth, plans, profile, repos, evaluate, chat, share, admin, contact, public_profile, templates
+from app.routers import auth, plans, profile, repos, evaluate, chat, share, admin, contact, public_profile, templates, pipeline
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(plans.router, prefix="/api", tags=["plans"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
@@ -177,3 +180,4 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(contact.router, prefix="/api", tags=["contact"])
 app.include_router(public_profile.router, tags=["public"])
 app.include_router(templates.router, prefix="/api", tags=["templates"])
+app.include_router(pipeline.router, prefix="/admin/pipeline", tags=["pipeline"])
