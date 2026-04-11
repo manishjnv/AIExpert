@@ -429,7 +429,10 @@
 <div class="chat-panel" id="chatPanel">
   <div class="chat-header">
     <h4>AI Mentor</h4>
-    <button onclick="toggleChat()" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px">✕</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="chatHistory[chatWeek]=[];renderChatMessages()" class="btn" style="font-size:9px;padding:3px 8px;color:var(--ink-soft);border-color:var(--line)">Clear</button>
+      <button onclick="toggleChat()" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px">✕</button>
+    </div>
   </div>
   <div class="chat-messages" id="chatMessages"></div>
   <div class="chat-input-row">
@@ -1039,11 +1042,12 @@ function setChatWeek(weekN) {
 function formatMarkdown(text) {
   return text
     .replace(/</g, '&lt;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code style="background:var(--bg-3);padding:1px 4px;border-radius:2px;font-size:12px">$1</code>')
-    .replace(/^[-•]\s+(.+)$/gm, '<div style="padding:2px 0 2px 12px">• $1</div>')
-    .replace(/^\d+\.\s+(.+)$/gm, '<div style="padding:2px 0 2px 12px">$&</div>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    .replace(/^[\-\•\*]\s+(.+)$/gm, '<div style="padding:2px 0 2px 14px">• $1</div>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<div style="padding:2px 0 2px 14px">$&</div>')
+    .replace(/\n\n/g, '<div style="margin:8px 0"></div>')
     .replace(/\n/g, '<br>');
 }
 
