@@ -55,7 +55,6 @@
         <a href="/admin/pipeline/topics"${activeClass('/admin/pipeline/topics')}>Topics</a>
         <a href="/admin/pipeline/settings"${activeClass('/admin/pipeline/settings')}>Settings</a>
         <a href="/admin/pipeline/ai-usage"${activeClass('/admin/pipeline/ai-usage')}>AI Usage</a>
-        <a href="/admin/pipeline/normalization"${activeClass('/admin/pipeline/normalization')}>Normalization</a>
       </nav>
     `;
   }
