@@ -269,6 +269,90 @@ async def list_admin_templates(
     return result
 
 
+@router.get("/api/templates/{key}")
+async def get_template_detail(
+    key: str,
+    _user: User = Depends(get_current_admin),
+):
+    """Get full template content for admin review."""
+    from app.curriculum.loader import load_template
+    try:
+        tpl = load_template(key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return tpl.model_dump()
+
+
+@router.get("/templates/{key}", response_class=HTMLResponse)
+async def admin_template_view(
+    key: str,
+    _user: User = Depends(get_current_admin),
+):
+    """Admin template detail page — view full curriculum content."""
+    from app.curriculum.loader import load_template, get_template_status
+
+    try:
+        tpl = load_template(key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    status_info = get_template_status(key)
+    pub_status = status_info.get("status", "draft")
+    grandfathered = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
+    if key in grandfathered and pub_status == "draft":
+        pub_status = "published"
+    q_score = status_info.get("quality_score", 0)
+
+    status_color = "#6db585" if pub_status == "published" else "#e8a849"
+    score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
+
+    months_html = ""
+    for m in tpl.months:
+        weeks_html = ""
+        for w in m.weeks:
+            resources_html = "".join(
+                f'<li><a href="{esc(r.url)}" target="_blank" style="color:#e8a849">{esc(r.name)}</a> <span style="color:#8a92a0">({r.hrs}h)</span></li>'
+                for r in w.resources
+            )
+            checks_html = "".join(f"<li>{esc(c)}</li>" for c in w.checks)
+            focus_html = " · ".join(esc(f) for f in w.focus)
+            deliv_html = "".join(f"<li>{esc(d)}</li>" for d in w.deliv)
+
+            weeks_html += f"""
+            <div style="background:#0f1419;border-radius:6px;padding:16px;margin-bottom:12px">
+                <h4 style="margin:0 0 8px">Week {w.n}: {esc(w.t)} <span style="color:#8a92a0;font-weight:400;font-size:12px">({w.hours}h)</span></h4>
+                <div style="font-size:12px;color:#8a92a0;margin-bottom:8px">{focus_html}</div>
+                {'<div style="margin-bottom:8px"><strong style="font-size:12px;color:#e8a849">Deliverables</strong><ul style="margin:4px 0;padding-left:20px;font-size:13px">' + deliv_html + '</ul></div>' if w.deliv else ''}
+                {'<div style="margin-bottom:8px"><strong style="font-size:12px;color:#6db585">Resources</strong><ul style="margin:4px 0;padding-left:20px;font-size:13px">' + resources_html + '</ul></div>' if w.resources else ''}
+                {'<div><strong style="font-size:12px;color:#d0cbc2">Checklist</strong><ul style="margin:4px 0;padding-left:20px;font-size:13px">' + checks_html + '</ul></div>' if w.checks else ''}
+            </div>"""
+
+        months_html += f"""
+        <div style="margin-bottom:24px">
+            <h3 style="color:#e8a849;margin-bottom:4px">{esc(m.label)}: {esc(m.title)}</h3>
+            <p style="font-size:13px;color:#8a92a0;margin-bottom:4px"><em>{esc(m.tagline)}</em></p>
+            <p style="font-size:12px;color:#6db585;margin-bottom:12px">Checkpoint: {esc(m.checkpoint)}</p>
+            {weeks_html}
+        </div>"""
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{esc(tpl.title)}</title>
+<style>{ADMIN_CSS}</style></head><body>
+{ADMIN_NAV}
+<div class="page">
+<div style="margin-bottom:16px"><a href="/admin/templates" style="color:#8a92a0;font-size:13px">&larr; Back to Templates</a></div>
+<h1>{esc(tpl.title)}</h1>
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+    <span style="color:{status_color};font-weight:600">{pub_status.title()}</span>
+    <span style="color:#8a92a0">·</span>
+    <span>{esc(tpl.level)} · {tpl.duration_months}mo · {tpl.total_weeks} weeks · {tpl.total_checks} checks</span>
+    <span style="color:#8a92a0">·</span>
+    <span style="color:{score_color};font-weight:600">Quality: {q_score if q_score else '—'}</span>
+</div>
+<p style="color:#8a92a0;font-size:13px;margin-bottom:24px">{esc(tpl.goal)}</p>
+{months_html}
+</div></body></html>"""
+
+
 @router.delete("/api/templates/{key}")
 async def delete_template(
     key: str,
@@ -682,7 +766,7 @@ async def admin_templates_page(
             subs = subscriber_counts.get(key, 0)
             subs_display = f'<span style="font-weight:600">{subs}</span>' if subs > 0 else '<span style="color:#8a92a0">0</span>'
 
-            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
+            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
         except Exception:
             continue
 

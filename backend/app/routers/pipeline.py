@@ -236,6 +236,36 @@ async def list_topics(
     ]
 
 
+@router.get("/api/topics/{topic_id}")
+async def get_topic_detail(
+    topic_id: int,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full topic detail."""
+    result = await db.execute(
+        select(DiscoveredTopic).where(DiscoveredTopic.id == topic_id)
+    )
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    return {
+        "id": t.id,
+        "topic_name": t.topic_name,
+        "category": t.category,
+        "subcategory": t.subcategory,
+        "justification": t.justification,
+        "evidence_sources": json.loads(t.evidence_sources) if t.evidence_sources else [],
+        "confidence_score": t.confidence_score,
+        "status": t.status,
+        "discovery_run": t.discovery_run,
+        "ai_model_used": t.ai_model_used,
+        "templates_generated": t.templates_generated,
+        "generation_error": t.generation_error,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
 @router.post("/api/topics/{topic_id}/approve")
 async def approve_topic(
     topic_id: int,
@@ -578,7 +608,7 @@ async def pipeline_dashboard_page(
           : `<div style="font-size:11px;color:#8a92a0;margin-top:4px">Score &lt; ${{t.publish_threshold}} — fix issues first</div>`);
       rows += `<tr>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
-          <strong>${{t.title || t.key}}</strong>
+          <strong><a href="/admin/templates/${{t.key}}" style="color:#e8a849">${{t.title || t.key}}</a></strong>
           <div style="font-size:12px;color:#8a92a0">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
           <div style="margin-top:4px">${{statusBadge}}</div>
           ${{pubBtn}}
@@ -740,7 +770,7 @@ async def pipeline_topics_page(
 
         rows_html += f"""<tr>
 <td>{t.id}</td>
-<td><strong>{esc(t.topic_name)}</strong><div style="font-size:12px;color:#8a92a0">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
+<td><strong><a href="#" onclick="viewTopic({t.id});return false" style="color:#e8a849">{esc(t.topic_name)}</a></strong><div style="font-size:12px;color:#8a92a0">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
 <td style="font-size:12px;max-width:300px">{esc(t.justification[:150])}{'...' if len(t.justification) > 150 else ''}</td>
 <td>{t.confidence_score}</td>
 <td><span class="badge {t.status}">{t.status}</span>{error_html}</td>
@@ -782,7 +812,45 @@ async function deleteTopic(id) {{
   else alert('Failed');
 }}
 
+async function viewTopic(id) {{
+  const modal = document.getElementById('topicModal');
+  const content = document.getElementById('topicContent');
+  content.innerHTML = 'Loading...';
+  modal.style.display = 'flex';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/topics/' + id, {{credentials: 'same-origin'}});
+    const t = await resp.json();
+    const sources = (t.evidence_sources || []).map(s => '<li>' + s + '</li>').join('');
+    content.innerHTML = `
+      <h2 style="color:#e8a849;margin:0 0 12px">${{t.topic_name}}</h2>
+      <div style="margin-bottom:12px">
+        <span class="badge ${{t.status}}">${{t.status}}</span>
+        <span style="color:#8a92a0;margin-left:8px">Confidence: ${{t.confidence_score}}%</span>
+        <span style="color:#8a92a0;margin-left:8px">Model: ${{t.ai_model_used || '—'}}</span>
+      </div>
+      <div style="margin-bottom:12px"><strong style="color:#d0cbc2">Category:</strong> ${{t.category}}${{t.subcategory ? ' / ' + t.subcategory : ''}}</div>
+      <div style="margin-bottom:16px"><strong style="color:#d0cbc2">Justification:</strong><p style="color:#b0aaa0;line-height:1.6">${{t.justification}}</p></div>
+      ${{sources ? '<div style="margin-bottom:16px"><strong style="color:#d0cbc2">Evidence Sources:</strong><ul style="color:#b0aaa0;padding-left:20px;line-height:1.8">' + sources + '</ul></div>' : ''}}
+      <div style="color:#8a92a0;font-size:12px">Discovered: ${{t.created_at ? t.created_at.substring(0,10) : '—'}} · Templates generated: ${{t.templates_generated}}</div>
+      ${{t.generation_error ? '<div style="color:#d97757;font-size:12px;margin-top:8px">Error: ' + t.generation_error.substring(0,200) + '</div>' : ''}}
+    `;
+  }} catch(e) {{
+    content.innerHTML = 'Error: ' + e.message;
+  }}
+}}
+
+document.getElementById('topicModal').addEventListener('click', function(e) {{
+  if (e.target === this) this.style.display = 'none';
+}});
+
 </script>
+
+<div id="topicModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#1d242e;border-radius:8px;padding:24px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto">
+    <button onclick="document.getElementById('topicModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
+    <div id="topicContent">Loading...</div>
+  </div>
+</div>
 <div style="margin-top:12px">{'<a href="/admin/pipeline/topics?page='+str(page-1)+'&status='+esc(status)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/pipeline/topics?page='+str(page+1)+'&status='+esc(status)+'" class="btn">Next</a>' if page*50<total else ''} <span style="font-size:12px;color:#8a92a0">{total} total</span></div>
 </div>
 </body></html>"""
