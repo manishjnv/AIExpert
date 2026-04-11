@@ -366,26 +366,170 @@ async def admin_users_page(
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin users list HTML page."""
+    """Admin users list with stats, session history, device info."""
+    from app.models.user import Session as SessionModel
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # ---- Summary stats ----
+    total_users = await db.scalar(select(func.count()).select_from(User)) or 0
+    users_with_plans = await db.scalar(
+        select(func.count(func.distinct(UserPlan.user_id)))
+    ) or 0
+    active_sessions = await db.scalar(
+        select(func.count()).select_from(SessionModel)
+        .where(SessionModel.expires_at > now, SessionModel.revoked_at.is_(None))
+    ) or 0
+    google_users = await db.scalar(
+        select(func.count()).select_from(User).where(User.provider == "google")
+    ) or 0
+    otp_users = await db.scalar(
+        select(func.count()).select_from(User).where(User.provider == "otp")
+    ) or 0
+    today_logins = await db.scalar(
+        select(func.count(func.distinct(SessionModel.user_id)))
+        .where(SessionModel.issued_at > now - timedelta(days=1))
+    ) or 0
+    week_logins = await db.scalar(
+        select(func.count(func.distinct(SessionModel.user_id)))
+        .where(SessionModel.issued_at > now - timedelta(days=7))
+    ) or 0
+    new_this_week = await db.scalar(
+        select(func.count()).select_from(User)
+        .where(User.created_at > now - timedelta(days=7))
+    ) or 0
+
+    # ---- User list ----
     query = select(User)
     if q:
         query = query.where(User.email.contains(q) | User.name.contains(q))
     total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = (await db.execute(query.order_by(User.created_at.desc()).offset((page-1)*20).limit(20))).scalars().all()
 
-    rows_html = "".join(
-        f"<tr><td>{u.id}</td><td>{esc(u.email)}</td><td>{esc(u.name or '-')}</td><td>{esc(u.provider)}</td><td>{'Yes' if u.is_admin else ''}</td><td>{u.created_at}</td></tr>"
-        for u in rows
-    )
+    # Get last session for each user (for IP, user_agent, last login)
+    user_ids = [u.id for u in rows]
+    last_sessions = {}
+    if user_ids:
+        for uid in user_ids:
+            sess = (await db.execute(
+                select(SessionModel)
+                .where(SessionModel.user_id == uid)
+                .order_by(SessionModel.issued_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            if sess:
+                last_sessions[uid] = sess
+
+    # Get plan info per user
+    user_plans = {}
+    if user_ids:
+        plan_rows = (await db.execute(
+            select(UserPlan.user_id, UserPlan.template_key, UserPlan.status)
+            .where(UserPlan.user_id.in_(user_ids), UserPlan.status == "active")
+        )).all()
+        for pr in plan_rows:
+            user_plans[pr.user_id] = pr.template_key
+
+    rows_html = ""
+    for u in rows:
+        sess = last_sessions.get(u.id)
+        last_ip = esc(sess.ip or "-") if sess else "-"
+        last_login = sess.issued_at.strftime("%b %d, %H:%M") if sess else "-"
+
+        # Parse user agent for device info
+        ua_raw = sess.user_agent if sess else ""
+        device = _parse_device(ua_raw)
+
+        plan = user_plans.get(u.id, "")
+        plan_badge = f'<span style="color:#6db585;font-size:11px">{esc(plan)}</span>' if plan else '<span style="color:#4a5260;font-size:11px">No plan</span>'
+
+        provider_icon = "G" if u.provider == "google" else "✉"
+        admin_badge = ' <span style="color:#e8a849;font-size:10px">ADMIN</span>' if u.is_admin else ""
+
+        created = u.created_at.strftime("%b %d, %Y") if u.created_at else "-"
+
+        rows_html += f"""<tr>
+<td>{u.id}</td>
+<td>
+  <div><strong>{esc(u.name or '-')}</strong>{admin_badge}</div>
+  <div style="font-size:11px;color:#4a5260">{esc(u.email)}</div>
+</td>
+<td><span title="{esc(u.provider)}">{provider_icon}</span></td>
+<td>{plan_badge}</td>
+<td style="font-size:11px">{last_login}</td>
+<td style="font-size:11px;color:#4a5260">{last_ip}</td>
+<td style="font-size:11px;color:#4a5260" title="{esc(ua_raw[:100])}">{esc(device)}</td>
+<td style="font-size:11px">{created}</td>
+</tr>"""
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
 {ADMIN_NAV}
 <div class="page">
-<h1>Users ({total})</h1>
-<form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
-<table><tr><th>ID</th><th>Email</th><th>Name</th><th>Provider</th><th>Admin</th><th>Created</th></tr>{rows_html}</table>
-<div style="margin-top:12px">{'<a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}</div>
+<h1>Users</h1>
+<div class="subtitle">User activity, sessions, and enrollment</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+<div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
+<div class="stat"><div class="num">{today_logins}</div><div class="lbl">Today</div></div>
+<div class="stat"><div class="num">{week_logins}</div><div class="lbl">This Week</div></div>
+<div class="stat"><div class="num">{new_this_week}</div><div class="lbl">New This Week</div></div>
+<div class="stat"><div class="num">{active_sessions}</div><div class="lbl">Active Sessions</div></div>
+<div class="stat"><div class="num">{users_with_plans}</div><div class="lbl">Enrolled</div></div>
+<div class="stat"><div class="num">{google_users}</div><div class="lbl">Google SSO</div></div>
+<div class="stat"><div class="num">{otp_users}</div><div class="lbl">Email OTP</div></div>
+</div>
+
+<form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:8px 12px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px;width:250px"> <button class="btn" type="submit">Search</button></form>
+
+<table>
+<tr><th>ID</th><th>User</th><th>Auth</th><th>Plan</th><th>Last Login</th><th>IP</th><th>Device</th><th>Joined</th></tr>
+{rows_html}
+</table>
+<div style="margin-top:12px;font-size:12px;color:#4a5260">
+  Showing {len(rows)} of {total} users
+  {'  <a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a>' if page>1 else ''}
+  {'  <a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}
+</div>
 </div></body></html>"""
+
+
+def _parse_device(ua: str) -> str:
+    """Extract a short device description from User-Agent string."""
+    if not ua:
+        return "-"
+    ua_lower = ua.lower()
+
+    # OS
+    if "iphone" in ua_lower:
+        os_name = "iPhone"
+    elif "ipad" in ua_lower:
+        os_name = "iPad"
+    elif "android" in ua_lower:
+        os_name = "Android"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        os_name = "Mac"
+    elif "windows" in ua_lower:
+        os_name = "Windows"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+    elif "cli-test" in ua_lower:
+        return "CLI"
+    else:
+        os_name = "Other"
+
+    # Browser
+    if "edg/" in ua_lower:
+        browser = "Edge"
+    elif "chrome" in ua_lower and "safari" in ua_lower:
+        browser = "Chrome"
+    elif "firefox" in ua_lower:
+        browser = "Firefox"
+    elif "safari" in ua_lower:
+        browser = "Safari"
+    else:
+        browser = ""
+
+    return f"{os_name} · {browser}" if browser else os_name
 
 
 @router.get("/proposals", response_class=HTMLResponse)
