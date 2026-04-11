@@ -27,7 +27,9 @@ async def send_weekly_reminders(session_factory) -> int:
     """
     settings = get_settings()
     sent = 0
-    MAX_EMAILS_PER_RUN = 100  # Gmail free limit safety cap
+    MAX_EMAILS_PER_RUN = 400  # Gmail free limit: 500/day, keep 100 buffer for OTP/contact
+    BATCH_SIZE = 50  # Send in batches of 50
+    BATCH_DELAY = 60  # 60 second pause between batches
 
     async with session_factory() as db:
         # Get all users with email_notifications=True and an active plan
@@ -108,8 +110,12 @@ async def send_weekly_reminders(session_factory) -> int:
                     pct=pct,
                 )
                 sent += 1
-                # Throttle: 2 second delay between emails to avoid Gmail blocking
+                # Throttle: 2 second delay between emails
                 await asyncio.sleep(2)
+                # Pause between batches
+                if sent % BATCH_SIZE == 0:
+                    logger.info("Batch %d complete (%d sent), pausing %ds", sent // BATCH_SIZE, sent, BATCH_DELAY)
+                    await asyncio.sleep(BATCH_DELAY)
 
             except Exception as e:
                 logger.error("Failed to send reminder to %s: %s", user.email, e)
