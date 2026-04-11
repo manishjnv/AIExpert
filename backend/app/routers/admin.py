@@ -421,7 +421,7 @@ async def admin_templates_page(
         try:
             tpl = load_template(key)
             is_default = key.startswith("generalist_")
-            delete_btn = "" if is_default else f'<button class="btn danger" onclick="deleteTemplate(\\'{key}\\')">Delete</button>'
+            delete_btn = "" if is_default else f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>'
             rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.goal)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td>{delete_btn}</td></tr>"
         except Exception:
             continue
