@@ -386,6 +386,79 @@ async def _run_refinement(
         return None
 
 
+# ---- Refine existing templates on disk ----
+
+
+async def refine_existing_templates(db: AsyncSession | None = None) -> dict:
+    """Run the quality pipeline (review → refine → validate) on all saved templates.
+
+    Improves templates that score below the publish threshold.
+    Returns summary of what was improved.
+    """
+    from app.curriculum.loader import (
+        list_templates, load_template, PUBLISH_THRESHOLD,
+        update_quality_score,
+    )
+    from app.services.curriculum_generator import save_curriculum_draft
+
+    keys = list_templates()
+    results = []
+    improved = 0
+    skipped = 0
+    failed = 0
+
+    for key in keys:
+        try:
+            tpl = load_template(key)
+            plan = json.loads(tpl.model_dump_json())
+
+            # Score first
+            original_score = _quick_heuristic_score(plan)
+            if original_score >= PUBLISH_THRESHOLD:
+                skipped += 1
+                results.append({"key": key, "status": "skipped", "score": original_score,
+                                "reason": f"Already {original_score} >= {PUBLISH_THRESHOLD}"})
+                update_quality_score(key, original_score)
+                continue
+
+            # Run the full pipeline
+            qr = await run_quality_pipeline(plan, "unknown", db)
+            final_score = qr["final_score"]
+            update_quality_score(key, final_score)
+
+            if qr["plan"] != plan and final_score > original_score:
+                # Save the improved version
+                await save_curriculum_draft(qr["plan"])
+                improved += 1
+                results.append({
+                    "key": key, "status": "improved",
+                    "score_before": original_score, "score_after": final_score,
+                    "stages": qr["stages_run"], "models": qr["models_used"],
+                })
+                logger.info("Refined %s: %d -> %d", key, original_score, final_score)
+            else:
+                skipped += 1
+                skipped_reasons = qr.get("skipped", [])
+                results.append({
+                    "key": key, "status": "no_improvement",
+                    "score": final_score, "skipped": skipped_reasons,
+                })
+
+        except Exception as e:
+            failed += 1
+            results.append({"key": key, "status": "error", "error": str(e)})
+            logger.error("Failed to refine %s: %s", key, e)
+
+    return {
+        "status": "ok",
+        "total": len(keys),
+        "improved": improved,
+        "skipped": skipped,
+        "failed": failed,
+        "results": results,
+    }
+
+
 # ---- Claude Batch API for bulk refinement (50% discount) ----
 
 BATCH_THRESHOLD = 5  # Use batch API when 5+ refinements queued

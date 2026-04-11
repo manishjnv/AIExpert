@@ -176,6 +176,19 @@ async def trigger_generation(
     return result
 
 
+@router.post("/api/run-refine")
+async def trigger_refine(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Refine existing templates via AI quality pipeline to push scores toward 90+."""
+    _check_origin(request)
+    from app.services.quality_pipeline import refine_existing_templates
+    result = await refine_existing_templates(db)
+    return result
+
+
 @router.post("/api/run-refresh")
 async def trigger_refresh(
     request: Request,
@@ -383,7 +396,7 @@ async def pipeline_dashboard_page(
 <h1>Pipeline Actions</h1>
 <div class="subtitle">Run tasks, review pipeline status · Provider health on <a href="/admin/pipeline/ai-usage" style="color:#e8a849">AI Usage</a></div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px">
 
 <div class="card">
   <h3>1. Discover Topics</h3>
@@ -404,7 +417,16 @@ async def pipeline_dashboard_page(
 </div>
 
 <div class="card">
-  <h3>3. Refresh Content</h3>
+  <h3>3. Refine Quality</h3>
+  <p style="font-size:12px;color:#8a92a0">AI reviews templates below 90 and surgically fixes weak dimensions.</p>
+  <p style="font-size:12px">Templates to refine: <strong>{template_count}</strong></p>
+  <p style="font-size:12px">Pipeline: Score → Review → Refine → Validate</p>
+  <button class="btn primary" onclick="runAction('run-refine', this)">Refine Now</button>
+  <div id="status-refine" class="status-msg"></div>
+</div>
+
+<div class="card">
+  <h3>4. Refresh Content</h3>
   <p style="font-size:12px;color:#8a92a0">Checks resource links and reviews if content is still current.</p>
   <p style="font-size:12px">Last run: {esc(last_refresh)}</p>
   <p style="font-size:12px">Templates to check: <strong>{template_count}</strong></p>
@@ -628,6 +650,7 @@ async function runAction(action, btn) {{
       let msg = '';
       if (data.total_discovered !== undefined) msg = data.total_discovered + ' topic(s) discovered, ' + data.saved + ' saved';
       else if (data.generated !== undefined) msg = data.generated + ' curricula generated, ' + data.errors + ' failed';
+      else if (data.improved !== undefined) msg = data.improved + ' improved, ' + data.skipped + ' skipped, ' + data.failed + ' failed';
       else msg = JSON.stringify(data).substring(0, 150);
       statusEl.textContent = '✓ ' + msg;
       statusEl.className = 'status-msg ok';
