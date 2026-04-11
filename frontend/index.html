@@ -430,7 +430,7 @@
   <div class="chat-header">
     <h4>AI Mentor</h4>
     <div style="display:flex;gap:8px;align-items:center">
-      <button onclick="chatHistory[chatWeek]=[];renderChatMessages()" class="btn" style="font-size:9px;padding:3px 8px;color:var(--ink-soft);border-color:var(--line)">Clear</button>
+      <button onclick="chatHistory[chatWeek]=[];renderChatMessages()" class="btn" style="font-size:10px;padding:4px 10px;color:var(--danger);border-color:var(--danger)">Clear</button>
       <button onclick="toggleChat()" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px">✕</button>
     </div>
   </div>
@@ -1099,6 +1099,7 @@ async function sendChat() {
       if (done) break;
       const chunk = decoder.decode(value, { stream: true });
       for (const line of chunk.split("\n")) {
+        if (line === "data: ") { assistantText += "\n"; continue; }
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6);
         if (data === "[DONE]") break;
