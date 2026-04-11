@@ -218,13 +218,9 @@
   .checkpoint strong { color: var(--success); font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; display: block; margin-bottom: 4px; font-weight: 600; }
 
   /* FOOTER */
-  footer { padding: 48px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-family: var(--mono); letter-spacing: 0.05em; }
+  footer { padding: 48px 20px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-family: var(--mono); letter-spacing: 0.05em; }
   footer em { color: var(--accent); font-style: normal; }
-  .footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; margin-bottom: 24px; }
-  .footer-links { display: flex; flex-direction: column; gap: 4px; }
-  .footer-links a { color: var(--paper-dim); text-decoration: none; font-size: 12px; }
-  .footer-links a:hover { color: var(--accent); }
-  .footer-bottom { text-align: center; padding-top: 16px; border-top: 1px solid var(--line); font-size: 11px; }
+  footer a:hover { color: var(--accent) !important; }
 
   /* TOAST */
   .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-3); border: 1px solid var(--accent); color: var(--paper); padding: 14px 24px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 100; }
@@ -265,8 +261,7 @@
     .res-list { grid-template-columns: 1fr; }
     .res-item { font-size: 12px; padding: 8px 10px; }
     .checkpoint { flex-direction: column; gap: 10px; padding: 16px 20px; }
-    .footer-inner { grid-template-columns: 1fr; gap: 20px; }
-    footer { padding: 32px 20px; font-size: 11px; }
+    footer { padding: 32px 16px; font-size: 11px; }
     .month-tagline { font-size: 14px; }
     .eyebrow { font-size: 9px; letter-spacing: 0.12em; }
     .modal { width: 95%; max-width: 380px; padding: 20px; }
@@ -450,28 +445,33 @@
 <main id="content"></main>
 
 <footer>
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <div style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:4px">AI Learning Roadmap</div>
-      <div style="font-size:12px;color:var(--ink-soft)">A free, self-paced learning platform for AI/ML engineers.</div>
+  <div style="text-align:center">
+    <div style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:6px">AI Learning Roadmap</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px">A free, self-paced learning platform for AI/ML engineers.</div>
+    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">
+      <a href="#" onclick="openContactModal();return false" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Contact Us</a>
+      <span style="color:var(--line)">·</span>
+      <a href="https://github.com/manishjnv/AIExpert" target="_blank" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Source Code</a>
     </div>
-    <div class="footer-links">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:6px">Platform</div>
-      <a href="/">Home</a>
-      <a href="https://github.com/manishjnv/AIExpert" target="_blank">Source Code</a>
-      <a href="https://github.com/manishjnv/AIExpert#readme" target="_blank">About</a>
-    </div>
-    <div class="footer-links">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);margin-bottom:6px">Contact</div>
-      <a href="https://github.com/manishjnv/AIExpert/issues/new" target="_blank">Contact Us</a>
-      <a href="https://github.com/manishjnv/AIExpert/issues" target="_blank">Report an Issue</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <em>Build > watch. Ship > learn. One commit a day keeps drift away.</em>
-    <div style="margin-top:4px">&copy; 2026 AutomateEdge. All rights reserved.</div>
+    <div style="font-style:italic;color:var(--ink-soft);font-size:11px;margin-bottom:6px">Build > watch. Ship > learn. One commit a day keeps drift away.</div>
+    <div style="font-size:10px;color:var(--ink-soft)">&copy; 2026 AutomateEdge. All rights reserved.</div>
   </div>
 </footer>
+
+<!-- Contact Modal -->
+<div id="contactModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeContactModal()">
+  <div class="modal" style="max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:var(--serif);margin:0">Contact Us</h3>
+      <span onclick="closeContactModal()" style="cursor:pointer;color:var(--ink-soft);font-size:18px">✕</span>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">Have a question, suggestion, or found a bug? We'd love to hear from you.</p>
+    <div class="modal-field"><label>Your Name</label><input id="contactName" type="text" placeholder="Name"></div>
+    <div class="modal-field"><label>Email</label><input id="contactEmail" type="email" placeholder="your@email.com"></div>
+    <div class="modal-field"><label>Message</label><textarea id="contactMessage" placeholder="How can we help?" rows="4" style="width:100%;padding:8px 10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-family:var(--sans);font-size:13px;border-radius:3px;resize:vertical"></textarea></div>
+    <button onclick="sendContact()" class="btn" style="width:100%;padding:10px;font-size:12px;border-color:var(--success);color:var(--success);margin-top:8px">Send Message</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1066,6 +1066,29 @@ ${monthsHtml}
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+}
+
+// ---- Contact ----
+function openContactModal() {
+  document.getElementById("contactName").value = currentUser?.name || "";
+  document.getElementById("contactEmail").value = currentUser?.email || "";
+  document.getElementById("contactMessage").value = "";
+  document.getElementById("contactModal").style.display = "flex";
+}
+function closeContactModal() { document.getElementById("contactModal").style.display = "none"; }
+
+async function sendContact() {
+  const name = document.getElementById("contactName").value.trim();
+  const email = document.getElementById("contactEmail").value.trim();
+  const message = document.getElementById("contactMessage").value.trim();
+  if (!name) { showToast("Please enter your name"); return; }
+  if (!email || !email.includes("@")) { showToast("Please enter a valid email"); return; }
+  if (message.length < 10) { showToast("Message too short"); return; }
+  try {
+    const resp = await fetch("/api/contact", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({name, email, message}) });
+    if (resp.status === 204 || resp.ok) { showToast("Message sent! We'll get back to you."); closeContactModal(); }
+    else { const d = await resp.json().catch(()=>({})); showToast(d.detail || "Failed to send"); }
+  } catch { showToast("Failed to send message"); }
 }
 
 // ---- Sharing ----
