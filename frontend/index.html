@@ -376,9 +376,7 @@
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
       <div class="modal-field"><label>Plan</label>
         <select id="planDurationInline" style="width:100%;padding:6px 8px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:12px;border-radius:3px">
-          <option value="3mo|intermediate">3 months — Accelerated</option>
-          <option value="6mo|intermediate">6 months — Standard</option>
-          <option value="12mo|beginner">12 months — Beginner</option>
+          <option value="loading">Loading plans...</option>
         </select>
       </div>
     </div>
@@ -443,9 +441,7 @@
     <h3 style="font-family:var(--serif);margin-bottom:16px">Choose Your Plan</h3>
     <div class="modal-field"><label>Duration</label>
       <select id="planDuration">
-        <option value="3mo|intermediate">3 months — Accelerated</option>
-        <option value="6mo|intermediate" selected>6 months — Standard</option>
-        <option value="12mo|beginner">12 months — Beginner</option>
+        <option value="loading">Loading plans...</option>
       </select>
     </div>
     <div style="margin-top:16px;display:flex;gap:8px">
@@ -1367,11 +1363,9 @@ function openProfileModal() {
   document.getElementById("pLevel").value = currentUser.experience_level || "intermediate";
   document.getElementById("pEmailNotif").checked = currentUser.email_notifications !== false;
   document.getElementById("pPublicProfile").checked = currentUser.public_profile === true;
-  // Pre-select current plan in the inline dropdown
-  const planMap = { "3-Month Accelerated": "3mo|intermediate", "6-Month Standard": "6mo|intermediate", "12-Month Beginner": "12mo|beginner" };
-  const badge = document.getElementById("planBadge")?.textContent?.replace(' · ','') || "";
+  // Pre-select current plan by template key from profile data
   const sel = document.getElementById("planDurationInline");
-  if (planMap[badge]) sel.value = planMap[badge];
+  if (currentUser?.active_plan) sel.value = currentUser.active_plan;
   sel.dataset.original = sel.value; // track original to detect change
   document.getElementById("profileModal").style.display = "flex";
 }
@@ -1443,24 +1437,42 @@ async function deleteAccount() {
   } catch { showToast("Delete failed"); }
 }
 
+let availableTemplates = [];
+
+async function loadTemplateOptions() {
+  try {
+    const resp = await fetch("/api/templates");
+    if (resp.ok) availableTemplates = await resp.json();
+  } catch {}
+  updatePlanLabels();
+  for (const selId of ["planDuration", "planDurationInline"]) {
+    const sel = document.getElementById(selId);
+    if (!sel) continue;
+    sel.innerHTML = availableTemplates.map(t =>
+      `<option value="${t.key}">${t.title} (${t.total_weeks}w)</option>`
+    ).join("");
+  }
+}
+loadTemplateOptions();
+
 function openPlanPicker() { document.getElementById("planModal").style.display = "flex"; }
 function closePlanModal() { document.getElementById("planModal").style.display = "none"; }
+
 async function enrollFromModal() {
-  const [duration, level] = document.getElementById("planDuration").value.split("|");
+  const key = document.getElementById("planDuration").value;
   try {
-    const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({goal:"generalist", duration, level}) });
+    const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({template_key: key}) });
     if (resp.ok) { showToast("Enrolled"); closePlanModal(); window.location.reload(); }
     else { const d = await resp.json(); showToast(d.detail || "Failed"); }
   } catch { showToast("Failed"); }
 }
 
 async function enrollPlanInline() {
-  const val = document.getElementById("planDurationInline").value;
-  const [duration, level] = val.split("|");
+  const key = document.getElementById("planDurationInline").value;
   try {
-    const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({goal:"generalist", duration, level}) });
+    const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({template_key: key}) });
     if (resp.ok) { showToast("Plan switched"); closeProfileModal(); window.location.reload(); }
-    else { const d = await resp.json(); showToast(d.detail || d.message || "Switch failed"); }
+    else { const d = await resp.json(); showToast(d.detail || "Switch failed"); }
   } catch { showToast("Switch failed"); }
 }
 
@@ -1659,12 +1671,16 @@ window.addEventListener("scroll", () => {
 loadState();
 render();
 
-// Plan name lookup
-const PLAN_LABELS = {
+// Plan name lookup — built dynamically from /api/templates
+let PLAN_LABELS = {
   "generalist_3mo_intermediate": "3-Month Accelerated",
   "generalist_6mo_intermediate": "6-Month Standard",
   "generalist_12mo_beginner": "12-Month Beginner",
 };
+// Update labels when templates load
+function updatePlanLabels() {
+  availableTemplates.forEach(t => { PLAN_LABELS[t.key] = t.title.replace(/ — .*/, ''); });
+}
 
 async function loadActivePlan() {
   try {

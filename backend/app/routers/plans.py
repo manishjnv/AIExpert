@@ -28,6 +28,7 @@ class EnrollBody(BaseModel):
     goal: str = "generalist"
     duration: str = "6mo"
     level: str = "intermediate"
+    template_key: str | None = None  # Direct key — overrides goal/duration/level if provided
 
 
 class ProgressBody(BaseModel):
@@ -104,7 +105,7 @@ async def enroll(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new plan, archiving any previous active plan."""
-    template_key = _template_key(body.goal, body.duration, body.level)
+    template_key = body.template_key or _template_key(body.goal, body.duration, body.level)
 
     # Validate template exists
     try:
