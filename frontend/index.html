@@ -524,6 +524,7 @@
 
 <!-- Chat -->
 <button class="chat-fab" id="chatFab" onclick="toggleChat()">💬 AI Mentor</button>
+<button id="scrollTopBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="position:fixed;bottom:24px;left:24px;width:42px;height:42px;border-radius:50%;background:var(--bg-3);border:1px solid var(--line);color:var(--paper-dim);font-size:18px;cursor:pointer;z-index:90;display:none;box-shadow:0 2px 8px rgba(0,0,0,0.3)">↑</button>
 <div class="chat-panel" id="chatPanel">
   <div class="chat-header">
     <h4>AI Mentor</h4>
@@ -1631,6 +1632,10 @@ function syncTick(weekN, idx, done) {
     } catch { setSyncBadge("error", "Sync failed"); }
   }, 800);
 }
+
+window.addEventListener("scroll", () => {
+  document.getElementById("scrollTopBtn").style.display = window.scrollY > 500 ? "block" : "none";
+});
 
 loadState();
 render();
