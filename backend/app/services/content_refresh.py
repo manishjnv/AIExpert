@@ -261,11 +261,25 @@ async def run_content_refresh(db: AsyncSession) -> dict:
 
     # 2. AI currency review for each template
     reviews = {}
+    auto_unpublished = []
     keys = list_templates()
     for key in keys:
         review = await review_template_currency(key, db)
         if review:
             reviews[key] = review
+
+            # Auto-unpublish templates with low currency score
+            from app.curriculum.loader import get_template_status, unpublish_template
+            CURRENCY_UNPUBLISH_THRESHOLD = 40
+            status_info = get_template_status(key)
+            if (status_info.get("status") == "published"
+                    and review.get("currency_score", 100) < CURRENCY_UNPUBLISH_THRESHOLD):
+                unpublish_template(key)
+                auto_unpublished.append(key)
+                logger.warning(
+                    "Auto-unpublished %s: currency score %d < %d",
+                    key, review["currency_score"], CURRENCY_UNPUBLISH_THRESHOLD,
+                )
 
     # Update last run timestamp
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -277,7 +291,8 @@ async def run_content_refresh(db: AsyncSession) -> dict:
         "link_health": link_results,
         "currency_reviews": reviews,
         "templates_reviewed": len(reviews),
+        "auto_unpublished": auto_unpublished,
     }
-    logger.info("Content refresh complete: %d links checked, %d templates reviewed",
-                link_results["total_checked"], len(reviews))
+    logger.info("Content refresh complete: %d links checked, %d templates reviewed, %d auto-unpublished",
+                link_results["total_checked"], len(reviews), len(auto_unpublished))
     return summary

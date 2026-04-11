@@ -69,6 +69,7 @@
         <a href="/admin/templates"${activeClass('/admin/templates')}>Templates</a>
         <a href="/admin/pipeline/"${activeClass('/admin/pipeline')}>Pipeline</a>
         <a href="/admin/pipeline/topics"${activeClass('/admin/pipeline/topics')}>Topics</a>
+        <a href="/admin/pipeline/proposals"${activeClass('/admin/pipeline/proposals')}>Proposals</a>
         <a href="/admin/pipeline/settings"${activeClass('/admin/pipeline/settings')}>Settings</a>
         <a href="/admin/pipeline/ai-usage"${activeClass('/admin/pipeline/ai-usage')}>AI Usage</a>
       </nav>

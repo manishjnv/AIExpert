@@ -1426,3 +1426,208 @@ async def normalization_redirect():
     """Redirect old normalization URL to pipeline page."""
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/admin/pipeline/", status_code=301)
+
+
+# ---- Proposals page ----
+
+@router.get("/api/proposals")
+async def list_proposals(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all curriculum proposals."""
+    from app.models.curriculum import CurriculumProposal
+    result = await db.execute(
+        select(CurriculumProposal).order_by(CurriculumProposal.created_at.desc())
+    )
+    proposals = result.scalars().all()
+    return [{
+        "id": p.id,
+        "source_run": p.source_run,
+        "status": p.status,
+        "created_at": str(p.created_at),
+        "reviewed_at": str(p.reviewed_at) if p.reviewed_at else None,
+        "notes": p.notes,
+        "proposal_md": p.proposal_md[:500],
+    } for p in proposals]
+
+
+@router.get("/api/proposals/{proposal_id}")
+async def get_proposal(
+    proposal_id: int,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full proposal content."""
+    from app.models.curriculum import CurriculumProposal
+    result = await db.execute(
+        select(CurriculumProposal).where(CurriculumProposal.id == proposal_id)
+    )
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    return {
+        "id": p.id,
+        "source_run": p.source_run,
+        "status": p.status,
+        "created_at": str(p.created_at),
+        "reviewed_at": str(p.reviewed_at) if p.reviewed_at else None,
+        "notes": p.notes,
+        "proposal_md": p.proposal_md,
+    }
+
+
+@router.post("/api/proposals/{proposal_id}/approve")
+async def approve_proposal(
+    proposal_id: int,
+    request: Request,
+    user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a proposal as approved/applied."""
+    _check_origin(request)
+    from app.models.curriculum import CurriculumProposal
+    from datetime import datetime, timezone
+    result = await db.execute(
+        select(CurriculumProposal).where(CurriculumProposal.id == proposal_id)
+    )
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    p.status = "applied"
+    p.reviewer_id = user.id
+    p.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.flush()
+    return {"ok": True, "status": "applied"}
+
+
+@router.post("/api/proposals/{proposal_id}/reject")
+async def reject_proposal(
+    proposal_id: int,
+    request: Request,
+    user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a proposal as rejected."""
+    _check_origin(request)
+    from app.models.curriculum import CurriculumProposal
+    from datetime import datetime, timezone
+    result = await db.execute(
+        select(CurriculumProposal).where(CurriculumProposal.id == proposal_id)
+    )
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    p.status = "rejected"
+    p.reviewer_id = user.id
+    p.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.flush()
+    return {"ok": True, "status": "rejected"}
+
+
+@router.get("/proposals", response_class=HTMLResponse)
+async def proposals_page(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin proposals review page."""
+    from app.models.curriculum import CurriculumProposal
+
+    result = await db.execute(
+        select(CurriculumProposal).order_by(CurriculumProposal.created_at.desc())
+    )
+    proposals = result.scalars().all()
+
+    pending_count = sum(1 for p in proposals if p.status == "pending")
+
+    rows = ""
+    for p in proposals:
+        status_color = {"pending": "#e8a849", "applied": "#6db585", "rejected": "#d97757"}.get(p.status, "#8a92a0")
+        status_badge = f'<span style="color:{status_color};font-weight:600">{p.status.title()}</span>'
+        created = str(p.created_at)[:10] if p.created_at else "—"
+        reviewed = str(p.reviewed_at)[:10] if p.reviewed_at else "—"
+        preview = esc(p.proposal_md[:200]).replace("\\n", " ")
+
+        actions = ""
+        if p.status == "pending":
+            actions = f"""
+                <button class="btn success" style="font-size:11px;padding:4px 8px" onclick="proposalAction({p.id},'approve',this)">Approve</button>
+                <button class="btn danger" style="font-size:11px;padding:4px 8px" onclick="proposalAction({p.id},'reject',this)">Reject</button>
+            """
+
+        rows += f"""<tr>
+            <td>{p.id}</td>
+            <td>{esc(p.source_run)}</td>
+            <td>{created}</td>
+            <td>{status_badge}</td>
+            <td>{reviewed}</td>
+            <td style="max-width:300px;font-size:12px;color:#8a92a0;overflow:hidden;text-overflow:ellipsis">{preview}</td>
+            <td>
+                <button class="btn" style="font-size:11px;padding:4px 8px" onclick="viewProposal({p.id})">View</button>
+                {actions}
+            </td>
+        </tr>"""
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title>
+<link rel="stylesheet" href="/nav.css">
+<style>{ADMIN_CSS}
+.modal {{ display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }}
+.modal-content {{ background:#1d242e; border-radius:8px; padding:24px; max-width:800px; width:90%; max-height:80vh; overflow-y:auto; color:#d0cbc2; white-space:pre-wrap; font-size:13px; line-height:1.7; }}
+.modal-close {{ float:right; cursor:pointer; font-size:20px; color:#8a92a0; background:none; border:none; }}
+</style>
+<script src="/nav.js"></script></head><body>
+<div class="page">
+<h1>Curriculum Proposals</h1>
+<p style="color:#8a92a0;font-size:13px;margin-bottom:16px">
+    Quarterly sync generates proposals to update, add, or retire topics. Review and approve/reject below.
+    {f'<span style="color:#e8a849;font-weight:600">{pending_count} pending</span>' if pending_count else '<span style="color:#6db585">All reviewed</span>'}
+</p>
+
+{'<p style="color:#8a92a0;font-size:13px">No proposals yet. The quarterly sync runs on Jan/Apr/Jul/Oct 1st, or trigger it manually from the Pipeline page.</p>' if not proposals else f"""
+<table>
+<tr><th>ID</th><th>Run</th><th>Created</th><th>Status</th><th>Reviewed</th><th>Preview</th><th>Actions</th></tr>
+{rows}
+</table>
+"""}
+
+<div class="modal" id="proposalModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="document.getElementById('proposalModal').style.display='none'">&times;</button>
+        <div id="proposalContent">Loading...</div>
+    </div>
+</div>
+
+<script>
+async function viewProposal(id) {{
+    const modal = document.getElementById('proposalModal');
+    const content = document.getElementById('proposalContent');
+    content.textContent = 'Loading...';
+    modal.style.display = 'flex';
+    try {{
+        const resp = await fetch('/admin/pipeline/api/proposals/' + id, {{credentials: 'same-origin'}});
+        const data = await resp.json();
+        content.textContent = data.proposal_md;
+    }} catch(e) {{
+        content.textContent = 'Error: ' + e.message;
+    }}
+}}
+
+async function proposalAction(id, action, btn) {{
+    btn.disabled = true;
+    try {{
+        const resp = await fetch('/admin/pipeline/api/proposals/' + id + '/' + action, {{
+            method: 'POST', credentials: 'same-origin'
+        }});
+        if (resp.ok) window.location.reload();
+        else alert('Failed: ' + (await resp.json()).detail);
+    }} catch(e) {{
+        alert('Error: ' + e.message);
+    }}
+    btn.disabled = false;
+}}
+
+document.getElementById('proposalModal').addEventListener('click', function(e) {{
+    if (e.target === this) this.style.display = 'none';
+}});
+</script>
+</div></body></html>"""
