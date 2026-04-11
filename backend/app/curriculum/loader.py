@@ -26,11 +26,11 @@ class Resource(BaseModel):
 class Week(BaseModel):
     n: int
     t: str
-    hours: int
-    focus: list[str]
-    deliv: list[str]
-    resources: list[Resource]
-    checks: list[str]
+    hours: int = 16
+    focus: list[str] = Field(default_factory=list)
+    deliv: list[str] = Field(default_factory=list)
+    resources: list[Resource] = Field(default_factory=list)
+    checks: list[str] = Field(default_factory=list)
 
 
 class Month(BaseModel):

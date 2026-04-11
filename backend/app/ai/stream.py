@@ -1,7 +1,8 @@
 """
-Streaming AI completion — yields text chunks from Gemini (or Groq fallback).
+Streaming AI completion — yields text chunks from providers in fallback order.
 
 Used by the chat endpoint for SSE streaming.
+Chain: Gemini → Groq → Cerebras → Mistral → DeepSeek → Sambanova.
 """
 
 from __future__ import annotations
@@ -20,20 +21,19 @@ GEMINI_STREAM_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent"
 )
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+SAMBANOVA_URL = "https://api.sambanova.ai/v1/chat/completions"
 
 
 async def stream_gemini(messages: list[dict]) -> AsyncGenerator[str, None]:
-    """Stream text chunks from Gemini.
-
-    Args:
-        messages: list of {"role": "user"|"model", "content": "..."}
-    """
+    """Stream text chunks from Gemini."""
     settings = get_settings()
     if not settings.gemini_api_key:
         yield "[AI not configured]"
         return
 
-    # Convert messages to Gemini format
     contents = []
     for m in messages:
         role = "model" if m["role"] == "assistant" else "user"
@@ -65,15 +65,16 @@ async def stream_gemini(messages: list[dict]) -> AsyncGenerator[str, None]:
                     continue
 
 
-async def stream_groq(messages: list[dict]) -> AsyncGenerator[str, None]:
-    """Stream text chunks from Groq (OpenAI-compatible SSE)."""
-    settings = get_settings()
-    if not settings.groq_api_key:
-        yield "[AI not configured]"
-        return
-
+async def _stream_openai_compat(
+    url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    provider_name: str,
+) -> AsyncGenerator[str, None]:
+    """Stream from any OpenAI-compatible API (Groq, Cerebras, Mistral, DeepSeek, Sambanova)."""
     body = {
-        "model": settings.groq_model,
+        "model": model,
         "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
         "temperature": 0.5,
         "max_tokens": 1024,
@@ -82,12 +83,12 @@ async def stream_groq(messages: list[dict]) -> AsyncGenerator[str, None]:
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         async with client.stream(
-            "POST", GROQ_URL,
-            headers={"Authorization": f"Bearer {settings.groq_api_key}", "Content-Type": "application/json"},
+            "POST", url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=body,
         ) as resp:
             if resp.status_code != 200:
-                raise Exception(f"Groq stream error: {resp.status_code}")
+                raise Exception(f"{provider_name} stream error: {resp.status_code}")
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -104,24 +105,76 @@ async def stream_groq(messages: list[dict]) -> AsyncGenerator[str, None]:
                     continue
 
 
+async def stream_groq(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Groq (OpenAI-compatible SSE)."""
+    settings = get_settings()
+    async for chunk in _stream_openai_compat(
+        GROQ_URL, settings.groq_api_key, settings.groq_model, messages, "Groq"
+    ):
+        yield chunk
+
+
+async def stream_cerebras(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Cerebras."""
+    settings = get_settings()
+    async for chunk in _stream_openai_compat(
+        CEREBRAS_URL, settings.cerebras_api_key, settings.cerebras_model, messages, "Cerebras"
+    ):
+        yield chunk
+
+
+async def stream_mistral(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Mistral."""
+    settings = get_settings()
+    async for chunk in _stream_openai_compat(
+        MISTRAL_URL, settings.mistral_api_key, settings.mistral_model, messages, "Mistral"
+    ):
+        yield chunk
+
+
+async def stream_deepseek(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Stream text chunks from DeepSeek."""
+    settings = get_settings()
+    async for chunk in _stream_openai_compat(
+        DEEPSEEK_URL, settings.deepseek_api_key, settings.deepseek_model, messages, "DeepSeek"
+    ):
+        yield chunk
+
+
+async def stream_sambanova(messages: list[dict]) -> AsyncGenerator[str, None]:
+    """Stream text chunks from Sambanova."""
+    settings = get_settings()
+    async for chunk in _stream_openai_compat(
+        SAMBANOVA_URL, settings.sambanova_api_key, settings.sambanova_model, messages, "Sambanova"
+    ):
+        yield chunk
+
+
+# Ordered list of streaming providers: (name, key_field, stream_fn)
+_STREAM_PROVIDERS = [
+    ("Gemini", "gemini_api_key", stream_gemini),
+    ("Groq", "groq_api_key", stream_groq),
+    ("Cerebras", "cerebras_api_key", stream_cerebras),
+    ("Mistral", "mistral_api_key", stream_mistral),
+    ("DeepSeek", "deepseek_api_key", stream_deepseek),
+    ("Sambanova", "sambanova_api_key", stream_sambanova),
+]
+
+
 async def stream_complete(messages: list[dict]) -> AsyncGenerator[str, None]:
-    """Stream from the best available provider (Gemini first, Groq fallback)."""
+    """Stream from the best available provider with fallback through all configured providers."""
     settings = get_settings()
 
-    if settings.gemini_api_key:
-        try:
-            async for chunk in stream_gemini(messages):
-                yield chunk
-            return
-        except Exception as e:
-            logger.warning("Gemini stream failed (%s), falling back to Groq", e)
+    for name, key_field, stream_fn in _STREAM_PROVIDERS:
+        api_key = getattr(settings, key_field, "")
+        if not api_key:
+            continue
 
-    if settings.groq_api_key and settings.groq_api_key != "YOUR_GROQ_API_KEY":
         try:
-            async for chunk in stream_groq(messages):
+            async for chunk in stream_fn(messages):
                 yield chunk
             return
         except Exception as e:
-            logger.warning("Groq stream failed: %s", e)
+            logger.warning("%s stream failed (%s), trying next provider", name, e)
 
     yield "[AI temporarily unavailable — please try again later]"

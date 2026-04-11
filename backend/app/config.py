@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-1.5-flash"
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
+    cerebras_api_key: str = ""
+    cerebras_model: str = "llama-3.3-70b"
+    mistral_api_key: str = ""
+    mistral_model: str = "mistral-small-latest"
+    deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
+    sambanova_api_key: str = ""
+    sambanova_model: str = "Meta-Llama-3.3-70B-Instruct"
 
     # ----- GitHub (optional) -----
     github_token: str = ""

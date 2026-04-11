@@ -30,8 +30,8 @@ class PipelineSettingsUpdate(BaseModel):
     discovery_frequency: Optional[str] = Field(None, pattern=r"^(weekly|monthly|quarterly)$")
     auto_approve_topics: Optional[bool] = None
     auto_generate_variants: Optional[bool] = None
-    ai_model_research: Optional[str] = Field(None, pattern=r"^(gemini|groq)$")
-    ai_model_formatting: Optional[str] = Field(None, pattern=r"^(gemini|groq)$")
+    ai_model_research: Optional[str] = Field(None, pattern=r"^(gemini|groq|cerebras|mistral|deepseek|sambanova)$")
+    ai_model_formatting: Optional[str] = Field(None, pattern=r"^(gemini|groq|cerebras|mistral|deepseek|sambanova)$")
     max_tokens_per_run: Optional[int] = Field(None, ge=0, le=1000000)
     refresh_frequency: Optional[str] = Field(None, pattern=r"^(monthly|quarterly)$")
 
@@ -553,15 +553,23 @@ async def pipeline_settings_page(
   <div class="form-group">
     <label>Research Model (deep)</label>
     <select name="ai_model_research">
-      <option value="gemini" {_sel(s.ai_model_research, 'gemini')}>Gemini (recommended)</option>
+      <option value="gemini" {_sel(s.ai_model_research, 'gemini')}>Gemini</option>
       <option value="groq" {_sel(s.ai_model_research, 'groq')}>Groq</option>
+      <option value="cerebras" {_sel(s.ai_model_research, 'cerebras')}>Cerebras</option>
+      <option value="mistral" {_sel(s.ai_model_research, 'mistral')}>Mistral</option>
+      <option value="deepseek" {_sel(s.ai_model_research, 'deepseek')}>DeepSeek</option>
+      <option value="sambanova" {_sel(s.ai_model_research, 'sambanova')}>Sambanova</option>
     </select>
   </div>
   <div class="form-group">
     <label>Formatting Model (cheap)</label>
     <select name="ai_model_formatting">
-      <option value="groq" {_sel(s.ai_model_formatting, 'groq')}>Groq (recommended)</option>
+      <option value="groq" {_sel(s.ai_model_formatting, 'groq')}>Groq</option>
       <option value="gemini" {_sel(s.ai_model_formatting, 'gemini')}>Gemini</option>
+      <option value="cerebras" {_sel(s.ai_model_formatting, 'cerebras')}>Cerebras</option>
+      <option value="mistral" {_sel(s.ai_model_formatting, 'mistral')}>Mistral</option>
+      <option value="deepseek" {_sel(s.ai_model_formatting, 'deepseek')}>DeepSeek</option>
+      <option value="sambanova" {_sel(s.ai_model_formatting, 'sambanova')}>Sambanova</option>
     </select>
   </div>
 </div>
