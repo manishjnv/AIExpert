@@ -267,12 +267,10 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
     try:
         if model_name == "gemini":
             from app.ai.gemini import complete
-            from app.ai.schemas import QUALITY_REVIEW_SCHEMA
             result = await complete(
                 user_part, json_response=True,
                 task="quality_review",
                 system_instruction=system_part,
-                json_schema=QUALITY_REVIEW_SCHEMA,
             )
         elif model_name == "groq":
             from app.ai.groq import complete

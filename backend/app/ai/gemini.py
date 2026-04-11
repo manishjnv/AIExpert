@@ -86,6 +86,9 @@ async def complete(
         "generationConfig": {
             "temperature": 0.3,
             "maxOutputTokens": max_tokens,
+            # Disable thinking for Gemini 2.5+ to avoid wasting output tokens
+            # and producing multi-part responses that complicate JSON parsing
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
@@ -119,8 +122,26 @@ async def complete(
         raise GeminiError(f"Gemini API error: {resp.status_code}")
 
     data = resp.json()
+
+    # Check for truncation (MAX_TOKENS finish reason)
+    finish_reason = ""
     try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        finish_reason = data["candidates"][0].get("finishReason", "")
+    except (KeyError, IndexError):
+        pass
+    if finish_reason == "MAX_TOKENS":
+        logger.warning("Gemini response truncated (MAX_TOKENS) for task=%s", task)
+
+    # Gemini 2.5+ "thinking" models return multiple parts — find the text part
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+        text = ""
+        for part in parts:
+            if "text" in part:
+                text = part["text"]
+                break  # use the last text part (thinking models put thought first)
+        if not text:
+            text = parts[0].get("text", "")
     except (KeyError, IndexError) as e:
         raise GeminiError(f"Unexpected Gemini response structure: {e}") from e
 
@@ -128,9 +149,19 @@ async def complete(
         try:
             return json.loads(text)
         except json.JSONDecodeError:
+            # Try extracting from markdown code blocks
             if "```json" in text:
                 text = text.split("```json", 1)[1].split("```", 1)[0].strip()
-                return json.loads(text)
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    pass
+            elif "```" in text:
+                text = text.split("```", 1)[1].split("```", 1)[0].strip()
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    pass
             raise GeminiError(f"Gemini returned non-JSON: {text[:200]}")
 
     return text
