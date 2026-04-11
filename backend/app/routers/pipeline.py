@@ -417,47 +417,47 @@ async def pipeline_dashboard_page(
 
       <h2 style="margin-top:32px;font-family:Fraunces,Georgia,serif;color:#e8a849;font-size:18px">Pipeline Stages</h2>
       <p style="font-size:12px;color:#4a5260;margin-bottom:4px">Every topic goes through these stages before becoming a course. Stages marked with <span style="color:#e8a849">AI</span> use AI providers and consume budget.</p>
-      <p style="font-size:11px;color:#3a4452;margin-bottom:12px">Gold = data cleanup · Blue = AI enrichment · Green = process control · Red = maintenance</p>
+      <p style="font-size:12px;color:#6a7280;margin-bottom:14px"><span style="color:#e8a849">■</span> Data cleanup · <span style="color:#5d9be8">■</span> AI enrichment · <span style="color:#6db585">■</span> Process control · <span style="color:#d97757">■</span> Maintenance</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #e8a849">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">1. Name Normalization</div>
-          <div style="font-size:11px;color:#4a5260">Cleans topic names — lowercased, special characters removed, creates a unique key. Prevents "LLMs" and "llms" from creating duplicates.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #e8a849">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">1. Name Normalization</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">Cleans topic names — lowercased, special characters removed, creates a unique key. Prevents "LLMs" and "llms" from creating duplicates.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #e8a849">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">2. Deduplication</div>
-          <div style="font-size:11px;color:#4a5260">Checks if a topic already exists by its normalized name. Duplicates are skipped silently. Safe to re-run discovery.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #e8a849">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">2. Deduplication</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">Checks if a topic already exists by its normalized name. Duplicates are skipped silently. Safe to re-run discovery.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px"><span style="color:#e8a849">AI</span> 3. Topic Discovery</div>
-          <div style="font-size:11px;color:#4a5260">AI researches trending topics from universities, papers, and industry. Uses the research model (Gemini/Groq/Mistral) from the fallback chain. Costs ~3,000 tokens per run.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px"><span style="color:#e8a849">AI</span> 3. Topic Discovery</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">AI researches trending topics from universities, papers, and industry. Uses the research model (Gemini/Groq/Mistral) from the fallback chain. Costs ~3,000 tokens per run.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px"><span style="color:#e8a849">AI</span> 4. Triage Classifier</div>
-          <div style="font-size:11px;color:#4a5260">A cheap, fast AI classifier filters each topic: "Worth generating a course?" Uses the cheapest available model (Groq). Costs ~200 tokens per topic. Filters ~80% of low-value topics.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px"><span style="color:#e8a849">AI</span> 4. Triage Classifier</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">A cheap, fast AI classifier filters each topic: "Worth generating a course?" Uses the cheapest available model (Groq). Costs ~200 tokens per topic. Filters ~80% of low-value topics.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px"><span style="color:#e8a849">AI</span> 5. Curriculum Generation</div>
-          <div style="font-size:11px;color:#4a5260">AI creates full study plans — weeks, resources, checklists, deliverables. Generates up to 5 variants per topic (3mo/6mo × levels). Costs ~5,000 tokens per variant. The most expensive stage.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px"><span style="color:#e8a849">AI</span> 5. Curriculum Generation</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">AI creates full study plans — weeks, resources, checklists, deliverables. Generates up to 5 variants per topic (3mo/6mo × levels). Costs ~5,000 tokens per variant. The most expensive stage.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px"><span style="color:#e8a849">AI</span> 6. Currency Review</div>
-          <div style="font-size:11px;color:#4a5260">During content refresh, AI reviews each template: "Is this content still current?" Checks if topics, frameworks, or best practices have changed. Flags stale content for update.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px"><span style="color:#e8a849">AI</span> 6. Currency Review</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">During content refresh, AI reviews each template: "Is this content still current?" Checks if topics, frameworks, or best practices have changed. Flags stale content for update.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #6db585">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">7. Schema Validation</div>
-          <div style="font-size:11px;color:#4a5260">Every AI response is validated against a strict schema — required fields, value ranges, correct types. Malformed data is rejected and the next provider is tried.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #6db585">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">7. Schema Validation</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">Every AI response is validated against a strict schema — required fields, value ranges, correct types. Malformed data is rejected and the next provider is tried.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #6db585">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">8. Lifecycle State Machine</div>
-          <div style="font-size:11px;color:#4a5260"><strong>Pending</strong> → <strong>Approved</strong> → <strong>Generating</strong> → <strong>Generated</strong>. Each transition is tracked. Topics can be <strong>Rejected</strong> and later re-approved.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #6db585">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">8. Lifecycle State Machine</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5"><strong>Pending</strong> → <strong>Approved</strong> → <strong>Generating</strong> → <strong>Generated</strong>. Each transition is tracked. Topics can be <strong>Rejected</strong> and later re-approved.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #d97757">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">9. Budget Gating</div>
-          <div style="font-size:11px;color:#4a5260">&lt;80%: normal · 80-90%: warning · 90-100%: fallback to cheaper models · &gt;100%: hard stop. Checked before every AI call.</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #d97757">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">9. Budget Gating</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">&lt;80%: normal · 80-90%: warning · 90-100%: fallback to cheaper models · &gt;100%: hard stop. Checked before every AI call.</div>
         </div>
-        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #d97757">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">10. Cache &amp; Link Health</div>
-          <div style="font-size:11px;color:#4a5260">AI responses cached (24h–30d TTL). Resource URLs checked periodically — broken links flagged, private IPs blocked (SSRF protection).</div>
+        <div style="background:#1d242e;padding:16px 18px;border-radius:6px;border-left:3px solid #d97757">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">10. Cache &amp; Link Health</div>
+          <div style="font-size:12px;color:#8a92a0;line-height:1.5">AI responses cached (24h–30d TTL). Resource URLs checked periodically — broken links flagged, private IPs blocked (SSRF protection).</div>
         </div>
       </div>
     `;
