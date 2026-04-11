@@ -648,9 +648,10 @@ async def admin_templates_page(
     from app.curriculum.loader import list_templates, load_template, get_template_status
     from app.models.plan import UserPlan
 
-    # Get subscriber counts per template
+    # Get subscriber counts per template (active enrollments only)
     sub_rows = await db.execute(
         select(UserPlan.template_key, func.count(UserPlan.id))
+        .where(UserPlan.status == "active")
         .group_by(UserPlan.template_key)
     )
     subscriber_counts = {row[0]: row[1] for row in sub_rows}
