@@ -14,6 +14,7 @@ Cost optimization:
 - Claude only sees broken weeks (3-5 out of 24), not full plan
 - Cache review results by template hash
 - Cross-review: never use same model for generation and review
+- Batch API: 5+ refinements submitted as single batch for 50% Claude discount
 """
 
 from __future__ import annotations
@@ -266,10 +267,12 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
     try:
         if model_name == "gemini":
             from app.ai.gemini import complete
+            from app.ai.schemas import QUALITY_REVIEW_SCHEMA
             result = await complete(
                 user_part, json_response=True,
                 task="quality_review",
                 system_instruction=system_part,
+                json_schema=QUALITY_REVIEW_SCHEMA,
             )
         elif model_name == "groq":
             from app.ai.groq import complete
@@ -383,3 +386,140 @@ async def _run_refinement(
             await log_usage(db, model_name, model_name, "quality_refine", "error",
                            error_message=str(e))
         return None
+
+
+# ---- Claude Batch API for bulk refinement (50% discount) ----
+
+BATCH_THRESHOLD = 5  # Use batch API when 5+ refinements queued
+
+
+async def create_batch_refinement(
+    items: list[dict],
+    db: AsyncSession | None = None,
+) -> str:
+    """Submit multiple refinement tasks as a Claude Batch for 50% discount.
+
+    Args:
+        items: List of dicts, each with:
+            - plan: dict (full curriculum)
+            - critical_fixes: list[dict] (from review)
+            - fix_week_nums: list[int]
+            - template_key: str (for matching results)
+
+    Returns:
+        batch_id: str — poll with poll_batch_refinement()
+    """
+    from app.ai.anthropic import create_batch
+
+    prompt_template = REFINE_PROMPT_PATH.read_text(encoding="utf-8")
+    system_rules = prompt_template.split("WEEKS THAT NEED FIXING:")[0]
+
+    requests = []
+    for item in items:
+        plan = item["plan"]
+        critical_fixes = item["critical_fixes"]
+        fix_week_nums = item["fix_week_nums"]
+
+        failing_weeks = []
+        for m in plan.get("months", []):
+            for w in m.get("weeks", []):
+                if w.get("n") in fix_week_nums:
+                    failing_weeks.append(w)
+
+        user_content = (
+            f"WEEKS THAT NEED FIXING:\n{json.dumps(failing_weeks, separators=(',', ':'))}\n\n"
+            f"ISSUES TO FIX:\n{json.dumps(critical_fixes, separators=(',', ':'))}\n\n"
+            f"CONTEXT:\n- Topic: {plan.get('title', '')}\n"
+            f"- Level: {plan.get('level', '')}\n"
+            f"- Duration: {plan.get('duration_months', 6)} months"
+        )
+
+        requests.append({
+            "custom_id": item["template_key"],
+            "prompt": user_content,
+            "system_prompt": system_rules,
+            "max_tokens": 4096,
+        })
+
+    batch_id = await create_batch(requests)
+
+    if db is not None:
+        from app.ai.health import log_usage
+        await log_usage(db, "claude", "claude-batch", "quality_refine_batch", "ok",
+                       subtask=f"{len(items)} items")
+
+    logger.info("Created batch refinement %s with %d items", batch_id, len(items))
+    return batch_id
+
+
+async def apply_batch_results(
+    batch_id: str,
+    items: list[dict],
+    db: AsyncSession | None = None,
+) -> dict:
+    """Fetch and apply batch refinement results.
+
+    Args:
+        batch_id: The batch ID from create_batch_refinement()
+        items: Same list passed to create_batch_refinement() (for matching)
+
+    Returns:
+        {"applied": int, "failed": int, "results": [...]}
+    """
+    from app.ai.anthropic import get_batch_results
+    from app.services.curriculum_generator import save_curriculum_draft
+
+    results = await get_batch_results(batch_id)
+    items_by_key = {item["template_key"]: item for item in items}
+
+    applied = 0
+    failed = 0
+    details = []
+
+    for result in results:
+        key = result["custom_id"]
+        item = items_by_key.get(key)
+        if not item:
+            continue
+
+        if result["error"]:
+            failed += 1
+            details.append({"key": key, "status": "error", "error": result["error"]})
+            continue
+
+        fixed_weeks = result["result"]
+        if not isinstance(fixed_weeks, list):
+            failed += 1
+            details.append({"key": key, "status": "error", "error": "Non-list response"})
+            continue
+
+        # Merge fixed weeks back into the plan
+        plan = item["plan"]
+        patched = json.loads(json.dumps(plan))
+        fixed_by_num = {w["n"]: w for w in fixed_weeks if isinstance(w, dict) and "n" in w}
+
+        for m in patched.get("months", []):
+            for i, w in enumerate(m.get("weeks", [])):
+                if w.get("n") in fixed_by_num:
+                    m["weeks"][i] = fixed_by_num[w["n"]]
+
+        # Validate improvement
+        original_score = _quick_heuristic_score(plan)
+        new_score = _quick_heuristic_score(patched)
+
+        if new_score >= original_score:
+            await save_curriculum_draft(patched)
+            applied += 1
+            details.append({
+                "key": key, "status": "applied",
+                "score_change": f"{original_score} → {new_score}",
+            })
+        else:
+            failed += 1
+            details.append({
+                "key": key, "status": "reverted",
+                "reason": f"Score regressed: {original_score} → {new_score}",
+            })
+
+    logger.info("Batch %s applied: %d succeeded, %d failed", batch_id, applied, failed)
+    return {"applied": applied, "failed": failed, "results": details}

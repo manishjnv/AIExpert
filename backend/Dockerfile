@@ -30,6 +30,9 @@ COPY alembic ./alembic
 COPY tests ./tests
 COPY pytest.ini ./
 
+# Seed templates — kept separate so volume mount can overlay /app/app/curriculum/templates/
+COPY app/curriculum/templates /app/seed_templates
+
 # Data volume mount point
 RUN mkdir -p /data && chown -R app:app /data /app
 
@@ -38,4 +41,4 @@ USER app
 EXPOSE 8000
 
 # Run migrations (if any exist) then start the server
-CMD ["sh", "-c", "if ls alembic/versions/*.py 1>/dev/null 2>&1; then alembic upgrade head; fi && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "if [ -z \"$(ls /app/app/curriculum/templates/*.json 2>/dev/null)\" ]; then cp /app/seed_templates/*.json /app/app/curriculum/templates/; fi && if ls alembic/versions/*.py 1>/dev/null 2>&1; then alembic upgrade head; fi && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips='*'"]

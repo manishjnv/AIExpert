@@ -43,6 +43,7 @@ services:
     volumes:
       - ./data:/data
       - ./scripts:/app/scripts:ro
+      - ./data/templates:/app/app/curriculum/templates
     networks:
       - roadmap-net
     mem_limit: 512m
@@ -67,6 +68,7 @@ services:
       - ./data:/data
       - ./scripts:/app/scripts:ro
       - ./proposals:/proposals
+      - ./data/templates:/app/app/curriculum/templates
     command: ["python", "-m", "scripts.quarterly_sync_scheduler"]
     depends_on:
       backend:

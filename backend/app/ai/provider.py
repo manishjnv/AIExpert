@@ -124,6 +124,10 @@ async def complete(
                 kwargs = {"json_response": json_response}
                 if name == "gemini":
                     kwargs["task"] = task
+                    # Structured output schemas — guarantee valid JSON shape
+                    if task == "generation":
+                        from app.ai.schemas import PLAN_TEMPLATE_SCHEMA
+                        kwargs["json_schema"] = PLAN_TEMPLATE_SCHEMA
                 result = await complete_fn(prompt, **kwargs)
                 latency = int((time.time() - start) * 1000)
 
