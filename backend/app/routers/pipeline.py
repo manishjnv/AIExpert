@@ -62,7 +62,8 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; color
 .btn.primary:hover { background: rgba(232,168,73,0.1); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .card { background: #1d242e; padding: 16px; border-radius: 6px; margin-bottom: 16px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 900px) { .form-row { grid-template-columns: 1fr 1fr; } }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8a92a0; }
 .form-group input, .form-group select { padding: 8px; background: #0f1419; border: 1px solid #2a323d; color: #f5f1e8; border-radius: 3px; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
@@ -700,7 +701,7 @@ async def pipeline_settings_page(
 <h1>Pipeline Settings</h1>
 <div class="subtitle">Configure auto-discovery, AI models, budget, and refresh schedule</div>
 
-<form id="settingsForm" class="card" style="max-width:700px">
+<form id="settingsForm" class="card">
 
 <h3>Discovery</h3>
 <div class="form-row">
