@@ -121,9 +121,9 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
 **Last session date:** 2026-04-11
-**Last session summary:** P1 (auto curriculum pipeline) fully built and deployed — AI topic discovery, batch generation, content refresh, budget tracking, admin UI with 3 pages. P2 (user experience) — 3-step plan picker, course history in profile, modal fix. Security hardening via Codex audit (5 issues fixed). Admin header matched to main site. GitHub MCP configured. RCA entries 011-015 added.
+**Last session summary:** Major session — 20+ commits. P1 auto curriculum pipeline (discovery, generation, refresh, budget, cache, scheduler, admin UI). P2 UX (3-step picker, course history). Security hardening (5 Codex findings). Account page (replaced modal). Unified persistent navigation (nav.js/nav.css shared across all pages). Admin sub-nav. Plan switch rate limit. Inline plan switcher on account page. RCA 011-015. GitHub MCP configured. Additional AI API keys (Sambanova, Cerebras, Mistral, DeepSeek) documented for future use.
 **Tests passing:** 90 automated
 **Tests failing:** none
 **Blockers:** None.
-**Next action:** Test P1 live (Run Discovery from admin pipeline). Then P3 (email SPF/DKIM), P4 (generate specialist templates).
+**Next action:** Test P1 live (Run Discovery from admin pipeline). Add new AI provider keys to VPS. P3 (email), P4 (specialist templates).
 **Open questions for the user:** None.
