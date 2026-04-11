@@ -241,13 +241,18 @@ async def generate_template(
 async def list_admin_templates(
     _user: User = Depends(get_current_admin),
 ):
-    """List all templates with file details for admin."""
-    from app.curriculum.loader import list_templates, load_template
+    """List all templates with file details and publish status for admin."""
+    from app.curriculum.loader import list_templates, load_template, get_template_status
+    grandfathered = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
     keys = list_templates()
     result = []
     for key in sorted(keys):
         try:
             tpl = load_template(key)
+            status_info = get_template_status(key)
+            pub_status = status_info.get("status", "draft")
+            if key in grandfathered and pub_status == "draft":
+                pub_status = "published"
             result.append({
                 "key": tpl.key,
                 "title": tpl.title,
@@ -256,6 +261,8 @@ async def list_admin_templates(
                 "duration_months": tpl.duration_months,
                 "total_weeks": tpl.total_weeks,
                 "total_checks": tpl.total_checks,
+                "publish_status": pub_status,
+                "quality_score": status_info.get("quality_score", 0),
             })
         except Exception:
             continue
@@ -638,16 +645,32 @@ async def admin_templates_page(
     db: AsyncSession = Depends(get_db),
 ):
     """Admin templates management page."""
-    from app.curriculum.loader import list_templates, load_template
+    from app.curriculum.loader import list_templates, load_template, get_template_status
 
+    grandfathered = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
     keys = list_templates()
     rows_html = ""
     for key in sorted(keys):
         try:
             tpl = load_template(key)
-            is_default = key.startswith("generalist_")
+            is_default = key in grandfathered
             delete_btn = "" if is_default else f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>'
-            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.goal)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td>{delete_btn}</td></tr>"
+
+            status_info = get_template_status(key)
+            pub_status = status_info.get("status", "draft")
+            q_score = status_info.get("quality_score", 0)
+            if is_default and pub_status == "draft":
+                pub_status = "published"
+
+            if pub_status == "published":
+                status_badge = '<span style="background:#1d3525;color:#6db585;padding:2px 8px;border-radius:10px;font-size:11px">Published</span>'
+            else:
+                status_badge = '<span style="background:#2a2520;color:#e8a849;padding:2px 8px;border-radius:10px;font-size:11px">Draft</span>'
+
+            score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
+            score_display = f'<span style="color:{score_color};font-weight:600">{q_score}</span>' if q_score > 0 else '<span style="color:#8a92a0">—</span>'
+
+            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
         except Exception:
             continue
 
@@ -668,7 +691,7 @@ async def admin_templates_page(
   <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
-<table><tr><th>Title</th><th>Goal</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Actions</th></tr>{rows_html}</table>
+<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
 
 <script>
 async function generateTemplate() {{

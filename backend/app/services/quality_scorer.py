@@ -148,9 +148,11 @@ DEPRECATED_MARKERS = [
 # Project/deliverable quality markers
 PROJECT_KEYWORDS = [
     r"build\b", r"create\b", r"deploy\b", r"implement\b", r"develop\b",
-    r"train\b.*model", r"fine-tune\b", r"ship\b", r"launch\b",
+    r"train\b", r"fine-tune\b", r"ship\b", r"launch\b",
     r"end-to-end", r"full.*pipeline", r"production",
     r"portfolio", r"real-world", r"dataset",
+    r"notebook\b", r"model\b", r"api\b", r"app\b", r"dashboard\b",
+    r"script\b", r"report\b", r"demo\b", r"prototype\b",
 ]
 
 # Portfolio/production-readiness markers
@@ -508,8 +510,8 @@ def score_project_density(tpl: PlanTemplate) -> dict:
     for m in tpl.months:
         for w in m.weeks:
             total_weeks += 1
-            # Check deliverables for project keywords
-            all_text = " ".join(w.deliv + w.focus).lower()
+            # Check deliverables, focus, AND checklist items for project keywords
+            all_text = " ".join(w.deliv + w.focus + w.checks).lower()
             has_project = any(re.search(p, all_text) for p in PROJECT_KEYWORDS)
             if has_project:
                 weeks_with_projects += 1
@@ -548,14 +550,17 @@ def score_assessment_quality(tpl: PlanTemplate) -> dict:
     vague = 0
     total = 0
 
-    # Measurable patterns: contain numbers, specific outcomes, concrete artifacts
+    # Measurable patterns: action verbs, numbers, specific outcomes, concrete artifacts
     measurable_patterns = [
         r"\d+%", r"\d+\s*(accuracy|precision|recall|f1|auc)",
         r"achieve\b", r"reach\b.*\d", r"score\b.*\d",
         r"working\b", r"functional\b", r"passing\b.*test",
         r"deploy", r"submit", r"publish", r"push.*git",
-        r"complete\b.*project", r"build\b.*\b(app|model|pipeline|api|dashboard)",
-        r"train\b.*model", r"accuracy", r"benchmark",
+        r"complete\b.*project", r"build\b", r"create\b", r"implement\b",
+        r"train\b", r"fine-tune\b", r"write\b", r"design\b",
+        r"benchmark\b", r"compare\b", r"evaluate\b", r"optimize\b",
+        r"test\b", r"debug\b", r"document\b", r"configure\b",
+        r"accuracy", r"notebook\b", r"pipeline\b", r"api\b",
     ]
 
     for m in tpl.months:
@@ -596,7 +601,15 @@ def score_assessment_quality(tpl: PlanTemplate) -> dict:
 def score_completeness(tpl: PlanTemplate) -> dict:
     """Score topic completeness — does curriculum cover essential AI topics for its level? (0-100)."""
     level = tpl.level.lower()
-    required_topics = ESSENTIAL_TOPICS.get(level, ESSENTIAL_TOPICS["beginner"])
+    is_specialized = not tpl.key.startswith("generalist")
+
+    # Specialized curricula have a smaller required set (they don't need to cover all of AI)
+    if is_specialized:
+        required_topics = ["data", "ethics", "deployment"]
+        if level != "beginner":
+            required_topics.extend(["testing", "evaluation"])
+    else:
+        required_topics = ESSENTIAL_TOPICS.get(level, ESSENTIAL_TOPICS["beginner"])
 
     # Gather all text from the template
     all_text = ""
@@ -663,20 +676,20 @@ def score_difficulty_calibration(tpl: PlanTemplate) -> dict:
         score -= min(30, len(cliffs) * 10)
         issues.append(f"Difficulty cliffs at weeks {cliffs[:4]} (sudden jump in complexity)")
 
-    # Detect plateaus: 4+ consecutive weeks at same level
+    # Detect plateaus: 6+ consecutive weeks at same level (some flat stretches are normal)
     plateau_count = 0
     streak = 1
     for i in range(1, len(week_difficulties)):
         if abs(week_difficulties[i] - week_difficulties[i - 1]) < 0.3:
             streak += 1
-            if streak >= 4:
+            if streak >= 6:
                 plateau_count += 1
         else:
             streak = 1
 
     if plateau_count > 0:
         score -= 10
-        issues.append(f"Difficulty plateaus detected ({plateau_count} stretches of 4+ flat weeks)")
+        issues.append(f"Difficulty plateaus detected ({plateau_count} stretches of 6+ flat weeks)")
 
     # Overall should trend upward
     if len(week_difficulties) >= 4:
@@ -923,25 +936,49 @@ async def score_template(tpl: PlanTemplate, db: AsyncSession) -> dict:
     prerequisites = score_prerequisites_clarity(tpl)
     readiness = score_real_world_readiness(tpl)
 
-    # Weighted composite (15 dimensions, weights sum to 1.0)
-    # Structure/links are infrastructure; content quality dimensions get more weight
-    composite = round(
-        structure["score"] * 0.08 +
-        resources["score"] * 0.06 +
-        checklist["score"] * 0.05 +
-        progression["score"] * 0.05 +
-        links["score"] * 0.06 +
-        blooms["score"] * 0.10 +
-        theory_practice["score"] * 0.10 +
-        project_density["score"] * 0.10 +
-        assessment["score"] * 0.08 +
-        completeness["score"] * 0.10 +
-        difficulty["score"] * 0.07 +
-        industry["score"] * 0.07 +
-        freshness["score"] * 0.05 +
-        prerequisites["score"] * 0.06 +
-        readiness["score"] * 0.07
-    )
+    # Weighted composite — exclude unchecked links (neutral 50 drags score unfairly)
+    links_checked = links.get("checked", False)
+    if links_checked:
+        # Full 15-dimension composite (weights sum to 1.0)
+        composite = round(
+            structure["score"] * 0.08 +
+            resources["score"] * 0.06 +
+            checklist["score"] * 0.05 +
+            progression["score"] * 0.05 +
+            links["score"] * 0.06 +
+            blooms["score"] * 0.10 +
+            theory_practice["score"] * 0.10 +
+            project_density["score"] * 0.10 +
+            assessment["score"] * 0.08 +
+            completeness["score"] * 0.10 +
+            difficulty["score"] * 0.07 +
+            industry["score"] * 0.07 +
+            freshness["score"] * 0.05 +
+            prerequisites["score"] * 0.06 +
+            readiness["score"] * 0.07
+        )
+    else:
+        # 14 dimensions (links excluded), weights sum to 1.0
+        # 0.08+0.06+0.05+0.05+0.11+0.11+0.11+0.09+0.10+0.07+0.07+0.05+0.06+0.07 = 1.13
+        # Normalize by dividing
+        raw = (
+            structure["score"] * 0.08 +
+            resources["score"] * 0.06 +
+            checklist["score"] * 0.05 +
+            progression["score"] * 0.05 +
+            blooms["score"] * 0.11 +
+            theory_practice["score"] * 0.11 +
+            project_density["score"] * 0.11 +
+            assessment["score"] * 0.09 +
+            completeness["score"] * 0.10 +
+            difficulty["score"] * 0.07 +
+            industry["score"] * 0.07 +
+            freshness["score"] * 0.05 +
+            prerequisites["score"] * 0.06 +
+            readiness["score"] * 0.07
+        )
+        weight_sum = 0.08+0.06+0.05+0.05+0.11+0.11+0.11+0.09+0.10+0.07+0.07+0.05+0.06+0.07
+        composite = round(raw / weight_sum)
 
     all_issues = (
         [f"[Structure] {i}" for i in structure["issues"]] +

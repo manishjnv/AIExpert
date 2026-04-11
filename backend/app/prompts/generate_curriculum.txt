@@ -54,10 +54,11 @@ BLOOM'S TAXONOMY — progressive cognitive levels by month position:
 - Final 25%: Evaluate/Create (design systems, justify decisions, build end-to-end project)
 
 CHECKLIST QUALITY — every item MUST:
-- Start with an ACTION VERB: Implement, Build, Train, Deploy, Fine-tune, Write, Benchmark, Debug, Compare, Design, Submit, Test, Evaluate, Document, Optimize
+- Start with an ACTION VERB: Implement, Build, Train, Deploy, Fine-tune, Write, Benchmark, Debug, Compare, Design, Submit, Test, Evaluate, Document, Optimize, Configure, Create
 - NEVER start with: Understand, Learn, Know, Study, Explore, Review, Read about, Familiarize, Get familiar, Look into
 - Be independently verifiable (could be checked in a GitHub PR or notebook output)
-- Include measurable criteria where possible (e.g. "Train a CNN achieving >90% accuracy on CIFAR-10" not "Train a CNN")
+- At least 2 of 5 items per week MUST include measurable criteria with numbers (e.g. "Train a CNN achieving >90% accuracy on CIFAR-10", "Build an API handling 100 req/s", "Write tests with >80% coverage")
+- The other items should reference concrete artifacts: "Build a notebook", "Deploy to HuggingFace Spaces", "Submit PR with pipeline code"
 
 RESOURCE QUALITY:
 - Resources must be REAL, FREE, and currently accessible
