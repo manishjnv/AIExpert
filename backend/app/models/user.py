@@ -26,6 +26,7 @@ class User(PrimaryKeyMixin, TimestampMixin, Base):
     experience_level: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # beginner/intermediate/advanced
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     email_notifications: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    public_profile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_seen_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Relationships
