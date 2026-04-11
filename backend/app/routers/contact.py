@@ -2,8 +2,6 @@
 Contact form — sends user messages to the maintainer via SMTP.
 """
 
-from __future__ import annotations
-
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response
