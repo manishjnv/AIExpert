@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account — AI Learning Roadmap</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1419; --bg-2: #161c24; --bg-3: #1d242e;
+  --paper: #f5f1e8; --paper-dim: #e8e2d3;
+  --ink-soft: #4a5260; --line: #2a323d; --line-soft: #3a4452;
+  --accent: #e8a849; --accent-soft: #c98e2f;
+  --success: #6db585; --danger: #d97757; --info: #6fa8d6;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: var(--sans); background: var(--bg); color: var(--paper); margin: 0; -webkit-font-smoothing: antialiased; }
+
+/* Nav */
+.topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
+.topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; text-decoration: none; display: flex; align-items: center; gap: 6px; }
+.topnav-links { display: flex; gap: 4px; align-items: center; }
+.topnav-links a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); text-decoration: none; padding: 8px 12px; border-radius: 2px; transition: all 0.2s; }
+.topnav-links a:hover { color: var(--accent); background: rgba(232,168,73,0.08); }
+
+/* Layout */
+.page { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weight: 300; margin: 0 0 4px; }
+.subtitle { color: var(--ink-soft); font-size: 13px; margin-bottom: 32px; font-family: var(--mono); letter-spacing: 0.03em; }
+
+/* Sections */
+.section { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+.section-title { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 16px; }
+
+/* Profile card */
+.profile-card { display: flex; gap: 20px; align-items: center; }
+.avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-3); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 28px; color: var(--accent); border: 2px solid var(--line); }
+.profile-info { flex: 1; }
+.profile-name { font-family: var(--serif); font-size: 22px; color: var(--paper); font-weight: 400; }
+.profile-email { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+.profile-joined { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); margin-top: 4px; letter-spacing: 0.08em; }
+
+/* Form */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+.form-group input, .form-group select { padding: 10px 12px; background: var(--bg-3); border: 1px solid var(--line); color: var(--paper); font-family: var(--sans); font-size: 13px; border-radius: 4px; transition: border-color 0.2s; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+
+/* Current plan */
+.plan-card { display: flex; align-items: center; gap: 20px; }
+.plan-ring { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.plan-ring svg { transform: rotate(-90deg); }
+.plan-ring .pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 20px; color: var(--accent); }
+.plan-details { flex: 1; }
+.plan-title { font-family: var(--serif); font-size: 16px; color: var(--paper); }
+.plan-meta { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.btn { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 16px; background: transparent; border: 1px solid var(--line-soft); color: var(--paper-dim); cursor: pointer; transition: all 0.2s; border-radius: 2px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.success { border-color: var(--success); color: var(--success); }
+.btn.success:hover { background: rgba(109,181,133,0.08); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: rgba(217,119,87,0.08); }
+.btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-soft); }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 24px; }
+.timeline::before { content: ''; position: absolute; left: 7px; top: 4px; bottom: 4px; width: 2px; background: var(--line); }
+.timeline-item { position: relative; margin-bottom: 16px; }
+.timeline-dot { position: absolute; left: -20px; top: 4px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); background: var(--bg-2); }
+.timeline-dot.active { border-color: var(--success); background: var(--success); }
+.timeline-dot.archived { border-color: var(--ink-soft); }
+.timeline-head { display: flex; align-items: center; gap: 10px; }
+.timeline-title { font-size: 14px; color: var(--paper); }
+.timeline-status { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 10px; }
+.timeline-status.active { background: rgba(109,181,133,0.2); color: var(--success); }
+.timeline-status.archived { background: rgba(74,82,96,0.3); color: var(--ink-soft); }
+.timeline-meta { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+.timeline-bar { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+.timeline-bar .bar { flex: 1; background: var(--line); height: 4px; border-radius: 2px; max-width: 200px; }
+.timeline-bar .bar > div { height: 4px; border-radius: 2px; }
+.timeline-bar .pct { font-size: 12px; color: var(--accent); font-weight: 600; min-width: 36px; }
+
+/* Toggle */
+.toggle-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.toggle-row + .toggle-row { border-top: 1px solid var(--line); }
+.toggle-row label { font-size: 13px; color: var(--paper-dim); cursor: pointer; flex: 1; }
+.toggle-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* Toast */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-3); color: var(--paper); padding: 10px 24px; border-radius: 6px; border: 1px solid var(--line); font-size: 13px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* Danger zone */
+.danger-zone { border-color: rgba(217,119,87,0.3); }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .topnav { padding: 10px 16px; }
+  .page { padding: 24px 16px 60px; }
+  .form-row { grid-template-columns: 1fr; }
+  .profile-card { flex-direction: column; text-align: center; }
+  .plan-card { flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="/" class="topnav-brand">
+    <svg width="24" height="24" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>
+    AI Learning Roadmap
+  </a>
+  <div class="topnav-links">
+    <a href="/">Home</a>
+    <a href="/leaderboard">Leaderboard</a>
+    <a href="#" onclick="signOut()">Sign Out</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Loading state -->
+  <div id="loading" style="text-align:center;padding:60px 0;color:var(--ink-soft)">Loading account...</div>
+
+  <!-- Main content (hidden until loaded) -->
+  <div id="accountContent" style="display:none">
+
+    <h1>Account</h1>
+    <div class="subtitle" id="subtitleText"></div>
+
+    <!-- Profile Card -->
+    <div class="section">
+      <div class="profile-card">
+        <div class="avatar" id="avatarEl"></div>
+        <div class="profile-info">
+          <div class="profile-name" id="profileName"></div>
+          <div class="profile-email" id="profileEmail"></div>
+          <div class="profile-joined" id="profileJoined"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current Plan -->
+    <div class="section">
+      <div class="section-title">Current Plan</div>
+      <div id="currentPlanSection">
+        <div class="plan-card">
+          <div class="plan-ring">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="#2a323d" stroke-width="6"/>
+              <circle id="planArc" cx="40" cy="40" r="34" fill="none" stroke="#e8a849" stroke-width="6" stroke-linecap="round" stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
+            </svg>
+            <div class="pct" id="planPct">0%</div>
+          </div>
+          <div class="plan-details">
+            <div class="plan-title" id="planTitle">No plan enrolled</div>
+            <div class="plan-meta" id="planMeta"></div>
+          </div>
+          <button class="btn" onclick="window.location='/#enroll'" id="switchBtn">Switch Plan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Details -->
+    <div class="section">
+      <div class="section-title">Profile</div>
+      <div class="form-row">
+        <div class="form-group"><label>Name</label><input id="fName" type="text" placeholder="Your name"></div>
+        <div class="form-group"><label>Learning Goal</label><input id="fGoal" type="text" placeholder="e.g. AI/ML Engineer" maxlength="200"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Experience Level</label>
+          <select id="fLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select>
+        </div>
+        <div class="form-group">&nbsp;</div>
+      </div>
+    </div>
+
+    <!-- Connections -->
+    <div class="section">
+      <div class="section-title">Connections</div>
+      <div class="form-row">
+        <div class="form-group"><label>GitHub Username</label><input id="fGithub" type="text" placeholder="username"></div>
+        <div class="form-group"><label>LinkedIn URL</label><input id="fLinkedin" type="text" placeholder="linkedin.com/in/username"></div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="section">
+      <div class="section-title">Notifications</div>
+      <div class="toggle-row">
+        <input type="checkbox" id="fEmailNotif">
+        <label for="fEmailNotif">Weekly progress reminder emails</label>
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="fPublicProfile">
+        <label for="fPublicProfile">Show my profile on the <a href="/leaderboard" style="color:var(--info)">public leaderboard</a></label>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <button class="btn success" onclick="saveProfile()" style="width:100%;padding:12px;font-size:12px;margin-bottom:20px" id="saveBtn">Save Changes</button>
+
+    <!-- Course History -->
+    <div class="section" id="historySection" style="display:none">
+      <div class="section-title">Course History</div>
+      <div class="timeline" id="historyTimeline"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="section" style="display:flex;gap:12px;align-items:center">
+      <button class="btn" onclick="exportData()" style="font-size:10px">Export Data</button>
+      <div style="flex:1"></div>
+      <button class="btn danger" onclick="deleteAccount()" style="font-size:10px">Delete Account</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let profile = null;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function loadProfile() {
+  try {
+    const resp = await fetch('/api/profile', { credentials: 'same-origin' });
+    if (resp.status === 401) { window.location = '/'; return; }
+    if (!resp.ok) { showToast('Failed to load profile'); return; }
+    profile = await resp.json();
+    render();
+  } catch { showToast('Failed to load profile'); }
+}
+
+function render() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('accountContent').style.display = 'block';
+
+  // Avatar
+  const initial = (profile.name || profile.email || '?')[0].toUpperCase();
+  document.getElementById('avatarEl').textContent = initial;
+
+  // Header
+  document.getElementById('profileName').textContent = profile.name || 'Learner';
+  document.getElementById('profileEmail').textContent = profile.email;
+  const joined = profile.account_created ? new Date(profile.account_created).toLocaleDateString('en-US', {month:'long', year:'numeric'}) : '';
+  document.getElementById('profileJoined').textContent = joined ? 'Joined ' + joined : '';
+  document.getElementById('subtitleText').textContent = profile.email;
+
+  // Current plan
+  if (profile.active_plan) {
+    const history = profile.plan_history || [];
+    const active = history.find(h => h.status === 'active');
+    if (active) {
+      document.getElementById('planTitle').textContent = active.title;
+      document.getElementById('planMeta').textContent = active.done + ' / ' + active.total + ' tasks completed';
+      document.getElementById('planPct').textContent = active.pct + '%';
+      const circ = 2 * Math.PI * 34;
+      document.getElementById('planArc').style.strokeDashoffset = circ - (circ * active.pct / 100);
+    }
+    document.getElementById('switchBtn').textContent = 'Switch Plan';
+  } else {
+    document.getElementById('switchBtn').textContent = 'Enroll';
+  }
+
+  // Form fields
+  document.getElementById('fName').value = profile.name || '';
+  document.getElementById('fGoal').value = profile.learning_goal || '';
+  document.getElementById('fLevel').value = profile.experience_level || 'intermediate';
+  document.getElementById('fGithub').value = profile.github_username || '';
+  document.getElementById('fLinkedin').value = profile.linkedin_url || '';
+  document.getElementById('fEmailNotif').checked = profile.email_notifications !== false;
+  document.getElementById('fPublicProfile').checked = profile.public_profile === true;
+
+  // Course history timeline
+  const history = profile.plan_history || [];
+  if (history.length > 0) {
+    document.getElementById('historySection').style.display = 'block';
+    const tl = document.getElementById('historyTimeline');
+    tl.innerHTML = history.map(h => {
+      const date = h.enrolled_at ? new Date(h.enrolled_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '';
+      const barColor = h.pct >= 75 ? 'var(--success)' : h.pct >= 25 ? 'var(--accent)' : 'var(--ink-soft)';
+      const dotClass = h.status === 'active' ? 'active' : 'archived';
+      const statusClass = h.status === 'active' ? 'active' : 'archived';
+      return '<div class="timeline-item">' +
+        '<div class="timeline-dot ' + dotClass + '"></div>' +
+        '<div class="timeline-head">' +
+          '<span class="timeline-title">' + h.title + '</span>' +
+          '<span class="timeline-status ' + statusClass + '">' + h.status + '</span>' +
+        '</div>' +
+        '<div class="timeline-meta">' + date + (h.archived_at ? ' \u2014 ' + new Date(h.archived_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '') + '</div>' +
+        '<div class="timeline-bar">' +
+          '<div class="bar"><div style="width:' + h.pct + '%;background:' + barColor + '"></div></div>' +
+          '<span class="pct">' + h.pct + '%</span>' +
+          '<span style="font-size:11px;color:var(--ink-soft)">' + h.done + '/' + h.total + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+async function saveProfile() {
+  const ghUser = document.getElementById('fGithub').value.trim();
+  const liUrl = document.getElementById('fLinkedin').value.trim();
+
+  if (ghUser) {
+    try {
+      const ghResp = await fetch('https://api.github.com/users/' + encodeURIComponent(ghUser));
+      if (ghResp.status === 404) { showToast('GitHub username not found: ' + ghUser); return; }
+    } catch {}
+  }
+  if (liUrl && !liUrl.match(/linkedin\.com\/in\//i)) {
+    showToast('LinkedIn URL should contain linkedin.com/in/username'); return;
+  }
+
+  const body = {
+    name: document.getElementById('fName').value || null,
+    github_username: ghUser || null,
+    linkedin_url: liUrl || null,
+    learning_goal: document.getElementById('fGoal').value || null,
+    experience_level: document.getElementById('fLevel').value,
+    email_notifications: document.getElementById('fEmailNotif').checked,
+    public_profile: document.getElementById('fPublicProfile').checked,
+  };
+
+  try {
+    const resp = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    });
+    if (resp.ok) {
+      profile = await resp.json();
+      showToast('Saved');
+      render();
+    } else {
+      const d = await resp.json();
+      showToast(d.detail || 'Save failed');
+    }
+  } catch { showToast('Save failed'); }
+}
+
+async function exportData() {
+  try {
+    const resp = await fetch('/api/profile/export', { credentials: 'same-origin' });
+    if (!resp.ok) { showToast('Export failed'); return; }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ai-roadmap-data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch { showToast('Export failed'); }
+}
+
+async function deleteAccount() {
+  if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+  if (!confirm('This will permanently delete all your data. Type OK to continue.')) return;
+  try {
+    const resp = await fetch('/api/profile', {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({confirm: 'DELETE'})
+    });
+    if (resp.ok) { window.location = '/'; }
+    else { showToast('Delete failed'); }
+  } catch { showToast('Delete failed'); }
+}
+
+async function signOut() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  window.location = '/';
+}
+
+loadProfile();
+</script>
+</body>
+</html>
