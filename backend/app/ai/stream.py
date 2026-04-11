@@ -50,8 +50,7 @@ async def stream_gemini(messages: list[dict]) -> AsyncGenerator[str, None]:
             "POST", url, params={"key": settings.gemini_api_key, "alt": "sse"}, json=body,
         ) as resp:
             if resp.status_code != 200:
-                yield "[AI error — try again]"
-                return
+                raise Exception(f"Gemini stream error: {resp.status_code}")
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -88,8 +87,7 @@ async def stream_groq(messages: list[dict]) -> AsyncGenerator[str, None]:
             json=body,
         ) as resp:
             if resp.status_code != 200:
-                yield "[AI error — try again]"
-                return
+                raise Exception(f"Groq stream error: {resp.status_code}")
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -115,12 +113,15 @@ async def stream_complete(messages: list[dict]) -> AsyncGenerator[str, None]:
             async for chunk in stream_gemini(messages):
                 yield chunk
             return
-        except Exception:
-            logger.warning("Gemini stream failed, falling back to Groq")
+        except Exception as e:
+            logger.warning("Gemini stream failed (%s), falling back to Groq", e)
 
-    if settings.groq_api_key:
-        async for chunk in stream_groq(messages):
-            yield chunk
-        return
+    if settings.groq_api_key and settings.groq_api_key != "YOUR_GROQ_API_KEY":
+        try:
+            async for chunk in stream_groq(messages):
+                yield chunk
+            return
+        except Exception as e:
+            logger.warning("Groq stream failed: %s", e)
 
-    yield "[No AI provider configured]"
+    yield "[AI temporarily unavailable — please try again later]"
