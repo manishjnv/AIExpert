@@ -785,6 +785,10 @@ async def pipeline_topics_page(
 <div class="page">
 <h1>Discovered Topics ({len(rows)})</h1>
 <div class="subtitle">AI-discovered trending topics for curriculum generation</div>
+<div style="background:#1d242e;padding:12px 16px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#8a92a0;line-height:1.6">
+    <strong style="color:#d0cbc2">Workflow:</strong>
+    Discover topics (Pipeline page) &rarr; <strong style="color:#6db585">Approve</strong> here &rarr; Generate Curricula (Pipeline page) &rarr; AI creates 5 template variants per approved topic &rarr; Review &amp; Publish
+</div>
 <div style="margin-bottom:16px">{filter_html}</div>
 
 <table>
@@ -833,6 +837,12 @@ async function viewTopic(id) {{
       ${{sources ? '<div style="margin-bottom:16px"><strong style="color:#d0cbc2">Evidence Sources:</strong><ul style="color:#b0aaa0;padding-left:20px;line-height:1.8">' + sources + '</ul></div>' : ''}}
       <div style="color:#8a92a0;font-size:12px">Discovered: ${{t.created_at ? t.created_at.substring(0,10) : '—'}} · Templates generated: ${{t.templates_generated}}</div>
       ${{t.generation_error ? '<div style="color:#d97757;font-size:12px;margin-top:8px">Error: ' + t.generation_error.substring(0,200) + '</div>' : ''}}
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid #2a323d">
+        ${{t.status === 'pending' ? '<button class="btn success" onclick="topicAction('+t.id+',\\'approve\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Approve</button> <button class="btn danger" onclick="topicAction('+t.id+',\\'reject\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Reject</button>' : ''}}
+        ${{t.status === 'approved' ? '<span style="color:#6db585;font-weight:600">✓ Approved</span> — go to Pipeline page and click "Generate Curricula" to create templates' : ''}}
+        ${{t.status === 'generated' ? '<span style="color:#6db585;font-weight:600">✓ Generated</span> — ' + t.templates_generated + ' templates created. Review them in Templates page.' : ''}}
+        ${{t.status === 'rejected' ? '<button class="btn success" onclick="topicAction('+t.id+',\\'approve\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Re-approve</button>' : ''}}
+      </div>
     `;
   }} catch(e) {{
     content.innerHTML = 'Error: ' + e.message;
