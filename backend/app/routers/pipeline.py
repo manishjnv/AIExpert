@@ -788,34 +788,52 @@ async def ai_usage_page(
         successes = h.get("success_count", 0) if h else 0
         errors = h.get("error_count", 0) if h else 0
         rl_count = h.get("rate_limit_count", 0) if h else 0
-        last_err = esc(h.get("last_error_msg", "") or "") if h else ""
+        last_err_raw = h.get("last_error_msg", "") or "" if h else ""
         model = getattr(app_settings, f"{p}_model", "")
 
+        # Human-readable status + reason
         if not has_key:
-            status_badge = '<span class="badge rejected">No Key</span>'
+            dot = "🔴"
+            status_text = "Not configured"
+            reason = "No API key set"
         elif permanent:
-            status_badge = '<span class="badge rejected">Unavailable</span>'
+            dot = "🔴"
+            status_text = "Down"
+            if "402" in last_err_raw or "Insufficient" in last_err_raw:
+                reason = "Out of credits — needs top-up"
+            elif "404" in last_err_raw or "not found" in last_err_raw:
+                reason = "Model retired or invalid"
+            else:
+                reason = "Permanent error"
         elif not available:
-            status_badge = '<span class="badge pending">Cooldown</span>'
+            dot = "🟡"
+            status_text = "Cooling down"
+            reason = "Hit rate limit — auto-retries in 60s"
+        elif successes > 0:
+            dot = "🟢"
+            status_text = "Working"
+            reason = f"{successes} successful calls"
+        elif rl_count > 0:
+            dot = "🟡"
+            status_text = "Rate limited"
+            reason = f"Hit limit {rl_count} times — will retry"
         else:
-            status_badge = '<span class="badge approved">Available</span>'
+            dot = "🟢"
+            status_text = "Ready"
+            reason = "No calls yet"
 
         reset_btn = ""
         if permanent or not available:
-            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:10px" onclick="resetProvider(\'{p}\')">Reset</button>'
+            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:10px" onclick="resetProvider(\'{p}\')">Retry This Provider</button>'
 
-        provider_cards += f"""<div class="card" style="flex:1;min-width:160px">
+        provider_cards += f"""<div class="card" style="flex:1;min-width:170px">
   <div style="display:flex;justify-content:space-between;align-items:center">
     <strong style="color:#e8a849;text-transform:capitalize">{esc(p)}</strong>
-    {status_badge}
+    <span style="font-size:13px">{dot}</span>
   </div>
-  <div style="font-size:11px;color:#4a5260;margin:4px 0">{esc(model)}</div>
-  <div style="font-size:12px">
-    <span style="color:#6db585">{successes} ok</span> ·
-    <span style="color:#e8a849">{rl_count} rl</span> ·
-    <span style="color:#d97757">{errors} err</span>
-  </div>
-  {f'<div style="font-size:10px;color:#d97757;margin-top:2px">{last_err[:60]}</div>' if last_err else ''}
+  <div style="font-size:13px;margin:6px 0;color:#f5f1e8">{status_text}</div>
+  <div style="font-size:11px;color:#4a5260">{esc(reason)}</div>
+  <div style="font-size:10px;color:#3a4452;margin-top:4px">Model: {esc(model)}</div>
   {reset_btn}
 </div>"""
 
@@ -865,16 +883,17 @@ async function loadUsageData() {{
 
     // Provider stats table
     if (data.provider_stats.length > 0) {{
-      let html = '<table><tr><th>Provider</th><th>Calls</th><th>Success</th><th>Rate Limited</th><th>Errors</th><th>Tokens</th><th>Avg Latency</th></tr>';
+      let html = '<table><tr><th>Provider</th><th>Total Calls</th><th>Succeeded</th><th>Rate Limited</th><th>Failed</th><th>Avg Speed</th></tr>';
       for (const p of data.provider_stats) {{
+        const successRate = p.total_calls > 0 ? Math.round(p.success / p.total_calls * 100) : 0;
+        const speedLabel = p.avg_latency_ms < 1000 ? p.avg_latency_ms + 'ms' : (p.avg_latency_ms / 1000).toFixed(1) + 's';
         html += `<tr>
-          <td style="text-transform:capitalize">${{p.provider}}</td>
+          <td style="text-transform:capitalize"><strong>${{p.provider}}</strong></td>
           <td>${{p.total_calls}}</td>
-          <td style="color:#6db585">${{p.success}}</td>
+          <td style="color:#6db585">${{p.success}} (${{successRate}}%)</td>
           <td style="color:#e8a849">${{p.rate_limited}}</td>
           <td style="color:#d97757">${{p.errors}}</td>
-          <td>${{p.total_tokens.toLocaleString()}}</td>
-          <td>${{p.avg_latency_ms}}ms</td>
+          <td>${{speedLabel}}</td>
         </tr>`;
       }}
       html += '</table>';
@@ -904,17 +923,25 @@ async function loadUsageData() {{
 
     // Recent calls
     if (data.recent.length > 0) {{
-      let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Subtask</th><th>Status</th><th>Latency</th><th>Error</th></tr>';
+      // Human-readable status labels
+      function friendlyStatus(status, err) {{
+        if (status === 'ok') return '<span class="badge approved">Success</span>';
+        if (status === 'rate_limited') return '<span class="badge pending">Rate Limited</span>';
+        if (err && (err.includes('402') || err.includes('Insufficient'))) return '<span class="badge rejected">No Credits</span>';
+        if (err && (err.includes('404') || err.includes('not found'))) return '<span class="badge rejected">Bad Model</span>';
+        if (err && err.includes('non-JSON')) return '<span class="badge rejected">Bad Response</span>';
+        return '<span class="badge rejected">Error</span>';
+      }}
+      function friendlyTime(ms) {{ return ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(1) + 's'; }}
+
+      let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Result</th><th>Speed</th></tr>';
       for (const r of data.recent) {{
-        const statusCls = r.status === 'ok' ? 'approved' : r.status === 'rate_limited' ? 'pending' : 'rejected';
         html += `<tr>
-          <td style="font-size:11px;white-space:nowrap">${{r.called_at}}</td>
+          <td style="font-size:11px;white-space:nowrap">${{r.called_at.slice(11)}}</td>
           <td style="text-transform:capitalize">${{r.provider}}</td>
-          <td>${{r.task}}</td>
-          <td style="font-size:11px;color:#4a5260;max-width:150px;overflow:hidden;text-overflow:ellipsis">${{r.subtask}}</td>
-          <td><span class="badge ${{statusCls}}">${{r.status}}</span></td>
-          <td>${{r.latency_ms}}ms</td>
-          <td style="font-size:10px;color:#d97757;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{r.error_message}}</td>
+          <td>${{r.task}}${{r.subtask ? ' <span style="color:#4a5260;font-size:10px">(' + r.subtask.slice(0,30) + ')</span>' : ''}}</td>
+          <td>${{friendlyStatus(r.status, r.error_message)}}</td>
+          <td>${{friendlyTime(r.latency_ms)}}</td>
         </tr>`;
       }}
       html += '</table>';
