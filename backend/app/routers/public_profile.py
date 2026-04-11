@@ -78,29 +78,58 @@ nav a:hover { color: #e8a849; }
 
 
 async def _get_user_progress(user: User, db: AsyncSession) -> dict:
-    """Calculate progress stats for a user."""
-    plan = (await db.execute(
+    """Calculate progress stats for a user — lifetime across all plans."""
+    # Get active plan for display
+    active_plan = (await db.execute(
         select(UserPlan).where(UserPlan.user_id == user.id, UserPlan.status == "active")
     )).scalar_one_or_none()
 
-    if plan is None:
-        return {"plan": None, "done": 0, "total": 0, "pct": 0, "template": None}
+    # Get ALL plans (active + archived) for lifetime stats
+    all_plans = (await db.execute(
+        select(UserPlan).where(UserPlan.user_id == user.id)
+    )).scalars().all()
 
-    done = (await db.execute(
-        select(func.count()).select_from(Progress).where(
-            Progress.user_plan_id == plan.id, Progress.done == True
-        )
-    )).scalar() or 0
+    if not all_plans:
+        return {"plan": None, "done": 0, "total": 0, "pct": 0, "template": None, "lifetime_done": 0, "plans_count": 0}
 
-    from app.curriculum.loader import load_template
-    try:
-        tpl = load_template(plan.template_key)
-        total = tpl.total_checks
-    except Exception:
-        total = 120
+    # Count unique completed tasks across all plans
+    lifetime_done = 0
+    for p in all_plans:
+        done = (await db.execute(
+            select(func.count()).select_from(Progress).where(
+                Progress.user_plan_id == p.id, Progress.done == True
+            )
+        )).scalar() or 0
+        lifetime_done += done
 
-    pct = round((done / total) * 100) if total else 0
-    return {"plan": plan, "done": done, "total": total, "pct": pct, "template": plan.template_key}
+    # Active plan stats for current progress
+    active_done = 0
+    active_total = 120
+    template = None
+    if active_plan:
+        active_done = (await db.execute(
+            select(func.count()).select_from(Progress).where(
+                Progress.user_plan_id == active_plan.id, Progress.done == True
+            )
+        )).scalar() or 0
+        template = active_plan.template_key
+        from app.curriculum.loader import load_template
+        try:
+            tpl = load_template(active_plan.template_key)
+            active_total = tpl.total_checks
+        except Exception:
+            active_total = 120
+
+    pct = round((active_done / active_total) * 100) if active_total else 0
+    return {
+        "plan": active_plan,
+        "done": active_done,
+        "total": active_total,
+        "pct": pct,
+        "template": template,
+        "lifetime_done": lifetime_done,
+        "plans_count": len(all_plans),
+    }
 
 
 PLAN_LABELS = {
@@ -159,7 +188,8 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         stats = await _get_user_progress(user, db)
         if stats["plan"] is None:
             continue
-        total_tasks_all += stats["done"]
+        lifetime = stats.get("lifetime_done", stats["done"])
+        total_tasks_all += lifetime
         joined = user.created_at.strftime("%b %Y") if user.created_at else "—"
         streak = await _get_streak(user.id, stats["plan"].id, db) if stats["plan"] else 0
         total_streak_all = max(total_streak_all, streak)
@@ -170,14 +200,16 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             "done": stats["done"],
             "total": stats["total"],
             "pct": stats["pct"],
+            "lifetime_done": lifetime,
+            "plans_count": stats.get("plans_count", 1),
             "github": user.github_username,
             "linkedin": user.linkedin_url,
             "joined": joined,
             "streak": streak,
         })
 
-    # Sort by completion % descending, then by done count
-    entries.sort(key=lambda e: (e["pct"], e["done"]), reverse=True)
+    # Sort by completion % descending, then by lifetime tasks
+    entries.sort(key=lambda e: (e["pct"], e["lifetime_done"]), reverse=True)
 
     medals = ["🥇", "🥈", "🥉"]
 
@@ -195,7 +227,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             <td class="rank" style="font-size:20px;text-align:center">{medal}</td>
             <td>
               <a href="/profile/{e['id']}" style="font-weight:600;font-size:14px">{e['name']}</a>
-              <div style="font-size:10px;color:#4a5260">Joined {e['joined']}</div>
+              <div style="font-size:10px;color:#4a5260">Joined {e['joined']} · {e['lifetime_done']} lifetime tasks</div>
             </td>
             <td><span style="font-size:11px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
             <td>
