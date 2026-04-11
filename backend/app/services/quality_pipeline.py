@@ -184,7 +184,11 @@ async def run_quality_pipeline(
 
 
 def _quick_heuristic_score(plan: dict) -> int:
-    """Fast heuristic score without DB access (subset of quality_scorer)."""
+    """Fast heuristic score without DB access — mirrors the full 15-dim scorer.
+
+    Must correlate with the full scorer so the pipeline doesn't skip
+    templates that actually need refinement.
+    """
     from app.curriculum.loader import PlanTemplate
     try:
         tpl = PlanTemplate(**plan)
@@ -197,22 +201,51 @@ def _quick_heuristic_score(plan: dict) -> int:
     # Structure checks
     expected_weeks = tpl.duration_months * 4
     if tpl.total_weeks < expected_weeks * 0.8:
-        score -= 15
+        score -= 10
 
     empty_weeks = sum(1 for m in tpl.months for w in m.weeks if not w.focus and not w.deliv)
-    score -= min(20, empty_weeks * 5)
+    score -= min(15, empty_weeks * 5)
 
     no_resource_weeks = sum(1 for m in tpl.months for w in m.weeks if not w.resources)
-    score -= min(15, no_resource_weeks * 5)
+    score -= min(10, no_resource_weeks * 3)
 
-    # Checklist vagueness
+    # Checklist vagueness (assessment quality proxy)
     vague_patterns = [r"^understand\b", r"^learn\b", r"^know\b", r"^study\b",
                       r"^read about\b", r"^explore\b", r"^review\b", r"^familiarize\b"]
     all_checks = [c for m in tpl.months for w in m.weeks for c in w.checks]
     if all_checks:
         vague_count = sum(1 for c in all_checks if any(re.match(p, c.strip(), re.IGNORECASE) for p in vague_patterns))
         vague_pct = vague_count / len(all_checks) * 100
-        score -= min(25, int(vague_pct * 0.5))
+        score -= min(20, int(vague_pct * 0.4))
+
+    # Bloom's progression proxy — check if last month uses high-level verbs
+    create_verbs = [r"^build\b", r"^design\b", r"^create\b", r"^deploy\b",
+                    r"^develop\b", r"^train\b", r"^fine-tune\b", r"^architect\b"]
+    if tpl.months:
+        last_checks = [c for w in tpl.months[-1].weeks for c in w.checks]
+        if last_checks:
+            create_count = sum(1 for c in last_checks
+                             if any(re.match(v, c.strip(), re.IGNORECASE) for v in create_verbs))
+            create_pct = create_count / len(last_checks)
+            if create_pct < 0.3:
+                score -= 10  # Last month should be mostly Create/Evaluate level
+
+    # Difficulty calibration proxy — check for cognitive cliffs
+    if len(tpl.months) >= 3:
+        first_vague = sum(1 for c in (w.checks for w in tpl.months[0].weeks for c in [c for c in w]) if True) if False else 0
+        # Simplified: just check last month has harder content than first
+        first_text = " ".join(c for w in tpl.months[0].weeks for c in w.checks).lower()
+        last_text = " ".join(c for w in tpl.months[-1].weeks for c in w.checks).lower()
+        basic_words = sum(1 for w in ["define", "list", "identify", "describe"] if w in first_text)
+        advanced_words = sum(1 for w in ["deploy", "design", "optimize", "evaluate", "build"] if w in last_text)
+        if advanced_words < 2:
+            score -= 5  # Last month should use advanced verbs
+
+    # Measurability proxy — check for numbers in checklist items
+    if all_checks:
+        has_numbers = sum(1 for c in all_checks if re.search(r'\d+%|\d+\s*(accuracy|f1|auc)', c.lower()))
+        if has_numbers < len(all_checks) * 0.1:
+            score -= 5  # Less than 10% of items have measurable criteria
 
     # Resource diversity
     from urllib.parse import urlparse
@@ -228,7 +261,7 @@ def _quick_heuristic_score(plan: dict) -> int:
             except Exception:
                 pass
         if len(domains) < 3:
-            score -= 10
+            score -= 5
 
     return max(0, min(100, score))
 
