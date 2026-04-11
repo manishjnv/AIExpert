@@ -210,6 +210,8 @@ async def me(user: User = Depends(get_current_user)):
         "avatar_url": user.avatar_url,
         "github_username": user.github_username,
         "linkedin_url": user.linkedin_url,
+        "email_notifications": user.email_notifications,
+        "public_profile": user.public_profile,
         "learning_goal": user.learning_goal,
         "experience_level": user.experience_level,
         "is_admin": user.is_admin,
