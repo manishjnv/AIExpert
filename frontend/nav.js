@@ -17,6 +17,12 @@
     return isActive(href) ? ' class="active"' : '';
   }
 
+  // On admin/account pages the user MUST be logged in, so show auth links immediately
+  const requiresAuth = path.startsWith('/admin') || path.startsWith('/account');
+  const authDisplay = requiresAuth ? 'inline' : 'none';
+  const anonDisplay = requiresAuth ? 'none' : 'inline';
+  const adminDisplay = path.startsWith('/admin') ? 'inline' : 'none';
+
   // Build main nav
   const nav = document.createElement('div');
   nav.id = 'shared-nav';
@@ -26,12 +32,12 @@
       <div class="topnav-links">
         <a href="/"${activeClass('/')}>Home</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
-        <span id="navAuth" style="display:none">
+        <span id="navAuth" style="display:${authDisplay}">
           <a href="/account"${activeClass('/account')}>Account</a>
-          <a href="/admin/" id="navAdminLink" style="display:none"${activeClass('/admin')}>Admin</a>
+          <a href="/admin/" id="navAdminLink" style="display:${adminDisplay}"${activeClass('/admin')}>Admin</a>
           <a href="#" onclick="navSignOut();return false">Sign Out</a>
         </span>
-        <span id="navAnon">
+        <span id="navAnon" style="display:${anonDisplay}">
           <a href="#" onclick="navSignIn();return false" class="signin-link">Sign In</a>
         </span>
       </div>
