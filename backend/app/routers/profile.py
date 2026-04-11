@@ -78,6 +78,42 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         except FileNotFoundError:
             pass
 
+    # Course history — all non-active plans with their progress
+    all_plans = (
+        await db.execute(
+            select(UserPlan).where(UserPlan.user_id == user.id)
+            .order_by(UserPlan.enrolled_at.desc())
+        )
+    ).scalars().all()
+
+    plan_history = []
+    for plan in all_plans:
+        done_count = await db.scalar(
+            select(func.count()).select_from(Progress).where(
+                Progress.user_plan_id == plan.id, Progress.done == True
+            )
+        ) or 0
+        total_checks = 0
+        plan_title = plan.template_key
+        try:
+            from app.curriculum.loader import load_template
+            tpl = load_template(plan.template_key)
+            total_checks = tpl.total_checks
+            plan_title = tpl.title
+        except Exception:
+            total_checks = 120
+        pct = round((done_count / total_checks) * 100) if total_checks else 0
+        plan_history.append({
+            "template_key": plan.template_key,
+            "title": plan_title,
+            "status": plan.status,
+            "enrolled_at": plan.enrolled_at.isoformat() if plan.enrolled_at else None,
+            "archived_at": plan.archived_at.isoformat() if plan.archived_at else None,
+            "done": done_count,
+            "total": total_checks,
+            "pct": pct,
+        })
+
     return {
         "id": user.id,
         "email": user.email,
@@ -93,6 +129,7 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         "total_weeks": total_weeks,
         "completed_weeks": completed_weeks,
         "active_plan": active_plan.template_key if active_plan else None,
+        "plan_history": plan_history,
         "account_created": user.created_at.isoformat() if user.created_at else None,
     }
 

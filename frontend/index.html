@@ -102,6 +102,16 @@
   .modal-field { margin-bottom:12px; }
   .modal-field label { display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px; }
   .modal-field input, .modal-field select { width:100%;padding:8px 10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-family:var(--sans);font-size:13px;border-radius:3px; }
+  .plan-step { flex:1;text-align:center;padding:8px 4px;font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid var(--line);transition:all 0.2s; }
+  .plan-step.active { color:var(--accent);border-color:var(--accent); }
+  .plan-step.done { color:var(--success);border-color:var(--success); }
+  .plan-step-num { display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid currentColor;font-size:9px;margin-right:4px;vertical-align:middle; }
+  .plan-option { background:var(--bg-3);border:1px solid var(--line);border-radius:6px;padding:14px;cursor:pointer;transition:all 0.2s;text-align:center; }
+  .plan-option:hover { border-color:var(--accent);color:var(--accent); }
+  .plan-option.selected { border-color:var(--accent);background:rgba(232,168,73,0.08); }
+  .plan-option .opt-title { font-family:var(--serif);font-size:15px;color:var(--paper);margin-bottom:4px; }
+  .plan-option:hover .opt-title { color:var(--accent); }
+  .plan-option .opt-desc { font-size:11px;color:var(--ink-soft); }
   .modal-field input:focus, .modal-field select:focus { outline:none;border-color:var(--accent); }
 
   /* Repo link */
@@ -356,7 +366,7 @@
 </div>
 
 <!-- Account Settings Modal -->
-<div id="profileModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeProfileModal()">
+<div id="profileModal" class="modal-overlay" style="display:none">
   <div class="modal" style="max-width:420px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="font-family:var(--serif);margin:0">Account Settings</h3>
@@ -393,6 +403,12 @@
     </div>
 
     <button class="btn" onclick="saveProfile()" style="margin-top:16px;width:100%;padding:10px;border-color:var(--success);color:var(--success);font-size:12px">Save Changes</button>
+
+    <!-- Course History -->
+    <div id="courseHistory" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:none">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px">Course History</div>
+      <div id="courseHistoryList" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
+    </div>
 
     <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
       <button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:4px 10px">Export Plan PDF</button>
@@ -435,18 +451,55 @@
   </div>
 </div>
 
-<!-- Plan Picker Modal (kept for first-time enrollment flow) -->
-<div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePlanModal()">
-  <div class="modal">
-    <h3 style="font-family:var(--serif);margin-bottom:16px">Choose Your Plan</h3>
-    <div class="modal-field"><label>Duration</label>
-      <select id="planDuration">
-        <option value="loading">Loading plans...</option>
-      </select>
+<!-- 3-Step Plan Picker Modal -->
+<div id="planModal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:var(--serif);margin:0">Choose Your Plan</h3>
+      <span onclick="closePlanModal()" style="cursor:pointer;color:var(--ink-soft);font-size:18px">&#x2715;</span>
     </div>
-    <div style="margin-top:16px;display:flex;gap:8px">
-      <button class="btn" onclick="enrollFromModal()" style="border-color:var(--success);color:var(--success)">Start</button>
-      <button class="btn" onclick="closePlanModal()">Cancel</button>
+
+    <!-- Step indicators -->
+    <div id="planSteps" style="display:flex;gap:4px;margin-bottom:20px">
+      <div class="plan-step active" data-step="1"><span class="plan-step-num">1</span> Topic</div>
+      <div class="plan-step" data-step="2"><span class="plan-step-num">2</span> Duration</div>
+      <div class="plan-step" data-step="3"><span class="plan-step-num">3</span> Level</div>
+    </div>
+
+    <!-- Step 1: Topic -->
+    <div id="planStep1" class="plan-step-content">
+      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">What area of AI/ML do you want to study?</p>
+      <div id="topicGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+    </div>
+
+    <!-- Step 2: Duration -->
+    <div id="planStep2" class="plan-step-content" style="display:none">
+      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">How long do you want to study?</p>
+      <div id="durationGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+      <button class="btn" onclick="planPickerBack(1)" style="margin-top:12px;font-size:10px">&#x2190; Back</button>
+    </div>
+
+    <!-- Step 3: Level -->
+    <div id="planStep3" class="plan-step-content" style="display:none">
+      <p style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">What's your experience level?</p>
+      <div id="levelGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"></div>
+      <button class="btn" onclick="planPickerBack(2)" style="margin-top:12px;font-size:10px">&#x2190; Back</button>
+    </div>
+
+    <!-- Step 4: Preview + Confirm -->
+    <div id="planStep4" class="plan-step-content" style="display:none">
+      <div id="planPreview" style="background:var(--bg-3);border-radius:6px;padding:16px;margin-bottom:16px">
+        <div id="previewTitle" style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:8px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+          <div style="text-align:center"><div id="previewWeeks" style="font-family:var(--serif);font-size:24px;color:var(--accent)"></div><div style="font-size:9px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.1em">Weeks</div></div>
+          <div style="text-align:center"><div id="previewChecks" style="font-family:var(--serif);font-size:24px;color:var(--accent)"></div><div style="font-size:9px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.1em">Tasks</div></div>
+          <div style="text-align:center"><div id="previewLevel" style="font-family:var(--serif);font-size:24px;color:var(--accent)"></div><div style="font-size:9px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.1em">Level</div></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="planPickerBack(3)" style="font-size:10px">&#x2190; Back</button>
+        <button class="btn" onclick="enrollFromModal()" style="flex:1;border-color:var(--success);color:var(--success);padding:10px">Start Learning</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1367,6 +1420,30 @@ function openProfileModal() {
   const sel = document.getElementById("planDurationInline");
   if (currentUser?.active_plan) sel.value = currentUser.active_plan;
   sel.dataset.original = sel.value; // track original to detect change
+  // Populate course history
+  const historyEl = document.getElementById("courseHistory");
+  const listEl = document.getElementById("courseHistoryList");
+  const history = currentUser.plan_history || [];
+  if (history.length > 0) {
+    historyEl.style.display = "block";
+    listEl.innerHTML = history.map(h => {
+      const statusColor = h.status === 'active' ? 'var(--success)' : h.status === 'completed' ? 'var(--accent)' : 'var(--ink-soft)';
+      const barColor = h.pct >= 75 ? 'var(--success)' : h.pct >= 25 ? 'var(--accent)' : 'var(--ink-soft)';
+      const date = h.enrolled_at ? new Date(h.enrolled_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '';
+      return `<div style="background:var(--bg-3);padding:8px 10px;border-radius:4px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.title}</div>
+          <div style="font-size:10px;color:var(--ink-soft)">${date} &middot; <span style="color:${statusColor}">${h.status}</span></div>
+        </div>
+        <div style="width:60px">
+          <div style="background:var(--line);height:4px;border-radius:2px"><div style="width:${h.pct}%;height:4px;border-radius:2px;background:${barColor}"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--accent);min-width:30px;text-align:right">${h.pct}%</div>
+      </div>`;
+    }).join('');
+  } else {
+    historyEl.style.display = "none";
+  }
   document.getElementById("profileModal").style.display = "flex";
 }
 
@@ -1438,6 +1515,7 @@ async function deleteAccount() {
 }
 
 let availableTemplates = [];
+let pickerState = { topic: null, duration: null, level: null, key: null };
 
 async function loadTemplateOptions() {
   try {
@@ -1445,9 +1523,9 @@ async function loadTemplateOptions() {
     if (resp.ok) availableTemplates = await resp.json();
   } catch {}
   updatePlanLabels();
-  for (const selId of ["planDuration", "planDurationInline"]) {
-    const sel = document.getElementById(selId);
-    if (!sel) continue;
+  // Update inline plan selector in profile modal
+  const sel = document.getElementById("planDurationInline");
+  if (sel) {
     sel.innerHTML = availableTemplates.map(t =>
       `<option value="${t.key}">${t.title} (${t.total_weeks}w)</option>`
     ).join("");
@@ -1455,11 +1533,138 @@ async function loadTemplateOptions() {
 }
 loadTemplateOptions();
 
-function openPlanPicker() { document.getElementById("planModal").style.display = "flex"; }
+function _getTopics() {
+  const topics = new Map();
+  for (const t of availableTemplates) {
+    if (!topics.has(t.goal)) {
+      // Capitalize and clean topic name
+      const label = t.goal.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      topics.set(t.goal, { goal: t.goal, label, count: 0 });
+    }
+    topics.get(t.goal).count++;
+  }
+  return [...topics.values()];
+}
+
+function _getDurations(topic) {
+  const durations = new Map();
+  for (const t of availableTemplates) {
+    if (t.goal !== topic) continue;
+    if (!durations.has(t.duration_months)) {
+      durations.set(t.duration_months, { months: t.duration_months, count: 0 });
+    }
+    durations.get(t.duration_months).count++;
+  }
+  return [...durations.values()].sort((a, b) => a.months - b.months);
+}
+
+function _getLevels(topic, duration) {
+  return availableTemplates.filter(t => t.goal === topic && t.duration_months === duration);
+}
+
+function _setStep(step) {
+  document.querySelectorAll('.plan-step').forEach(el => {
+    const s = parseInt(el.dataset.step);
+    el.classList.toggle('active', s === step);
+    el.classList.toggle('done', s < step);
+  });
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('planStep' + i);
+    if (el) el.style.display = i === step ? 'block' : 'none';
+  }
+}
+
+function openPlanPicker() {
+  pickerState = { topic: null, duration: null, level: null, key: null };
+  _setStep(1);
+  // Render topics
+  const topics = _getTopics();
+  const grid = document.getElementById('topicGrid');
+  if (topics.length === 1) {
+    // Only one topic — skip step 1, auto-select
+    pickerState.topic = topics[0].goal;
+    _showDurations();
+  } else {
+    grid.innerHTML = topics.map(t =>
+      `<div class="plan-option" onclick="pickTopic('${t.goal}')">
+        <div class="opt-title">${t.label}</div>
+        <div class="opt-desc">${t.count} plan${t.count > 1 ? 's' : ''} available</div>
+      </div>`
+    ).join('');
+  }
+  document.getElementById("planModal").style.display = "flex";
+}
+
+function pickTopic(goal) {
+  pickerState.topic = goal;
+  _showDurations();
+}
+
+function _showDurations() {
+  _setStep(2);
+  const durations = _getDurations(pickerState.topic);
+  const durationLabels = { 3: '3 Months', 6: '6 Months', 9: '9 Months', 12: '12 Months' };
+  const durationDescs = { 3: 'Accelerated pace', 6: 'Balanced pace', 9: 'Comfortable pace', 12: 'Thorough deep-dive' };
+  const grid = document.getElementById('durationGrid');
+  grid.innerHTML = durations.map(d =>
+    `<div class="plan-option" onclick="pickDuration(${d.months})">
+      <div class="opt-title">${durationLabels[d.months] || d.months + ' Months'}</div>
+      <div class="opt-desc">${durationDescs[d.months] || d.months * 4 + ' weeks'}</div>
+    </div>`
+  ).join('');
+}
+
+function pickDuration(months) {
+  pickerState.duration = months;
+  _showLevels();
+}
+
+function _showLevels() {
+  _setStep(3);
+  const levels = _getLevels(pickerState.topic, pickerState.duration);
+  const levelDescs = {
+    beginner: 'Start from the basics',
+    intermediate: 'Skip fundamentals',
+    advanced: 'Cutting-edge topics'
+  };
+  const levelIcons = { beginner: '&#x1F331;', intermediate: '&#x1F332;', advanced: '&#x1F525;' };
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = levels.map(t =>
+    `<div class="plan-option" onclick="pickLevel('${t.key}','${t.level}')">
+      <div style="font-size:24px;margin-bottom:4px">${levelIcons[t.level] || ''}</div>
+      <div class="opt-title">${t.level.charAt(0).toUpperCase() + t.level.slice(1)}</div>
+      <div class="opt-desc">${levelDescs[t.level] || ''}</div>
+    </div>`
+  ).join('');
+}
+
+function pickLevel(key, level) {
+  pickerState.key = key;
+  pickerState.level = level;
+  _showPreview();
+}
+
+function _showPreview() {
+  _setStep(4);
+  const tpl = availableTemplates.find(t => t.key === pickerState.key);
+  if (!tpl) return;
+  document.getElementById('previewTitle').textContent = tpl.title;
+  document.getElementById('previewWeeks').textContent = tpl.total_weeks;
+  document.getElementById('previewChecks').textContent = tpl.total_checks;
+  document.getElementById('previewLevel').textContent = tpl.level.charAt(0).toUpperCase() + tpl.level.slice(1);
+}
+
+function planPickerBack(step) {
+  if (step === 1) { _setStep(1); }
+  else if (step === 2) { _showDurations(); }
+  else if (step === 3) { _showLevels(); }
+}
+
 function closePlanModal() { document.getElementById("planModal").style.display = "none"; }
 
 async function enrollFromModal() {
-  const key = document.getElementById("planDuration").value;
+  const key = pickerState.key;
+  if (!key) { showToast("Select a plan first"); return; }
   try {
     const resp = await fetch("/api/plans", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({template_key: key}) });
     if (resp.ok) { showToast("Enrolled"); closePlanModal(); window.location.reload(); }
