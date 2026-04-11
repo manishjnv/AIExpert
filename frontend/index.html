@@ -1135,11 +1135,24 @@ async function sendContact() {
   if (!name) { showToast("Please enter your name"); return; }
   if (!email || !email.includes("@")) { showToast("Please enter a valid email"); return; }
   if (message.length < 10) { showToast("Message too short"); return; }
+
+  const btn = document.querySelector("#contactModal .btn");
+  btn.disabled = true;
+  btn.textContent = "SENDING...";
+
   try {
     const resp = await fetch("/api/contact", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({name, email, message}) });
-    if (resp.status === 204 || resp.ok) { showToast("Message sent! We'll get back to you."); closeContactModal(); }
-    else { const d = await resp.json().catch(()=>({})); showToast(d.detail || "Failed to send"); }
+    if (resp.status === 204 || resp.ok) {
+      closeContactModal();
+      setTimeout(() => showToast("Message sent! We'll get back to you."), 200);
+    } else {
+      const d = await resp.json().catch(()=>({}));
+      showToast(d.detail || "Failed to send");
+    }
   } catch { showToast("Failed to send message"); }
+
+  btn.disabled = false;
+  btn.textContent = "SEND MESSAGE";
 }
 
 // ---- Sharing ----
