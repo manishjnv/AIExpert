@@ -138,6 +138,56 @@ async def unhandled_exception(request: Request, exc: Exception):
     )
 
 
+# ----- Anonymous visit tracking (in-memory, resets on restart) -----
+import time as _time
+from collections import defaultdict as _defaultdict
+
+_anon_stats = {
+    "total_hits": 0,
+    "unique_ips": set(),
+    "today": "",
+    "today_hits": 0,
+    "today_ips": set(),
+}
+
+
+def _track_anonymous_hit(ip: str) -> None:
+    """Track an anonymous page visit. Called from middleware."""
+    today = _time.strftime("%Y-%m-%d")
+    if _anon_stats["today"] != today:
+        _anon_stats["today"] = today
+        _anon_stats["today_hits"] = 0
+        _anon_stats["today_ips"] = set()
+    _anon_stats["total_hits"] += 1
+    _anon_stats["unique_ips"].add(ip)
+    _anon_stats["today_hits"] += 1
+    _anon_stats["today_ips"].add(ip)
+
+
+@app.middleware("http")
+async def track_anonymous_visits(request: Request, call_next):
+    """Count anonymous visits (no auth cookie) to public pages."""
+    response = await call_next(request)
+    path = request.url.path
+    # Only track public page hits, skip API/admin/static
+    if path in ("/", "/leaderboard", "/account") or path.startswith("/profile/"):
+        auth_cookie = request.cookies.get("auth_token")
+        if not auth_cookie:
+            ip = request.headers.get("x-real-ip") or request.client.host if request.client else "unknown"
+            _track_anonymous_hit(ip)
+    return response
+
+
+def get_anon_stats() -> dict:
+    """Return anonymous visit stats for admin dashboard."""
+    return {
+        "total_hits": _anon_stats["total_hits"],
+        "unique_visitors": len(_anon_stats["unique_ips"]),
+        "today_hits": _anon_stats["today_hits"],
+        "today_unique": len(_anon_stats["today_ips"]),
+    }
+
+
 # ----- Public endpoints (Phase 1) -----
 
 @app.get("/api/health", tags=["public"])

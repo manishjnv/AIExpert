@@ -371,6 +371,10 @@ async def admin_users_page(
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    # ---- Anonymous stats ----
+    from app.main import get_anon_stats
+    anon = get_anon_stats()
+
     # ---- Summary stats ----
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
     users_with_plans = await db.scalar(
@@ -458,6 +462,7 @@ async def admin_users_page(
 <td>{plan_badge}</td>
 <td style="font-size:11px">{last_login}</td>
 <td style="font-size:11px;color:#4a5260">{last_ip}</td>
+<td style="font-size:11px;color:#4a5260" data-ip="{esc(sess.ip or '')}" class="loc-cell">—</td>
 <td style="font-size:11px;color:#4a5260" title="{esc(ua_raw[:100])}">{esc(device)}</td>
 <td style="font-size:11px">{created}</td>
 </tr>"""
@@ -468,9 +473,9 @@ async def admin_users_page(
 <h1>Users</h1>
 <div class="subtitle">User activity, sessions, and enrollment</div>
 
-<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
 <div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
-<div class="stat"><div class="num">{today_logins}</div><div class="lbl">Today</div></div>
+<div class="stat"><div class="num">{today_logins}</div><div class="lbl">Logged In Today</div></div>
 <div class="stat"><div class="num">{week_logins}</div><div class="lbl">This Week</div></div>
 <div class="stat"><div class="num">{new_this_week}</div><div class="lbl">New This Week</div></div>
 <div class="stat"><div class="num">{active_sessions}</div><div class="lbl">Active Sessions</div></div>
@@ -478,11 +483,17 @@ async def admin_users_page(
 <div class="stat"><div class="num">{google_users}</div><div class="lbl">Google SSO</div></div>
 <div class="stat"><div class="num">{otp_users}</div><div class="lbl">Email OTP</div></div>
 </div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+<div class="stat" style="border-left:3px solid #5d9be8"><div class="num">{anon['today_hits']}</div><div class="lbl">Anonymous Today</div></div>
+<div class="stat" style="border-left:3px solid #5d9be8"><div class="num">{anon['today_unique']}</div><div class="lbl">Unique Visitors Today</div></div>
+<div class="stat" style="border-left:3px solid #5d9be8"><div class="num">{anon['total_hits']}</div><div class="lbl">Total Anonymous</div></div>
+<div class="stat" style="border-left:3px solid #5d9be8"><div class="num">{anon['unique_visitors']}</div><div class="lbl">Unique All Time</div></div>
+</div>
 
 <form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:8px 12px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px;width:250px"> <button class="btn" type="submit">Search</button></form>
 
 <table>
-<tr><th>ID</th><th>User</th><th>Auth</th><th>Plan</th><th>Last Login</th><th>IP</th><th>Device</th><th>Joined</th></tr>
+<tr><th>ID</th><th>User</th><th>Auth</th><th>Plan</th><th>Last Login</th><th>IP</th><th>Location</th><th>Device</th><th>Joined</th></tr>
 {rows_html}
 </table>
 <div style="margin-top:12px;font-size:12px;color:#4a5260">
@@ -490,6 +501,37 @@ async def admin_users_page(
   {'  <a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a>' if page>1 else ''}
   {'  <a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}
 </div>
+
+<script>
+// Geo-lookup for IP addresses (free ip-api.com, no key needed)
+(async function() {{
+  const cells = document.querySelectorAll('.loc-cell');
+  const ips = new Set();
+  cells.forEach(c => {{ const ip = c.dataset.ip; if (ip && ip !== '-' && !ip.startsWith('127.') && !ip.startsWith('10.')) ips.add(ip); }});
+  if (ips.size === 0) return;
+
+  // Batch lookup (ip-api supports batch POST for up to 100 IPs)
+  try {{
+    const ipList = [...ips].slice(0, 100);
+    const resp = await fetch('http://ip-api.com/batch?fields=query,city,country,countryCode', {{
+      method: 'POST',
+      body: JSON.stringify(ipList.map(ip => ({{ query: ip }})))
+    }});
+    const results = await resp.json();
+    const lookup = {{}};
+    for (const r of results) {{
+      if (r.city && r.countryCode) lookup[r.query] = r.city + ', ' + r.countryCode;
+      else if (r.country) lookup[r.query] = r.country;
+    }}
+    cells.forEach(c => {{
+      const ip = c.dataset.ip;
+      if (lookup[ip]) c.textContent = lookup[ip];
+    }});
+  }} catch(e) {{
+    // Geo-lookup failed silently — locations stay as "—"
+  }}
+}})();
+</script>
 </div></body></html>"""
 
 
