@@ -449,6 +449,8 @@
     <div style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:6px">AI Learning Roadmap</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px">A free, self-paced learning platform for AI/ML engineers.</div>
     <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">
+      <a href="#" onclick="openAboutModal();return false" style="color:var(--paper-dim);text-decoration:none;font-size:12px">About</a>
+      <span style="color:var(--line)">·</span>
       <a href="#" onclick="openContactModal();return false" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Contact Us</a>
       <span style="color:var(--line)">·</span>
       <a href="https://github.com/manishjnv/AIExpert" target="_blank" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Source Code</a>
@@ -457,6 +459,51 @@
     <div style="font-size:10px;color:var(--ink-soft)">&copy; 2026 AutomateEdge. All rights reserved.</div>
   </div>
 </footer>
+
+<!-- About Modal -->
+<div id="aboutModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAboutModal()">
+  <div class="modal" style="max-width:520px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:var(--serif);margin:0">About AI Learning Roadmap</h3>
+      <span onclick="closeAboutModal()" style="cursor:pointer;color:var(--ink-soft);font-size:18px">✕</span>
+    </div>
+
+    <div style="font-size:13px;color:var(--paper-dim);line-height:1.6">
+      <p style="margin-bottom:12px"><strong style="color:var(--accent)">What is this?</strong><br>
+      A free, structured study plan that takes you from Python fundamentals to deployed AI applications. No paywalls, no ads, no fluff — just a clear path with curated resources from top universities and practitioners.</p>
+
+      <p style="margin-bottom:12px"><strong style="color:var(--accent)">Who is it for?</strong><br>
+      Working developers, CS students, and career changers who want a serious, accountable roadmap to break into AI/ML engineering.</p>
+
+      <p style="margin-bottom:16px"><strong style="color:var(--accent)">How it works</strong></p>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin-bottom:16px;font-size:12px">
+        <span style="color:var(--accent);font-weight:600">1.</span><span><strong>Pick a plan</strong> — 3, 6, or 12 months based on your pace</span>
+        <span style="color:var(--accent);font-weight:600">2.</span><span><strong>Follow week by week</strong> — each week has focus areas, deliverables, and curated resources</span>
+        <span style="color:var(--accent);font-weight:600">3.</span><span><strong>Check off tasks</strong> — progress syncs across devices when signed in</span>
+        <span style="color:var(--accent);font-weight:600">4.</span><span><strong>Link your GitHub repos</strong> — connect your work to each week</span>
+        <span style="color:var(--accent);font-weight:600">5.</span><span><strong>Get AI evaluation</strong> — AI reviews your repos and gives feedback</span>
+        <span style="color:var(--accent);font-weight:600">6.</span><span><strong>Ask the AI Mentor</strong> — get help on any topic in your current week</span>
+        <span style="color:var(--accent);font-weight:600">7.</span><span><strong>Share milestones</strong> — post achievements to LinkedIn</span>
+      </div>
+
+      <p style="margin-bottom:12px"><strong style="color:var(--accent)">Features</strong></p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px;font-size:11px">
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ 3 plan durations</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ 120+ checklist items</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ 70+ curated resources</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ AI-powered evaluation</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ AI Mentor chat</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ GitHub repo linking</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ LinkedIn sharing</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ PDF export</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ Cross-device sync</div>
+        <div style="padding:6px 8px;background:var(--bg-3);border-radius:3px">✓ No ads, 100% free</div>
+      </div>
+
+      <p style="font-size:11px;color:var(--ink-soft)">Built with FastAPI, vanilla JS, SQLite, and Gemini/Groq AI. Resources sourced from Stanford, MIT, CMU, Kaggle, Hugging Face, and more.</p>
+    </div>
+  </div>
+</div>
 
 <!-- Contact Modal -->
 <div id="contactModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeContactModal()">
@@ -1067,6 +1114,10 @@ ${monthsHtml}
   win.document.close();
   setTimeout(() => win.print(), 500);
 }
+
+// ---- About ----
+function openAboutModal() { document.getElementById("aboutModal").style.display = "flex"; }
+function closeAboutModal() { document.getElementById("aboutModal").style.display = "none"; }
 
 // ---- Contact ----
 function openContactModal() {
