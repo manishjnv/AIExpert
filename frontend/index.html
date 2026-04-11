@@ -223,7 +223,7 @@
   footer a:hover { color: var(--accent) !important; }
 
   /* TOAST */
-  .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-3); border: 1px solid var(--accent); color: var(--paper); padding: 14px 24px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 100; }
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: var(--ink); padding: 14px 28px; border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -926,7 +926,7 @@ function showToast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 2000);
+  setTimeout(() => t.classList.remove("show"), 3000);
 }
 
 function resetAll() {
