@@ -4,6 +4,7 @@ Weekly progress reminder emails.
 Sends a summary email to active users every Monday.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -26,6 +27,7 @@ async def send_weekly_reminders(session_factory) -> int:
     """
     settings = get_settings()
     sent = 0
+    MAX_EMAILS_PER_RUN = 100  # Gmail free limit safety cap
 
     async with session_factory() as db:
         # Get all users with email_notifications=True and an active plan
@@ -36,6 +38,9 @@ async def send_weekly_reminders(session_factory) -> int:
         )).scalars().all()
 
         for user in users:
+            if sent >= MAX_EMAILS_PER_RUN:
+                logger.warning("Hit email cap (%d), stopping", MAX_EMAILS_PER_RUN)
+                break
             try:
                 # Get active plan
                 plan = (await db.execute(
@@ -103,6 +108,8 @@ async def send_weekly_reminders(session_factory) -> int:
                     pct=pct,
                 )
                 sent += 1
+                # Throttle: 2 second delay between emails to avoid Gmail blocking
+                await asyncio.sleep(2)
 
             except Exception as e:
                 logger.error("Failed to send reminder to %s: %s", user.email, e)
