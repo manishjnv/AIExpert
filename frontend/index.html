@@ -1143,8 +1143,8 @@ async function sendContact() {
   try {
     const resp = await fetch("/api/contact", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({name, email, message}) });
     if (resp.status === 204 || resp.ok) {
+      showToast("Message sent! We'll get back to you.");
       closeContactModal();
-      setTimeout(() => showToast("Message sent! We'll get back to you."), 200);
     } else {
       const d = await resp.json().catch(()=>({}));
       showToast(d.detail || "Failed to send");
