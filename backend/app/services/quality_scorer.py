@@ -722,7 +722,7 @@ def score_industry_alignment(tpl: PlanTemplate) -> dict:
     issues = []
     if len(found_tools) < expected // 2:
         issues.append(f"Only {len(found_tools)} industry tools/frameworks mentioned (expected ~{expected})")
-    if not any(re.search(r"docker|kubernetes|mlflow|ci/cd", all_text)):
+    if not re.search(r"docker|kubernetes|mlflow|ci/cd", all_text):
         if level != "beginner":
             issues.append("No MLOps/deployment tooling (Docker, K8s, MLflow, CI/CD)")
 
