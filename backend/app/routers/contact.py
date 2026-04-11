@@ -58,7 +58,8 @@ async def contact(body: ContactBody, request: Request):
             port=settings.smtp_port,
             username=settings.smtp_user,
             password=settings.smtp_password,
-            start_tls=True,
+            start_tls=not settings.smtp_use_tls,
+            use_tls=settings.smtp_use_tls,
         )
         logger.info("Contact form sent from %s <%s>", body.name, body.email)
     except Exception as e:

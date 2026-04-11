@@ -47,6 +47,7 @@ async def send_otp_email(to_email: str, code: str) -> None:
         port=settings.smtp_port,
         username=settings.smtp_user,
         password=settings.smtp_password,
-        start_tls=True,
+        start_tls=not settings.smtp_use_tls,
+        use_tls=settings.smtp_use_tls,
     )
     logger.info("OTP email sent to %s", to_email)
