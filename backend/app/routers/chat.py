@@ -80,11 +80,24 @@ def _build_system_prompt(week_num: int, template_key: str = "generalist_6mo_inte
 @router.post("/chat")
 async def chat(
     body: ChatBody,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    request: Request,
 ):
-    """Stream AI chat response via SSE."""
-    _check_rate_limit(user.id)
+    """Stream AI chat response via SSE. Works for both signed-in and anonymous users."""
+    # Rate limit by user ID if signed in, otherwise by IP
+    from app.auth.jwt import verify_token
+    from app.db import get_db as _get_db
+    import app.db as db_module
+
+    rate_key = None
+    token = request.cookies.get("auth_token")
+    if token and db_module.async_session_factory:
+        async with db_module.async_session_factory() as db:
+            user = await verify_token(token, db)
+            if user:
+                rate_key = user.id
+    if rate_key is None:
+        rate_key = f"ip:{request.client.host if request.client else 'unknown'}"
+    _check_rate_limit(rate_key)
 
     system_prompt = _build_system_prompt(body.week_num)
 
