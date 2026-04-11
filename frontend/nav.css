@@ -1,0 +1,102 @@
+/* Shared navigation styles — included on every page */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+.topnav {
+  padding: 12px 48px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #2a323d;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  background: rgba(15,20,25,0.92);
+}
+.topnav-brand {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 16px;
+  color: #e8a849;
+  font-weight: 400;
+  margin-right: auto;
+  white-space: nowrap;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.topnav-links {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.topnav-links a {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e8e2d3;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 2px;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+.topnav-links a:hover {
+  color: #e8a849;
+  background: rgba(232,168,73,0.06);
+}
+.topnav-links a.active {
+  color: #e8a849;
+  border-bottom-color: #e8a849;
+}
+.topnav-links a.signin-link {
+  background: #e8a849;
+  color: #0f1419;
+  border-radius: 3px;
+  font-weight: 600;
+  border-bottom: none;
+  padding: 8px 18px;
+}
+.topnav-links a.signin-link:hover {
+  background: #c98e2f;
+}
+
+/* Admin sub-nav */
+.subnav {
+  padding: 6px 48px;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  border-bottom: 1px solid #2a323d;
+  background: #161c24;
+  flex-wrap: wrap;
+}
+.subnav a {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4a5260;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+.subnav a:hover {
+  color: #e8e2d3;
+  background: rgba(232,168,73,0.06);
+}
+.subnav a.active {
+  color: #e8a849;
+  background: rgba(232,168,73,0.08);
+}
+
+@media (max-width: 768px) {
+  .topnav { padding: 10px 16px; flex-wrap: wrap; }
+  .topnav-brand { font-size: 14px; }
+  .topnav-links a { font-size: 10px; padding: 6px 10px; }
+  .subnav { padding: 4px 16px; }
+  .subnav a { font-size: 9px; padding: 4px 8px; }
+}

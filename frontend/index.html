@@ -72,9 +72,7 @@
 
   /* TOOLBAR */
   /* TOP NAV */
-  .topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15, 20, 25, 0.92); }
-  .topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; }
-  .topnav-brand span { color: var(--paper-dim); font-size: 13px; margin-left: 8px; opacity: 0.6; }
+  /* topnav styles in nav.css */
   .conn-badge { display: inline-flex; align-items: center; gap: 4px; font-family: var(--sans); font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 20px; background: rgba(109,181,133,0.2); color: var(--success); border: 1px solid rgba(109,181,133,0.4); margin-left: 6px; opacity: 1 !important; vertical-align: middle; cursor: default; transition: background 0.2s; }
   .conn-badge:hover { background: rgba(109,181,133,0.35); }
   .conn-badge.unverified { background: rgba(74,82,96,0.3); color: var(--ink-soft); border-color: var(--line); }
@@ -304,29 +302,9 @@
 </head>
 <body>
 
-<!-- TOP NAVIGATION -->
-<nav class="topnav">
-  <div class="topnav-brand"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg> AI Learning Roadmap<span id="planBadge"></span>
-    <span id="connectionBadges" style="display:none;margin-left:8px">
-      <span id="badgeGoogle" class="conn-badge" style="display:none">Google</span>
-      <span id="badgeGithub" class="conn-badge" style="display:none">GitHub</span>
-      <span id="badgeLinkedin" class="conn-badge" style="display:none">LinkedIn</span>
-    </span>
-  </div>
-  <span id="anonButtons">
-    <button class="btn" onclick="window.location='/leaderboard'">Leaderboard</button>
-    <button class="btn" onclick="exportPlanPDF()">Export Plan</button>
-    <button class="btn signin-btn" onclick="signIn()">Sign In →</button>
-  </span>
-  <span id="authButtons" style="display:none">
-    <button class="btn" onclick="window.location='/leaderboard'">Leaderboard</button>
-    <button class="btn" onclick="openPlanPicker()">Switch Plan</button>
-    <button class="btn" id="exportPlanBtn" onclick="exportPlanPDF()">Export Plan</button>
-    <button class="btn" id="profileBtn" onclick="window.location='/account'">Account</button>
-    <button class="btn" id="adminBtn" style="display:none" onclick="window.open('/admin/','_blank')">Admin</button>
-    <button class="btn" id="logoutBtn" onclick="logOut()">Sign Out</button>
-  </span>
-</nav>
+<!-- Shared navigation (injected by nav.js) -->
+<link rel="stylesheet" href="/nav.css">
+<script src="/nav.js"></script>
 
 <header>
   <div class="eyebrow" id="eyebrowText">Free AI learning roadmap · No signup required · Start below</div>
@@ -1650,10 +1628,6 @@ async function checkAuth() {
     if (resp.ok) {
       currentUser = await resp.json();
       setSyncBadge("synced", "Synced");
-      document.getElementById("anonButtons").style.display = "none";
-      document.getElementById("authButtons").style.display = "inline";
-      // chatFab is always visible (CSS display:flex by default)
-      document.getElementById("adminBtn").style.display = currentUser.is_admin ? "" : "none";
       const firstName = (currentUser.name || "").split(" ")[0] || "there";
       document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · Loading plan...`;
       updateConnectionBadges();
@@ -1662,8 +1636,6 @@ async function checkAuth() {
   } catch {}
   currentUser = null;
   setSyncBadge("local", "Local only");
-  document.getElementById("anonButtons").style.display = "inline";
-  document.getElementById("authButtons").style.display = "none";
   return false;
 }
 

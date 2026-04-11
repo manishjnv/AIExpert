@@ -69,10 +69,7 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
 a { color: #6fa8d6; text-decoration: none; }
 a:hover { color: #e8a849; }
-nav { padding: 12px 48px; border-bottom: 1px solid #2a323d; display: flex; align-items: center; gap: 16px; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
-nav a { color: #f5f1e8; font-size: 13px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
-nav a:hover { color: #e8a849; }
-.brand { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 16px; margin-right: auto; text-transform: none; letter-spacing: 0; }
+/* nav styles in /nav.css */
 @media (max-width: 768px) { nav { padding: 10px 16px; } .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
 """
 
@@ -158,8 +155,8 @@ async def public_profile(user_id: int, db: AsyncSession = Depends(get_db)):
         li_href = user.linkedin_url if user.linkedin_url.startswith("http") else "https://" + user.linkedin_url
         badges_html += f'<a class="badge" href="{esc(li_href)}" target="_blank">LinkedIn</a>'
 
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><style>{CSS}</style></head><body>
-<nav><a href="/" class="brand" style="text-decoration:none">AI Learning Roadmap</a><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+<script src="/nav.js"></script>
 <div class="container">
 <h1>{full_name}</h1>
 <div class="subtitle">{plan_label} · Joined {user.created_at.strftime('%B %Y') if user.created_at else '—'}</div>
@@ -250,8 +247,8 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     top_streak = max((e["streak"] for e in entries), default=0)
     completers = sum(1 for e in entries if e["pct"] >= 100)
 
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><style>{CSS}</style></head><body>
-<nav><a href="/" class="brand" style="text-decoration:none">AI Learning Roadmap</a><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+<script src="/nav.js"></script>
 <div class="container">
 <h1>Leaderboard</h1>
 <div class="subtitle">Top learners ranked by progress. Enable your public profile in Account Settings to appear here.</div>

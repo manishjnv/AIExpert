@@ -285,12 +285,10 @@ async def delete_template(
 
 # ---- Jinja2 admin UI ----
 
-LOGO_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>'
-
 ADMIN_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
-.page { max-width: 1200px; margin: 0 auto; padding: 32px 48px; }
+.page { max-width: 100%; margin: 0; padding: 32px 48px; }
 h1 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 28px; font-weight: 300; margin-bottom: 4px; }
 h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
 .subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
@@ -304,25 +302,10 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .btn:hover { border-color: #e8a849; color: #e8a849; }
 .btn.success { border-color: #6db585; color: #6db585; }
 .btn.danger { border-color: #d97757; color: #d97757; }
-.topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #2a323d; position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
-.topnav-brand { font-family: 'Fraunces', Georgia, serif; font-size: 16px; color: #e8a849; font-weight: 400; margin-right: auto; white-space: nowrap; text-decoration: none; }
-.topnav-links { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-.topnav-links a { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #e8e2d3; text-decoration: none; padding: 8px 12px; border-radius: 2px; transition: all 0.2s; }
-.topnav-links a:hover { color: #e8a849; background: rgba(232,168,73,0.08); }
-@media (max-width: 768px) { .topnav { padding: 10px 16px; flex-wrap: wrap; } .topnav-brand { font-size: 14px; } .topnav-links a { font-size: 10px; padding: 6px 8px; } .page { padding: 20px 16px; } .stat { padding: 12px 14px; } .stat .num { font-size: 22px; } }
+@media (max-width: 768px) { .page { padding: 20px 16px; } .stat { padding: 12px 14px; } .stat .num { font-size: 22px; } }
 """
 
-ADMIN_NAV = f"""<nav class="topnav">
-<a href="/" class="topnav-brand" style="text-decoration:none">{LOGO_SVG} AI Learning Roadmap</a>
-<div class="topnav-links">
-<a href="/admin/">Dashboard</a>
-<a href="/admin/users">Users</a>
-<a href="/admin/templates">Templates</a>
-<a href="/admin/pipeline/">Pipeline</a>
-<a href="/admin/pipeline/topics">Topics</a>
-<a href="/admin/pipeline/settings">Settings</a>
-</div>
-</nav>"""
+ADMIN_NAV = '<link rel="stylesheet" href="/nav.css"><script src="/nav.js"></script>'
 
 
 @router.get("/", response_class=HTMLResponse)

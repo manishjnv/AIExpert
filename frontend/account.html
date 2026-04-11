@@ -19,12 +19,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 body { font-family: var(--sans); background: var(--bg); color: var(--paper); margin: 0; -webkit-font-smoothing: antialiased; }
 
-/* Nav */
-.topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
-.topnav-brand { font-family: var(--serif); font-size: 16px; color: var(--accent); font-weight: 400; margin-right: auto; white-space: nowrap; text-decoration: none; display: flex; align-items: center; gap: 6px; }
-.topnav-links { display: flex; gap: 4px; align-items: center; }
-.topnav-links a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim); text-decoration: none; padding: 8px 12px; border-radius: 2px; transition: all 0.2s; }
-.topnav-links a:hover { color: var(--accent); background: rgba(232,168,73,0.08); }
+/* Nav styles in nav.css */
 
 /* Layout */
 .page { max-width: 100%; margin: 0; padding: 40px 48px 80px; }
@@ -126,17 +121,9 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
 </head>
 <body>
 
-<nav class="topnav">
-  <a href="/" class="topnav-brand">
-    <svg width="24" height="24" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>
-    AI Learning Roadmap
-  </a>
-  <div class="topnav-links">
-    <a href="/">Home</a>
-    <a href="/leaderboard">Leaderboard</a>
-    <a href="#" onclick="signOut()">Sign Out</a>
-  </div>
-</nav>
+<!-- Shared navigation -->
+<link rel="stylesheet" href="/nav.css">
+<script src="/nav.js"></script>
 
 <div class="page">
 
@@ -429,10 +416,7 @@ async function deleteAccount() {
   } catch { showToast('Delete failed'); }
 }
 
-async function signOut() {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
-  window.location = '/';
-}
+// signOut handled by nav.js (navSignOut)
 
 // ---- Inline plan switcher ----
 let templates = [];
