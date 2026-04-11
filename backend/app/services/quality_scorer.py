@@ -374,10 +374,27 @@ def score_progression(tpl: PlanTemplate) -> dict:
 def _classify_bloom_level(text: str) -> str:
     """Classify a checklist item by Bloom's taxonomy level."""
     text_lower = text.strip().lower()
+
+    # Strip common prefixes that are completion markers, not cognitive verbs
+    # e.g. "Reviewed: Core feature working end-to-end" → classify "Core feature..."
+    for prefix in ["reviewed:", "completed:", "done:", "checked:", "verified:"]:
+        if text_lower.startswith(prefix):
+            text_lower = text_lower[len(prefix):].strip()
+            break
+
     for level in reversed(BLOOMS_LEVEL_ORDER):  # check highest first
         for pat in BLOOMS_LEVELS[level]:
             if re.match(pat, text_lower):
                 return level
+
+    # Content-based fallback: if the text references building/deploying artifacts,
+    # classify as "create" even without a matching verb prefix
+    create_signals = ["end-to-end", "deployed", "working", "integrated",
+                      "architecture", "portfolio", "capstone", "production",
+                      "resume", "applications submitted"]
+    if any(sig in text_lower for sig in create_signals):
+        return "create"
+
     # Default: if starts with action verb not in our list, assume "apply"
     if re.match(r"^[a-z]", text_lower):
         return "apply"
