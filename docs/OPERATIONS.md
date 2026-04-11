@@ -160,8 +160,8 @@ docker compose up -d --force-recreate backend   # Restart required to pick up ch
 ### Step 1: Google App Password
 1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 2. Select "Mail" → Generate
-3. Copy the 16-character password (e.g., `xhbm jzhn zbed jkfo`)
-4. Set in `.env` as `SMTP_PASSWORD=xhbmjzhnzbedjkfo` (no spaces)
+3. Copy the 16-character password (format: `xxxx xxxx xxxx xxxx`)
+4. Set in `.env` as `SMTP_PASSWORD=<paste without spaces>`
 
 ### Step 2: Cloudflare Email Routing
 1. Cloudflare Dashboard → `automateedge.cloud` → **Email Routing**
