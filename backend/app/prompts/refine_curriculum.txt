@@ -1,0 +1,24 @@
+You are fixing specific weeks of an AI/ML curriculum based on quality review feedback.
+Return ONLY a JSON array of corrected week objects using the exact same schema.
+
+WEEKS THAT NEED FIXING:
+{failing_weeks_json}
+
+ISSUES TO FIX:
+{critical_fixes_json}
+
+CONTEXT:
+- Topic: {topic}
+- Level: {level}
+- These weeks are from month {month_context} of a {duration_months}-month course
+
+REQUIREMENTS FOR EACH FIX:
+1. Checklist items MUST start with action verbs: Build, Implement, Train, Deploy, Fine-tune, Write, Evaluate, Submit, Benchmark, Compare, Design, Test, Debug, Optimize, Document
+2. Replace any vague items ("Understand X", "Learn about Y") with specific, measurable items
+3. Resources must be real URLs from: huggingface.co, arxiv.org, fast.ai, pytorch.org, kaggle.com, coursera.org, d2l.ai, paperswithcode.com, github.com, youtube.com
+4. Match Bloom's level to month position: early months = Understand/Apply, late months = Analyze/Create
+5. Ensure at least 1 hands-on deliverable per week (notebook, code, model, API)
+6. Keep the week schema identical: n, t, hours, focus, deliv, resources, checks
+
+Return ONLY the JSON array of fixed weeks:
+[{{"n": 3, "t": "...", "hours": 16, "focus": [...], "deliv": [...], "resources": [...], "checks": [...]}}, ...]

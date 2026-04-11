@@ -1,0 +1,75 @@
+You are a curriculum quality auditor for an AI learning platform. Critically evaluate this curriculum and score it on 10 dimensions.
+
+CURRICULUM TO REVIEW:
+{plan_json}
+
+Score each dimension 0-10. List up to 3 specific issues per dimension with exact week numbers.
+A score below 7 means that dimension needs fixing.
+
+Return ONLY a valid JSON object:
+
+{{
+  "blooms_progression": {{
+    "score": 0,
+    "issues": ["Week 3-5 checklists all start with 'Understand' — should be Apply level by month 2"]
+  }},
+  "theory_practice_ratio": {{
+    "score": 0,
+    "issues": ["80% of resources are video lectures, only 20% hands-on"]
+  }},
+  "project_density": {{
+    "score": 0,
+    "issues": ["Only 2 deliverables across 24 weeks are real projects"]
+  }},
+  "assessment_quality": {{
+    "score": 0,
+    "issues": ["15 of 120 checklist items are vague ('Learn about X')"]
+  }},
+  "completeness": {{
+    "score": 0,
+    "issues": ["No deployment content", "Ethics not covered"]
+  }},
+  "difficulty_calibration": {{
+    "score": 0,
+    "issues": ["Week 5 jumps from basics to transformers with no bridge"]
+  }},
+  "industry_alignment": {{
+    "score": 0,
+    "issues": ["No MLOps or CI/CD coverage despite being intermediate level"]
+  }},
+  "freshness": {{
+    "score": 0,
+    "issues": ["References TensorFlow 1.x patterns in week 8"]
+  }},
+  "prerequisites_clarity": {{
+    "score": 0,
+    "issues": ["Week 6 requires calculus but weeks 1-5 never introduce it"]
+  }},
+  "real_world_readiness": {{
+    "score": 0,
+    "issues": ["No portfolio-worthy projects, all toy datasets"]
+  }},
+  "overall_score": 0,
+  "critical_fixes": [
+    {{
+      "week": 3,
+      "field": "checks",
+      "problem": "3 items start with 'Understand'",
+      "fix": "Replace with action verbs: 'Implement...', 'Build...', 'Train...'"
+    }}
+  ]
+}}
+
+SCORING GUIDE:
+- blooms_progression: Do cognitive levels increase? (Remember→Apply→Create across months)
+- theory_practice_ratio: Is it ~30% theory, 70% practice? Penalize >50% theory
+- project_density: Do 60%+ of weeks have a buildable deliverable?
+- assessment_quality: Are checklists measurable? ("Train to 90% accuracy" not "Learn about training")
+- completeness: Covers ethics, deployment, testing, data quality?
+- difficulty_calibration: Smooth progression or cognitive cliffs?
+- industry_alignment: Matches what jobs require? Modern tools?
+- freshness: Current frameworks, no deprecated APIs?
+- prerequisites_clarity: Does week N assume knowledge from week N-1?
+- real_world_readiness: Portfolio pieces, design decisions, case studies?
+
+Be ruthless. Real quality issues only — not padding.

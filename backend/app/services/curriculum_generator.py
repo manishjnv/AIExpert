@@ -1,8 +1,8 @@
 """
-AI-powered curriculum generator.
+AI-powered curriculum generator with quality pipeline.
 
-Takes a topic, duration, and level, calls AI to generate a full
-plan template JSON, validates it, and saves as a draft.
+Flow: Generate → Heuristic Score → AI Review → Refine → Validate.
+Uses multi-model cross-review for quality assurance.
 """
 
 import json
@@ -25,8 +25,21 @@ def _make_key(topic: str, duration: str, level: str) -> str:
     return f"{clean}_{duration}_{level}"
 
 
-async def generate_curriculum(topic: str, duration_months: int, level: str, db=None) -> dict:
-    """Generate a curriculum plan using AI.
+async def generate_curriculum(
+    topic: str,
+    duration_months: int,
+    level: str,
+    db=None,
+    quality_check: bool = True,
+) -> dict:
+    """Generate a curriculum plan using AI, with optional quality pipeline.
+
+    Args:
+        topic: Course topic name
+        duration_months: 3, 6, 9, or 12
+        level: beginner, intermediate, or advanced
+        db: DB session for usage logging
+        quality_check: If True, run review → refine → validate pipeline
 
     Returns the validated plan dict. Raises on failure.
     """
@@ -46,7 +59,7 @@ async def generate_curriculum(topic: str, duration_months: int, level: str, db=N
         goal=goal,
     )
 
-    # Call AI — need a larger response for full curriculum
+    # Stage 1: Generate via fallback chain
     result, model = await ai_complete(
         prompt, json_response=True,
         task="generation", subtask=f"{topic} {duration_str} {level}",
@@ -60,9 +73,41 @@ async def generate_curriculum(topic: str, duration_months: int, level: str, db=N
     template = PlanTemplate(**result)
 
     logger.info(
-        "Generated curriculum: %s (%d months, %d weeks, %d checks)",
-        template.key, template.duration_months, template.total_weeks, template.total_checks,
+        "Generated curriculum: %s (%d months, %d weeks, %d checks) via %s",
+        template.key, template.duration_months, template.total_weeks, template.total_checks, model,
     )
+
+    # Stage 2-5: Quality pipeline (if enabled)
+    if quality_check:
+        try:
+            from app.services.quality_pipeline import run_quality_pipeline
+            qr = await run_quality_pipeline(result, model, db)
+
+            improved_plan = qr["plan"]
+            orig = qr["original_score"]
+            final = qr["final_score"]
+            stages = qr["stages_run"]
+            models = qr["models_used"]
+            skipped = qr["skipped"]
+
+            if final > orig:
+                logger.info(
+                    "Quality pipeline improved %s: %d → %d (+%d) | stages=%s models=%s",
+                    key, orig, final, final - orig, stages, models,
+                )
+                result = improved_plan
+                # Re-validate after refinement
+                PlanTemplate(**result)
+            elif skipped:
+                logger.info(
+                    "Quality pipeline skipped for %s (score=%d): %s",
+                    key, orig, "; ".join(skipped),
+                )
+            else:
+                logger.info("Quality pipeline: no improvement for %s (score=%d)", key, orig)
+
+        except Exception as e:
+            logger.warning("Quality pipeline failed for %s (keeping original): %s", key, e)
 
     return result
 

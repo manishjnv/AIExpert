@@ -496,7 +496,7 @@ async def admin_users_page(
 <td style="font-size:12px">{last_login}</td>
 <td style="font-size:12px;color:#8a92a0">{last_ip}</td>
 <td style="font-size:12px;color:#8a92a0" data-ip="{esc(sess.ip or '') if sess else ''}" class="loc-cell">—</td>
-<td style="font-size:12px;color:#8a92a0" title="{esc(ua_raw[:100])}">{esc(device)}</td>
+<td style="font-size:12px;color:#8a92a0" title="{esc((ua_raw or '')[:100])}">{esc(device)}</td>
 <td style="font-size:12px">{created}</td>
 </tr>"""
 

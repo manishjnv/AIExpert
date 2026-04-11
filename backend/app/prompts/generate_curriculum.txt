@@ -1,4 +1,4 @@
-You are a curriculum designer for an AI learning platform. Generate a complete, structured study plan.
+You are a world-class AI curriculum designer. Generate a rigorous, job-ready study plan that matches the quality of Stanford CS229, MIT 6.S191, and fast.ai courses.
 
 INPUTS:
 - Topic: {topic}
@@ -41,17 +41,51 @@ OUTPUT: Return a valid JSON object with this exact structure. No markdown, no ex
   ]
 }}
 
-RULES:
+STRUCTURE RULES:
 1. Generate exactly {duration_months} months with exactly 4 weeks each ({total_weeks} weeks total)
 2. Week numbers must be sequential from 1 to {total_weeks}
-3. Each week MUST have exactly: 4 focus items, 1-3 deliverables, 3 resources with REAL URLs, 5 checklist items
-4. Resources must be REAL, FREE, and currently accessible (courses, docs, tutorials, YouTube, papers)
-5. For {level} level:
-   - beginner: start from absolute basics, assume no prior knowledge
-   - intermediate: assume programming knowledge, skip basics
-   - advanced: assume ML experience, focus on cutting-edge topics
-6. Structure the months as a logical progression from foundations to capstone
-7. Last month should always be a capstone project + job preparation
-8. Each week should have 14-18 hours of work
-9. Make checklist items specific and verifiable (not vague)
-10. Deliverables should be GitHub-pushable artifacts (notebooks, code, apps)
+3. Each week MUST have: 4 focus items, 2-3 deliverables, 3 resources with REAL URLs, 5 checklist items
+4. Each week should have 14-18 hours of work
+5. Last month MUST be a capstone project + job preparation (portfolio, resume, interview prep)
+
+BLOOM'S TAXONOMY — progressive cognitive levels by month position:
+- First 25% of months: Remember/Understand (define, explain, identify core concepts)
+- Middle 50%: Apply/Analyze (implement, build, debug, compare approaches)
+- Final 25%: Evaluate/Create (design systems, justify decisions, build end-to-end project)
+
+CHECKLIST QUALITY — every item MUST:
+- Start with an ACTION VERB: Implement, Build, Train, Deploy, Fine-tune, Write, Benchmark, Debug, Compare, Design, Submit, Test, Evaluate, Document, Optimize
+- NEVER start with: Understand, Learn, Know, Study, Explore, Review, Read about, Familiarize, Get familiar, Look into
+- Be independently verifiable (could be checked in a GitHub PR or notebook output)
+- Include measurable criteria where possible (e.g. "Train a CNN achieving >90% accuracy on CIFAR-10" not "Train a CNN")
+
+RESOURCE QUALITY:
+- Resources must be REAL, FREE, and currently accessible
+- Each week should have a MIX of resource types:
+  * 1 structured learning (course/tutorial from: coursera.org, fast.ai, deeplearning.ai, d2l.ai, cs231n.stanford.edu, youtube.com)
+  * 1 official documentation or paper (pytorch.org, tensorflow.org, huggingface.co/docs, arxiv.org, scikit-learn.org)
+  * 1 hands-on practice (kaggle.com, github.com repos, colab notebooks, paperswithcode.com)
+- URLs must be full https:// links you are confident exist as of 2026
+
+THEORY-PRACTICE BALANCE:
+- Weeks 1-2 of each month: 60% theory (concepts, lectures, papers), 40% practice
+- Weeks 3-4 of each month: 40% theory, 60% practice (build, experiment, deploy)
+- Every month must include at least one project deliverable that produces a GitHub-pushable artifact
+
+DELIVERABLE QUALITY:
+- Each deliverable must be a concrete artifact: notebook, trained model, API endpoint, report, deployed app
+- At least 2 deliverables per course should be portfolio-worthy (real dataset, real problem, shareable)
+- Deliverables should build on each other across months (cumulative learning, not isolated exercises)
+
+COMPLETENESS — ensure the curriculum covers:
+- Core theory and fundamentals for {topic}
+- Practical implementation with modern frameworks (PyTorch preferred, TensorFlow acceptable)
+- Model evaluation, testing, and debugging (not just training)
+- Deployment/serving (even basic: Flask API, Gradio demo, HuggingFace Space)
+- Ethics and responsible AI considerations (bias, fairness, interpretability) — at least 1 week
+- Data quality, preprocessing, and feature engineering
+
+LEVEL CALIBRATION for {level}:
+- beginner: start from absolute basics, assume Python knowledge only, no ML background
+- intermediate: assume ML fundamentals (regression, classification, neural networks), focus on depth
+- advanced: assume strong ML experience, focus on research papers, state-of-the-art, system design
