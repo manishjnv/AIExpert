@@ -120,10 +120,10 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-11
-**Last session summary:** Major session — 20+ commits. P1 auto curriculum pipeline (discovery, generation, refresh, budget, cache, scheduler, admin UI). P2 UX (3-step picker, course history). Security hardening (5 Codex findings). Account page (replaced modal). Unified persistent navigation (nav.js/nav.css shared across all pages). Admin sub-nav. Plan switch rate limit. Inline plan switcher on account page. RCA 011-015. GitHub MCP configured. Additional AI API keys (Sambanova, Cerebras, Mistral, DeepSeek) documented for future use.
+**Last session date:** 2026-04-11 (session 2)
+**Last session summary:** P1 pipeline tested live (10 topics discovered, 28 templates generated). 4 new AI providers added (Cerebras, Mistral, DeepSeek, Sambanova) with 6-provider fallback chain. Resend SMTP configured (DKIM verified, "via gmail.com" fixed). Provider bugs fixed (Cerebras model retired, Mistral JSON parsing, max_tokens too small). nginx timeout increased for pipeline. Anthropic/Claude key on VPS but not wired up (reserved).
 **Tests passing:** 90 automated
 **Tests failing:** none
-**Blockers:** None.
-**Next action:** Test P1 live (Run Discovery from admin pipeline). Add new AI provider keys to VPS. P3 (email), P4 (specialist templates).
-**Open questions for the user:** None.
+**Blockers:** 2 topics have failed generation variants (rate limits). DeepSeek returns 402 (insufficient balance).
+**Next action:** Re-run generation when rate limits reset. Review 28 generated templates. P4 specialist templates. Wire up Claude if approved.
+**Open questions for the user:** Permission to wire up Claude API for curriculum generation? Top up DeepSeek or remove?
