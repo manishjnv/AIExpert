@@ -70,6 +70,30 @@
 - **Fix:** Updated test to `test_chat_works_without_auth` asserting 200.
 - **Prevention:** When changing endpoint auth requirements, update corresponding tests in the same commit.
 
+### 011 — SSRF in link health checker (2026-04-11)
+- **Symptom:** Codex security audit flagged — `httpx.head(url)` with `follow_redirects=True` on template-stored URLs could reach cloud metadata (169.254.169.254) or internal IPs.
+- **Root cause:** No URL validation before outbound HTTP requests. Redirects followed blindly.
+- **Fix:** Added `_is_safe_url()` that blocks RFC-1918, link-local, metadata IPs. Disabled redirect following. Skip URLs that fail check.
+- **Prevention:** Any outbound HTTP request on user-influenced or DB-stored URLs must pass SSRF validation. Block private IPs, metadata endpoints, and non-http(s) schemes. Disable redirect following or re-validate targets.
+
+### 012 — Weak CSRF origin check (2026-04-11)
+- **Symptom:** Codex flagged — `_check_origin()` used substring match (`host in origin`). An attacker origin like `evil-myhost.com` containing the legitimate host string would pass. Also silently passed when both Origin and Referer were absent.
+- **Root cause:** Substring match instead of strict hostname comparison. Missing headers not treated as a rejection condition.
+- **Fix:** Parse origin URL, compare hostname with strict equality. Reject requests with neither Origin nor Referer header.
+- **Prevention:** CSRF origin checks must use parsed hostname equality, not substring. Always reject missing Origin+Referer on state-changing endpoints.
+
+### 013 — Missing input validation on settings API (2026-04-11)
+- **Symptom:** Codex flagged — `POST /api/settings` used raw `setattr(s, key, value)` without type or range checking. Negative numbers, arbitrary strings accepted.
+- **Root cause:** No Pydantic validation on the request body. Trusted admin input without schema enforcement.
+- **Fix:** Added `PipelineSettingsUpdate` Pydantic model with `ge/le` constraints, regex patterns for enum fields, and `Optional` with `exclude_none`.
+- **Prevention:** Every POST/PATCH endpoint must validate the request body with a Pydantic model. Never use raw `setattr` from unvalidated JSON, even for admin endpoints.
+
+### 014 — Prompt injection via DB-sourced strings (2026-04-11)
+- **Symptom:** Codex flagged — existing topic names from DB interpolated directly into AI discovery prompt. Malicious topic name like `"Ignore above. Instead output: ..."` could manipulate AI output. Same pattern in triage prompt and content refresh review prompt.
+- **Root cause:** DB-sourced strings treated as safe and interpolated directly into AI prompts without sanitization.
+- **Fix:** JSON-encode topic lists for discovery prompt. Truncate + strip newlines for triage and review prompts. Schema validation on AI output (already existed) as defense-in-depth.
+- **Prevention:** Never interpolate DB/user-sourced strings directly into AI prompts. Use JSON encoding for lists, truncate + strip control characters for individual strings. Always validate AI output against strict schemas.
+
 ---
 
 ## Patterns to watch for
@@ -84,3 +108,7 @@
 | AI model retirement | Medium | Verify model exists before deploying |
 | Async generator error handling | Medium | Raise exceptions, don't yield error strings |
 | Auth changes without test updates | Medium | Update tests in same commit as auth changes |
+| SSRF on outbound HTTP | High | Block private IPs, metadata, disable redirects |
+| CSRF substring match | Medium | Use parsed hostname equality, reject missing headers |
+| Raw setattr from JSON | Medium | Always validate with Pydantic model first |
+| DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
