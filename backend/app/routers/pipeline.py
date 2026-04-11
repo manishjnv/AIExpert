@@ -1569,13 +1569,12 @@ async def proposals_page(
         </tr>"""
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title>
-<link rel="stylesheet" href="/nav.css">
 <style>{ADMIN_CSS}
 .modal {{ display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }}
 .modal-content {{ background:#1d242e; border-radius:8px; padding:24px; max-width:800px; width:90%; max-height:80vh; overflow-y:auto; color:#d0cbc2; white-space:pre-wrap; font-size:13px; line-height:1.7; }}
 .modal-close {{ float:right; cursor:pointer; font-size:20px; color:#8a92a0; background:none; border:none; }}
-</style>
-<script src="/nav.js"></script></head><body>
+</style></head><body>
+{NAV_HTML}
 <div class="page">
 <h1>Curriculum Proposals</h1>
 <p style="color:#8a92a0;font-size:13px;margin-bottom:16px">
