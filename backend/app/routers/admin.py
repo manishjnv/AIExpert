@@ -199,6 +199,90 @@ async def reject_proposal(
     return {"ok": True, "status": "rejected"}
 
 
+@router.post("/api/generate-template")
+async def generate_template(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+):
+    """Generate a new curriculum template using AI."""
+    _check_origin(request)
+    body = await request.json()
+    topic = body.get("topic", "").strip()
+    duration = int(body.get("duration", 6))
+    level = body.get("level", "intermediate")
+
+    if not topic:
+        raise HTTPException(status_code=400, detail="Topic is required")
+    if duration not in (3, 6, 9, 12):
+        raise HTTPException(status_code=400, detail="Duration must be 3, 6, 9, or 12 months")
+    if level not in ("beginner", "intermediate", "advanced"):
+        raise HTTPException(status_code=400, detail="Level must be beginner, intermediate, or advanced")
+
+    from app.services.curriculum_generator import generate_curriculum, save_curriculum_draft
+    from app.ai.provider import AIProviderError
+
+    try:
+        plan_data = await generate_curriculum(topic, duration, level)
+        path = await save_curriculum_draft(plan_data)
+        return {
+            "ok": True,
+            "key": plan_data.get("key"),
+            "title": plan_data.get("title"),
+            "weeks": sum(len(m.get("weeks", [])) for m in plan_data.get("months", [])),
+            "path": path,
+        }
+    except AIProviderError as e:
+        raise HTTPException(status_code=503, detail=f"AI unavailable: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+
+
+@router.get("/api/templates")
+async def list_admin_templates(
+    _user: User = Depends(get_current_admin),
+):
+    """List all templates with file details for admin."""
+    from app.curriculum.loader import list_templates, load_template
+    keys = list_templates()
+    result = []
+    for key in sorted(keys):
+        try:
+            tpl = load_template(key)
+            result.append({
+                "key": tpl.key,
+                "title": tpl.title,
+                "goal": tpl.goal,
+                "level": tpl.level,
+                "duration_months": tpl.duration_months,
+                "total_weeks": tpl.total_weeks,
+                "total_checks": tpl.total_checks,
+            })
+        except Exception:
+            continue
+    return result
+
+
+@router.delete("/api/templates/{key}")
+async def delete_template(
+    key: str,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+):
+    """Delete a template file."""
+    _check_origin(request)
+    from pathlib import Path
+    path = Path(__file__).parent.parent / "curriculum" / "templates" / f"{key}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Template not found")
+    # Don't delete the 3 original generalist templates
+    if key.startswith("generalist_"):
+        raise HTTPException(status_code=400, detail="Cannot delete default generalist templates")
+    path.unlink()
+    from app.curriculum.loader import load_template
+    load_template.cache_clear()
+    return {"ok": True, "deleted": key}
+
+
 # ---- Jinja2 admin UI ----
 
 ADMIN_CSS = """
@@ -259,7 +343,7 @@ async def admin_dashboard_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admin</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a></nav>
 <h1>Dashboard</h1>
 <div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
 <div class="stat"><div class="num">{dau}</div><div class="lbl">DAU</div></div>
@@ -291,7 +375,7 @@ async def admin_users_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a></nav>
 <h1>Users ({total})</h1>
 <form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
 <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Provider</th><th>Admin</th><th>Created</th></tr>{rows_html}</table>
@@ -317,7 +401,88 @@ async def admin_proposals_page(
         rows_html += f"<tr><td>{p.id}</td><td>{esc(p.source_run)}</td><td>{esc(p.status)}</td><td>{esc(p.notes or '-')}</td><td>{p.created_at}</td><td>{actions}</td></tr>"
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a></nav>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a></nav>
 <h1>Curriculum Proposals</h1>
 <table><tr><th>ID</th><th>Source Run</th><th>Status</th><th>Notes</th><th>Created</th><th>Actions</th></tr>{rows_html}</table>
+</body></html>"""
+
+
+@router.get("/templates", response_class=HTMLResponse)
+async def admin_templates_page(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin templates management page."""
+    from app.curriculum.loader import list_templates, load_template
+
+    keys = list_templates()
+    rows_html = ""
+    for key in sorted(keys):
+        try:
+            tpl = load_template(key)
+            is_default = key.startswith("generalist_")
+            delete_btn = "" if is_default else f'<button class="btn danger" onclick="deleteTemplate(\\'{key}\\')">Delete</button>'
+            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.goal)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td>{delete_btn}</td></tr>"
+        except Exception:
+            continue
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Templates</title><style>{ADMIN_CSS}</style></head><body>
+<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a></nav>
+<h1>Plan Templates</h1>
+<p style="color:#4a5260;font-size:13px;margin-bottom:16px">Add new templates by topic. AI generates the full curriculum automatically.</p>
+
+<div style="background:#1d242e;padding:16px;border-radius:6px;margin-bottom:24px">
+  <h2 style="font-size:16px;margin-bottom:12px">Generate New Template</h2>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end">
+    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Topic</label><input id="genTopic" placeholder="e.g. NLP, Computer Vision, MLOps" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"></div>
+    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Duration</label><select id="genDuration" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="9">9 months</option><option value="12">12 months</option></select></div>
+    <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#4a5260;display:block;margin-bottom:4px">Level</label><select id="genLevel" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select></div>
+    <button class="btn success" onclick="generateTemplate()" id="genBtn" style="padding:8px 16px">Generate</button>
+  </div>
+  <div id="genStatus" style="margin-top:8px;font-size:12px;color:#4a5260"></div>
+</div>
+
+<table><tr><th>Title</th><th>Goal</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Actions</th></tr>{rows_html}</table>
+
+<script>
+async function generateTemplate() {{
+  const btn = document.getElementById('genBtn');
+  const status = document.getElementById('genStatus');
+  const topic = document.getElementById('genTopic').value.trim();
+  if (!topic) {{ status.textContent = 'Enter a topic'; return; }}
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  status.textContent = 'AI is generating curriculum... this takes 15-30 seconds.';
+  try {{
+    const resp = await fetch('/admin/api/generate-template', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      credentials: 'same-origin',
+      body: JSON.stringify({{
+        topic: topic,
+        duration: document.getElementById('genDuration').value,
+        level: document.getElementById('genLevel').value,
+      }})
+    }});
+    const data = await resp.json();
+    if (resp.ok) {{
+      status.innerHTML = '<span style="color:#6db585">✓ Generated: ' + data.title + ' (' + data.weeks + ' weeks). Refreshing...</span>';
+      setTimeout(() => window.location.reload(), 1500);
+    }} else {{
+      status.innerHTML = '<span style="color:#d97757">✗ ' + (data.detail || 'Failed') + '</span>';
+    }}
+  }} catch(e) {{
+    status.innerHTML = '<span style="color:#d97757">✗ Error: ' + e.message + '</span>';
+  }}
+  btn.disabled = false;
+  btn.textContent = 'Generate';
+}}
+
+async function deleteTemplate(key) {{
+  if (!confirm('Delete template: ' + key + '?')) return;
+  const resp = await fetch('/admin/api/templates/' + key, {{method: 'DELETE', credentials: 'same-origin'}});
+  if (resp.ok) window.location.reload();
+  else alert('Delete failed');
+}}
+</script>
 </body></html>"""

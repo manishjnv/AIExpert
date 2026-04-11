@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Enrichment Architecture Blueprint — Reusable Pattern</title>
+<style>
+  :root {
+    --bg:        #0b0f1a;
+    --bg-card:   #131826;
+    --bg-code:   #0a0d16;
+    --border:    #1f2638;
+    --border-2:  #2a3349;
+    --text:      #e6ebf5;
+    --text-dim:  #9aa4b8;
+    --text-mute: #6b7390;
+    --accent:    #5eead4;
+    --accent-2:  #818cf8;
+    --blue:      #60a5fa;
+    --green:     #34d399;
+    --amber:     #fbbf24;
+    --red:       #f87171;
+    --purple:    #c084fc;
+    --cyan:      #22d3ee;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 60px 32px 80px; }
+  header.cover {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 40px;
+    margin-bottom: 50px;
+  }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: 42px;
+    line-height: 1.15;
+    margin: 0 0 16px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .sub {
+    color: var(--text-dim);
+    font-size: 18px;
+    max-width: 760px;
+    margin: 0 0 24px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    color: var(--text-mute);
+    font-size: 13px;
+  }
+  .meta span strong { color: var(--text-dim); font-weight: 500; }
+  section { margin-bottom: 56px; }
+  h2 {
+    font-size: 26px;
+    margin: 0 0 8px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  h2 .num {
+    color: var(--text-mute);
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid var(--border-2);
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+  h3 {
+    font-size: 18px;
+    margin: 32px 0 10px;
+    color: var(--text);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 14px;
+    margin: 22px 0 8px;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  p { margin: 0 0 14px; color: var(--text-dim); }
+  p strong { color: var(--text); font-weight: 600; }
+  .lead { font-size: 16px; color: var(--text-dim); max-width: 820px; }
+  ul, ol { color: var(--text-dim); padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  li strong { color: var(--text); font-weight: 600; }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', Menlo, monospace;
+    background: var(--bg-code);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #c9d1e0;
+    margin: 14px 0;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin: 16px 0;
+  }
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 800px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    vertical-align: top;
+  }
+  th {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-2);
+  }
+  td strong { color: var(--text); font-weight: 600; }
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+  }
+  .badge-blue   { color: var(--blue);   border-color: var(--blue);   background: rgba(96,165,250,0.1); }
+  .badge-green  { color: var(--green);  border-color: var(--green);  background: rgba(52,211,153,0.1); }
+  .badge-amber  { color: var(--amber);  border-color: var(--amber);  background: rgba(251,191,36,0.1); }
+  .badge-red    { color: var(--red);    border-color: var(--red);    background: rgba(248,113,113,0.1); }
+  .badge-purple { color: var(--purple); border-color: var(--purple); background: rgba(192,132,252,0.1); }
+  .badge-cyan   { color: var(--cyan);   border-color: var(--cyan);   background: rgba(34,211,238,0.1); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(94,234,212,0.05);
+    padding: 16px 22px;
+    border-radius: 0 8px 8px 0;
+    margin: 18px 0;
+  }
+  .callout-title {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .callout-amber { border-left-color: var(--amber); background: rgba(251,191,36,0.05); }
+  .callout-amber .callout-title { color: var(--amber); }
+  .callout-red { border-left-color: var(--red); background: rgba(248,113,113,0.05); }
+  .callout-red .callout-title { color: var(--red); }
+
+  .phase {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin: 18px 0;
+    position: relative;
+  }
+  .phase-num {
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .phase h3 { margin-top: 6px; }
+  .phase .role {
+    font-size: 12px;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 28px;
+    margin-bottom: 50px;
+    columns: 2;
+    column-gap: 32px;
+  }
+  @media (max-width: 700px) { .toc { columns: 1; } }
+  .toc h4 { margin-top: 0; column-span: all; }
+  .toc ol { padding-left: 20px; margin: 0; }
+  .toc li { margin-bottom: 4px; break-inside: avoid; }
+  .toc a { color: var(--text-dim); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    color: var(--text-mute);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <div class="eyebrow">Reusable Architecture Pattern</div>
+  <h1>AI Enrichment Engine</h1>
+  <p class="sub">A domain-agnostic blueprint for adding LLM-powered enrichment to any data platform without losing control of cost, latency, or output quality. Three patterns, one budget gate, zero unstructured outputs.</p>
+  <div class="meta">
+    <span><strong>Pattern:</strong> Cache-first, budget-gated, schema-enforced</span>
+    <span><strong>Audience:</strong> Backend architects</span>
+    <span><strong>Status:</strong> Production-validated</span>
+    <span><strong>Version:</strong> 1.0</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#why">Why an enrichment layer exists</a></li>
+    <li><a href="#principles">Core principles</a></li>
+    <li><a href="#placement">Placement &amp; ownership</a></li>
+    <li><a href="#patterns">The three enrichment patterns</a></li>
+    <li><a href="#providers">External provider orchestration</a></li>
+    <li><a href="#caching">Prompt caching strategy</a></li>
+    <li><a href="#budget">Token budget enforcement</a></li>
+    <li><a href="#tiering">Model tiering</a></li>
+    <li><a href="#schema">Enforced output schema &amp; reasoning trail</a></li>
+    <li><a href="#scoring">Composite final scoring</a></li>
+    <li><a href="#integration">Integration contract</a></li>
+    <li><a href="#reuse">Reuse checklist</a></li>
+    <li><a href="#antipatterns">Anti-patterns</a></li>
+  </ol>
+</nav>
+
+<section id="why">
+  <h2><span class="num">01</span>Why an enrichment layer exists</h2>
+  <p class="lead">Normalization gives you clean, canonical records. Enrichment is what turns those records into <em>decisions</em> — adding context, classification, scoring, and recommendations that no single source could produce alone. It's the layer where external data and an LLM combine to answer the question "what does this record actually mean, and what should I do about it?"</p>
+
+  <p>Done well, enrichment is the most valuable layer in the platform. Done badly, it's the most expensive — runaway token bills, hallucinated outputs, latency spikes, and cache hit rates that nobody measures. The difference between the two outcomes is almost entirely a matter of architecture, not prompt engineering.</p>
+
+  <div class="callout">
+    <div class="callout-title">The four invariants that keep enrichment sane</div>
+    <p style="margin:0"><strong>1.</strong> Every LLM call is preceded by a cache check.<br>
+       <strong>2.</strong> Every LLM call is preceded by a budget check.<br>
+       <strong>3.</strong> Every LLM output is validated against a strict schema before storage.<br>
+       <strong>4.</strong> Every LLM output includes its own reasoning trail for audit.</p>
+  </div>
+</section>
+
+<section id="principles">
+  <h2><span class="num">02</span>Core principles</h2>
+  <div class="grid grid-2">
+    <div class="card">
+      <h4>Cache before you call</h4>
+      <p>Redis is checked first on every single request. If the value is hot, the LLM is never invoked. Cache TTLs are tuned per record type — volatile records expire fast, stable records live for days.</p>
+    </div>
+    <div class="card">
+      <h4>Budget before you spend</h4>
+      <p>Every tenant has a monthly token budget per module. Every call checks the budget before issuing the request. At 80% of budget the system warns; at 90% it falls back to a cheaper model; at 100% it hard-stops.</p>
+    </div>
+    <div class="card">
+      <h4>Schema before you trust</h4>
+      <p>The LLM is instructed to return JSON matching a strict schema, and the response is validated at runtime. If validation fails, the result is rejected — never coerced, never stored as free text.</p>
+    </div>
+    <div class="card">
+      <h4>External signals before LLM tokens</h4>
+      <p>Free or cheap external APIs (lookups, public databases, internal services) are called in parallel <em>before</em> the LLM. The LLM reasons over the consolidated provider output rather than wasting tokens looking things up.</p>
+    </div>
+    <div class="card">
+      <h4>Reasoning is part of the output</h4>
+      <p>Every enrichment includes evidence sources, score justification, and uncertainty factors. A score with no reasoning trail is worse than no score at all — it's a number nobody can defend.</p>
+    </div>
+    <div class="card">
+      <h4>Async by default, sync by exception</h4>
+      <p>Bulk enrichment runs through a batch queue. Real-time enrichment is reserved for human-triggered actions (an analyst clicks a record). The two paths share the same engine but have different SLAs and different cost profiles.</p>
+    </div>
+  </div>
+</section>
+
+<section id="placement">
+  <h2><span class="num">03</span>Placement &amp; ownership</h2>
+  <p>The enrichment layer sits immediately after normalization and before search/graph indexing. It is the fifth stage of the generic data pipeline:</p>
+
+<pre>
+  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+  │  Source  │──▶│ Normalize│──▶│  Persist │──▶│  ENRICH  │──▶│ Index +  │
+  │ adapters │   │          │   │  (NEW)   │   │ (→ACTIVE)│   │ fan-out  │
+  └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
+</pre>
+
+  <p>Records enter persistence in their initial lifecycle state (<code>NEW</code>). The enrichment service consumes <code>normalization.complete</code> events, runs the enrichment, writes the result back, and publishes <code>enrichment.complete</code> — which triggers the lifecycle transition to <code>ACTIVE</code> and the downstream indexing fan-out.</p>
+
+  <h3>Service layout</h3>
+<pre>
+apps/enrichment-service/
+  src/
+    index.ts            # Bootstrap, route registration
+    routes.ts           # 5 HTTP endpoints
+    controller.ts       # HTTP layer
+    service.ts          # enrichSingle / enrichBatch / processBatchResults
+    budget.ts           # checkTokenBudget — called before every LLM call
+    providers/
+      provider-a.ts     # External lookup adapters
+      provider-b.ts
+      circuit-breaker.ts
+    prompts/
+      system-prompts.ts # Per-type system prompts (cached)
+      corpus.ts         # Large reference corpus (cached)
+      builders.ts       # buildPrompt(record, providerResults)
+    schema.ts           # EnrichmentOutputSchema (Zod / Pydantic / JSON Schema)
+    repository.ts       # Persistence
+    queue.ts            # Real-time worker, batch worker, batch poller
+    README.md
+</pre>
+
+  <p>Unlike normalization (which is a shared package consumed in-process by every other service), enrichment <em>is</em> a real service. The reason: it has external dependencies (LLM provider, third-party APIs), it owns expensive state (token budget, prompt cache), and its failure modes (rate limits, provider outages) need to be isolated from the rest of the system.</p>
+</section>
+
+<section id="patterns">
+  <h2><span class="num">04</span>The three enrichment patterns</h2>
+  <p class="lead">All three patterns share the same engine. They differ in <em>how the work is queued</em> and <em>what the SLA looks like</em>.</p>
+
+  <div class="phase">
+    <span class="phase-num">PATTERN 1</span>
+    <div class="role">Synchronous</div>
+    <h3>Real-time + cache</h3>
+    <p>For human-triggered single lookups. A user clicks a record in the UI and expects sub-second feedback. The hot path is engineered to make the cache hit in &lt;50ms, and the cold path (cache miss) to complete in 1-3 seconds.</p>
+<pre>async function enrichSingle(record: CanonicalRecord, tenantId: string): Promise&lt;EnrichmentOutput&gt; {
+  // 1. Cache check — sub-millisecond hit on Redis
+  const cacheKey = `enrichment:${record.type}:${record.normalized_value}`;
+  const cached = await redis.get(cacheKey);
+  if (cached) return EnrichmentOutputSchema.parse(JSON.parse(cached));
+
+  // 2. Budget gate — never call the LLM without checking
+  const budget = await checkTokenBudget(tenantId, 'enrichment');
+  if (!budget.allowed) {
+    if (budget.fallbackToCheaperModel) return enrichWithCheapModel(record, tenantId);
+    throw new BudgetExceededError();
+  }
+
+  // 3. Parallel external provider calls — zero LLM cost
+  const providerResults = await Promise.allSettled([
+    providerA.lookup(record),
+    providerB.lookup(record),
+    providerC.lookup(record),
+  ]);
+
+  // 4. LLM call with prompt caching
+  const llmResponse = await llm.complete({
+    model: MODELS.default,
+    system: [
+      { text: SYSTEM_PROMPTS[record.type], cache: 'ephemeral' },
+      { text: REFERENCE_CORPUS,             cache: 'ephemeral' },
+    ],
+    user: buildPrompt(record, providerResults),
+    maxOutputTokens: 1024,
+  });
+
+  // 5. Schema validation — never store unvalidated output
+  const validated = EnrichmentOutputSchema.parse(extractJson(llmResponse));
+
+  // 6. Cache with type-specific TTL
+  await redis.setex(cacheKey, CACHE_TTL[record.type], JSON.stringify(validated));
+
+  // 7. Token usage tracking
+  await trackTokenUsage({ tenantId, module: 'enrichment', usage: llmResponse.usage });
+
+  return validated;
+}</pre>
+  </div>
+
+  <div class="phase">
+    <span class="phase-num">PATTERN 2</span>
+    <div class="role">Asynchronous bulk</div>
+    <h3>Batch API enrichment</h3>
+    <p>For non-real-time enrichment of N or more records. Most LLM providers offer a batch API that runs work asynchronously over hours in exchange for a 50% cost reduction. This is the right path for any feed-driven ingest where the SLA is "complete within an hour" rather than "complete within a second."</p>
+
+    <p>The flow:</p>
+    <ol>
+      <li>Ingestion service buffers records until it has at least N (configurable, typically 10-50)</li>
+      <li>Enrichment service builds a single batch request with one entry per record</li>
+      <li>Batch is submitted, ID is stored, and a polling worker is scheduled</li>
+      <li>Worker polls every minute for up to one hour</li>
+      <li>On completion, results are validated one-by-one and written back to the corresponding records</li>
+    </ol>
+
+<pre>async function enrichBatch(records: CanonicalRecord[], tenantId: string): Promise&lt;string&gt; {
+  if (records.length &lt; BATCH_MIN_SIZE) throw new BatchTooSmallError();
+
+  // Budget for the entire batch upfront
+  const budget = await checkTokenBudget(tenantId, 'enrichment', records.length * AVG_TOKENS);
+  if (!budget.allowed) throw new BudgetExceededError();
+
+  // Build batch with one request per record, sharing cached system prompt
+  const requests = records.map((r, idx) =&gt; ({
+    custom_id: `enrich-${r.id}-${idx}`,
+    params: {
+      model: MODELS.default,
+      system: [{ text: SYSTEM_PROMPTS[r.type], cache: 'ephemeral' }],
+      user: buildPrompt(r),
+      maxOutputTokens: 1024,
+    },
+  }));
+
+  const batch = await llm.batches.create({ requests });
+  await redis.setex(`batch:${batch.id}`, 86400, JSON.stringify({
+    tenantId, recordIds: records.map(r =&gt; r.id), submittedAt: new Date().toISOString(),
+  }));
+
+  // Schedule polling worker — 60s interval, up to 60 attempts (1 hour SLA)
+  await batchQueue.add('batch-poll', { batchId: batch.id, tenantId }, {
+    delay: 60_000, attempts: 60,
+    backoff: { type: 'fixed', delay: 60_000 },
+  });
+
+  return batch.id;
+}</pre>
+
+    <div class="callout">
+      <div class="callout-title">Why batch is the default, not the exception</div>
+      <p style="margin:0">For feed-driven ingest, the 50% cost reduction is the difference between affordable and unaffordable at scale. The hourly latency rarely matters because nobody is staring at the screen waiting. Real-time should be reserved for cases where a human is actually waiting for the answer.</p>
+    </div>
+  </div>
+
+  <div class="phase">
+    <span class="phase-num">PATTERN 3</span>
+    <div class="role">Multi-step</div>
+    <h3>Agentic enrichment</h3>
+    <p>For complex investigations that require more than one LLM call to complete. The model is given a set of tools — graph traversal, search, related-record lookup, fact retrieval — and runs an iterative loop: hypothesize, query, evaluate, refine, conclude.</p>
+
+    <p>This pattern is reserved for high-value workflows where a single-shot enrichment isn't enough. Examples: tracing how a record connects to others several hops away, building a timeline of related events, or producing a narrative summary that requires looking up multiple supporting records.</p>
+
+    <p>Cost discipline is even more important here than in single-shot enrichment, because agentic loops can spiral. Two guardrails:</p>
+    <ul>
+      <li><strong>Hard step limit.</strong> The loop exits after N tool calls regardless of completion. N is small (5-10) and configurable per workflow.</li>
+      <li><strong>Per-investigation token budget.</strong> A separate budget bucket is allocated per investigation. When it runs out, the loop stops and returns whatever it has.</li>
+    </ul>
+
+    <p>Agentic enrichment should always be human-initiated and optionally human-reviewed before any of its outputs propagate downstream.</p>
+  </div>
+</section>
+
+<section id="providers">
+  <h2><span class="num">05</span>External provider orchestration</h2>
+  <p>External providers are called <em>before</em> the LLM, in parallel, and their output is fed into the LLM prompt as structured context. This is the single biggest cost reduction lever in the entire system: the LLM doesn't waste tokens looking up facts it could be told.</p>
+
+  <h3>Parallel fan-out</h3>
+<pre>const providerResults = await Promise.allSettled([
+  providerA.lookup(record),
+  providerB.lookup(record),
+  providerC.lookup(record),
+  providerD.lookup(record),
+]);
+
+const consolidated = {
+  providerA: providerResults[0].status === 'fulfilled' ? providerResults[0].value : null,
+  providerB: providerResults[1].status === 'fulfilled' ? providerResults[1].value : null,
+  providerC: providerResults[2].status === 'fulfilled' ? providerResults[2].value : null,
+  providerD: providerResults[3].status === 'fulfilled' ? providerResults[3].value : null,
+  unavailable: providerResults
+    .map((r, i) =&gt; r.status === 'rejected' ? PROVIDER_NAMES[i] : null)
+    .filter(Boolean),
+};</pre>
+
+  <p>The <code>unavailable</code> array is included in the LLM prompt so the model knows what data was missing. This is what makes the system degrade gracefully: a flapping provider doesn't take down enrichment, the LLM just gets less context and is told so.</p>
+
+  <h3>Circuit breakers per provider</h3>
+  <p>Wrap every provider call in a circuit breaker (Hystrix, Opossum, Resilience4j — pick your stack). Set per-provider timeouts at 2 seconds maximum, and trip the breaker after 5 consecutive failures. A tripped breaker returns null immediately for the next 60 seconds without making the network call. This is what prevents one slow provider from serializing the whole pipeline.</p>
+
+  <h3>Per-provider rate limits</h3>
+  <p>Many free-tier external APIs have aggressive rate limits (e.g., 4 requests per minute). The circuit breaker doesn't catch this — the call succeeds, just slowly. Add a per-provider token bucket at the adapter level so requests queue locally rather than getting rejected by the upstream.</p>
+</section>
+
+<section id="caching">
+  <h2><span class="num">06</span>Prompt caching strategy</h2>
+  <p>Modern LLM APIs support <em>prompt caching</em> — marking parts of the prompt as cacheable so subsequent calls within a window pay only for the changing portion. Used correctly, this is a 60-90% reduction in input token cost.</p>
+
+  <h3>What to cache</h3>
+  <p>Two blocks per request:</p>
+  <ol>
+    <li><strong>The system prompt</strong> — typically 1-2K tokens, one per record type. Identical across all calls of the same type.</li>
+    <li><strong>The reference corpus</strong> — large body of background knowledge the LLM needs (taxonomies, classification frameworks, examples). Often 100K+ tokens. Identical across <em>all</em> calls regardless of type.</li>
+  </ol>
+
+<pre>const response = await llm.complete({
+  model: MODELS.default,
+  system: [
+    { text: SYSTEM_PROMPTS[record.type], cache: 'ephemeral' },  // ~1-2K tokens
+    { text: REFERENCE_CORPUS,             cache: 'ephemeral' }, // ~200K tokens
+  ],
+  user: buildPrompt(record, providerResults),                    // ~500 tokens — the only changing part
+  maxOutputTokens: 1024,
+});</pre>
+
+  <p>After the first call in the cache window, subsequent calls pay only for the user message — the cached blocks are billed at 10% of normal input cost (provider-dependent).</p>
+
+  <h3>Target hit rate</h3>
+  <p><strong>Target: 80%+ cache hit rate on the cached blocks.</strong> Below this number, something is wrong — either the cache window is too short for your traffic pattern, or the cached blocks are changing more often than they should.</p>
+
+  <h3>Instrument it</h3>
+  <p>Most LLM APIs return separate counters for cached vs uncached input tokens (<code>cache_read_input_tokens</code>, <code>cache_creation_input_tokens</code>). Track them separately in your token usage table, dashboard the ratio, and alert if it drops below your target. This is the single most important metric for enrichment cost.</p>
+
+  <div class="callout callout-amber">
+    <div class="callout-title">Don't put dynamic content in cached blocks</div>
+    <p style="margin:0">If you templatize the system prompt with the tenant name or current date, the cache will never hit. Cached blocks must be byte-identical across calls. Put dynamic content in the user message.</p>
+  </div>
+</section>
+
+<section id="budget">
+  <h2><span class="num">07</span>Token budget enforcement</h2>
+  <p>Every tenant has a monthly token budget per module. Every LLM call passes through a budget check before it issues the request. No exceptions, no escape hatches.</p>
+
+  <h3>Three-tier enforcement</h3>
+  <table>
+    <thead>
+      <tr><th>Budget used</th><th>Action</th><th>User experience</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-green">&lt; 80%</span></td>
+        <td>Normal — use default model</td>
+        <td>No visible change</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">80–90%</span></td>
+        <td>Warning event published, dashboard banner shown</td>
+        <td>Admin sees warning, no degradation</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">90–100%</span></td>
+        <td>Automatic fallback to cheaper model</td>
+        <td>Slightly lower quality, no failures</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">≥ 100%</span></td>
+        <td>Hard stop — return budget-exceeded error</td>
+        <td>Admin notified, user sees clear error</td>
+      </tr>
+    </tbody>
+  </table>
+
+<pre>async function checkTokenBudget(tenantId, module, estimatedTokens = 2000) {
+  const key = `budget:${tenantId}:${module}:${currentMonth()}`;
+  const used = Number(await redis.get(key) ?? 0);
+  const limit = await getTenantLimit(tenantId, module);
+  const usedPct = (used / limit) * 100;
+
+  if (usedPct &gt;= 80 && usedPct &lt; 90)
+    await publishEvent('budget.warning', { tenantId, module, usedPct });
+
+  if (usedPct &gt;= 90 && usedPct &lt; 100)
+    return { allowed: true, fallbackToCheaperModel: true };
+
+  if (limit - used &lt; estimatedTokens) {
+    await publishEvent('budget.exceeded', { tenantId, module, usedPct });
+    return { allowed: false, fallbackToCheaperModel: false };
+  }
+  return { allowed: true, fallbackToCheaperModel: false };
+}</pre>
+
+  <h3>Per-module budgets</h3>
+  <p>Different modules have different budgets because their workloads have different value-per-token. Typical allocation:</p>
+
+  <table>
+    <thead>
+      <tr><th>Module</th><th>Default monthly budget</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Enrichment</td><td>500K tokens</td><td>Highest volume — every record passes through</td></tr>
+      <tr><td>Correlation</td><td>200K tokens</td><td>Lower volume, runs on clusters</td></tr>
+      <tr><td>Investigation / hunting</td><td>100K tokens</td><td>Human-initiated only, low volume</td></tr>
+    </tbody>
+  </table>
+
+  <p>Budgets are per-tenant overrideable from an admin panel. Enterprise customers get higher caps.</p>
+</section>
+
+<section id="tiering">
+  <h2><span class="num">08</span>Model tiering</h2>
+  <p>Not every task needs the most expensive model. Tier the models against the tasks:</p>
+
+  <table>
+    <thead>
+      <tr><th>Tier</th><th>Use for</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Reasoner</span><br>(mid-tier)</td>
+        <td>Single-record enrichment, multi-step reasoning, cluster analysis</td>
+        <td>Best balance of quality and cost. The default for any task that requires actual reasoning.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">Classifier</span><br>(small/fast)</td>
+        <td>Triage, classification, tag extraction, severity labeling, summarization, budget-fallback target</td>
+        <td>5-10x cheaper than the reasoner. Quality is 80-90% as good for narrow extraction tasks.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-purple">Heavyweight</span><br>(top-tier)</td>
+        <td>Development conversations only — never in production runtime</td>
+        <td>Too expensive for per-record use. Reserved for offline tasks where a human is reading the output.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>The triage pattern</h3>
+  <p>One of the highest-ROI uses of model tiering: a two-stage cascade where the cheap classifier filters out work the reasoner doesn't need to do.</p>
+
+  <ol>
+    <li><strong>Stage 1 (cheap classifier):</strong> "Is this record worth deeply enriching?" — yes/no plus a confidence score.</li>
+    <li><strong>Stage 2 (expensive reasoner):</strong> Only runs on records the classifier flagged as worth processing.</li>
+  </ol>
+
+  <p>If 80% of incoming records are not worth deep enrichment, this single pattern cuts the expensive model bill by ~80% with negligible quality loss.</p>
+</section>
+
+<section id="schema">
+  <h2><span class="num">09</span>Enforced output schema &amp; reasoning trail</h2>
+  <p>The LLM is instructed to return JSON matching a strict schema. The response is validated at runtime. If validation fails, the result is rejected and either retried or quarantined — never coerced, never stored as free text.</p>
+
+  <h3>The schema</h3>
+<pre>interface EnrichmentOutput {
+  // Core scoring
+  score:           number;          // 0-100 risk/relevance/priority score
+  confidence:      number;          // 0.0-1.0 model self-confidence
+
+  // Classification
+  categories:      string[];        // Discrete labels from a controlled vocabulary
+  attributions:    string[];        // Named entities the record is linked to
+
+  // Reasoning trail — the auditability differentiator
+  reasoning: {
+    score_justification: string;    // 2-3 sentences citing specific evidence
+    evidence_sources:    string[];  // Concrete evidence items used
+    uncertainty_factors: string[];  // What would change this score
+  };
+
+  // Action guidance
+  recommended_actions: string[];
+
+  // Negative-result handling
+  is_false_positive:    boolean;
+  false_positive_reason: string | null;
+
+  // Provenance
+  schema_version:  '1.0';
+}</pre>
+
+  <h3>The reasoning trail is the differentiator</h3>
+  <p>Most enrichment systems output a number with no explanation. This is unusable in any context where a human will be asked to defend the result — a security review, a compliance audit, an analyst walkthrough. The reasoning trail solves this by making every score self-documenting:</p>
+
+  <ul>
+    <li><strong>score_justification</strong> — 2-3 sentences explaining the score in concrete terms, citing specific evidence the LLM used.</li>
+    <li><strong>evidence_sources</strong> — list of the concrete items (provider results, classification taxonomies, related records) that informed the score.</li>
+    <li><strong>uncertainty_factors</strong> — what the model is unsure about. This is the most undervalued field in the schema. A model that admits uncertainty is more trustworthy than one that doesn't.</li>
+  </ul>
+
+  <h3>Validation enforcement</h3>
+<pre>const result = EnrichmentOutputSchema.safeParse(extractJson(llmResponse));
+if (!result.success) {
+  // Optional: one retry with the validation errors fed back to the model
+  // Otherwise: quarantine and alert
+  await quarantine.store({ rawResponse: llmResponse, errors: result.error.issues });
+  throw new SchemaValidationError(result.error);
+}</pre>
+
+  <p>Add a Zod refinement that requires <code>reasoning.evidence_sources</code> to be non-empty. If the LLM returns an empty array, that's a hallucinated score — reject it.</p>
+
+  <div class="callout">
+    <div class="callout-title">Why a strict schema beats free-text output</div>
+    <p style="margin:0">A strict schema turns the LLM into a typed function call. Downstream code can read the fields with confidence, the UI can render them in dedicated slots, and bugs surface as validation errors instead of garbled displays. Free-text output looks more flexible but creates a permanent integration tax.</p>
+  </div>
+</section>
+
+<section id="scoring">
+  <h2><span class="num">10</span>Composite final scoring</h2>
+  <p>The LLM's score is <em>one</em> signal. The final score stored on the record combines the LLM output with the external provider signals using documented weights:</p>
+
+<pre>finalScore = (providerA_score × 0.35)
+           + (providerB_score × 0.30)
+           + (llm_score       × 0.35)</pre>
+
+  <p>Weights sum to 1.0. When a provider is unavailable, weights are renormalized over the remaining signals (LLM alone = <code>llm_score × 1.0</code>).</p>
+
+  <p>Why combine signals at all? Because any single signal — including the LLM — has blind spots. The LLM might miss a pattern that an external reputation database catches. The reputation database might be outdated on a record the LLM has fresher context on. Composite scoring is what makes the final number more robust than any individual input.</p>
+
+  <p>This composite final score then feeds back into the normalization layer's composite confidence formula (see the Normalization Architecture Blueprint, section 06) — the two layers reinforce each other.</p>
+</section>
+
+<section id="integration">
+  <h2><span class="num">11</span>Integration contract</h2>
+  <p>The enrichment service consumes one event and produces one event. Same narrow contract pattern as normalization.</p>
+
+  <table>
+    <thead>
+      <tr><th>Direction</th><th>Channel</th><th>Payload</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">consumes</span></td>
+        <td><code>normalization.complete</code></td>
+        <td><code>{ recordId, type, tenantId }</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">produces</span></td>
+        <td><code>enrichment.complete</code></td>
+        <td><code>{ recordId, type, tenantId, score, confidence }</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">produces</span></td>
+        <td><code>enrichment.failed</code></td>
+        <td><code>{ recordId, errorCode, errorDetails }</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">produces</span></td>
+        <td><code>budget.warning</code></td>
+        <td><code>{ tenantId, module, usedPct }</code></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">produces</span></td>
+        <td><code>budget.exceeded</code></td>
+        <td><code>{ tenantId, module, usedPct }</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The <code>enrichment.complete</code> event is what triggers the lifecycle transition <code>NEW → ACTIVE</code> on the record (see the Normalization Blueprint, section 08). A record stuck in <code>NEW</code> state for more than 24 hours is a tripwire — something is wrong with the enrichment pipeline and an alert should fire.</p>
+</section>
+
+<section id="reuse">
+  <h2><span class="num">12</span>Reuse checklist for a new project</h2>
+  <p>To drop this pattern into a new domain, work through these questions in order. Each one corresponds to a section above.</p>
+
+  <ol>
+    <li><strong>What does "enrichment" mean for your domain?</strong> Write down the specific decisions the layer should produce — score, classification, action recommendation, narrative summary. This determines your output schema.</li>
+    <li><strong>Which external providers add context for free or cheap?</strong> List them. For each, write the adapter, the timeout, and the rate limit. This becomes section 05.</li>
+    <li><strong>What goes in the system prompt?</strong> One per record type. Keep it under 2K tokens. Test it with 20 hand-picked examples before committing. This becomes section 06.</li>
+    <li><strong>Is there a large reference corpus?</strong> Taxonomies, classification frameworks, controlled vocabularies. If yes, this is your second cached block. If no, skip it — but instrument cache hit rate anyway.</li>
+    <li><strong>What is your monthly token budget per tenant per module?</strong> Pick numbers, even if they're guesses. You can tune later. This becomes section 07.</li>
+    <li><strong>What models are available, and how do they tier?</strong> Identify the reasoner, the classifier, and the heavyweight. Document which is used for which task. This becomes section 08.</li>
+    <li><strong>What is the output schema?</strong> Draft it in your runtime validator of choice. Make the reasoning trail mandatory. This becomes section 09.</li>
+    <li><strong>What are the composite scoring weights?</strong> Pick a starting point that sums to 1.0. Plan to refit against ground truth after 30 days. This becomes section 10.</li>
+    <li><strong>What is the SLA for real-time vs batch?</strong> Real-time should be sub-3-second. Batch should be sub-1-hour. Anything else is wrong.</li>
+    <li><strong>What is the minimum batch size?</strong> Lower bound is 10. Higher is better for cache reuse, as long as it doesn't blow your SLA.</li>
+    <li><strong>What is the cache TTL per record type?</strong> Volatile types: minutes to hours. Stable types: days to weeks. Document the rationale per type.</li>
+    <li><strong>What is the quarantine path for schema validation failures?</strong> Build a simple admin view for inspecting and reprocessing failed enrichments.</li>
+  </ol>
+
+  <p>Twelve answers, then build. The layer takes about a week to get running and another week to tune cache hit rate and budget thresholds against real traffic.</p>
+</section>
+
+<section id="antipatterns">
+  <h2><span class="num">13</span>Anti-patterns to avoid</h2>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Calling the LLM without a cache check</div>
+    <p style="margin:0">Every miss that should have been a hit is wasted money and wasted latency. Every single LLM call must be preceded by a Redis check. No exceptions, even for "small" calls — they're never small at scale.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Calling the LLM without a budget check</div>
+    <p style="margin:0">A runaway loop or a misconfigured ingest can burn a month's budget in an hour. The budget check is the only thing standing between you and a surprise invoice. It must be unconditional.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Storing free-text LLM output</div>
+    <p style="margin:0">"We'll parse it later" never happens. Free-text output means downstream code is forever doing string matching against model responses, breaking every time the model changes. Strict schema, validated at the gate.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Score with no reasoning trail</div>
+    <p style="margin:0">A number that nobody can explain is a number nobody can defend. The first time a human asks "why did the system score this an 87?" and you can't answer, you've lost their trust permanently. Reasoning trail is mandatory.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Putting dynamic content in cached blocks</div>
+    <p style="margin:0">Templating the system prompt with the tenant name, current date, or record ID destroys the cache. The cached block must be byte-identical across calls. Dynamic content goes in the user message.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Synchronous fan-out over external providers</div>
+    <p style="margin:0">Calling provider A, then provider B, then provider C in sequence multiplies their latency. Always parallel via <code>Promise.allSettled</code> (or your stack's equivalent), always with per-provider circuit breakers.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Real-time as the default, batch as the exception</div>
+    <p style="margin:0">For feed-driven ingest, this gets the cost-vs-latency tradeoff exactly backwards. Real-time should be reserved for human-triggered actions. Everything else should batch.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">Using the heavyweight model in production runtime</div>
+    <p style="margin:0">The top-tier model is for development conversations and offline tasks where a human is reading the output. Putting it in the per-record hot path will bankrupt the project. The mid-tier reasoner is the production default.</p>
+  </div>
+
+  <div class="callout callout-red">
+    <div class="callout-title">No instrumentation on cache hit rate</div>
+    <p style="margin:0">If you don't track <code>cache_read_input_tokens / total_input_tokens</code>, you can't tell whether your prompt caching is actually working. The first time you check the dashboard you'll discover it's been at 12% for three months. Instrument from day one.</p>
+  </div>
+</section>
+
+<hr>
+
+<footer>
+  Reusable Architecture Pattern · AI Enrichment Engine · v1.0
+</footer>
+
+</div>
+</body>
+</html>

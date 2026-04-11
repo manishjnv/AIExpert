@@ -1,0 +1,57 @@
+You are a curriculum designer for an AI learning platform. Generate a complete, structured study plan.
+
+INPUTS:
+- Topic: {topic}
+- Duration: {duration_months} months ({total_weeks} weeks)
+- Level: {level}
+- Weeks per month: 4
+
+OUTPUT: Return a valid JSON object with this exact structure. No markdown, no explanation — ONLY the JSON.
+
+{{
+  "key": "{key}",
+  "version": "1.0",
+  "title": "{topic} — {duration_months}-Month Roadmap",
+  "level": "{level}",
+  "goal": "{goal}",
+  "duration_months": {duration_months},
+  "months": [
+    {{
+      "month": 1,
+      "label": "Phase name",
+      "title": "Short title for this month",
+      "tagline": "One motivating sentence about this month's focus.",
+      "checkpoint": "What the learner should have achieved by month end",
+      "weeks": [
+        {{
+          "n": 1,
+          "t": "Week title",
+          "hours": 16,
+          "focus": ["Focus area 1", "Focus area 2", "Focus area 3", "Focus area 4"],
+          "deliv": ["Deliverable 1", "Deliverable 2"],
+          "resources": [
+            {{"name": "Resource name", "url": "https://real-url.com", "hrs": 5}},
+            {{"name": "Resource name 2", "url": "https://real-url.com", "hrs": 5}},
+            {{"name": "Resource name 3", "url": "https://real-url.com", "hrs": 5}}
+          ],
+          "checks": ["Checklist item 1", "Checklist item 2", "Checklist item 3", "Checklist item 4", "Checklist item 5"]
+        }}
+      ]
+    }}
+  ]
+}}
+
+RULES:
+1. Generate exactly {duration_months} months with exactly 4 weeks each ({total_weeks} weeks total)
+2. Week numbers must be sequential from 1 to {total_weeks}
+3. Each week MUST have exactly: 4 focus items, 1-3 deliverables, 3 resources with REAL URLs, 5 checklist items
+4. Resources must be REAL, FREE, and currently accessible (courses, docs, tutorials, YouTube, papers)
+5. For {level} level:
+   - beginner: start from absolute basics, assume no prior knowledge
+   - intermediate: assume programming knowledge, skip basics
+   - advanced: assume ML experience, focus on cutting-edge topics
+6. Structure the months as a logical progression from foundations to capstone
+7. Last month should always be a capstone project + job preparation
+8. Each week should have 14-18 hours of work
+9. Make checklist items specific and verifiable (not vague)
+10. Deliverables should be GitHub-pushable artifacts (notebooks, code, apps)
