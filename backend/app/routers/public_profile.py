@@ -67,10 +67,10 @@ table { width: 100%; border-collapse: collapse; margin-top: 12px; }
 th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; border-bottom: 1px solid #2a323d; }
 td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
-a { color: #6fa8d6; text-decoration: none; }
-a:hover { color: #e8a849; }
+.container a { color: #6fa8d6; text-decoration: none; }
+.container a:hover { color: #e8a849; }
 /* nav styles in /nav.css */
-@media (max-width: 768px) { nav { padding: 10px 16px; } .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
+@media (max-width: 768px) { .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
 """
 
 
