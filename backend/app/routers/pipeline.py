@@ -20,7 +20,7 @@ from typing import Optional
 
 from app.auth.deps import get_current_admin
 from app.db import get_db
-from app.models.curriculum import CurriculumSettings, DiscoveredTopic
+from app.models.curriculum import AIUsageLog, CurriculumSettings, DiscoveredTopic
 from app.models.user import User
 
 
@@ -636,6 +636,298 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
     status.className = 'status-msg error';
   }}
 }});
+</script>
+</div>
+</body></html>"""
+
+
+# ---- AI Usage API + Page ----
+
+@router.get("/api/ai-usage")
+async def get_ai_usage(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get AI usage stats for admin dashboard."""
+    from sqlalchemy import case, cast, Float as SAFloat
+    from app.ai.health import get_all_health
+
+    # Per-provider stats
+    provider_stats = (await db.execute(
+        select(
+            AIUsageLog.provider,
+            func.count().label("total_calls"),
+            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("success"),
+            func.sum(case((AIUsageLog.status == "rate_limited", 1), else_=0)).label("rate_limited"),
+            func.sum(case((AIUsageLog.status == "error", 1), else_=0)).label("errors"),
+            func.sum(AIUsageLog.tokens_estimated).label("total_tokens"),
+            func.avg(AIUsageLog.latency_ms).label("avg_latency_ms"),
+        ).group_by(AIUsageLog.provider)
+    )).all()
+
+    # Per-task stats
+    task_stats = (await db.execute(
+        select(
+            AIUsageLog.task,
+            AIUsageLog.subtask,
+            func.count().label("total_calls"),
+            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("success"),
+            func.sum(case((AIUsageLog.status != "ok", 1), else_=0)).label("failures"),
+            func.sum(AIUsageLog.tokens_estimated).label("total_tokens"),
+        ).group_by(AIUsageLog.task, AIUsageLog.subtask)
+        .order_by(AIUsageLog.task, AIUsageLog.subtask)
+    )).all()
+
+    # Recent calls (last 50)
+    recent = (await db.execute(
+        select(AIUsageLog)
+        .order_by(AIUsageLog.called_at.desc())
+        .limit(50)
+    )).scalars().all()
+
+    # Health state
+    health = get_all_health()
+
+    return {
+        "provider_stats": [
+            {
+                "provider": r.provider,
+                "total_calls": r.total_calls,
+                "success": r.success or 0,
+                "rate_limited": r.rate_limited or 0,
+                "errors": r.errors or 0,
+                "total_tokens": r.total_tokens or 0,
+                "avg_latency_ms": int(r.avg_latency_ms or 0),
+            }
+            for r in provider_stats
+        ],
+        "task_stats": [
+            {
+                "task": r.task,
+                "subtask": r.subtask or "",
+                "total_calls": r.total_calls,
+                "success": r.success or 0,
+                "failures": r.failures or 0,
+                "total_tokens": r.total_tokens or 0,
+            }
+            for r in task_stats
+        ],
+        "recent": [
+            {
+                "id": r.id,
+                "called_at": r.called_at.strftime("%Y-%m-%d %H:%M:%S") if r.called_at else "",
+                "provider": r.provider,
+                "model": r.model,
+                "task": r.task,
+                "subtask": r.subtask or "",
+                "status": r.status,
+                "error_message": r.error_message or "",
+                "tokens_estimated": r.tokens_estimated,
+                "latency_ms": r.latency_ms,
+            }
+            for r in recent
+        ],
+        "health": {
+            name: {
+                "available": s.get("available", True),
+                "permanent_error": s.get("permanent_error", False),
+                "success_count": s.get("success_count", 0),
+                "error_count": s.get("error_count", 0),
+                "rate_limit_count": s.get("rate_limit_count", 0),
+                "last_error_msg": s.get("last_error_msg", ""),
+            }
+            for name, s in health.items()
+        },
+    }
+
+
+@router.post("/api/ai-usage/reset-provider")
+async def reset_provider_health(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+):
+    """Reset a provider's circuit breaker state."""
+    _check_origin(request)
+    body = await request.json()
+    provider = body.get("provider", "")
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider required")
+    from app.ai.health import reset_provider
+    reset_provider(provider)
+    return {"ok": True, "provider": provider}
+
+
+@router.get("/ai-usage", response_class=HTMLResponse)
+async def ai_usage_page(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """AI Usage dashboard — per-provider stats, per-task breakdown, health status."""
+    from app.ai.health import get_all_health
+
+    s = await _get_settings(db)
+    budget_pct = 0
+    if s.max_tokens_per_run > 0:
+        budget_pct = int((s.tokens_used_this_month / s.max_tokens_per_run) * 100)
+
+    # Provider health for status indicators
+    health = get_all_health()
+
+    # All known providers
+    all_providers = ["gemini", "groq", "cerebras", "mistral", "deepseek", "sambanova"]
+    from app.config import get_settings as get_app_settings
+    app_settings = get_app_settings()
+
+    provider_cards = ""
+    for p in all_providers:
+        api_key = getattr(app_settings, f"{p}_api_key", "")
+        has_key = bool(api_key)
+        h = health.get(p, {})
+        available = h.get("available", True) if h else True
+        permanent = h.get("permanent_error", False) if h else False
+        successes = h.get("success_count", 0) if h else 0
+        errors = h.get("error_count", 0) if h else 0
+        rl_count = h.get("rate_limit_count", 0) if h else 0
+        last_err = esc(h.get("last_error_msg", "") or "") if h else ""
+        model = getattr(app_settings, f"{p}_model", "")
+
+        if not has_key:
+            status_badge = '<span class="badge rejected">No Key</span>'
+        elif permanent:
+            status_badge = '<span class="badge rejected">Unavailable</span>'
+        elif not available:
+            status_badge = '<span class="badge pending">Cooldown</span>'
+        else:
+            status_badge = '<span class="badge approved">Available</span>'
+
+        reset_btn = ""
+        if permanent or not available:
+            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:10px" onclick="resetProvider(\'{p}\')">Reset</button>'
+
+        provider_cards += f"""<div class="card" style="flex:1;min-width:160px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <strong style="color:#e8a849;text-transform:capitalize">{esc(p)}</strong>
+    {status_badge}
+  </div>
+  <div style="font-size:11px;color:#4a5260;margin:4px 0">{esc(model)}</div>
+  <div style="font-size:12px">
+    <span style="color:#6db585">{successes} ok</span> ·
+    <span style="color:#e8a849">{rl_count} rl</span> ·
+    <span style="color:#d97757">{errors} err</span>
+  </div>
+  {f'<div style="font-size:10px;color:#d97757;margin-top:2px">{last_err[:60]}</div>' if last_err else ''}
+  {reset_btn}
+</div>"""
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI Usage</title>
+<style>{ADMIN_CSS}</style></head><body>
+{NAV_HTML}
+<div class="page">
+<h1>AI Usage Dashboard</h1>
+<div class="subtitle">Provider health, usage per task, token budget</div>
+
+<h2>Token Budget</h2>
+<div style="display:flex;gap:8px;margin-bottom:24px">
+<div class="stat"><div class="num">{s.tokens_used_this_month:,}</div><div class="lbl">Tokens Used</div></div>
+<div class="stat"><div class="num">{s.max_tokens_per_run:,}</div><div class="lbl">Monthly Limit</div></div>
+<div class="stat"><div class="num">{budget_pct}%</div><div class="lbl">Budget Used</div></div>
+<div class="stat"><div class="num">{esc(s.budget_month or 'N/A')}</div><div class="lbl">Budget Month</div></div>
+</div>
+
+<h2>Provider Health</h2>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
+{provider_cards}
+</div>
+
+<h2>Usage by Provider</h2>
+<div id="provider-stats"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Usage by Task</h2>
+<div id="task-stats"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Recent Calls (last 50)</h2>
+<div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#4a5260">Loading...</em></div>
+
+<script>
+async function resetProvider(name) {{
+  await fetch('/admin/pipeline/api/ai-usage/reset-provider', {{
+    method: 'POST', credentials: 'same-origin',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{provider: name}})
+  }});
+  window.location.reload();
+}}
+
+async function loadUsageData() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage', {{credentials: 'same-origin'}});
+    const data = await resp.json();
+
+    // Provider stats table
+    if (data.provider_stats.length > 0) {{
+      let html = '<table><tr><th>Provider</th><th>Calls</th><th>Success</th><th>Rate Limited</th><th>Errors</th><th>Tokens</th><th>Avg Latency</th></tr>';
+      for (const p of data.provider_stats) {{
+        html += `<tr>
+          <td style="text-transform:capitalize">${{p.provider}}</td>
+          <td>${{p.total_calls}}</td>
+          <td style="color:#6db585">${{p.success}}</td>
+          <td style="color:#e8a849">${{p.rate_limited}}</td>
+          <td style="color:#d97757">${{p.errors}}</td>
+          <td>${{p.total_tokens.toLocaleString()}}</td>
+          <td>${{p.avg_latency_ms}}ms</td>
+        </tr>`;
+      }}
+      html += '</table>';
+      document.getElementById('provider-stats').innerHTML = html;
+    }} else {{
+      document.getElementById('provider-stats').innerHTML = '<p style="color:#4a5260">No usage data yet. Run a pipeline task to generate data.</p>';
+    }}
+
+    // Task stats table
+    if (data.task_stats.length > 0) {{
+      let html = '<table><tr><th>Task</th><th>Subtask</th><th>Calls</th><th>Success</th><th>Failures</th><th>Tokens</th></tr>';
+      for (const t of data.task_stats) {{
+        html += `<tr>
+          <td>${{t.task}}</td>
+          <td style="font-size:11px;color:#4a5260;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{t.subtask}}</td>
+          <td>${{t.total_calls}}</td>
+          <td style="color:#6db585">${{t.success}}</td>
+          <td style="color:#d97757">${{t.failures}}</td>
+          <td>${{t.total_tokens.toLocaleString()}}</td>
+        </tr>`;
+      }}
+      html += '</table>';
+      document.getElementById('task-stats').innerHTML = html;
+    }} else {{
+      document.getElementById('task-stats').innerHTML = '<p style="color:#4a5260">No task data yet.</p>';
+    }}
+
+    // Recent calls
+    if (data.recent.length > 0) {{
+      let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Subtask</th><th>Status</th><th>Latency</th><th>Error</th></tr>';
+      for (const r of data.recent) {{
+        const statusCls = r.status === 'ok' ? 'approved' : r.status === 'rate_limited' ? 'pending' : 'rejected';
+        html += `<tr>
+          <td style="font-size:11px;white-space:nowrap">${{r.called_at}}</td>
+          <td style="text-transform:capitalize">${{r.provider}}</td>
+          <td>${{r.task}}</td>
+          <td style="font-size:11px;color:#4a5260;max-width:150px;overflow:hidden;text-overflow:ellipsis">${{r.subtask}}</td>
+          <td><span class="badge ${{statusCls}}">${{r.status}}</span></td>
+          <td>${{r.latency_ms}}ms</td>
+          <td style="font-size:10px;color:#d97757;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{r.error_message}}</td>
+        </tr>`;
+      }}
+      html += '</table>';
+      document.getElementById('recent-calls').innerHTML = html;
+    }} else {{
+      document.getElementById('recent-calls').innerHTML = '<p style="color:#4a5260">No recent calls.</p>';
+    }}
+  }} catch(e) {{
+    document.getElementById('provider-stats').innerHTML = '<p style="color:#d97757">Failed to load: ' + e.message + '</p>';
+  }}
+}}
+
+loadUsageData();
 </script>
 </div>
 </body></html>"""

@@ -118,7 +118,7 @@ async def run_batch_generation(db: AsyncSession) -> dict:
             # Generate via AI
             try:
                 plan_data = await generate_curriculum(
-                    topic.topic_name, duration, level
+                    topic.topic_name, duration, level, db=db
                 )
                 await save_curriculum_draft(plan_data)
 

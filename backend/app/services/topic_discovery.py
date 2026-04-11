@@ -138,7 +138,11 @@ async def run_discovery(db: AsyncSession) -> dict:
             model_used = "groq_fallback"
         else:
             from app.ai.provider import complete as ai_complete
-            raw_result, model_used = await ai_complete(prompt, json_response=True)
+            raw_result, model_used = await ai_complete(
+                prompt, json_response=True,
+                task="discovery", subtask=f"discover_{settings.max_topics_per_discovery}_topics",
+                db=db,
+            )
     except Exception as e:
         logger.error("AI discovery call failed: %s", e)
         return {"status": "ai_error", "error": str(e)}

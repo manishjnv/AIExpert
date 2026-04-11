@@ -152,17 +152,19 @@ async def stream_sambanova(messages: list[dict]) -> AsyncGenerator[str, None]:
 
 # Ordered list of streaming providers: (name, key_field, stream_fn)
 _STREAM_PROVIDERS = [
-    ("Gemini", "gemini_api_key", stream_gemini),
-    ("Groq", "groq_api_key", stream_groq),
-    ("Cerebras", "cerebras_api_key", stream_cerebras),
-    ("Mistral", "mistral_api_key", stream_mistral),
-    ("DeepSeek", "deepseek_api_key", stream_deepseek),
-    ("Sambanova", "sambanova_api_key", stream_sambanova),
+    ("gemini", "gemini_api_key", stream_gemini),
+    ("groq", "groq_api_key", stream_groq),
+    ("cerebras", "cerebras_api_key", stream_cerebras),
+    ("mistral", "mistral_api_key", stream_mistral),
+    ("deepseek", "deepseek_api_key", stream_deepseek),
+    ("sambanova", "sambanova_api_key", stream_sambanova),
 ]
 
 
 async def stream_complete(messages: list[dict]) -> AsyncGenerator[str, None]:
-    """Stream from the best available provider with fallback through all configured providers."""
+    """Stream from the best available provider with fallback. Uses circuit breaker."""
+    from app.ai.health import is_available, record_error, record_success
+
     settings = get_settings()
 
     for name, key_field, stream_fn in _STREAM_PROVIDERS:
@@ -170,11 +172,17 @@ async def stream_complete(messages: list[dict]) -> AsyncGenerator[str, None]:
         if not api_key:
             continue
 
+        if not is_available(name):
+            logger.debug("Skipping %s stream (circuit breaker)", name)
+            continue
+
         try:
             async for chunk in stream_fn(messages):
                 yield chunk
+            record_success(name)
             return
         except Exception as e:
             logger.warning("%s stream failed (%s), trying next provider", name, e)
+            record_error(name, str(e))
 
     yield "[AI temporarily unavailable — please try again later]"

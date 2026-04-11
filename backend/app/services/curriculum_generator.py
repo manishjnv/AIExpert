@@ -25,7 +25,7 @@ def _make_key(topic: str, duration: str, level: str) -> str:
     return f"{clean}_{duration}_{level}"
 
 
-async def generate_curriculum(topic: str, duration_months: int, level: str) -> dict:
+async def generate_curriculum(topic: str, duration_months: int, level: str, db=None) -> dict:
     """Generate a curriculum plan using AI.
 
     Returns the validated plan dict. Raises on failure.
@@ -47,7 +47,11 @@ async def generate_curriculum(topic: str, duration_months: int, level: str) -> d
     )
 
     # Call AI — need a larger response for full curriculum
-    result, model = await ai_complete(prompt, json_response=True)
+    result, model = await ai_complete(
+        prompt, json_response=True,
+        task="generation", subtask=f"{topic} {duration_str} {level}",
+        db=db,
+    )
 
     if isinstance(result, str):
         result = json.loads(result)

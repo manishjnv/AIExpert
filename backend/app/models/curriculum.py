@@ -60,7 +60,7 @@ class CurriculumSettings(PrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "curriculum_settings"
 
     # Discovery config
-    max_topics_per_discovery: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    max_topics_per_discovery: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     discovery_frequency: Mapped[str] = mapped_column(String, nullable=False, default="monthly")  # monthly/quarterly
     auto_approve_topics: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -83,6 +83,37 @@ class CurriculumSettings(PrimaryKeyMixin, TimestampMixin, Base):
     last_discovery_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_generation_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_refresh_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class AIUsageLog(PrimaryKeyMixin, Base):
+    """Log of every AI provider call for usage tracking and admin dashboard."""
+
+    __tablename__ = "ai_usage_log"
+
+    # When
+    called_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    # What provider
+    provider: Mapped[str] = mapped_column(String, nullable=False)  # gemini, groq, cerebras, etc.
+    model: Mapped[str] = mapped_column(String, nullable=False)
+
+    # What task
+    task: Mapped[str] = mapped_column(String, nullable=False)  # discovery, triage, generation, chat, eval, refresh
+    subtask: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # topic name, week, etc.
+
+    # Result
+    status: Mapped[str] = mapped_column(String, nullable=False)  # ok, rate_limited, error, timeout
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tokens_estimated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("ix_ai_usage_log_called_at", "called_at"),
+        Index("ix_ai_usage_log_provider", "provider"),
+        Index("ix_ai_usage_log_task", "task"),
+    )
 
 
 class DiscoveredTopic(PrimaryKeyMixin, TimestampMixin, Base):
