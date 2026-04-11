@@ -96,7 +96,7 @@ async def public_profile(user_id: int, db: AsyncSession = Depends(get_db)):
         badges_html += f'<a class="badge" href="{esc(li_href)}" target="_blank">LinkedIn</a>'
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><style>{CSS}</style></head><body>
-<nav><span class="brand">AI Learning Roadmap</span><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
+<nav><a href="/" class="brand" style="text-decoration:none">AI Learning Roadmap</a><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
 <div class="container">
 <h1>{full_name}</h1>
 <div class="subtitle">{plan_label} · Joined {user.created_at.strftime('%B %Y') if user.created_at else '—'}</div>
@@ -152,7 +152,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         rows = '<tr><td colspan="6" style="text-align:center;color:#4a5260;padding:32px">No public profiles yet. Enable yours in Account Settings.</td></tr>'
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><style>{CSS}</style></head><body>
-<nav><span class="brand">AI Learning Roadmap</span><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
+<nav><a href="/" class="brand" style="text-decoration:none">AI Learning Roadmap</a><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
 <div class="container">
 <h1>Leaderboard</h1>
 <div class="subtitle">Top learners ranked by progress. Enable your public profile in Account Settings to appear here.</div>
