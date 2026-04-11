@@ -290,10 +290,10 @@
     </span>
   </div>
   <span id="anonButtons">
-    <button class="btn" onclick="exportData()">Export</button>
+    <button class="btn" onclick="exportPlanPDF()">Export Learning Plan</button>
     <button class="btn danger" onclick="resetAll()">Reset</button>
   </span>
-  <button class="btn" id="exportPlanBtn" style="display:none" onclick="exportPlanPDF()">Export Plan</button>
+  <button class="btn" id="exportPlanBtn" style="display:none" onclick="exportPlanPDF()">Export Learning Plan</button>
   <button class="btn" id="profileBtn" style="display:none" onclick="openProfileModal()">Account</button>
   <button class="btn" id="adminBtn" style="display:none" onclick="window.open('/admin/','_blank')">Admin</button>
   <button class="btn" id="authBtn" style="display:none" onclick="signIn()">Sign In</button>
@@ -869,9 +869,9 @@ function exportPlanPDF() {
   const dc = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + w.checks.filter((_, i) => state[key(w.n, i)]).length, 0), 0);
   const pct = tc ? Math.round((dc / tc) * 100) : 0;
   const totalWeeks = tw, totalChecks = tc, doneChecks = dc;
-  const planLabel = document.getElementById("planBadge")?.textContent?.replace('Your plan: ','') || "AI Generalist Roadmap";
+  const planLabel = document.getElementById("planBadge")?.textContent?.replace(' · ','') || "AI Generalist Roadmap";
   const userName = currentUser?.name || "Learner";
-  const userEmail = currentUser?.email || "";
+  const userEmail = currentUser?.email || "Not signed in";
   const userGithub = currentUser?.github_username || "";
   const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const totalHours = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
