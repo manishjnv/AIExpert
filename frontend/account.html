@@ -98,6 +98,16 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-3); color: var(--paper); padding: 10px 24px; border-radius: 6px; border: 1px solid var(--line); font-size: 13px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 .toast.show { opacity: 1; }
 
+/* Inline plan picker */
+.plan-opt { background: var(--bg-3); border: 1px solid var(--line); border-radius: 6px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+.plan-opt:hover { border-color: var(--accent); }
+.plan-opt.selected { border-color: var(--accent); background: rgba(232,168,73,0.08); }
+.plan-opt .po-title { font-family: var(--serif); font-size: 14px; color: var(--paper); margin-bottom: 4px; }
+.plan-opt:hover .po-title { color: var(--accent); }
+.plan-opt .po-meta { font-size: 11px; color: var(--ink-soft); }
+.plan-opt.current { border-color: var(--success); opacity: 0.5; cursor: default; }
+.plan-opt.current .po-title::after { content: ' (current)'; font-size: 10px; color: var(--success); }
+
 /* Danger zone */
 .danger-zone { border-color: rgba(217,119,87,0.3); }
 
@@ -172,7 +182,22 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
                 <div class="plan-title" id="planTitle">No plan enrolled</div>
                 <div class="plan-meta" id="planMeta"></div>
               </div>
-              <button class="btn" onclick="window.location='/?switch=1'" id="switchBtn">Switch Plan</button>
+              <button class="btn" onclick="toggleSwitchPlan()" id="switchBtn">Switch Plan</button>
+            </div>
+          </div>
+          <!-- Inline plan switcher -->
+          <div id="switchPlanSection" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+            <div class="section-title">Switch to a different plan</div>
+            <div id="switchPlanGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px"></div>
+            <div id="switchConfirm" style="display:none;margin-top:14px;padding:16px;background:var(--bg-3);border-radius:6px">
+              <div style="display:flex;align-items:center;gap:16px">
+                <div style="flex:1">
+                  <div id="switchPreviewTitle" style="font-size:15px;color:var(--paper)"></div>
+                  <div id="switchPreviewMeta" style="font-size:12px;color:var(--ink-soft);margin-top:4px"></div>
+                </div>
+                <button class="btn success" onclick="confirmSwitchPlan()" style="padding:10px 20px">Confirm Switch</button>
+                <button class="btn" onclick="cancelSwitch()" style="font-size:10px">Cancel</button>
+              </div>
             </div>
           </div>
         </div>
@@ -292,6 +317,10 @@ function render() {
   } else {
     document.getElementById('switchBtn').textContent = 'Enroll';
   }
+  // Reset inline switcher
+  document.getElementById('switchPlanSection').style.display = 'none';
+  document.getElementById('switchBtn').style.borderColor = '';
+  document.getElementById('switchBtn').style.color = '';
 
   // Form fields
   document.getElementById('fName').value = profile.name || '';
@@ -405,6 +434,88 @@ async function signOut() {
   window.location = '/';
 }
 
+// ---- Inline plan switcher ----
+let templates = [];
+let selectedSwitchKey = null;
+
+async function loadTemplates() {
+  try {
+    const resp = await fetch('/api/templates');
+    if (resp.ok) templates = await resp.json();
+  } catch {}
+}
+
+function toggleSwitchPlan() {
+  const el = document.getElementById('switchPlanSection');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    renderPlanOptions();
+    document.getElementById('switchBtn').textContent = 'Cancel';
+    document.getElementById('switchBtn').style.borderColor = 'var(--ink-soft)';
+    document.getElementById('switchBtn').style.color = 'var(--ink-soft)';
+  } else {
+    el.style.display = 'none';
+    document.getElementById('switchBtn').textContent = profile.active_plan ? 'Switch Plan' : 'Enroll';
+    document.getElementById('switchBtn').style.borderColor = '';
+    document.getElementById('switchBtn').style.color = '';
+  }
+}
+
+function renderPlanOptions() {
+  const grid = document.getElementById('switchPlanGrid');
+  const currentKey = profile.active_plan || '';
+  grid.innerHTML = templates.map(t => {
+    const isCurrent = t.key === currentKey;
+    return '<div class="plan-opt' + (isCurrent ? ' current' : '') + '" ' +
+      (isCurrent ? '' : 'onclick="selectPlan(\'' + t.key + '\')"') + '>' +
+      '<div class="po-title">' + t.title + '</div>' +
+      '<div class="po-meta">' + t.total_weeks + ' weeks &middot; ' + t.total_checks + ' tasks &middot; ' + t.level + '</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('switchConfirm').style.display = 'none';
+  selectedSwitchKey = null;
+}
+
+function selectPlan(key) {
+  selectedSwitchKey = key;
+  // Highlight selected
+  document.querySelectorAll('.plan-opt').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  // Show confirm
+  const t = templates.find(x => x.key === key);
+  if (!t) return;
+  document.getElementById('switchPreviewTitle').textContent = t.title;
+  document.getElementById('switchPreviewMeta').textContent = t.total_weeks + ' weeks \u00b7 ' + t.total_checks + ' tasks \u00b7 ' + t.level;
+  document.getElementById('switchConfirm').style.display = 'block';
+}
+
+function cancelSwitch() {
+  selectedSwitchKey = null;
+  document.querySelectorAll('.plan-opt').forEach(el => el.classList.remove('selected'));
+  document.getElementById('switchConfirm').style.display = 'none';
+}
+
+async function confirmSwitchPlan() {
+  if (!selectedSwitchKey) return;
+  try {
+    const resp = await fetch('/api/plans', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({template_key: selectedSwitchKey})
+    });
+    if (resp.ok) {
+      showToast('Plan switched');
+      loadProfile();  // reload data
+    } else {
+      const d = await resp.json();
+      showToast(d.detail || 'Switch failed');
+    }
+  } catch { showToast('Switch failed'); }
+}
+
+// Init
+loadTemplates();
 loadProfile();
 </script>
 </body>
