@@ -117,8 +117,9 @@ async def run_discovery(db: AsyncSession) -> dict:
         )
 
     # 3. Get existing topics for dedup (per normalization blueprint)
+    # Sanitize for prompt injection: wrap in JSON to prevent instruction injection
     existing_topics = await _get_existing_topic_names(db)
-    existing_str = ", ".join(existing_topics) if existing_topics else "none yet"
+    existing_str = json.dumps(existing_topics) if existing_topics else "[]"
 
     # 4. Build prompt and call AI
     prompt_template = DISCOVER_PROMPT_PATH.read_text(encoding="utf-8")
@@ -266,10 +267,14 @@ async def _triage_topic(
             pass
 
     prompt_template = TRIAGE_PROMPT_PATH.read_text(encoding="utf-8")
+    # Sanitize: truncate and strip control chars to prevent prompt injection
+    safe_name = topic.topic_name[:100].replace("\n", " ")
+    safe_category = topic.category[:50].replace("\n", " ")
+    safe_justification = topic.justification[:300].replace("\n", " ")
     prompt = prompt_template.format(
-        topic_name=topic.topic_name,
-        category=topic.category,
-        justification=topic.justification,
+        topic_name=safe_name,
+        category=safe_category,
+        justification=safe_justification,
     )
 
     try:

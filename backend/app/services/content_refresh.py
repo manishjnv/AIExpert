@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import ipaddress
+from urllib.parse import urlparse
+
 import httpx
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -34,6 +37,44 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "curriculum" / "templates"
 
 REVIEW_TOKENS_ESTIMATE = 1500
 LINK_CHECK_TIMEOUT = 10  # seconds
+
+# SSRF protection: block internal/metadata IPs
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local / cloud metadata
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def _is_safe_url(url: str) -> bool:
+    """Check if a URL is safe for outbound requests (no SSRF)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        # Block common metadata hostnames
+        blocked_hosts = {"metadata.google.internal", "metadata.google", "instance-data"}
+        if hostname in blocked_hosts:
+            return False
+        # Try to parse as IP and check against blocked ranges
+        try:
+            addr = ipaddress.ip_address(hostname)
+            for net in _BLOCKED_NETWORKS:
+                if addr in net:
+                    return False
+        except ValueError:
+            pass  # hostname, not IP — allowed
+        return True
+    except Exception:
+        return False
 
 
 class CurrencyReviewSchema(BaseModel):
@@ -59,7 +100,7 @@ async def check_link_health(db: AsyncSession) -> dict:
 
     async with httpx.AsyncClient(
         timeout=LINK_CHECK_TIMEOUT,
-        follow_redirects=True,
+        follow_redirects=False,  # disable redirect following to prevent SSRF via redirect
         headers={"User-Agent": "AIRoadmap-LinkChecker/1.0"},
     ) as client:
         for key in keys:
@@ -73,6 +114,9 @@ async def check_link_health(db: AsyncSession) -> dict:
                     for idx, resource in enumerate(week.resources):
                         url = resource.url
                         if not url or not url.startswith("http"):
+                            continue
+                        if not _is_safe_url(url):
+                            logger.warning("Skipping unsafe URL: %s", url)
                             continue
 
                         # Check or create LinkHealth record
@@ -98,7 +142,7 @@ async def check_link_health(db: AsyncSession) -> dict:
                             resp = await client.head(url)
                             health.last_status = resp.status_code
                             health.last_checked_at = datetime.now(timezone.utc).replace(tzinfo=None)
-                            if resp.status_code >= 400:
+                            if resp.status_code >= 400:  # 3xx is OK (redirects disabled)
                                 health.consecutive_failures += 1
                                 total_broken += 1
                             else:
@@ -162,19 +206,21 @@ async def review_template_currency(
     )
     dead_count = len(result.scalars().all())
 
-    # Gather sample resources
+    # Gather sample resources — sanitize to prevent prompt injection
     sample_resources = []
     for month in tpl.months[:2]:  # first 2 months only to limit prompt size
         for week in month.weeks[:2]:
             for r in week.resources:
-                sample_resources.append(f"- {r.name}: {r.url}")
+                safe_name = r.name[:100].replace("\n", " ")
+                safe_url = r.url[:200].replace("\n", " ") if r.url else ""
+                sample_resources.append(f"- {safe_name}: {safe_url}")
     resources_str = "\n".join(sample_resources[:10])
 
-    # Build prompt
+    # Build prompt — truncate template-sourced strings
     prompt_template = REVIEW_PROMPT_PATH.read_text(encoding="utf-8")
     prompt = prompt_template.format(
-        topic_title=tpl.title,
-        level=tpl.level,
+        topic_title=tpl.title[:100].replace("\n", " "),
+        level=tpl.level[:30].replace("\n", " "),
         created_date="unknown",
         dead_link_count=dead_count,
         sample_resources=resources_str,

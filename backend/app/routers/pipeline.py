@@ -15,10 +15,25 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
 from app.auth.deps import get_current_admin
 from app.db import get_db
 from app.models.curriculum import CurriculumSettings, DiscoveredTopic
 from app.models.user import User
+
+
+class PipelineSettingsUpdate(BaseModel):
+    """Validated settings update body."""
+    max_topics_per_discovery: Optional[int] = Field(None, ge=1, le=50)
+    discovery_frequency: Optional[str] = Field(None, pattern=r"^(weekly|monthly|quarterly)$")
+    auto_approve_topics: Optional[bool] = None
+    auto_generate_variants: Optional[bool] = None
+    ai_model_research: Optional[str] = Field(None, pattern=r"^(gemini|groq)$")
+    ai_model_formatting: Optional[str] = Field(None, pattern=r"^(gemini|groq)$")
+    max_tokens_per_run: Optional[int] = Field(None, ge=0, le=1000000)
+    refresh_frequency: Optional[str] = Field(None, pattern=r"^(monthly|quarterly)$")
 
 router = APIRouter()
 
@@ -71,9 +86,15 @@ NAV_HTML = """<nav>
 
 
 def _check_origin(request: Request) -> None:
+    """Strict CSRF check: parsed hostname must match, reject if both headers absent."""
+    from urllib.parse import urlparse
     origin = request.headers.get("origin") or request.headers.get("referer", "")
     host = request.headers.get("host", "")
-    if origin and host and host not in origin:
+    if not origin:
+        raise HTTPException(status_code=403, detail="Missing Origin/Referer header")
+    origin_host = urlparse(origin).hostname or ""
+    expected_host = host.split(":")[0]  # strip port
+    if origin_host != expected_host:
         raise HTTPException(status_code=403, detail="Origin mismatch")
 
 
@@ -122,16 +143,11 @@ async def update_pipeline_settings(
     """Update pipeline settings."""
     _check_origin(request)
     body = await request.json()
+    validated = PipelineSettingsUpdate(**body)
     s = await _get_settings(db)
 
-    allowed_fields = {
-        "max_topics_per_discovery", "discovery_frequency", "auto_approve_topics",
-        "auto_generate_variants", "ai_model_research", "ai_model_formatting",
-        "max_tokens_per_run", "refresh_frequency",
-    }
-    for key, value in body.items():
-        if key in allowed_fields:
-            setattr(s, key, value)
+    for field, value in validated.model_dump(exclude_none=True).items():
+        setattr(s, field, value)
 
     await db.flush()
     return {"ok": True}
@@ -179,15 +195,17 @@ async def trigger_refresh(
 @router.get("/api/topics")
 async def list_topics(
     status: str = Query("", description="Filter by status"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """List discovered topics."""
+    """List discovered topics (paginated)."""
     query = select(DiscoveredTopic).order_by(DiscoveredTopic.created_at.desc())
     if status:
         query = query.where(DiscoveredTopic.status == status)
 
-    rows = (await db.execute(query)).scalars().all()
+    rows = (await db.execute(query.offset((page - 1) * per_page).limit(per_page))).scalars().all()
     return [
         {
             "id": t.id,
@@ -389,14 +407,16 @@ async function runAction(action, btn) {{
 @router.get("/topics", response_class=HTMLResponse)
 async def pipeline_topics_page(
     status: str = Query("", description="Filter by status"),
+    page: int = Query(1, ge=1),
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Discovered topics management page."""
+    """Discovered topics management page (paginated)."""
     query = select(DiscoveredTopic).order_by(DiscoveredTopic.created_at.desc())
     if status:
         query = query.where(DiscoveredTopic.status == status)
-    rows = (await db.execute(query)).scalars().all()
+    total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = (await db.execute(query.offset((page - 1) * 50).limit(50))).scalars().all()
 
     # Status filter links
     statuses = ["", "pending", "approved", "generating", "generated", "rejected"]
@@ -470,7 +490,9 @@ async function deleteTopic(id) {{
   if (resp.ok) window.location.reload();
   else alert('Failed');
 }}
+
 </script>
+<div style="margin-top:12px">{'<a href="/admin/pipeline/topics?page='+str(page-1)+'&status='+esc(status)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/pipeline/topics?page='+str(page+1)+'&status='+esc(status)+'" class="btn">Next</a>' if page*50<total else ''} <span style="font-size:12px;color:#4a5260">{total} total</span></div>
 </body></html>"""
 
 
