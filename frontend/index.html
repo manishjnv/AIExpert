@@ -1248,7 +1248,9 @@ async function sendChat() {
 // ---- Auth & Profile UI ----
 function updateConnectionBadges() {
   if (!currentUser) return;
-  document.getElementById("connectionBadges").style.display = "inline";
+  const container = document.getElementById("connectionBadges");
+  if (!container) return;
+  container.style.display = "inline";
 
   // Google — shown for all signed-in users (Google or OTP both have a Google-verified email)
   const gEl = document.getElementById("badgeGoogle");
@@ -1739,7 +1741,7 @@ async function loadActivePlan() {
     // Show plan badge
     const badge = document.getElementById("planBadge");
     const label = PLAN_LABELS[plan.template_key] || plan.template_key;
-    badge.textContent = " · " + label;
+    if (badge) badge.textContent = " · " + label;
 
     // Update eyebrow with personalized text and real progress
     const firstName = (currentUser?.name || "").split(" ")[0] || "there";

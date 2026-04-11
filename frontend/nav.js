@@ -37,7 +37,12 @@
   nav.id = 'shared-nav';
   nav.innerHTML = `
     <nav class="topnav">
-      <a href="/" class="topnav-brand" style="text-decoration:none">${LOGO} AI Learning Roadmap</a>
+      <a href="/" class="topnav-brand" style="text-decoration:none">${LOGO} AI Learning Roadmap<span id="planBadge"></span></a>
+      <span id="connectionBadges" style="display:none;margin-left:8px">
+        <span id="badgeGoogle" class="conn-badge" style="display:none">Google</span>
+        <span id="badgeGithub" class="conn-badge" style="display:none">GitHub</span>
+        <span id="badgeLinkedin" class="conn-badge" style="display:none">LinkedIn</span>
+      </span>
       <div class="topnav-links">
         <a href="/"${activeClass('/')}>Home</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
