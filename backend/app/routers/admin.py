@@ -317,9 +317,10 @@ ADMIN_NAV = f"""<nav class="topnav">
 <div class="topnav-links">
 <a href="/admin/">Dashboard</a>
 <a href="/admin/users">Users</a>
-<a href="/admin/proposals">Proposals</a>
 <a href="/admin/templates">Templates</a>
 <a href="/admin/pipeline/">Pipeline</a>
+<a href="/admin/pipeline/topics">Topics</a>
+<a href="/admin/pipeline/settings">Settings</a>
 </div>
 </nav>"""
 

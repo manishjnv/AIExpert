@@ -98,6 +98,7 @@ NAV_HTML = """<nav class="topnav">
 <a href="/admin/pipeline/settings">Settings</a>
 </div>
 </nav>"""
+# Same links as admin.py ADMIN_NAV — keep in sync
 
 
 def _check_origin(request: Request) -> None:
