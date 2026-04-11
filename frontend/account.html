@@ -27,9 +27,12 @@ body { font-family: var(--sans); background: var(--bg); color: var(--paper); mar
 .topnav-links a:hover { color: var(--accent); background: rgba(232,168,73,0.08); }
 
 /* Layout */
-.page { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+.page { max-width: 100%; margin: 0; padding: 40px 48px 80px; }
 h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weight: 300; margin: 0 0 4px; }
 .subtitle { color: var(--ink-soft); font-size: 13px; margin-bottom: 32px; font-family: var(--mono); letter-spacing: 0.03em; }
+
+/* Two-column layout */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 /* Sections */
 .section { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
@@ -99,6 +102,9 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
 .danger-zone { border-color: rgba(217,119,87,0.3); }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+}
 @media (max-width: 640px) {
   .topnav { padding: 10px 16px; }
   .page { padding: 24px 16px 60px; }
@@ -133,90 +139,102 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
     <h1>Account</h1>
     <div class="subtitle" id="subtitleText"></div>
 
-    <!-- Profile Card -->
-    <div class="section">
-      <div class="profile-card">
-        <div class="avatar" id="avatarEl"></div>
-        <div class="profile-info">
-          <div class="profile-name" id="profileName"></div>
-          <div class="profile-email" id="profileEmail"></div>
-          <div class="profile-joined" id="profileJoined"></div>
-        </div>
-      </div>
-    </div>
+    <div class="two-col">
 
-    <!-- Current Plan -->
-    <div class="section">
-      <div class="section-title">Current Plan</div>
-      <div id="currentPlanSection">
-        <div class="plan-card">
-          <div class="plan-ring">
-            <svg width="80" height="80" viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="34" fill="none" stroke="#2a323d" stroke-width="6"/>
-              <circle id="planArc" cx="40" cy="40" r="34" fill="none" stroke="#e8a849" stroke-width="6" stroke-linecap="round" stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
-            </svg>
-            <div class="pct" id="planPct">0%</div>
+      <!-- LEFT COLUMN -->
+      <div class="col-left">
+
+        <!-- Profile Card -->
+        <div class="section">
+          <div class="profile-card">
+            <div class="avatar" id="avatarEl"></div>
+            <div class="profile-info">
+              <div class="profile-name" id="profileName"></div>
+              <div class="profile-email" id="profileEmail"></div>
+              <div class="profile-joined" id="profileJoined"></div>
+            </div>
           </div>
-          <div class="plan-details">
-            <div class="plan-title" id="planTitle">No plan enrolled</div>
-            <div class="plan-meta" id="planMeta"></div>
+        </div>
+
+        <!-- Current Plan -->
+        <div class="section">
+          <div class="section-title">Current Plan</div>
+          <div id="currentPlanSection">
+            <div class="plan-card">
+              <div class="plan-ring">
+                <svg width="80" height="80" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#2a323d" stroke-width="6"/>
+                  <circle id="planArc" cx="40" cy="40" r="34" fill="none" stroke="#e8a849" stroke-width="6" stroke-linecap="round" stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
+                </svg>
+                <div class="pct" id="planPct">0%</div>
+              </div>
+              <div class="plan-details">
+                <div class="plan-title" id="planTitle">No plan enrolled</div>
+                <div class="plan-meta" id="planMeta"></div>
+              </div>
+              <button class="btn" onclick="window.location='/#enroll'" id="switchBtn">Switch Plan</button>
+            </div>
           </div>
-          <button class="btn" onclick="window.location='/#enroll'" id="switchBtn">Switch Plan</button>
         </div>
-      </div>
-    </div>
 
-    <!-- Profile Details -->
-    <div class="section">
-      <div class="section-title">Profile</div>
-      <div class="form-row">
-        <div class="form-group"><label>Name</label><input id="fName" type="text" placeholder="Your name"></div>
-        <div class="form-group"><label>Learning Goal</label><input id="fGoal" type="text" placeholder="e.g. AI/ML Engineer" maxlength="200"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Experience Level</label>
-          <select id="fLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select>
+        <!-- Profile Details -->
+        <div class="section">
+          <div class="section-title">Profile</div>
+          <div class="form-row">
+            <div class="form-group"><label>Name</label><input id="fName" type="text" placeholder="Your name"></div>
+            <div class="form-group"><label>Learning Goal</label><input id="fGoal" type="text" placeholder="e.g. AI/ML Engineer" maxlength="200"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Experience Level</label>
+              <select id="fLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select>
+            </div>
+          </div>
         </div>
-        <div class="form-group">&nbsp;</div>
+
+        <!-- Connections -->
+        <div class="section">
+          <div class="section-title">Connections</div>
+          <div class="form-row">
+            <div class="form-group"><label>GitHub Username</label><input id="fGithub" type="text" placeholder="username"></div>
+            <div class="form-group"><label>LinkedIn URL</label><input id="fLinkedin" type="text" placeholder="linkedin.com/in/username"></div>
+          </div>
+        </div>
+
+        <!-- Save -->
+        <button class="btn success" onclick="saveProfile()" style="width:100%;padding:12px;font-size:12px" id="saveBtn">Save Changes</button>
+
       </div>
-    </div>
 
-    <!-- Connections -->
-    <div class="section">
-      <div class="section-title">Connections</div>
-      <div class="form-row">
-        <div class="form-group"><label>GitHub Username</label><input id="fGithub" type="text" placeholder="username"></div>
-        <div class="form-group"><label>LinkedIn URL</label><input id="fLinkedin" type="text" placeholder="linkedin.com/in/username"></div>
+      <!-- RIGHT COLUMN -->
+      <div class="col-right">
+
+        <!-- Notifications -->
+        <div class="section">
+          <div class="section-title">Preferences</div>
+          <div class="toggle-row">
+            <input type="checkbox" id="fEmailNotif">
+            <label for="fEmailNotif">Weekly progress reminder emails</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="fPublicProfile">
+            <label for="fPublicProfile">Show my profile on the <a href="/leaderboard" style="color:var(--info)">public leaderboard</a></label>
+          </div>
+        </div>
+
+        <!-- Course History -->
+        <div class="section" id="historySection" style="display:none">
+          <div class="section-title">Course History</div>
+          <div class="timeline" id="historyTimeline"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="section" style="display:flex;gap:12px;align-items:center">
+          <button class="btn" onclick="exportData()" style="font-size:10px">Export Data</button>
+          <div style="flex:1"></div>
+          <button class="btn danger" onclick="deleteAccount()" style="font-size:10px">Delete Account</button>
+        </div>
+
       </div>
-    </div>
-
-    <!-- Notifications -->
-    <div class="section">
-      <div class="section-title">Notifications</div>
-      <div class="toggle-row">
-        <input type="checkbox" id="fEmailNotif">
-        <label for="fEmailNotif">Weekly progress reminder emails</label>
-      </div>
-      <div class="toggle-row">
-        <input type="checkbox" id="fPublicProfile">
-        <label for="fPublicProfile">Show my profile on the <a href="/leaderboard" style="color:var(--info)">public leaderboard</a></label>
-      </div>
-    </div>
-
-    <!-- Save -->
-    <button class="btn success" onclick="saveProfile()" style="width:100%;padding:12px;font-size:12px;margin-bottom:20px" id="saveBtn">Save Changes</button>
-
-    <!-- Course History -->
-    <div class="section" id="historySection" style="display:none">
-      <div class="section-title">Course History</div>
-      <div class="timeline" id="historyTimeline"></div>
-    </div>
-
-    <!-- Actions -->
-    <div class="section" style="display:flex;gap:12px;align-items:center">
-      <button class="btn" onclick="exportData()" style="font-size:10px">Export Data</button>
-      <div style="flex:1"></div>
-      <button class="btn danger" onclick="deleteAccount()" style="font-size:10px">Delete Account</button>
     </div>
 
   </div>
