@@ -19,27 +19,30 @@ from app.models.user import User
 router = APIRouter()
 
 CSS = """
-body { font-family: system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 0; }
-.container { max-width: 700px; margin: 0 auto; padding: 32px 20px; }
-h1 { font-family: Georgia, serif; color: #e8a849; font-size: 24px; font-weight: 300; margin-bottom: 4px; }
-h2 { font-family: Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
-.subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; }
-.stat-row { display: flex; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+.container { max-width: 800px; margin: 0 auto; padding: 32px 20px; }
+h1 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 28px; font-weight: 300; margin-bottom: 4px; }
+h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
+.subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
+.stat-row { display: flex; gap: 16px; margin: 16px 0 24px; flex-wrap: wrap; }
 .stat { background: #1d242e; padding: 16px 20px; border-radius: 6px; text-align: center; flex: 1; min-width: 80px; }
-.stat .n { font-size: 24px; font-weight: bold; color: #e8a849; }
-.stat .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
+.stat .n { font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 400; color: #e8a849; }
+.stat .l { font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; margin-top: 2px; }
 .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 12px; background: rgba(109,181,133,0.2); color: #6db585; margin-right: 6px; }
-.progress-bar { background: #2a323d; border-radius: 4px; height: 8px; margin: 8px 0; }
-.progress-bar > div { background: #e8a849; height: 8px; border-radius: 4px; }
+.progress-bar { background: #2a323d; border-radius: 4px; height: 6px; }
+.progress-bar > div { height: 6px; border-radius: 4px; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-th { text-align: left; padding: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; border-bottom: 1px solid #2a323d; }
-td { padding: 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
+th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; border-bottom: 1px solid #2a323d; }
+td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
 a { color: #6fa8d6; text-decoration: none; }
-a:hover { text-decoration: underline; }
-nav { padding: 12px 20px; border-bottom: 1px solid #2a323d; display: flex; align-items: center; gap: 16px; }
-nav a { color: #f5f1e8; font-size: 13px; }
-.brand { font-family: Georgia, serif; color: #e8a849; font-size: 16px; margin-right: auto; }
+a:hover { color: #e8a849; }
+nav { padding: 12px 48px; border-bottom: 1px solid #2a323d; display: flex; align-items: center; gap: 16px; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
+nav a { color: #f5f1e8; font-size: 13px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+nav a:hover { color: #e8a849; }
+.brand { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 16px; margin-right: auto; text-transform: none; letter-spacing: 0; }
+@media (max-width: 768px) { nav { padding: 10px 16px; } .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
 """
 
 
