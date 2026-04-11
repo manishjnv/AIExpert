@@ -297,6 +297,47 @@ async def get_template_quality(
     return await score_template(tpl, db)
 
 
+@router.post("/api/quality/{template_key}/publish")
+async def publish_template_endpoint(
+    template_key: str,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Publish a template if it meets the quality threshold (>= 90)."""
+    _check_origin(request)
+    from app.services.quality_scorer import score_template
+    from app.curriculum.loader import load_template, publish_template, PUBLISH_THRESHOLD
+    try:
+        tpl = load_template(template_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    result = await score_template(tpl, db)
+    score = result["composite_score"]
+
+    if publish_template(template_key, score):
+        return {"ok": True, "status": "published", "score": score}
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Score {score} is below publish threshold ({PUBLISH_THRESHOLD}). Fix quality issues first.",
+        )
+
+
+@router.post("/api/quality/{template_key}/unpublish")
+async def unpublish_template_endpoint(
+    template_key: str,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+):
+    """Unpublish a template (move back to draft)."""
+    _check_origin(request)
+    from app.curriculum.loader import unpublish_template
+    unpublish_template(template_key)
+    return {"ok": True, "status": "draft"}
+
+
 @router.delete("/api/topics/{topic_id}")
 async def delete_topic(
     topic_id: int,
@@ -503,10 +544,22 @@ async def pipeline_dashboard_page(
       const issueList = (t.issues || []).slice(0, 3).map(i =>
         `<div style="font-size:12px;color:#d97757">• ${{i}}</div>`
       ).join('');
+      const pub = t.publish_status === 'published';
+      const canPublish = t.publishable;
+      const statusBadge = pub
+        ? '<span style="background:#1d3525;color:#6db585;padding:2px 8px;border-radius:10px;font-size:11px">Published</span>'
+        : '<span style="background:#2a2520;color:#e8a849;padding:2px 8px;border-radius:10px;font-size:11px">Draft</span>';
+      const pubBtn = pub
+        ? `<button class="btn" style="font-size:11px;padding:4px 10px;margin-top:4px" onclick="togglePublish('${{t.key}}','unpublish',this)">Unpublish</button>`
+        : (canPublish
+          ? `<button class="btn primary" style="font-size:11px;padding:4px 10px;margin-top:4px" onclick="togglePublish('${{t.key}}','publish',this)">Publish</button>`
+          : `<div style="font-size:11px;color:#8a92a0;margin-top:4px">Score &lt; ${{t.publish_threshold}} — fix issues first</div>`);
       rows += `<tr>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
           <strong>${{t.title || t.key}}</strong>
           <div style="font-size:12px;color:#8a92a0">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
+          <div style="margin-top:4px">${{statusBadge}}</div>
+          ${{pubBtn}}
         </td>
         <td style="text-align:center"><span style="font-size:20px;font-family:'Fraunces',serif;color:${{scoreColor(c)}}">${{c}}</span></td>
         <td style="min-width:200px">
@@ -589,6 +642,28 @@ async function runAction(action, btn) {{
   }}
   btn.disabled = false;
   btn.textContent = origText;
+}}
+
+async function togglePublish(key, action, btn) {{
+  btn.disabled = true;
+  btn.textContent = 'Working...';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/quality/' + key + '/' + action, {{
+      method: 'POST', credentials: 'same-origin'
+    }});
+    const data = await resp.json();
+    if (resp.ok) {{
+      window.location.reload();
+    }} else {{
+      alert(data.detail || 'Failed: ' + JSON.stringify(data));
+      btn.disabled = false;
+      btn.textContent = action === 'publish' ? 'Publish' : 'Unpublish';
+    }}
+  }} catch(e) {{
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = action === 'publish' ? 'Publish' : 'Unpublish';
+  }}
 }}
 </script>
 </div>

@@ -1,18 +1,30 @@
 """
 Plan template loader — reads JSON templates from disk and validates
 them against Pydantic schemas.
+
+Publishing model:
+- All templates are saved as drafts by default
+- Templates must score >= PUBLISH_THRESHOLD (90) to be publishable
+- Admin can publish/unpublish via API
+- User-facing endpoints only see published templates
+- _meta.json in templates dir tracks status + scores
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
+logger = logging.getLogger("roadmap.loader")
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+META_PATH = TEMPLATES_DIR / "_meta.json"
+PUBLISH_THRESHOLD = 90
 
 
 # ---- Pydantic schemas ----
@@ -87,5 +99,78 @@ def load_template(key: str) -> PlanTemplate:
 
 
 def list_templates() -> list[str]:
-    """Return available template keys."""
-    return [p.stem for p in TEMPLATES_DIR.glob("*.json")]
+    """Return ALL template keys (admin use)."""
+    return [p.stem for p in TEMPLATES_DIR.glob("*.json") if p.stem != "_meta"]
+
+
+# ---- Publishing model ----
+
+def _load_meta() -> dict:
+    """Load template metadata (publish status + quality scores)."""
+    if META_PATH.exists():
+        with open(META_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_meta(meta: dict) -> None:
+    """Persist template metadata."""
+    with open(META_PATH, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+
+def get_template_status(key: str) -> dict:
+    """Get publish status for a template."""
+    meta = _load_meta()
+    return meta.get(key, {"status": "draft", "quality_score": 0})
+
+
+def set_template_status(key: str, status: str, quality_score: int = 0) -> None:
+    """Set publish status for a template ('draft' or 'published')."""
+    meta = _load_meta()
+    meta[key] = {"status": status, "quality_score": quality_score}
+    _save_meta(meta)
+    load_template.cache_clear()
+    logger.info("Template %s → %s (score: %d)", key, status, quality_score)
+
+
+def publish_template(key: str, quality_score: int) -> bool:
+    """Publish a template if it meets the quality threshold.
+
+    Returns True if published, False if score too low.
+    """
+    if quality_score < PUBLISH_THRESHOLD:
+        return False
+    set_template_status(key, "published", quality_score)
+    return True
+
+
+def unpublish_template(key: str) -> None:
+    """Move a template back to draft status."""
+    meta = _load_meta()
+    if key in meta:
+        meta[key]["status"] = "draft"
+        _save_meta(meta)
+        load_template.cache_clear()
+
+
+def list_published() -> list[str]:
+    """Return only published template keys (user-facing).
+
+    The 3 original generalist templates are always published (grandfathered in).
+    """
+    meta = _load_meta()
+    all_keys = list_templates()
+    # Generalist templates are always available (they predate the publish system)
+    grandfathered = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
+    return [k for k in all_keys
+            if meta.get(k, {}).get("status") == "published" or k in grandfathered]
+
+
+def update_quality_score(key: str, score: int) -> None:
+    """Update the cached quality score for a template."""
+    meta = _load_meta()
+    entry = meta.get(key, {"status": "draft", "quality_score": 0})
+    entry["quality_score"] = score
+    meta[key] = entry
+    _save_meta(meta)

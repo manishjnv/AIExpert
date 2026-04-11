@@ -961,12 +961,18 @@ async def score_template(tpl: PlanTemplate, db: AsyncSession) -> dict:
         [f"[Readiness] {i}" for i in readiness["issues"]]
     )
 
+    from app.curriculum.loader import get_template_status, PUBLISH_THRESHOLD
+    status_info = get_template_status(tpl.key)
+
     return {
         "key": tpl.key,
         "title": tpl.title,
         "level": tpl.level,
         "duration_months": tpl.duration_months,
         "composite_score": composite,
+        "publish_status": status_info.get("status", "draft"),
+        "publishable": composite >= PUBLISH_THRESHOLD,
+        "publish_threshold": PUBLISH_THRESHOLD,
         "scores": {
             "structure": structure["score"],
             "resources": resources["score"],

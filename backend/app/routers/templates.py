@@ -1,19 +1,20 @@
 """
-Template listing endpoint — returns all available plan templates.
+Template listing endpoint — returns published plan templates only.
 
 Frontend reads this to populate the plan picker dynamically.
+Only templates with quality score >= 90 (published) are shown to users.
 """
 
 from fastapi import APIRouter
-from app.curriculum.loader import list_templates, load_template
+from app.curriculum.loader import list_published, load_template
 
 router = APIRouter()
 
 
 @router.get("/templates")
 async def get_templates():
-    """Return metadata for all available plan templates."""
-    keys = list_templates()
+    """Return metadata for published plan templates only."""
+    keys = list_published()
     templates = []
     for key in sorted(keys):
         try:
