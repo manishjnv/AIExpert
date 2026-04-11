@@ -61,13 +61,15 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
     cerebras_api_key: str = ""
-    cerebras_model: str = "llama-3.3-70b"
+    cerebras_model: str = "llama3.1-8b"
     mistral_api_key: str = ""
     mistral_model: str = "mistral-small-latest"
     deepseek_api_key: str = ""
     deepseek_model: str = "deepseek-chat"
     sambanova_api_key: str = ""
     sambanova_model: str = "Meta-Llama-3.3-70B-Instruct"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-6"
 
     # ----- GitHub (optional) -----
     github_token: str = ""

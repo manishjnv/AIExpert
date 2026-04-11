@@ -39,7 +39,7 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         "model": settings.mistral_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 2048,
+        "max_tokens": 4096,
     }
 
     if json_response:
@@ -71,6 +71,19 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
+            # Mistral sometimes wraps JSON in markdown code blocks
+            if "```json" in text:
+                text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    pass
+            elif "```" in text:
+                text = text.split("```", 1)[1].split("```", 1)[0].strip()
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    pass
             raise MistralError(f"Mistral returned non-JSON: {text[:200]}")
 
     return text

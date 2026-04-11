@@ -39,7 +39,7 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         "model": settings.deepseek_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 2048,
+        "max_tokens": 4096,
     }
 
     if json_response:
