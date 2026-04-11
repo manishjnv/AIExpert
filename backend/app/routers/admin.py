@@ -313,35 +313,41 @@ async def admin_dashboard_page(
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin dashboard HTML page."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    total_users = await db.scalar(select(func.count()).select_from(User)) or 0
+    """Admin dashboard — platform-wide overview."""
+    from app.curriculum.loader import list_templates
+    from app.models.curriculum import DiscoveredTopic
 
-    from app.models.user import Session as SessionModel
-    dau = await db.scalar(
-        select(func.count(func.distinct(SessionModel.user_id)))
-        .where(SessionModel.issued_at > now - timedelta(days=1))
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    total_users = await db.scalar(select(func.count()).select_from(User)) or 0
+    enrolled = await db.scalar(
+        select(func.count(func.distinct(UserPlan.user_id)))
     ) or 0
-    wau = await db.scalar(
-        select(func.count(func.distinct(SessionModel.user_id)))
-        .where(SessionModel.issued_at > now - timedelta(days=7))
+
+    # ---- Content ----
+    template_count = len(list_templates())
+    total_topics = await db.scalar(select(func.count()).select_from(DiscoveredTopic)) or 0
+    generated_topics = await db.scalar(
+        select(func.count()).select_from(DiscoveredTopic)
+        .where(DiscoveredTopic.status == "generated")
     ) or 0
-    mau = await db.scalar(
-        select(func.count(func.distinct(SessionModel.user_id)))
-        .where(SessionModel.issued_at > now - timedelta(days=30))
+    pending_topics = await db.scalar(
+        select(func.count()).select_from(DiscoveredTopic)
+        .where(DiscoveredTopic.status == "pending")
     ) or 0
     dead_links = await db.scalar(
         select(func.count()).select_from(LinkHealth)
         .where(LinkHealth.consecutive_failures > 2)
     ) or 0
 
+    # ---- Recent signups ----
     recent = (await db.execute(
         select(User).where(User.created_at > now - timedelta(days=7))
-        .order_by(User.created_at.desc()).limit(10)
+        .order_by(User.created_at.desc()).limit(5)
     )).scalars().all()
 
     signups_html = "".join(
-        f"<tr><td>{u.id}</td><td>{esc(u.email)}</td><td>{esc(u.name or '-')}</td><td>{u.created_at}</td></tr>"
+        f'<tr><td>{esc(u.name or "-")}</td><td style="color:#4a5260">{esc(u.email)}</td><td>{esc(u.provider)}</td><td>{u.created_at.strftime("%b %d, %H:%M") if u.created_at else "-"}</td></tr>'
         for u in recent
     )
 
@@ -349,13 +355,37 @@ async def admin_dashboard_page(
 {ADMIN_NAV}
 <div class="page">
 <h1>Dashboard</h1>
+<div class="subtitle">Platform overview</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
 <div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
-<div class="stat"><div class="num">{dau}</div><div class="lbl">DAU</div></div>
-<div class="stat"><div class="num">{wau}</div><div class="lbl">WAU</div></div>
-<div class="stat"><div class="num">{mau}</div><div class="lbl">MAU</div></div>
-<div class="stat"><div class="num">{dead_links}</div><div class="lbl">Dead Links</div></div>
+<div class="stat"><div class="num">{enrolled}</div><div class="lbl">Enrolled</div></div>
+<div class="stat"><div class="num">{template_count}</div><div class="lbl">Templates</div></div>
+<div class="stat"><div class="num">{total_topics}</div><div class="lbl">Topics</div></div>
+<div class="stat"><div class="num">{generated_topics}</div><div class="lbl">Generated</div></div>
+<div class="stat"><div class="num">{pending_topics}</div><div class="lbl">Pending Review</div></div>
+<div class="stat"><div class="num" style="color:{'#d97757' if dead_links > 0 else '#6db585'}">{dead_links}</div><div class="lbl">Broken Links</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+
+<div>
 <h2>Recent Signups</h2>
-<table><tr><th>ID</th><th>Email</th><th>Name</th><th>Created</th></tr>{signups_html}</table>
+{f'<table><tr><th>Name</th><th>Email</th><th>Auth</th><th>Joined</th></tr>{signups_html}</table>' if signups_html else '<p style="color:#4a5260;font-size:13px">No signups this week</p>'}
+</div>
+
+<div>
+<h2>Quick Actions</h2>
+<div style="display:flex;flex-direction:column;gap:8px">
+<a href="/admin/users" class="btn" style="text-align:center">Manage Users</a>
+<a href="/admin/pipeline/" class="btn" style="text-align:center">Run Pipeline</a>
+<a href="/admin/templates" class="btn" style="text-align:center">Manage Templates</a>
+<a href="/admin/pipeline/ai-usage" class="btn" style="text-align:center">AI Usage</a>
+</div>
+</div>
+
+</div>
+
 </div></body></html>"""
 
 
