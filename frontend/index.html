@@ -378,6 +378,40 @@
   </div>
 </div>
 
+<!-- Sign In Modal -->
+<div id="signInModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSignInModal()">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:var(--serif);margin:0">Sign In</h3>
+      <span onclick="closeSignInModal()" style="cursor:pointer;color:var(--ink-soft);font-size:18px">✕</span>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-bottom:16px">Sign in to sync progress across devices, get AI evaluations, and link your GitHub repos.</p>
+
+    <button onclick="window.location.href='/api/auth/google/login'" style="width:100%;padding:10px;background:#fff;color:#333;border:1px solid #ddd;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.27c-.18 1-.74 1.85-1.58 2.41v2h2.56c1.5-1.38 2.37-3.41 2.37-5.83 0-.56-.05-1.1-.14-1.58z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.56-2c-.72.48-1.63.77-2.74.77-2.1 0-3.88-1.42-4.52-3.33H1.84v2.07C3.15 15.12 5.87 17 8.98 17z"/><path fill="#FBBC05" d="M4.46 10.5c-.16-.48-.25-1-.25-1.53s.09-1.05.25-1.53V5.37H1.84C1.3 6.45 1 7.68 1 9s.3 2.55.84 3.63l2.62-2.13z"/><path fill="#EA4335" d="M8.98 4.14c1.19 0 2.25.41 3.09 1.21l2.32-2.32C12.95 1.68 11.14.86 8.98.86c-3.11 0-5.83 1.88-6.99 4.56l2.62 2.07c.64-1.91 2.42-3.35 4.37-3.35z"/></svg>
+      Continue with Google
+    </button>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:12px 0">
+      <div style="flex:1;height:1px;background:var(--line)"></div>
+      <span style="font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.1em">or</span>
+      <div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+
+    <div id="otpStep1">
+      <input id="otpEmail" type="email" placeholder="your@email.com" style="width:100%;padding:10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:13px;border-radius:4px;margin-bottom:8px;box-sizing:border-box">
+      <button onclick="requestOtp()" class="btn" style="width:100%;padding:10px;font-size:12px">Send sign-in code</button>
+    </div>
+
+    <div id="otpStep2" style="display:none">
+      <p style="font-size:12px;color:var(--paper-dim);margin-bottom:8px">Code sent to <strong id="otpSentEmail"></strong></p>
+      <input id="otpCode" type="text" placeholder="6-digit code" maxlength="6" style="width:100%;padding:10px;background:var(--bg-3);border:1px solid var(--line);color:var(--paper);font-size:18px;border-radius:4px;margin-bottom:8px;text-align:center;letter-spacing:8px;box-sizing:border-box">
+      <button onclick="verifyOtp()" class="btn" style="width:100%;padding:10px;font-size:12px;border-color:var(--success);color:var(--success)">Verify & Sign In</button>
+      <a onclick="document.getElementById('otpStep1').style.display='';document.getElementById('otpStep2').style.display='none'" style="font-size:11px;color:var(--ink-soft);cursor:pointer;display:block;margin-top:8px">Use a different email</a>
+    </div>
+  </div>
+</div>
+
 <!-- Plan Picker Modal (kept for first-time enrollment flow) -->
 <div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePlanModal()">
   <div class="modal">
@@ -1165,7 +1199,35 @@ function updateConnectionBadges() {
 }
 
 function signIn() {
-  window.location.href = "/api/auth/google/login";
+  document.getElementById("signInModal").style.display = "flex";
+  document.getElementById("otpStep1").style.display = "";
+  document.getElementById("otpStep2").style.display = "none";
+}
+function closeSignInModal() { document.getElementById("signInModal").style.display = "none"; }
+
+async function requestOtp() {
+  const email = document.getElementById("otpEmail").value.trim();
+  if (!email || !email.includes("@")) { showToast("Enter a valid email"); return; }
+  try {
+    const resp = await fetch("/api/auth/otp/request", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({email}) });
+    if (resp.status === 204 || resp.ok) {
+      document.getElementById("otpStep1").style.display = "none";
+      document.getElementById("otpStep2").style.display = "";
+      document.getElementById("otpSentEmail").textContent = email;
+      showToast("Code sent — check your email");
+    } else { showToast("Failed to send code"); }
+  } catch { showToast("Failed to send code"); }
+}
+
+async function verifyOtp() {
+  const email = document.getElementById("otpSentEmail").textContent;
+  const code = document.getElementById("otpCode").value.trim();
+  if (!code || code.length !== 6) { showToast("Enter the 6-digit code"); return; }
+  try {
+    const resp = await fetch("/api/auth/otp/verify", { method: "POST", headers: {"Content-Type":"application/json"}, credentials: "same-origin", body: JSON.stringify({email, code}) });
+    if (resp.ok) { showToast("Signed in!"); closeSignInModal(); window.location.reload(); }
+    else { showToast("Invalid or expired code"); }
+  } catch { showToast("Verification failed"); }
 }
 
 async function logOut() {
