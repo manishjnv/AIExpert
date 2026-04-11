@@ -269,6 +269,32 @@ async def reject_topic(
     return {"ok": True, "status": "rejected"}
 
 
+@router.get("/api/quality")
+async def get_quality_scores(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Score all templates on structure, resources, checklist, progression, links."""
+    from app.services.quality_scorer import score_all_templates
+    return await score_all_templates(db)
+
+
+@router.get("/api/quality/{template_key}")
+async def get_template_quality(
+    template_key: str,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Score a single template."""
+    from app.services.quality_scorer import score_template
+    from app.curriculum.loader import load_template
+    try:
+        tpl = load_template(template_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return await score_template(tpl, db)
+
+
 @router.delete("/api/topics/{topic_id}")
 async def delete_topic(
     topic_id: int,
@@ -347,6 +373,9 @@ async def pipeline_dashboard_page(
 
 <h2>Pipeline Status</h2>
 <div id="norm-data"><em style="color:#4a5260">Loading pipeline stats...</em></div>
+
+<h2>Template Quality Scores</h2>
+<div id="quality-data"><em style="color:#4a5260">Scoring templates...</em></div>
 
 <script>
 // Load normalization stats inline
@@ -434,6 +463,82 @@ async def pipeline_dashboard_page(
     `;
   }} catch(e) {{
     document.getElementById('norm-data').innerHTML = '<p style="color:#d97757">Failed to load stats</p>';
+  }}
+}})();
+
+// Load quality scores
+(async function() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/quality', {{credentials: 'same-origin'}});
+    const data = await resp.json();
+    if (!data.length) {{
+      document.getElementById('quality-data').innerHTML = '<p style="color:#4a5260">No templates to score yet.</p>';
+      return;
+    }}
+
+    // Summary stats
+    const avg = Math.round(data.reduce((s, t) => s + t.composite_score, 0) / data.length);
+    const lowest = data[0];
+    const highest = data[data.length - 1];
+    const issueCount = data.reduce((s, t) => s + (t.issues || []).length, 0);
+
+    function scoreColor(s) {{ return s >= 70 ? '#6db585' : s >= 40 ? '#e8a849' : '#d97757'; }}
+    function bar(score, label) {{
+      return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">
+        <span style="font-size:10px;color:#4a5260;width:70px">${{label}}</span>
+        <div style="flex:1;background:#0f1419;border-radius:2px;height:8px;max-width:120px">
+          <div style="width:${{score}}%;height:100%;background:${{scoreColor(score)}};border-radius:2px"></div>
+        </div>
+        <span style="font-size:11px;color:${{scoreColor(score)}}">${{score}}</span>
+      </div>`;
+    }}
+
+    let rows = '';
+    for (const t of data) {{
+      const c = t.composite_score;
+      const s = t.scores || {{}};
+      const d = t.details || {{}};
+      const issueList = (t.issues || []).slice(0, 3).map(i =>
+        `<div style="font-size:10px;color:#d97757">• ${{i}}</div>`
+      ).join('');
+      rows += `<tr>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
+          <strong>${{t.title || t.key}}</strong>
+          <div style="font-size:10px;color:#4a5260">${{t.level}} · ${{t.duration_months}}mo · ${{d.total_weeks || 0}} weeks</div>
+        </td>
+        <td style="text-align:center"><span style="font-size:20px;font-family:'Fraunces',serif;color:${{scoreColor(c)}}">${{c}}</span></td>
+        <td style="min-width:180px">
+          ${{bar(s.structure || 0, 'Structure')}}
+          ${{bar(s.resources || 0, 'Resources')}}
+          ${{bar(s.checklist || 0, 'Checklist')}}
+          ${{bar(s.progression || 0, 'Progression')}}
+          ${{bar(s.links || 0, 'Links')}}
+        </td>
+        <td style="font-size:11px">
+          ${{d.total_resources || 0}} resources · ${{d.unique_domains || 0}} domains · ${{d.reputable_pct || 0}}% reputable
+          <div style="color:#4a5260">${{d.vague_checks_pct || 0}}% vague checks · ${{d.links_broken || 0}} broken links</div>
+        </td>
+        <td style="max-width:250px">${{issueList || '<span style="color:#6db585;font-size:11px">No issues</span>'}}</td>
+      </tr>`;
+    }}
+
+    document.getElementById('quality-data').innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        <div class="stat"><div class="num" style="color:${{scoreColor(avg)}}">${{avg}}</div><div class="lbl">Avg Score</div></div>
+        <div class="stat"><div class="num">${{data.length}}</div><div class="lbl">Templates</div></div>
+        <div class="stat"><div class="num" style="color:#d97757">${{issueCount}}</div><div class="lbl">Total Issues</div></div>
+        <div class="stat"><div class="num" style="color:${{scoreColor(lowest.composite_score)}}">${{lowest.composite_score}}</div><div class="lbl">Lowest</div></div>
+        <div class="stat"><div class="num" style="color:${{scoreColor(highest.composite_score)}}">${{highest.composite_score}}</div><div class="lbl">Highest</div></div>
+      </div>
+      <div style="max-height:500px;overflow-y:auto">
+      <table>
+        <tr><th>Template</th><th>Score</th><th>Breakdown</th><th>Details</th><th>Issues</th></tr>
+        ${{rows}}
+      </table>
+      </div>
+    `;
+  }} catch(e) {{
+    document.getElementById('quality-data').innerHTML = '<p style="color:#d97757">Failed to load: ' + e.message + '</p>';
   }}
 }})();
 
