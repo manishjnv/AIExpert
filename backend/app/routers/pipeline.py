@@ -37,31 +37,44 @@ class PipelineSettingsUpdate(BaseModel):
 
 router = APIRouter()
 
+FONTS_HTML = '<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">'
+
+LOGO_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>'
+
 ADMIN_CSS = """
-body { font-family: system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 24px; }
-h1 { color: #e8a849; font-size: 24px; margin-bottom: 16px; }
-h2 { color: #e8a849; font-size: 18px; margin-top: 24px; }
-h3 { color: #e8a849; font-size: 15px; margin-top: 16px; }
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1200px; margin: 0 auto; padding: 32px 48px; }
+h1 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 28px; font-weight: 300; margin-bottom: 4px; }
+h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
+h3 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 15px; margin-top: 16px; }
+.subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
 .stat { display: inline-block; background: #1d242e; padding: 16px 24px; border-radius: 6px; margin: 4px; text-align: center; }
-.stat .num { font-size: 28px; font-weight: bold; color: #e8a849; }
-.stat .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
+.stat .num { font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 400; color: #e8a849; }
+.stat .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; margin-top: 2px; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #2a323d; font-size: 13px; }
-th { color: #4a5260; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
-.btn { padding: 6px 14px; border: 1px solid #2a323d; background: none; color: #f5f1e8; cursor: pointer; border-radius: 3px; font-size: 12px; }
+th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; border-bottom: 1px solid #2a323d; }
+td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
+.btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 14px; background: transparent; border: 1px solid #3a4452; color: #e8e2d3; cursor: pointer; transition: all 0.2s; border-radius: 2px; }
 .btn:hover { border-color: #e8a849; color: #e8a849; }
 .btn.success { border-color: #6db585; color: #6db585; }
+.btn.success:hover { background: rgba(109,181,133,0.1); }
 .btn.danger { border-color: #d97757; color: #d97757; }
+.btn.danger:hover { background: rgba(217,119,87,0.1); }
 .btn.primary { border-color: #e8a849; color: #e8a849; }
+.btn.primary:hover { background: rgba(232,168,73,0.1); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-nav { margin-bottom: 24px; }
-nav a { color: #e8a849; text-decoration: none; margin-right: 16px; font-size: 13px; }
-nav a:hover { text-decoration: underline; }
+.topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #2a323d; position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
+.topnav-brand { font-family: 'Fraunces', Georgia, serif; font-size: 16px; color: #e8a849; font-weight: 400; margin-right: auto; white-space: nowrap; text-decoration: none; }
+.topnav-links { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.topnav-links a { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #e8e2d3; text-decoration: none; padding: 8px 12px; border-radius: 2px; transition: all 0.2s; }
+.topnav-links a:hover { color: #e8a849; background: rgba(232,168,73,0.08); }
+.topnav-links a.active { color: #e8a849; border-bottom: 2px solid #e8a849; }
 .card { background: #1d242e; padding: 16px; border-radius: 6px; margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
-.form-group label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
-.form-group input, .form-group select { padding: 8px; background: #0f1419; border: 1px solid #2a323d; color: #f5f1e8; border-radius: 3px; }
+.form-group label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
+.form-group input, .form-group select { padding: 8px; background: #0f1419; border: 1px solid #2a323d; color: #f5f1e8; border-radius: 3px; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .badge.pending { background: #3d3520; color: #e8a849; }
 .badge.approved { background: #1d3525; color: #6db585; }
@@ -71,17 +84,19 @@ nav a:hover { text-decoration: underline; }
 .status-msg { margin-top: 8px; font-size: 12px; }
 .status-msg.ok { color: #6db585; }
 .status-msg.error { color: #d97757; }
+@media (max-width: 768px) { .topnav { padding: 10px 16px; flex-wrap: wrap; } .topnav-brand { font-size: 14px; } .topnav-links a { font-size: 10px; padding: 6px 8px; } .page { padding: 20px 16px; } .stat { padding: 12px 14px; } .stat .num { font-size: 22px; } }
 """
 
-NAV_HTML = """<nav>
-<a href="/">← Site</a>
+NAV_HTML = """<nav class="topnav">
+<a href="/" class="topnav-brand" style="text-decoration:none">""" + LOGO_SVG + """ AI Learning Roadmap</a>
+<div class="topnav-links">
 <a href="/admin/">Dashboard</a>
 <a href="/admin/users">Users</a>
-<a href="/admin/proposals">Proposals</a>
 <a href="/admin/templates">Templates</a>
 <a href="/admin/pipeline/">Pipeline</a>
 <a href="/admin/pipeline/topics">Topics</a>
 <a href="/admin/pipeline/settings">Settings</a>
+</div>
 </nav>"""
 
 
@@ -330,7 +345,9 @@ async def pipeline_dashboard_page(
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pipeline</title>
 <style>{ADMIN_CSS}</style></head><body>
 {NAV_HTML}
+<div class="page">
 <h1>Auto Curriculum Pipeline</h1>
+<div class="subtitle">AI-powered topic discovery, curriculum generation, and content refresh</div>
 
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
 <div class="stat"><div class="num">{total_topics}</div><div class="lbl">Total Topics</div></div>
@@ -401,6 +418,7 @@ async function runAction(action, btn) {{
   btn.textContent = origText;
 }}
 </script>
+</div>
 </body></html>"""
 
 
@@ -463,7 +481,9 @@ async def pipeline_topics_page(
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Topics</title>
 <style>{ADMIN_CSS}</style></head><body>
 {NAV_HTML}
+<div class="page">
 <h1>Discovered Topics ({len(rows)})</h1>
+<div class="subtitle">AI-discovered trending topics for curriculum generation</div>
 <div style="margin-bottom:16px">{filter_html}</div>
 
 <table>
@@ -493,6 +513,7 @@ async function deleteTopic(id) {{
 
 </script>
 <div style="margin-top:12px">{'<a href="/admin/pipeline/topics?page='+str(page-1)+'&status='+esc(status)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/pipeline/topics?page='+str(page+1)+'&status='+esc(status)+'" class="btn">Next</a>' if page*50<total else ''} <span style="font-size:12px;color:#4a5260">{total} total</span></div>
+</div>
 </body></html>"""
 
 
@@ -517,7 +538,9 @@ async def pipeline_settings_page(
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pipeline Settings</title>
 <style>{ADMIN_CSS}</style></head><body>
 {NAV_HTML}
+<div class="page">
 <h1>Pipeline Settings</h1>
+<div class="subtitle">Configure auto-discovery, AI models, budget, and refresh schedule</div>
 
 <form id="settingsForm" class="card" style="max-width:700px">
 
@@ -626,4 +649,5 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
   }}
 }});
 </script>
+</div>
 </body></html>"""

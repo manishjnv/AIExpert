@@ -285,24 +285,43 @@ async def delete_template(
 
 # ---- Jinja2 admin UI ----
 
+LOGO_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>'
+
 ADMIN_CSS = """
-body { font-family: system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 24px; }
-h1 { color: #e8a849; font-size: 24px; margin-bottom: 16px; }
-h2 { color: #e8a849; font-size: 18px; margin-top: 24px; }
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+body { font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #0f1419; color: #f5f1e8; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1200px; margin: 0 auto; padding: 32px 48px; }
+h1 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 28px; font-weight: 300; margin-bottom: 4px; }
+h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; margin-top: 24px; }
+.subtitle { color: #4a5260; font-size: 13px; margin-bottom: 24px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.03em; }
 .stat { display: inline-block; background: #1d242e; padding: 16px 24px; border-radius: 6px; margin: 4px; text-align: center; }
-.stat .num { font-size: 28px; font-weight: bold; color: #e8a849; }
-.stat .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; }
+.stat .num { font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 400; color: #e8a849; }
+.stat .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; margin-top: 2px; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #2a323d; font-size: 13px; }
-th { color: #4a5260; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
-.btn { padding: 4px 10px; border: 1px solid #2a323d; background: none; color: #f5f1e8; cursor: pointer; border-radius: 3px; font-size: 11px; }
+th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4a5260; border-bottom: 1px solid #2a323d; }
+td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
+.btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 14px; background: transparent; border: 1px solid #3a4452; color: #e8e2d3; cursor: pointer; transition: all 0.2s; border-radius: 2px; }
 .btn:hover { border-color: #e8a849; color: #e8a849; }
 .btn.success { border-color: #6db585; color: #6db585; }
 .btn.danger { border-color: #d97757; color: #d97757; }
-nav { margin-bottom: 24px; }
-nav a { color: #e8a849; text-decoration: none; margin-right: 16px; font-size: 13px; }
-nav a:hover { text-decoration: underline; }
+.topnav { padding: 12px 48px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #2a323d; position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); background: rgba(15,20,25,0.92); }
+.topnav-brand { font-family: 'Fraunces', Georgia, serif; font-size: 16px; color: #e8a849; font-weight: 400; margin-right: auto; white-space: nowrap; text-decoration: none; }
+.topnav-links { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.topnav-links a { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #e8e2d3; text-decoration: none; padding: 8px 12px; border-radius: 2px; transition: all 0.2s; }
+.topnav-links a:hover { color: #e8a849; background: rgba(232,168,73,0.08); }
+@media (max-width: 768px) { .topnav { padding: 10px 16px; flex-wrap: wrap; } .topnav-brand { font-size: 14px; } .topnav-links a { font-size: 10px; padding: 6px 8px; } .page { padding: 20px 16px; } .stat { padding: 12px 14px; } .stat .num { font-size: 22px; } }
 """
+
+ADMIN_NAV = f"""<nav class="topnav">
+<a href="/" class="topnav-brand" style="text-decoration:none">{LOGO_SVG} AI Learning Roadmap</a>
+<div class="topnav-links">
+<a href="/admin/">Dashboard</a>
+<a href="/admin/users">Users</a>
+<a href="/admin/proposals">Proposals</a>
+<a href="/admin/templates">Templates</a>
+<a href="/admin/pipeline/">Pipeline</a>
+</div>
+</nav>"""
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -343,7 +362,8 @@ async def admin_dashboard_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admin</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a><a href="/admin/pipeline/">Pipeline</a></nav>
+{ADMIN_NAV}
+<div class="page">
 <h1>Dashboard</h1>
 <div class="stat"><div class="num">{total_users}</div><div class="lbl">Total Users</div></div>
 <div class="stat"><div class="num">{dau}</div><div class="lbl">DAU</div></div>
@@ -352,7 +372,7 @@ async def admin_dashboard_page(
 <div class="stat"><div class="num">{dead_links}</div><div class="lbl">Dead Links</div></div>
 <h2>Recent Signups</h2>
 <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Created</th></tr>{signups_html}</table>
-</body></html>"""
+</div></body></html>"""
 
 
 @router.get("/users", response_class=HTMLResponse)
@@ -375,12 +395,13 @@ async def admin_users_page(
     )
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Users</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a><a href="/admin/pipeline/">Pipeline</a></nav>
+{ADMIN_NAV}
+<div class="page">
 <h1>Users ({total})</h1>
 <form style="margin-bottom:12px"><input name="q" value="{esc(q)}" placeholder="Search email or name" style="padding:6px;background:#1d242e;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"> <button class="btn" type="submit">Search</button></form>
 <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Provider</th><th>Admin</th><th>Created</th></tr>{rows_html}</table>
 <div style="margin-top:12px">{'<a href="/admin/users?page='+str(page-1)+'&q='+esc(q)+'" class="btn">Prev</a> ' if page>1 else ''}{'<a href="/admin/users?page='+str(page+1)+'&q='+esc(q)+'" class="btn">Next</a>' if page*20<total else ''}</div>
-</body></html>"""
+</div></body></html>"""
 
 
 @router.get("/proposals", response_class=HTMLResponse)
@@ -401,10 +422,11 @@ async def admin_proposals_page(
         rows_html += f"<tr><td>{p.id}</td><td>{esc(p.source_run)}</td><td>{esc(p.status)}</td><td>{esc(p.notes or '-')}</td><td>{p.created_at}</td><td>{actions}</td></tr>"
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Proposals</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a><a href="/admin/pipeline/">Pipeline</a></nav>
+{ADMIN_NAV}
+<div class="page">
 <h1>Curriculum Proposals</h1>
 <table><tr><th>ID</th><th>Source Run</th><th>Status</th><th>Notes</th><th>Created</th><th>Actions</th></tr>{rows_html}</table>
-</body></html>"""
+</div></body></html>"""
 
 
 @router.get("/templates", response_class=HTMLResponse)
@@ -427,7 +449,8 @@ async def admin_templates_page(
             continue
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Templates</title><style>{ADMIN_CSS}</style></head><body>
-<nav><a href="/">← Site</a><a href="/admin/">Dashboard</a><a href="/admin/users">Users</a><a href="/admin/proposals">Proposals</a><a href="/admin/templates">Templates</a><a href="/admin/pipeline/">Pipeline</a></nav>
+{ADMIN_NAV}
+<div class="page">
 <h1>Plan Templates</h1>
 <p style="color:#4a5260;font-size:13px;margin-bottom:16px">Add new templates by topic. AI generates the full curriculum automatically.</p>
 
@@ -485,4 +508,4 @@ async function deleteTemplate(key) {{
   else alert('Delete failed');
 }}
 </script>
-</body></html>"""
+</div></body></html>"""
