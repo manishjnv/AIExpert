@@ -104,7 +104,7 @@ async def enroll(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new plan, archiving any previous active plan."""
+    """Create a new plan, archiving any previous active plan. Max 10 switches/day."""
     template_key = body.template_key or _template_key(body.goal, body.duration, body.level)
 
     # Validate template exists
@@ -114,6 +114,17 @@ async def enroll(
         raise HTTPException(status_code=400, detail=f"Unknown plan template: {template_key}")
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Rate limit: max 10 plan switches per day
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    switches_today = await db.scalar(
+        select(func.count()).select_from(UserPlan).where(
+            UserPlan.user_id == user.id,
+            UserPlan.enrolled_at >= day_start,
+        )
+    ) or 0
+    if switches_today >= 10:
+        raise HTTPException(status_code=429, detail="Plan switch limit reached (10/day). Try again tomorrow.")
 
     # Archive current active plan if any
     active = (
