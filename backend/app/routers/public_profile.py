@@ -186,8 +186,6 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     total_streak_all = 0
     for user in users:
         stats = await _get_user_progress(user, db)
-        if stats["plan"] is None:
-            continue
         lifetime = stats.get("lifetime_done", stats["done"])
         total_tasks_all += lifetime
         joined = user.created_at.strftime("%b %Y") if user.created_at else "—"
@@ -196,7 +194,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         entries.append({
             "id": user.id,
             "name": esc((user.name or "Learner")),
-            "plan": PLAN_LABELS.get(stats["template"] or "", "—"),
+            "plan": PLAN_LABELS.get(stats["template"] or "", "Not enrolled yet"),
             "done": stats["done"],
             "total": stats["total"],
             "pct": stats["pct"],
