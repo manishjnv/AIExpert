@@ -120,10 +120,10 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-10
-**Last session summary:** All 12 phases built, tested, deployed. Production live at automateedge.cloud. Google OAuth, OTP email, Gemini AI all configured and verified working.
+**Last session date:** 2026-04-11
+**Last session summary:** P1 (auto curriculum pipeline) fully built and deployed — AI topic discovery, batch generation, content refresh, budget tracking, admin UI with 3 pages. P2 (user experience) — 3-step plan picker, course history in profile, modal fix. Security hardening via Codex audit (5 issues fixed). Admin header matched to main site. GitHub MCP configured. RCA entries 011-015 added.
 **Tests passing:** 90 automated
 **Tests failing:** none
 **Blockers:** None.
-**Next action:** Soft launch (Task 12.4) — share with friends, collect feedback. Test AI chat + evaluation live.
+**Next action:** Test P1 live (Run Discovery from admin pipeline). Then P3 (email SPF/DKIM), P4 (generate specialist templates).
 **Open questions for the user:** None.
