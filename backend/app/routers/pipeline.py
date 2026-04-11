@@ -385,6 +385,43 @@ async def pipeline_dashboard_page(
       </div>
       <div style="margin-bottom:16px">${{catHtml || ''}}</div>
       ${{topicRows ? '<h3 style="margin-top:8px">Generation by Topic</h3><div style="max-height:300px;overflow-y:auto"><table><tr><th>Topic</th><th>Variants</th><th>Status</th><th>Errors</th></tr>' + topicRows + '</table></div>' : ''}}
+
+      <h2 style="margin-top:32px;font-family:Fraunces,Georgia,serif;color:#e8a849;font-size:18px">Normalization Stages</h2>
+      <p style="font-size:12px;color:#4a5260;margin-bottom:12px">Every topic goes through these stages before becoming a course. Each stage ensures data quality.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #e8a849">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">1. Name Normalization</div>
+          <div style="font-size:11px;color:#4a5260">Cleans topic names — lowercased, special characters removed, creates a unique key for deduplication. Prevents "LLMs", "llms", and "Large Language Models" from creating duplicate entries.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #e8a849">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">2. Deduplication</div>
+          <div style="font-size:11px;color:#4a5260">Checks if a topic with the same normalized name already exists in the database. If it does, the duplicate is silently skipped. This is why you can re-run discovery safely without getting repeats.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">3. AI Triage</div>
+          <div style="font-size:11px;color:#4a5260">A cheap, fast AI classifier reviews each discovered topic: "Is this worth generating a full course for?" Filters out niche or low-value topics before the expensive generation step. Saves ~80% of AI costs.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #5d9be8">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">4. Schema Validation</div>
+          <div style="font-size:11px;color:#4a5260">Every AI response is validated against a strict schema — required fields, value ranges, correct types. If the AI returns malformed data, it's rejected and the next provider is tried. Prevents broken courses from reaching users.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #6db585">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">5. Lifecycle State Machine</div>
+          <div style="font-size:11px;color:#4a5260">Topics move through defined stages: <strong>Pending</strong> (needs review) → <strong>Approved</strong> (ready to generate) → <strong>Generating</strong> (AI working) → <strong>Generated</strong> (course ready). Each transition is tracked. Topics can also be <strong>Rejected</strong> and later re-approved.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #6db585">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">6. Budget Gating</div>
+          <div style="font-size:11px;color:#4a5260">Every AI call checks the monthly token budget first. Under 80%: normal operation. 80-90%: warning logged. 90-100%: switches to cheaper AI models. Over 100%: hard stop, no more AI calls until next month. Prevents runaway costs.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #d97757">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">7. Cache Layer</div>
+          <div style="font-size:11px;color:#4a5260">AI responses are cached with TTLs: discovery (24h), triage (7 days), generation (30 days), content reviews (7 days). Re-running the same operation within the TTL returns cached results instantly — no AI cost, no waiting.</div>
+        </div>
+        <div style="background:#1d242e;padding:14px;border-radius:6px;border-left:3px solid #d97757">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">8. Link Health Check</div>
+          <div style="font-size:11px;color:#4a5260">During content refresh, every resource URL in every course is checked. Broken links (2+ consecutive failures) are flagged. URLs are validated for safety first — internal/private IPs are blocked to prevent server-side request forgery.</div>
+        </div>
+      </div>
     `;
   }} catch(e) {{
     document.getElementById('norm-data').innerHTML = '<p style="color:#d97757">Failed to load stats</p>';
