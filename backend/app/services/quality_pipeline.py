@@ -35,8 +35,8 @@ REVIEW_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "review_curricul
 REFINE_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "refine_curriculum.txt"
 
 # Thresholds
-SKIP_REVIEW_THRESHOLD = 85      # Heuristic score above which we skip AI review
-SKIP_REFINE_THRESHOLD = 7       # All dimensions >= this → skip refinement
+SKIP_REVIEW_THRESHOLD = 92      # Heuristic score above which we skip AI review
+SKIP_REFINE_THRESHOLD = 8       # All dimensions >= this → skip refinement
 CLAUDE_THRESHOLD = 3            # Use Claude only if >= this many dimensions fail
 REVIEW_CACHE_TTL = 86400 * 30   # 30 days
 
