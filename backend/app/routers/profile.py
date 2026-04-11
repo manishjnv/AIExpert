@@ -29,6 +29,7 @@ class ProfilePatch(BaseModel):
     linkedin_url: Optional[str] = None
     learning_goal: Optional[str] = Field(None, max_length=200)
     experience_level: Optional[str] = None
+    email_notifications: Optional[bool] = None
 
 
 class DeleteConfirm(BaseModel):
@@ -84,6 +85,7 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         "github_username": user.github_username,
         "linkedin_url": user.linkedin_url,
         "learning_goal": user.learning_goal,
+        "email_notifications": user.email_notifications,
         "experience_level": user.experience_level,
         "is_admin": user.is_admin,
         "total_weeks": total_weeks,

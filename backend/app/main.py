@@ -60,16 +60,18 @@ async def lifespan(app: FastAPI):
 
     # Start background cleanup tasks
     import asyncio
-    from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions
+    from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions, send_weekly_reminders
     import app.db as _db
     otp_task = asyncio.create_task(cleanup_expired_otps(_db.async_session_factory))
     session_task = asyncio.create_task(cleanup_expired_sessions(_db.async_session_factory))
+    reminder_task = asyncio.create_task(send_weekly_reminders(_db.async_session_factory))
 
     yield
 
     # Cancel cleanup tasks
     otp_task.cancel()
     session_task.cancel()
+    reminder_task.cancel()
     logger.info("Shutting down")
     await close_db()
 

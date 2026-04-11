@@ -37,12 +37,18 @@ async def _user_token(email="chat@test.com"):
 
 
 @pytest.mark.asyncio
-async def test_chat_requires_auth():
+async def test_chat_works_without_auth():
+    """Chat is available to anonymous users."""
     await _setup()
     app = _app()
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        resp = await c.post("/api/chat", json={"week_num": 1, "message": "hello"})
-        assert resp.status_code == 401
+
+    async def mock_stream(messages):
+        yield "ok"
+
+    with patch("app.ai.stream.stream_complete", side_effect=lambda m: mock_stream(m)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            resp = await c.post("/api/chat", json={"week_num": 1, "message": "hello"})
+            assert resp.status_code == 200
     await close_db()
 
 

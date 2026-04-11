@@ -381,6 +381,11 @@
       </div>
     </div>
 
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="pEmailNotif" style="accent-color:var(--accent)">
+      <label for="pEmailNotif" style="font-size:11px;color:var(--paper-dim);cursor:pointer">Weekly progress reminder emails</label>
+    </div>
+
     <button class="btn" onclick="saveProfile()" style="margin-top:16px;width:100%;padding:10px;border-color:var(--success);color:var(--success);font-size:12px">Save Changes</button>
 
     <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
@@ -1350,6 +1355,7 @@ function openProfileModal() {
   document.getElementById("pLinkedin").value = currentUser.linkedin_url || "";
   document.getElementById("pGoal").value = currentUser.learning_goal || "";
   document.getElementById("pLevel").value = currentUser.experience_level || "intermediate";
+  document.getElementById("pEmailNotif").checked = currentUser.email_notifications !== false;
   // Pre-select current plan in the inline dropdown
   const planMap = { "3-Month Accelerated": "3mo|intermediate", "6-Month Standard": "6mo|intermediate", "12-Month Beginner": "12mo|beginner" };
   const badge = document.getElementById("planBadge")?.textContent?.replace(' · ','') || "";
@@ -1386,6 +1392,7 @@ async function saveProfile() {
     linkedin_url: liUrl || null,
     learning_goal: document.getElementById("pGoal").value || null,
     experience_level: document.getElementById("pLevel").value,
+    email_notifications: document.getElementById("pEmailNotif").checked,
   };
   try {
     // Save profile fields
