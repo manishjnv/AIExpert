@@ -39,13 +39,13 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         "model": settings.sambanova_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 4096,
+        "max_tokens": 8192,
     }
 
     if json_response:
         body["response_format"] = {"type": "json_object"}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
             SAMBANOVA_URL,
             headers={
