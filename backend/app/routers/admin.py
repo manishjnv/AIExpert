@@ -646,6 +646,14 @@ async def admin_templates_page(
 ):
     """Admin templates management page."""
     from app.curriculum.loader import list_templates, load_template, get_template_status
+    from app.models.plan import UserPlan
+
+    # Get subscriber counts per template
+    sub_rows = await db.execute(
+        select(UserPlan.template_key, func.count(UserPlan.id))
+        .group_by(UserPlan.template_key)
+    )
+    subscriber_counts = {row[0]: row[1] for row in sub_rows}
 
     grandfathered = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
     keys = list_templates()
@@ -670,7 +678,10 @@ async def admin_templates_page(
             score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
             score_display = f'<span style="color:{score_color};font-weight:600">{q_score}</span>' if q_score > 0 else '<span style="color:#8a92a0">—</span>'
 
-            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
+            subs = subscriber_counts.get(key, 0)
+            subs_display = f'<span style="font-weight:600">{subs}</span>' if subs > 0 else '<span style="color:#8a92a0">0</span>'
+
+            rows_html += f"<tr><td>{esc(tpl.title)}</td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
         except Exception:
             continue
 
@@ -691,7 +702,7 @@ async def admin_templates_page(
   <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
-<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Subscribers</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
 
 <script>
 async function generateTemplate() {{
