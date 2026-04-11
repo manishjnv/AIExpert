@@ -120,10 +120,10 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-11 (session 2)
-**Last session summary:** P1 pipeline tested live (10 topics discovered, 28 templates generated). 4 new AI providers added (Cerebras, Mistral, DeepSeek, Sambanova) with 6-provider fallback chain. Resend SMTP configured (DKIM verified, "via gmail.com" fixed). Provider bugs fixed (Cerebras model retired, Mistral JSON parsing, max_tokens too small). nginx timeout increased for pipeline. Anthropic/Claude key on VPS but not wired up (reserved).
-**Tests passing:** 90 automated
-**Tests failing:** none
-**Blockers:** 2 topics have failed generation variants (rate limits). DeepSeek returns 402 (insufficient balance).
-**Next action:** Re-run generation when rate limits reset. Review 28 generated templates. P4 specialist templates. Wire up Claude if approved.
+**Last session date:** 2026-04-11 (session 3)
+**Last session summary:** Major admin + infrastructure session. 4 new AI providers (Cerebras/Mistral/DeepSeek/Sambanova) with 6-provider fallback chain + circuit breaker. AI Usage dashboard (provider health, per-task stats, recent calls). Normalization stages merged into Pipeline page with AI markers. Resend email (DKIM, no "via gmail.com"). Admin Dashboard vs Users separation. Users page: location geo-lookup, anonymous visitor tracking, device/IP/plan columns. Favicon on all pages. 11 commits.
+**Tests passing:** 88 (2 flaky from GitHub API rate limit, not our code)
+**Tests failing:** 2 flaky (test_repos — external GitHub rate limit)
+**Blockers:** DeepSeek 402 insufficient balance. 2 topics still have failed generation variants.
+**Next action:** Re-run generation. Review template quality. P4 specialist templates. Wire up Claude if approved.
 **Open questions for the user:** Permission to wire up Claude API for curriculum generation? Top up DeepSeek or remove?
