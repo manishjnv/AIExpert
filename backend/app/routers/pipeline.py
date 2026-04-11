@@ -931,3 +931,382 @@ loadUsageData();
 </script>
 </div>
 </body></html>"""
+
+
+# ---- Normalization Dashboard API + Page ----
+
+@router.get("/api/normalization")
+async def get_normalization_stats(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get normalization pipeline stats for admin dashboard."""
+    from sqlalchemy import case
+    from app.models.curriculum import LinkHealth
+    from app.curriculum.loader import list_templates
+
+    # ---- Stage A: Discovery stats ----
+    status_counts = {}
+    for status_val in ["pending", "approved", "generating", "generated", "rejected"]:
+        count = await db.scalar(
+            select(func.count()).select_from(DiscoveredTopic)
+            .where(DiscoveredTopic.status == status_val)
+        ) or 0
+        status_counts[status_val] = count
+    total_topics = sum(status_counts.values())
+
+    avg_confidence = await db.scalar(
+        select(func.avg(DiscoveredTopic.confidence_score))
+    ) or 0
+
+    # Category distribution
+    cat_rows = (await db.execute(
+        select(
+            DiscoveredTopic.category,
+            func.count().label("cnt"),
+        ).group_by(DiscoveredTopic.category)
+        .order_by(func.count().desc())
+    )).all()
+
+    # Discovery runs
+    run_rows = (await db.execute(
+        select(
+            DiscoveredTopic.discovery_run,
+            DiscoveredTopic.ai_model_used,
+            func.count().label("topics_found"),
+        ).group_by(DiscoveredTopic.discovery_run, DiscoveredTopic.ai_model_used)
+        .order_by(DiscoveredTopic.discovery_run.desc())
+        .limit(10)
+    )).all()
+
+    # ---- Stage B: Generation stats ----
+    total_templates_on_disk = len(list_templates())
+
+    gen_topics = (await db.execute(
+        select(
+            DiscoveredTopic.topic_name,
+            DiscoveredTopic.templates_generated,
+            DiscoveredTopic.generation_error,
+            DiscoveredTopic.status,
+        ).where(DiscoveredTopic.templates_generated > 0)
+        .order_by(DiscoveredTopic.templates_generated.desc())
+    )).all()
+
+    total_variants_generated = sum(t.templates_generated for t in gen_topics)
+    topics_with_errors = sum(1 for t in gen_topics if t.generation_error)
+
+    # ---- Stage C: Content Refresh stats ----
+    total_links = await db.scalar(
+        select(func.count()).select_from(LinkHealth)
+    ) or 0
+    broken_links = await db.scalar(
+        select(func.count()).select_from(LinkHealth)
+        .where(LinkHealth.consecutive_failures >= 2)
+    ) or 0
+    ok_links = await db.scalar(
+        select(func.count()).select_from(LinkHealth)
+        .where(LinkHealth.consecutive_failures == 0)
+    ) or 0
+
+    # Broken links by template
+    broken_by_template = (await db.execute(
+        select(
+            LinkHealth.template_key,
+            func.count().label("broken_count"),
+        ).where(LinkHealth.consecutive_failures >= 2)
+        .group_by(LinkHealth.template_key)
+        .order_by(func.count().desc())
+        .limit(10)
+    )).all()
+
+    # ---- Cache stats ----
+    cache_stats = _get_cache_stats()
+
+    # ---- Settings ----
+    s = await _get_settings(db)
+
+    return {
+        "discovery": {
+            "total_topics": total_topics,
+            "status_counts": status_counts,
+            "avg_confidence": round(avg_confidence, 1),
+            "categories": [{"category": r.category, "count": r.cnt} for r in cat_rows],
+            "recent_runs": [
+                {
+                    "run_id": r.discovery_run[:19] if r.discovery_run else "",
+                    "model": r.ai_model_used,
+                    "topics_found": r.topics_found,
+                }
+                for r in run_rows
+            ],
+        },
+        "generation": {
+            "templates_on_disk": total_templates_on_disk,
+            "total_variants_generated": total_variants_generated,
+            "topics_with_templates": len(gen_topics),
+            "topics_with_errors": topics_with_errors,
+            "per_topic": [
+                {
+                    "topic": t.topic_name,
+                    "variants": t.templates_generated,
+                    "status": t.status,
+                    "has_error": bool(t.generation_error),
+                    "error": (t.generation_error or "")[:100],
+                }
+                for t in gen_topics
+            ],
+        },
+        "refresh": {
+            "total_links": total_links,
+            "ok_links": ok_links,
+            "broken_links": broken_links,
+            "broken_by_template": [
+                {"template": r.template_key, "count": r.broken_count}
+                for r in broken_by_template
+            ],
+            "last_refresh": s.last_refresh_run.isoformat() if s.last_refresh_run else None,
+        },
+        "cache": cache_stats,
+        "config": {
+            "max_topics_per_discovery": s.max_topics_per_discovery,
+            "discovery_frequency": s.discovery_frequency,
+            "auto_approve": s.auto_approve_topics,
+            "auto_generate": s.auto_generate_variants,
+            "refresh_frequency": s.refresh_frequency,
+        },
+    }
+
+
+def _get_cache_stats() -> dict:
+    """Get cache file stats by type."""
+    from app.services.ai_cache import CACHE_DIR
+    import time as _time
+
+    stats = {"discovery": 0, "triage": 0, "generation": 0, "currency_review": 0, "other": 0, "expired": 0, "total_files": 0}
+    if not CACHE_DIR.exists():
+        return stats
+
+    for path in CACHE_DIR.glob("*.json"):
+        stats["total_files"] += 1
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            ptype = data.get("prompt_type", "other")
+            if _time.time() > data.get("expires_at", 0):
+                stats["expired"] += 1
+            elif ptype in stats:
+                stats[ptype] += 1
+            else:
+                stats["other"] += 1
+        except Exception:
+            stats["other"] += 1
+
+    return stats
+
+
+@router.get("/normalization", response_class=HTMLResponse)
+async def normalization_page(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Normalization pipeline dashboard — stages, lifecycle, quality metrics."""
+    s = await _get_settings(db)
+
+    # Quick topic counts for server-rendered stats
+    counts = {}
+    for sv in ["pending", "approved", "generating", "generated", "rejected"]:
+        counts[sv] = await db.scalar(
+            select(func.count()).select_from(DiscoveredTopic).where(DiscoveredTopic.status == sv)
+        ) or 0
+    total = sum(counts.values())
+
+    from app.curriculum.loader import list_templates
+    templates_on_disk = len(list_templates())
+
+    from app.models.curriculum import LinkHealth
+    broken = await db.scalar(
+        select(func.count()).select_from(LinkHealth).where(LinkHealth.consecutive_failures >= 2)
+    ) or 0
+    total_links = await db.scalar(select(func.count()).select_from(LinkHealth)) or 0
+
+    last_disc = s.last_discovery_run.strftime("%Y-%m-%d %H:%M") if s.last_discovery_run else "Never"
+    last_gen = s.last_generation_run.strftime("%Y-%m-%d %H:%M") if s.last_generation_run else "Never"
+    last_ref = s.last_refresh_run.strftime("%Y-%m-%d %H:%M") if s.last_refresh_run else "Never"
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Normalization</title>
+<style>{ADMIN_CSS}
+.flow-row {{ display: flex; gap: 0; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }}
+.flow-stage {{ background: #1d242e; padding: 14px 18px; border-radius: 6px; text-align: center; min-width: 130px; }}
+.flow-stage .num {{ font-family: 'Fraunces', Georgia, serif; font-size: 24px; color: #e8a849; }}
+.flow-stage .lbl {{ font-family: 'IBM Plex Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #4a5260; margin-top: 2px; }}
+.flow-arrow {{ color: #3a4452; font-size: 20px; padding: 0 6px; }}
+.grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }}
+@media (max-width: 768px) {{ .grid-2 {{ grid-template-columns: 1fr; }} }}
+</style></head><body>
+{NAV_HTML}
+<div class="page">
+<h1>Normalization Pipeline</h1>
+<div class="subtitle">Lifecycle stages, data quality, cache health, content freshness</div>
+
+<h2>Pipeline Flow</h2>
+<div class="flow-row">
+  <div class="flow-stage"><div class="num">{total}</div><div class="lbl">Discovered</div></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-stage"><div class="num">{counts['pending']}</div><div class="lbl">Pending</div></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-stage"><div class="num">{counts['approved']}</div><div class="lbl">Approved</div></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-stage"><div class="num">{counts['generating']}</div><div class="lbl">Generating</div></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-stage"><div class="num">{counts['generated']}</div><div class="lbl">Generated</div></div>
+  <div class="flow-arrow" style="margin-left:16px">|</div>
+  <div class="flow-stage" style="border:1px solid #3d2020"><div class="num">{counts['rejected']}</div><div class="lbl">Rejected</div></div>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+  <div class="stat"><div class="num">{templates_on_disk}</div><div class="lbl">Templates on Disk</div></div>
+  <div class="stat"><div class="num">{total_links}</div><div class="lbl">Links Tracked</div></div>
+  <div class="stat"><div class="num" style="color:{'#d97757' if broken > 0 else '#6db585'}">{broken}</div><div class="lbl">Broken Links</div></div>
+  <div class="stat"><div class="num">{esc(last_disc)}</div><div class="lbl">Last Discovery</div></div>
+  <div class="stat"><div class="num">{esc(last_gen)}</div><div class="lbl">Last Generation</div></div>
+  <div class="stat"><div class="num">{esc(last_ref)}</div><div class="lbl">Last Refresh</div></div>
+</div>
+
+<div class="grid-2">
+
+<div>
+<h2>Stage A: Discovery</h2>
+<div class="card" id="discovery-stats"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Stage B: Generation</h2>
+<div class="card" id="generation-stats"><em style="color:#4a5260">Loading...</em></div>
+</div>
+
+<div>
+<h2>Stage C: Content Refresh</h2>
+<div class="card" id="refresh-stats"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Cache Health</h2>
+<div class="card" id="cache-stats"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Config</h2>
+<div class="card" id="config-stats"><em style="color:#4a5260">Loading...</em></div>
+</div>
+
+</div>
+
+<h2>Discovery Runs</h2>
+<div id="discovery-runs"><em style="color:#4a5260">Loading...</em></div>
+
+<h2>Generation by Topic</h2>
+<div id="gen-by-topic" style="max-height:400px;overflow-y:auto"><em style="color:#4a5260">Loading...</em></div>
+
+<script>
+async function loadNormData() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/normalization', {{credentials: 'same-origin'}});
+    const d = await resp.json();
+
+    // Discovery stats
+    const disc = d.discovery;
+    let catHtml = disc.categories.map(c => `<span style="display:inline-block;background:#0f1419;padding:2px 8px;border-radius:10px;font-size:11px;margin:2px">${{c.category}} <strong>${{c.count}}</strong></span>`).join('');
+    document.getElementById('discovery-stats').innerHTML = `
+      <div style="font-size:13px;margin-bottom:8px"><strong>Avg Confidence:</strong> <span style="color:#e8a849">${{disc.avg_confidence}}/100</span></div>
+      <div style="font-size:13px;margin-bottom:8px"><strong>Categories:</strong></div>
+      <div style="margin-bottom:8px">${{catHtml || '<em style="color:#4a5260">No topics yet</em>'}}</div>
+      <div style="font-size:12px;color:#4a5260">
+        Dedup and triage filtering happen during discovery.<br>
+        Rejected topics can be re-approved from the Topics page.
+      </div>`;
+
+    // Generation stats
+    const gen = d.generation;
+    document.getElementById('generation-stats').innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <div><span style="color:#e8a849;font-size:20px;font-family:'Fraunces',serif">${{gen.total_variants_generated}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Variants Generated</div></div>
+        <div><span style="color:#6db585;font-size:20px;font-family:'Fraunces',serif">${{gen.topics_with_templates}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Topics Complete</div></div>
+        <div><span style="color:#d97757;font-size:20px;font-family:'Fraunces',serif">${{gen.topics_with_errors}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">With Errors</div></div>
+        <div><span style="color:#f5f1e8;font-size:20px;font-family:'Fraunces',serif">${{gen.templates_on_disk}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">On Disk</div></div>
+      </div>
+      <div style="font-size:12px;color:#4a5260">
+        Each topic generates up to 5 variants: 3mo/6mo × beginner/intermediate/advanced.
+      </div>`;
+
+    // Refresh stats
+    const ref = d.refresh;
+    const linkPct = ref.total_links > 0 ? Math.round(ref.ok_links / ref.total_links * 100) : 0;
+    let brokenHtml = ref.broken_by_template.length > 0
+      ? '<div style="margin-top:8px;font-size:12px"><strong>Broken by template:</strong></div>' +
+        ref.broken_by_template.map(b => `<div style="font-size:11px;color:#d97757">• ${{b.template}}: ${{b.count}} broken</div>`).join('')
+      : '';
+    document.getElementById('refresh-stats').innerHTML = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <div><span style="color:#6db585;font-size:20px;font-family:'Fraunces',serif">${{ref.ok_links}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Links OK</div></div>
+        <div><span style="color:#d97757;font-size:20px;font-family:'Fraunces',serif">${{ref.broken_links}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Broken</div></div>
+        <div><span style="color:#f5f1e8;font-size:20px;font-family:'Fraunces',serif">${{ref.total_links}}</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Total</div></div>
+        <div><span style="color:#e8a849;font-size:20px;font-family:'Fraunces',serif">${{linkPct}}%</span><div style="font-size:9px;color:#4a5260;text-transform:uppercase">Health</div></div>
+      </div>
+      <div style="font-size:12px;color:#4a5260">Last refresh: ${{ref.last_refresh || 'Never'}}</div>
+      ${{brokenHtml}}`;
+
+    // Cache stats
+    const cache = d.cache;
+    document.getElementById('cache-stats').innerHTML = `
+      <table style="margin:0">
+        <tr><th>Type</th><th>Cached</th></tr>
+        <tr><td>Discovery</td><td>${{cache.discovery}}</td></tr>
+        <tr><td>Triage</td><td>${{cache.triage}}</td></tr>
+        <tr><td>Generation</td><td>${{cache.generation}}</td></tr>
+        <tr><td>Currency Review</td><td>${{cache.currency_review}}</td></tr>
+        <tr><td style="color:#d97757">Expired</td><td style="color:#d97757">${{cache.expired}}</td></tr>
+        <tr><td><strong>Total Files</strong></td><td><strong>${{cache.total_files}}</strong></td></tr>
+      </table>`;
+
+    // Config
+    const cfg = d.config;
+    document.getElementById('config-stats').innerHTML = `
+      <table style="margin:0">
+        <tr><td style="color:#4a5260">Discovery Limit</td><td>${{cfg.max_topics_per_discovery}} topics</td></tr>
+        <tr><td style="color:#4a5260">Discovery Freq</td><td>${{cfg.discovery_frequency}}</td></tr>
+        <tr><td style="color:#4a5260">Auto-Approve</td><td>${{cfg.auto_approve ? '✓ Yes' : '✗ No'}}</td></tr>
+        <tr><td style="color:#4a5260">Auto-Generate</td><td>${{cfg.auto_generate ? '✓ Yes' : '✗ No'}}</td></tr>
+        <tr><td style="color:#4a5260">Refresh Freq</td><td>${{cfg.refresh_frequency}}</td></tr>
+      </table>`;
+
+    // Discovery runs
+    if (disc.recent_runs.length > 0) {{
+      let html = '<table><tr><th>Run</th><th>Model</th><th>Topics Found</th></tr>';
+      for (const r of disc.recent_runs) {{
+        html += `<tr><td style="font-size:11px">${{r.run_id}}</td><td>${{r.model}}</td><td>${{r.topics_found}}</td></tr>`;
+      }}
+      html += '</table>';
+      document.getElementById('discovery-runs').innerHTML = html;
+    }} else {{
+      document.getElementById('discovery-runs').innerHTML = '<p style="color:#4a5260">No discovery runs yet.</p>';
+    }}
+
+    // Generation by topic
+    if (gen.per_topic.length > 0) {{
+      let html = '<table><tr><th>Topic</th><th>Variants</th><th>Status</th><th>Error</th></tr>';
+      for (const t of gen.per_topic) {{
+        const statusCls = t.status === 'generated' ? 'approved' : t.status === 'approved' ? 'pending' : 'rejected';
+        html += `<tr>
+          <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis">${{t.topic}}</td>
+          <td>${{t.variants}}/5</td>
+          <td><span class="badge ${{statusCls}}">${{t.status}}</span></td>
+          <td style="font-size:10px;color:#d97757;max-width:300px;overflow:hidden;text-overflow:ellipsis">${{t.error}}</td>
+        </tr>`;
+      }}
+      html += '</table>';
+      document.getElementById('gen-by-topic').innerHTML = html;
+    }} else {{
+      document.getElementById('gen-by-topic').innerHTML = '<p style="color:#4a5260">No templates generated yet.</p>';
+    }}
+  }} catch(e) {{
+    document.getElementById('discovery-stats').innerHTML = '<p style="color:#d97757">Failed: ' + e.message + '</p>';
+  }}
+}}
+
+loadNormData();
+</script>
+</div>
+</body></html>"""
