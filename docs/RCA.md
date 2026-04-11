@@ -94,6 +94,12 @@
 - **Fix:** JSON-encode topic lists for discovery prompt. Truncate + strip newlines for triage and review prompts. Schema validation on AI output (already existed) as defense-in-depth.
 - **Prevention:** Never interpolate DB/user-sourced strings directly into AI prompts. Use JSON encoding for lists, truncate + strip control characters for individual strings. Always validate AI output against strict schemas.
 
+### 015 — Opted-in user missing from leaderboard (2026-04-11)
+- **Symptom:** User manishkumarjnvk@gmail.com enabled `public_profile` but didn't appear on `/leaderboard`.
+- **Root cause:** Leaderboard had `if stats["plan"] is None: continue` — users who opted in but hadn't enrolled in a plan were silently dropped. The user had `public_profile=1` but zero rows in `user_plans`.
+- **Fix:** Removed the plan-required gate. All opted-in users now appear on the leaderboard, showing "Not enrolled yet" and 0% if no plan.
+- **Prevention:** Opt-in features should work independently of other state. If a user enables a feature, they should see the result regardless of whether they've completed other prerequisites. Test opt-in features with minimal user state.
+
 ---
 
 ## Patterns to watch for
@@ -112,3 +118,4 @@
 | CSRF substring match | Medium | Use parsed hostname equality, reject missing headers |
 | Raw setattr from JSON | Medium | Always validate with Pydantic model first |
 | DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
+| Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
