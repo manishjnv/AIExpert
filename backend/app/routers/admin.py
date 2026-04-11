@@ -416,6 +416,7 @@ async def admin_dashboard_page(
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
     enrolled = await db.scalar(
         select(func.count(func.distinct(UserPlan.user_id)))
+        .where(UserPlan.status == "active")
     ) or 0
 
     # ---- Content ----
@@ -503,6 +504,7 @@ async def admin_users_page(
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
     users_with_plans = await db.scalar(
         select(func.count(func.distinct(UserPlan.user_id)))
+        .where(UserPlan.status == "active")
     ) or 0
     active_sessions = await db.scalar(
         select(func.count()).select_from(SessionModel)
