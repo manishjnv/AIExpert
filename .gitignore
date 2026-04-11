@@ -83,6 +83,7 @@ docker-compose.override.yml
 .claude/
 .anthropic/
 *.claude-session
+.mcp.json
 
 # ============================================================
 # Generated files
