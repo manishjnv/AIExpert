@@ -256,10 +256,21 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
     plan_json = json.dumps(plan, separators=(",", ":"))
     prompt = prompt_template.format(plan_json=plan_json)
 
+    # Split into system instruction (reusable, cached) + user content (varies)
+    # This is a major cost saver: Gemini caches system instructions across calls.
+    # The review rubric (~800 tokens) is the same for every template — only the
+    # curriculum JSON changes per call.
+    system_part = prompt_template.split("CURRICULUM TO REVIEW:")[0]
+    user_part = "CURRICULUM TO REVIEW:\n" + plan_json
+
     try:
         if model_name == "gemini":
             from app.ai.gemini import complete
-            result = await complete(prompt, json_response=True)
+            result = await complete(
+                user_part, json_response=True,
+                task="quality_review",
+                system_instruction=system_part,
+            )
         elif model_name == "groq":
             from app.ai.groq import complete
             result = await complete(prompt, json_response=True)
@@ -316,13 +327,24 @@ async def _run_refinement(
         duration_months=plan.get("duration_months", 6),
     )
 
+    # Split prompt: system rules (cacheable) vs user content (varies)
+    system_rules = prompt_template.split("WEEKS THAT NEED FIXING:")[0]
+    user_content = f"WEEKS THAT NEED FIXING:\n{json.dumps(failing_weeks, separators=(',', ':'))}\n\nISSUES TO FIX:\n{json.dumps(critical_fixes, separators=(',', ':'))}\n\nCONTEXT:\n- Topic: {plan.get('title', '')}\n- Level: {plan.get('level', '')}\n- Month: {month_context} of {plan.get('duration_months', 6)}"
+
     try:
         if model_name == "claude":
             from app.ai.anthropic import complete
-            fixed_weeks = await complete(prompt, json_response=True)
+            fixed_weeks = await complete(
+                user_content, json_response=True,
+                system_prompt=system_rules,
+            )
         elif model_name == "gemini":
             from app.ai.gemini import complete
-            fixed_weeks = await complete(prompt, json_response=True)
+            fixed_weeks = await complete(
+                user_content, json_response=True,
+                task="quality_refine",
+                system_instruction=system_rules,
+            )
         else:
             from app.ai.provider import complete as ai_complete
             fixed_weeks, _ = await ai_complete(prompt, json_response=True,

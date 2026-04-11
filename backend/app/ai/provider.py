@@ -120,7 +120,11 @@ async def complete(
         for attempt in range(MAX_RETRIES + 1):
             start = time.time()
             try:
-                result = await complete_fn(prompt, json_response=json_response)
+                # Pass task to Gemini for right-sized tokens/timeout
+                kwargs = {"json_response": json_response}
+                if name == "gemini":
+                    kwargs["task"] = task
+                result = await complete_fn(prompt, **kwargs)
                 latency = int((time.time() - start) * 1000)
 
                 record_success(name)
