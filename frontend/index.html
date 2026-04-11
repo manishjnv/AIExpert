@@ -429,7 +429,7 @@
 <div class="chat-panel" id="chatPanel">
   <div class="chat-header">
     <h4>AI Mentor — <span id="chatWeekLabel">Week 1</span></h4>
-    <button onclick="toggleChat()">✕</button>
+    <div><button onclick="chatHistory[chatWeek]=[];renderChatMessages()" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:11px;margin-right:8px">Clear</button><button onclick="toggleChat()" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px">✕</button></div>
   </div>
   <div class="chat-messages" id="chatMessages"></div>
   <div class="chat-input-row">
@@ -1036,11 +1036,22 @@ function setChatWeek(weekN) {
   renderChatMessages();
 }
 
+function formatMarkdown(text) {
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:var(--bg-3);padding:1px 4px;border-radius:2px;font-size:12px">$1</code>')
+    .replace(/^[-•]\s+(.+)$/gm, '<div style="padding:2px 0 2px 12px">• $1</div>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<div style="padding:2px 0 2px 12px">$&</div>')
+    .replace(/\n/g, '<br>');
+}
+
 function renderChatMessages() {
   const el = document.getElementById("chatMessages");
   const msgs = chatHistory[chatWeek] || [];
   el.innerHTML = msgs.map(m =>
-    `<div class="chat-msg ${m.role}"><div class="role">${m.role}</div>${m.content.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`
+    `<div class="chat-msg ${m.role}"><div class="role">${m.role === 'user' ? 'You' : 'AI Mentor'}</div>${formatMarkdown(m.content)}</div>`
   ).join('');
   el.scrollTop = el.scrollHeight;
 }
