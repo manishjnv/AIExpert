@@ -119,10 +119,13 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     )).scalars().all()
 
     entries = []
+    total_tasks_all = 0
     for user in users:
         stats = await _get_user_progress(user, db)
         if stats["plan"] is None:
             continue
+        total_tasks_all += stats["done"]
+        joined = user.created_at.strftime("%b %Y") if user.created_at else "—"
         entries.append({
             "id": user.id,
             "name": esc((user.name or "Learner")),
@@ -131,33 +134,60 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             "total": stats["total"],
             "pct": stats["pct"],
             "github": user.github_username,
+            "linkedin": user.linkedin_url,
+            "joined": joined,
         })
 
-    # Sort by completion % descending
-    entries.sort(key=lambda e: e["pct"], reverse=True)
+    # Sort by completion % descending, then by done count
+    entries.sort(key=lambda e: (e["pct"], e["done"]), reverse=True)
+
+    medals = ["🥇", "🥈", "🥉"]
 
     rows = ""
     for i, e in enumerate(entries, 1):
-        gh_link = f'<a href="https://github.com/{esc(e["github"])}" target="_blank">{esc(e["github"])}</a>' if e["github"] else "—"
+        medal = medals[i-1] if i <= 3 else str(i)
+        gh_link = f'<a href="https://github.com/{esc(e["github"])}" target="_blank">{esc(e["github"])}</a>' if e["github"] else ""
+        li_link = ""
+        if e["linkedin"]:
+            li_href = e["linkedin"] if e["linkedin"].startswith("http") else "https://" + e["linkedin"]
+            li_link = f' <a href="{esc(li_href)}" target="_blank" style="font-size:11px">LinkedIn</a>'
+        bar_color = "#6db585" if e["pct"] >= 75 else "#e8a849" if e["pct"] >= 25 else "#4a5260"
         rows += f"""<tr>
-            <td class="rank">{i}</td>
-            <td><a href="/profile/{e['id']}">{e['name']}</a></td>
-            <td>{e['plan']}</td>
-            <td>{e['done']}/{e['total']}</td>
-            <td style="color:#e8a849;font-weight:bold">{e['pct']}%</td>
-            <td>{gh_link}</td>
+            <td class="rank" style="font-size:18px">{medal}</td>
+            <td>
+              <a href="/profile/{e['id']}" style="font-weight:600">{e['name']}</a>
+              <div style="font-size:10px;color:#4a5260">Joined {e['joined']}</div>
+            </td>
+            <td><span style="font-size:11px;background:#1d242e;padding:3px 8px;border-radius:10px">{e['plan']}</span></td>
+            <td>
+              <div style="font-size:12px;margin-bottom:3px">{e['done']}/{e['total']}</div>
+              <div class="progress-bar" style="width:100px;height:6px"><div style="width:{e['pct']}%;background:{bar_color}"></div></div>
+            </td>
+            <td style="color:#e8a849;font-weight:bold;font-size:18px">{e['pct']}%</td>
+            <td style="font-size:11px">{gh_link}{li_link}</td>
         </tr>"""
 
     if not rows:
         rows = '<tr><td colspan="6" style="text-align:center;color:#4a5260;padding:32px">No public profiles yet. Enable yours in Account Settings.</td></tr>'
+
+    # Summary stats
+    total_learners = len(entries)
+    avg_pct = round(sum(e["pct"] for e in entries) / total_learners) if total_learners else 0
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><style>{CSS}</style></head><body>
 <nav><a href="/" class="brand" style="text-decoration:none">AI Learning Roadmap</a><a href="/">Home</a><a href="/leaderboard">Leaderboard</a></nav>
 <div class="container">
 <h1>Leaderboard</h1>
 <div class="subtitle">Top learners ranked by progress. Enable your public profile in Account Settings to appear here.</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="n">{total_learners}</div><div class="l">Learners</div></div>
+  <div class="stat"><div class="n">{total_tasks_all}</div><div class="l">Tasks Done</div></div>
+  <div class="stat"><div class="n">{avg_pct}%</div><div class="l">Avg Progress</div></div>
+</div>
+
 <table>
-<tr><th>#</th><th>Name</th><th>Plan</th><th>Progress</th><th>%</th><th>GitHub</th></tr>
+<tr><th>#</th><th>Learner</th><th>Plan</th><th>Progress</th><th>%</th><th>Links</th></tr>
 {rows}
 </table>
 </div></body></html>"""
