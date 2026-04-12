@@ -3,6 +3,33 @@
  * Renders the main nav bar with auth-aware links.
  * Admin sub-nav shown only on /admin/* pages.
  */
+// ---- Global time formatting — always IST (Asia/Kolkata) ----
+(function() {
+  const IST_OPTS_SHORT = { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+  const IST_OPTS_FULL  = { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+  const IST_OPTS_DATE  = { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' };
+  const IST_OPTS_MY    = { timeZone: 'Asia/Kolkata', month: 'short', year: 'numeric' };
+  const IST_OPTS_FMY   = { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' };
+
+  function parseUtc(s) {
+    if (!s) return null;
+    if (s instanceof Date) return s;
+    // Accept ISO with/without Z; if no tz info, treat as UTC.
+    const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+    const d = new Date(hasTz ? s : (s.includes('T') ? s + 'Z' : s.replace(' ', 'T') + 'Z'));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function format(d, opts) {
+    return d.toLocaleString('en-GB', opts).replace(',', '') + ' IST';
+  }
+
+  window.fmtIST       = function(s) { const d = parseUtc(s); return d ? format(d, IST_OPTS_SHORT) : (s || ''); };
+  window.fmtISTFull   = function(s) { const d = parseUtc(s); return d ? format(d, IST_OPTS_FULL)  : (s || ''); };
+  window.fmtISTDate   = function(s) { const d = parseUtc(s); return d ? d.toLocaleString('en-GB', IST_OPTS_DATE) : (s || ''); };
+  window.fmtISTMonthY = function(s) { const d = parseUtc(s); return d ? d.toLocaleString('en-GB', IST_OPTS_MY)   : (s || ''); };
+  window.fmtISTFullMY = function(s) { const d = parseUtc(s); return d ? d.toLocaleString('en-GB', IST_OPTS_FMY)  : (s || ''); };
+})();
+
 (function() {
   const LOGO = '<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:6px"><rect width="24" height="24" rx="5" fill="#e8a849"/><path d="M7 17L12 6L17 17" stroke="#0f1419" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="10" r="2" fill="#0f1419"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0f1419" stroke-width="1.5" stroke-linecap="round"/></svg>';
 

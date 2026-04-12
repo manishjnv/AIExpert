@@ -13,6 +13,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
+from app.utils.time_fmt import fmt_ist, FMT_MONTH_YEAR, FMT_FULL_MONTH_YEAR
 from app.models.plan import Progress, UserPlan
 from app.models.user import User
 
@@ -159,7 +160,7 @@ async def public_profile(user_id: int, db: AsyncSession = Depends(get_db)):
 <script src="/nav.js"></script>
 <div class="container">
 <h1>{full_name}</h1>
-<div class="subtitle">{plan_label} · Joined {user.created_at.strftime('%B %Y') if user.created_at else '—'}</div>
+<div class="subtitle">{plan_label} · Joined {fmt_ist(user.created_at, FMT_FULL_MONTH_YEAR)}</div>
 {badges_html}
 <div class="stat-row">
   <div class="stat"><div class="n">{stats['pct']}%</div><div class="l">Complete</div></div>
@@ -185,7 +186,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         stats = await _get_user_progress(user, db)
         lifetime = stats.get("lifetime_done", stats["done"])
         total_tasks_all += lifetime
-        joined = user.created_at.strftime("%b %Y") if user.created_at else "—"
+        joined = fmt_ist(user.created_at, FMT_MONTH_YEAR)
         streak = await _get_streak(user.id, stats["plan"].id, db) if stats["plan"] else 0
         total_streak_all = max(total_streak_all, streak)
         entries.append({

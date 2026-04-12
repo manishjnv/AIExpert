@@ -284,7 +284,7 @@ function render() {
   // Header
   document.getElementById('profileName').textContent = profile.name || 'Learner';
   document.getElementById('profileEmail').textContent = profile.email;
-  const joined = profile.account_created ? new Date(profile.account_created).toLocaleDateString('en-US', {month:'long', year:'numeric'}) : '';
+  const joined = profile.account_created ? window.fmtISTFullMY(profile.account_created) : '';
   document.getElementById('profileJoined').textContent = joined ? 'Joined ' + joined : '';
   document.getElementById('subtitleText').textContent = profile.email;
 
@@ -323,7 +323,7 @@ function render() {
     document.getElementById('historySection').style.display = 'block';
     const tl = document.getElementById('historyTimeline');
     tl.innerHTML = history.map(h => {
-      const date = h.enrolled_at ? new Date(h.enrolled_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '';
+      const date = h.enrolled_at ? window.fmtISTMonthY(h.enrolled_at) : '';
       const barColor = h.pct >= 75 ? 'var(--success)' : h.pct >= 25 ? 'var(--accent)' : 'var(--ink-soft)';
       const dotClass = h.status === 'active' ? 'active' : 'archived';
       const statusClass = h.status === 'active' ? 'active' : 'archived';
@@ -333,7 +333,7 @@ function render() {
           '<span class="timeline-title">' + h.title + '</span>' +
           '<span class="timeline-status ' + statusClass + '">' + h.status + '</span>' +
         '</div>' +
-        '<div class="timeline-meta">' + date + (h.archived_at ? ' \u2014 ' + new Date(h.archived_at).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '') + '</div>' +
+        '<div class="timeline-meta">' + date + (h.archived_at ? ' \u2014 ' + window.fmtISTMonthY(h.archived_at) : '') + '</div>' +
         '<div class="timeline-bar">' +
           '<div class="bar"><div style="width:' + h.pct + '%;background:' + barColor + '"></div></div>' +
           '<span class="pct">' + h.pct + '%</span>' +

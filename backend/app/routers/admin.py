@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from html import escape as esc
 
+from app.utils.time_fmt import fmt_ist, FMT_SHORT, FMT_DATE, iso_utc_z
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
@@ -443,7 +445,7 @@ async def admin_dashboard_page(
     )).scalars().all()
 
     signups_html = "".join(
-        f'<tr><td>{esc(u.name or "-")}</td><td style="color:#8a92a0">{esc(u.email)}</td><td>{esc(u.provider)}</td><td>{u.created_at.strftime("%b %d, %H:%M") if u.created_at else "-"}</td></tr>'
+        f'<tr><td>{esc(u.name or "-")}</td><td style="color:#8a92a0">{esc(u.email)}</td><td>{esc(u.provider)}</td><td>{fmt_ist(u.created_at, default="-")}</td></tr>'
         for u in recent
     )
 
@@ -565,7 +567,7 @@ async def admin_users_page(
     for u in rows:
         sess = last_sessions.get(u.id)
         last_ip = esc(sess.ip or "-") if sess else "-"
-        last_login = sess.issued_at.strftime("%b %d, %H:%M") if sess else "-"
+        last_login = fmt_ist(sess.issued_at, default="-") if sess else "-"
 
         # Parse user agent for device info
         ua_raw = sess.user_agent if sess else ""
@@ -577,7 +579,7 @@ async def admin_users_page(
         provider_icon = "G" if u.provider == "google" else "✉"
         admin_badge = ' <span style="color:#e8a849;font-size:12px">ADMIN</span>' if u.is_admin else ""
 
-        created = u.created_at.strftime("%b %d, %Y") if u.created_at else "-"
+        created = fmt_ist(u.created_at, FMT_DATE, default="-")
 
         rows_html += f"""<tr>
 <td>{u.id}</td>

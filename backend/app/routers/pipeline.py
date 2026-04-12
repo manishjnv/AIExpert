@@ -20,6 +20,7 @@ from typing import Optional
 
 from app.auth.deps import get_current_admin
 from app.db import get_db
+from app.utils.time_fmt import fmt_ist, FMT_SHORT, FMT_DATE, iso_utc_z
 from app.models.curriculum import (
     AdminAlert, AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic,
     ProviderBalance, ProviderDailySpend,
@@ -444,9 +445,9 @@ async def pipeline_dashboard_page(
     from app.curriculum.loader import list_templates
     template_count = len(list_templates())
 
-    last_discovery = s.last_discovery_run.strftime("%b %d, %H:%M") if s.last_discovery_run else "Never"
-    last_generation = s.last_generation_run.strftime("%b %d, %H:%M") if s.last_generation_run else "Never"
-    last_refresh = s.last_refresh_run.strftime("%b %d, %H:%M") if s.last_refresh_run else "Never"
+    last_discovery = fmt_ist(s.last_discovery_run, default="Never")
+    last_generation = fmt_ist(s.last_generation_run, default="Never")
+    last_refresh = fmt_ist(s.last_refresh_run, default="Never")
 
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pipeline</title>
 <style>{ADMIN_CSS}</style></head><body>
@@ -824,7 +825,7 @@ async def pipeline_topics_page(
 <td style="text-align:center">{_topic_quality_cell(topic_scores.get(t.id, {}))}</td>
 <td><span class="badge {t.status}">{t.status}</span>{error_html}</td>
 <td>{t.templates_generated}</td>
-<td style="font-size:12px">{t.created_at.strftime('%Y-%m-%d') if t.created_at else ''}</td>
+<td style="font-size:12px">{fmt_ist(t.created_at, FMT_DATE, default='')}</td>
 <td>{actions}</td>
 </tr>"""
 
@@ -1236,7 +1237,8 @@ async def get_ai_usage(
         "recent": [
             {
                 "id": r.id,
-                "called_at": r.called_at.strftime("%Y-%m-%d %H:%M:%S") if r.called_at else "",
+                "called_at": fmt_ist(r.called_at, default=""),
+                "called_at_utc": iso_utc_z(r.called_at),
                 "provider": r.provider,
                 "model": r.model,
                 "task": r.task,
@@ -2259,7 +2261,7 @@ async function loadUsageData() {{
       let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Result</th><th>Speed</th><th>Cost</th></tr>';
       for (const r of data.recent) {{
         html += `<tr>
-          <td style="font-size:12px;white-space:nowrap">${{r.called_at.slice(11)}}</td>
+          <td style="font-size:12px;white-space:nowrap" title="${{r.called_at}}">${{r.called_at_utc ? window.fmtIST(r.called_at_utc) : r.called_at}}</td>
           <td style="text-transform:capitalize">${{r.provider}}</td>
           <td>${{r.task}}${{r.subtask ? ' <span style="color:#8a92a0;font-size:12px">(' + r.subtask.slice(0,30) + ')</span>' : ''}}</td>
           <td>${{friendlyStatus(r.status, r.error_message)}}</td>

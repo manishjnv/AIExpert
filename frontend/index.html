@@ -970,7 +970,7 @@ function exportPlanPDF() {
   const userName = currentUser?.name || "Learner";
   const userEmail = currentUser?.email || "Not signed in";
   const userGithub = currentUser?.github_username || "";
-  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const date = new Date().toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", year: "numeric", month: "long", day: "numeric" });
   const totalHours = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
   const allResources = [];
   DATA.forEach(m => m.weeks.forEach(w => (w.resources||[]).forEach(r => { if(r.name && !allResources.find(x=>x.name===r.name)) allResources.push(r); })));
@@ -1535,12 +1535,12 @@ function renderRepoSection(weekN) {
           <div><h5>Strengths</h5><ul>${(ev.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
           <div><h5>Improvements</h5><ul>${(ev.improvements||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
         </div>
-        <div style="margin-top:6px;font-family:var(--mono);font-size:9px;color:var(--ink-soft)">${ev.model} · ${ev.created_at ? new Date(ev.created_at).toLocaleDateString() : ''}</div>
+        <div style="margin-top:6px;font-family:var(--mono);font-size:9px;color:var(--ink-soft)">${ev.model} · ${ev.created_at ? window.fmtISTDate(ev.created_at) : ''}</div>
       </div>`;
     }
     el.innerHTML = `<div class="repo-chip">
       <a href="https://github.com/${link.owner}/${link.name}" target="_blank">${link.owner}/${link.name}</a>
-      ${link.last_commit_date ? `<span style="color:var(--ink-soft);font-size:10px">${new Date(link.last_commit_date).toLocaleDateString()}</span>` : ''}
+      ${link.last_commit_date ? `<span style="color:var(--ink-soft);font-size:10px">${window.fmtISTDate(link.last_commit_date)}</span>` : ''}
       <button class="btn" onclick="runEval(${weekN})" style="font-size:10px;padding:4px 8px;margin-left:6px">Evaluate</button>
       <span class="unlink" onclick="unlinkRepo(${weekN})" title="Unlink">✕</span>
     </div>
