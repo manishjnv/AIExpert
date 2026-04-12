@@ -63,11 +63,11 @@
   background: #c98e2f;
 }
 
-/* Admin sub-nav */
+/* Admin sub-nav — segmented pill style */
 .subnav {
-  padding: 6px 48px;
+  padding: 8px 48px;
   display: flex;
-  gap: 2px;
+  gap: 4px;
   align-items: center;
   border-bottom: 1px solid #2a323d;
   background: #161c24;
@@ -75,28 +75,36 @@
 }
 .subnav a {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #4a5260;
+  color: #b8bfc9;
   text-decoration: none;
-  padding: 6px 12px;
-  border-radius: 2px;
-  transition: all 0.2s;
+  padding: 6px 14px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  border: 1px solid transparent;
 }
 .subnav a:hover {
-  color: #e8e2d3;
-  background: rgba(232,168,73,0.06);
+  color: #f5f1e8;
+  background: rgba(232,168,73,0.08);
+  border-color: rgba(232,168,73,0.2);
 }
 .subnav a.active {
-  color: #e8a849;
-  background: rgba(232,168,73,0.08);
+  color: #0f1419;
+  background: #e8a849;
+  font-weight: 600;
+  border-color: #e8a849;
+}
+.subnav a.active:hover {
+  background: #e8a849;
+  color: #0f1419;
 }
 
 @media (max-width: 768px) {
   .topnav { padding: 10px 16px; flex-wrap: wrap; }
   .topnav-brand { font-size: 14px; }
   .topnav-links a { font-size: 10px; padding: 6px 10px; }
-  .subnav { padding: 4px 16px; }
-  .subnav a { font-size: 9px; padding: 4px 8px; }
+  .subnav { padding: 6px 16px; }
+  .subnav a { font-size: 10px; padding: 5px 10px; }
 }
