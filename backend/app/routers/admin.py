@@ -943,7 +943,14 @@ async function refineOne(key) {{
       const msg = data.improved
         ? `Score: ${{before}} → ${{after}} ✓ improved`
         : `Score: ${{before}} → ${{after}} (no improvement saved)`;
-      alert(msg + '\\nStages: ' + (data.stages_run||[]).join(', '));
+      const stages = 'Stages: ' + (data.stages_run||[]).join(', ');
+      const models = Object.keys(data.models_used||{{}}).length
+        ? 'Models: ' + Object.entries(data.models_used).map(([k,v])=>k+'='+v).join(', ')
+        : '';
+      const skipped = (data.skipped && data.skipped.length)
+        ? 'Skipped:\\n  • ' + data.skipped.join('\\n  • ')
+        : '';
+      alert([msg, stages, models, skipped].filter(Boolean).join('\\n'));
       window.location.reload();
     }} else {{
       alert('Refine failed: ' + (data.detail || resp.statusText));
