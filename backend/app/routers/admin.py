@@ -867,7 +867,9 @@ async def admin_templates_page(
   <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
-<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th title="Sum of per-week focus areas across all weeks in this template (not to be confused with Topic, which is the course subject on the Topics tab)">Focus areas</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Count of resources that link to github.com (concrete GitHub practice)">GH Repos</th><th>Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+<div style="overflow-x:auto;border:1px solid #2a323d;border-radius:4px">
+<table style="min-width:1100px;margin:0"><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th title="Sum of per-week focus areas across all weeks in this template (not to be confused with Topic, which is the course subject on the Topics tab)">Focus areas</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Count of resources that link to github.com (concrete GitHub practice)">GH Repos</th><th title="Active subscribers / enrollments">Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+</div>
 
 <script>
 async function generateTemplate() {{
