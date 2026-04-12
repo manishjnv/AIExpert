@@ -749,7 +749,6 @@ async def admin_templates_page(
         try:
             tpl = load_template(key)
             is_default = key in grandfathered
-            delete_btn = "" if is_default else f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>'
 
             status_info = get_template_status(key)
             pub_status = status_info.get("status", "draft")
@@ -764,7 +763,7 @@ async def admin_templates_page(
 
             score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
             if q_score == 0:
-                score_display = '<span style="color:#8a92a0" title="Not yet scored">—</span>'
+                score_display = '<span style="color:#8a92a0" title="Not yet scored — click Check quality">—</span>'
             elif q_score >= 90:
                 score_display = f'<span style="color:{score_color};font-weight:600" title="At or above publish threshold (90)">{q_score} ✓ ready</span>'
             elif pub_status == "published":
@@ -775,7 +774,22 @@ async def admin_templates_page(
             subs = subscriber_counts.get(key, 0)
             subs_display = f'<span style="font-weight:600">{subs}</span>' if subs > 0 else '<span style="color:#8a92a0">0</span>'
 
-            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td>{delete_btn}</td></tr>"
+            # Action buttons by state
+            actions = []
+            if pub_status == "published" and not is_default:
+                actions.append(f'<button class="btn" onclick="unpublishTemplate(&quot;{key}&quot;)" title="Hide from users, return to draft">Unpublish</button>')
+            elif pub_status == "draft":
+                if q_score >= 90:
+                    actions.append(f'<button class="btn success" onclick="publishTemplate(&quot;{key}&quot;)" title="Make this template available to users">Publish</button>')
+                elif q_score == 0:
+                    actions.append(f'<button class="btn primary" onclick="checkQuality(&quot;{key}&quot;)" title="Score quality; auto-publishes if score >= 90">Check quality</button>')
+                else:
+                    actions.append(f'<a href="/admin/pipeline/" class="btn" title="Score {q_score} below 90. Run Pipeline → Refine Quality.">Refine →</a>')
+            if not is_default:
+                actions.append(f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>')
+            actions_html = " ".join(actions)
+
+            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
         except Exception:
             continue
 
@@ -783,9 +797,16 @@ async def admin_templates_page(
 {ADMIN_NAV}
 <div class="page">
 <h1>Plan Templates</h1>
-<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin-bottom:16px;font-size:13px;line-height:1.6">
-  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">choose what to publish to users.</span>
-  <span style="color:#8a92a0">AI writes curricula and scores them (0–100); publish threshold is 90. Anything below needs refinement (see Pipeline → Refine Quality) before it reaches users.</span>
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin-bottom:16px;font-size:13px;line-height:1.6">
+  <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — what to do on this page</div>
+  <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
+    <li><strong>Generate</strong> a new template using the form below (or let the Pipeline auto-generate from approved Topics).</li>
+    <li><strong>Check quality</strong> on new drafts — click <em>Check quality</em> in the Actions column. AI scores 0–100 across 15 dimensions.</li>
+    <li><strong>If score ≥ 90</strong> → click <em>Publish</em>. Users can now enroll.</li>
+    <li><strong>If score &lt; 90</strong> → click <em>Refine →</em> to jump to Pipeline → Refine Quality, then re-check.</li>
+    <li><strong>Unpublish</strong> if a template becomes stale, or <strong>Delete</strong> to remove entirely.</li>
+  </ol>
+  <div style="color:#8a92a0;font-size:12px">Score legend: <span style="color:#6db585">≥90 ready</span> · <span style="color:#e8a849">70–89 needs refine</span> · <span style="color:#d97757">&lt;70 weak, regenerate</span> · <span style="color:#8a92a0">— not yet scored</span></div>
 </div>
 
 <div style="background:#1d242e;padding:16px;border-radius:6px;margin-bottom:24px">
@@ -840,6 +861,38 @@ async function deleteTemplate(key) {{
   const resp = await fetch('/admin/api/templates/' + key, {{method: 'DELETE', credentials: 'same-origin'}});
   if (resp.ok) window.location.reload();
   else alert('Delete failed');
+}}
+
+async function publishTemplate(key) {{
+  const resp = await fetch('/admin/pipeline/api/quality/' + key + '/publish', {{method: 'POST', credentials: 'same-origin'}});
+  const data = await resp.json().catch(() => ({{}}));
+  if (resp.ok) window.location.reload();
+  else alert('Publish failed: ' + (data.detail || resp.statusText));
+}}
+
+async function unpublishTemplate(key) {{
+  if (!confirm('Unpublish ' + key + '? Users currently enrolled will keep their plan, but no new enrollments will be possible.')) return;
+  const resp = await fetch('/admin/pipeline/api/quality/' + key + '/unpublish', {{method: 'POST', credentials: 'same-origin'}});
+  if (resp.ok) window.location.reload();
+  else alert('Unpublish failed');
+}}
+
+async function checkQuality(key) {{
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Scoring…';
+  const resp = await fetch('/admin/pipeline/api/quality/' + key + '/publish', {{method: 'POST', credentials: 'same-origin'}});
+  const data = await resp.json().catch(() => ({{}}));
+  if (resp.ok) {{
+    alert('Score: ' + data.score + ' — Published ✓');
+    window.location.reload();
+  }} else {{
+    alert((data.detail || 'Scoring failed') + ' Refine via Pipeline, then re-check.');
+    btn.disabled = false;
+    btn.textContent = orig;
+    window.location.reload();
+  }}
 }}
 </script>
 </div></body></html>"""
