@@ -2065,102 +2065,106 @@ async function loadUsageData() {{
       document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
     }}
 
-    // Consolidated provider cards (paid) + collapsed free summary
+    // Single consolidated table — paid providers on top (editable), free at bottom
     if (data.provider_info) {{
-      window.__lastInfo = data.provider_info;  // for editBalanceOnly preserving rec cap
+      window.__lastInfo = data.provider_info;
+      // Only provider-wide caps (model === '*') appear here. Per-model
+      // overrides are intentionally hidden — admin UI is paved-path.
       const limitsByProvider = {{}};
-      const allLimits = data.limits || [];
-      allLimits.forEach(l => {{
+      (data.limits || []).forEach(l => {{
         if (l.model === '*') limitsByProvider[l.provider] = l.daily_cost_usd;
       }});
       const spend = data.spend_today || {{}};
 
-      const paid = data.provider_info.filter(p => p.paid);
-      const free = data.provider_info.filter(p => !p.paid);
+      let html = '<table style="font-size:13px"><tr>'
+        + '<th></th><th>Provider</th><th>Balance</th><th>Daily $ cap</th>'
+        + '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Used for</th></tr>';
 
-      let cards = '<div style="display:grid;gap:10px">';
-      for (const p of paid) {{
+      for (const p of data.provider_info) {{
         const curCap = limitsByProvider[p.provider];
         const rec = p.recommended_cap_usd || 0;
         const bal = p.balance_usd || 0;
         const sp = spend[p.provider] || 0;
 
-        // Status dot + utilization
-        let dot, dotTitle, pct = 0, barColor = '#6db585';
-        if (curCap == null) {{
-          dot = '🔴'; dotTitle = 'No cap set';
+        // Status dot
+        let dot;
+        if (!p.paid) dot = '🟢';
+        else if (curCap == null) dot = '🔴';
+        else {{
+          const pct = curCap > 0 ? (sp / curCap) * 100 : 0;
+          dot = pct >= 90 ? '🔴' : (pct >= 70 ? '🟡' : '🟢');
+        }}
+
+        // Balance cell
+        let balCell;
+        if (p.paid) {{
+          balCell = '$<span class="inline-edit" contenteditable="true" '
+            + 'data-kind="balance" data-provider="' + p.provider + '" '
+            + 'style="border-bottom:1px dashed #e8a849;color:#e8a849;'
+            + 'padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
+            + bal.toFixed(2) + '</span>';
         }} else {{
-          pct = curCap > 0 ? Math.min(100, (sp / curCap) * 100) : 0;
-          if (pct >= 90) {{ dot = '🔴'; dotTitle = 'Near cap'; barColor = '#d97757'; }}
-          else if (pct >= 70) {{ dot = '🟡'; dotTitle = 'Approaching cap'; barColor = '#e8a849'; }}
-          else {{ dot = '🟢'; dotTitle = 'Healthy'; }}
+          balCell = '<span style="color:#8a92a0">free</span>';
         }}
 
-        // Editable cap — contenteditable span, autosaves on blur/Enter
-        const capValStr = curCap != null ? curCap.toFixed(2) : '';
-        const capPlaceholder = curCap == null ? 'unset' : '';
-        const capColor = curCap == null ? '#d97757' : '#e8a849';
-        let capDisplay = '$<span class="inline-edit" contenteditable="true" '
-          + 'data-kind="cap" data-provider="' + p.provider + '" '
-          + 'style="border-bottom:1px dashed ' + capColor + ';color:' + capColor
-          + ';padding:1px 4px;min-width:40px;display:inline-block;font-weight:600"'
-          + '>' + (capValStr || capPlaceholder) + '</span>';
-        if (rec > 0 && (curCap == null || Math.abs(curCap - rec) > 0.01)) {{
-          capDisplay += ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>';
+        // Cap cell
+        let capCell;
+        if (p.paid) {{
+          const capValStr = curCap != null ? curCap.toFixed(2) : '';
+          const capColor = curCap == null ? '#d97757' : '#e8a849';
+          capCell = '$<span class="inline-edit" contenteditable="true" '
+            + 'data-kind="cap" data-provider="' + p.provider + '" '
+            + 'style="border-bottom:1px dashed ' + capColor + ';color:' + capColor
+            + ';padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
+            + (capValStr || 'unset') + '</span>';
+          if (curCap == null && rec > 0) {{
+            capCell += ' <a href="#" style="color:#6db585;font-size:11px;text-decoration:none;margin-left:4px" '
+              + 'onclick="event.preventDefault();applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">'
+              + '⚡$' + rec.toFixed(2) + '</a>';
+          }} else if (rec > 0 && curCap != null && Math.abs(curCap - rec) > 0.01) {{
+            capCell += ' <span style="color:#8a92a0;font-size:11px">(rec $' + rec.toFixed(2) + ')</span>';
+          }}
+        }} else {{
+          capCell = '<span style="color:#8a92a0">—</span>';
         }}
 
-        // Progress bar
-        const barHtml = curCap != null
-          ? '<div style="background:#2b2e36;border-radius:3px;height:6px;overflow:hidden;margin-top:6px">'
-            + '<div style="background:' + barColor + ';width:' + pct.toFixed(0) + '%;height:100%"></div>'
-            + '</div>'
-            + '<div style="font-size:11px;color:#8a92a0;margin-top:2px">'
-            + 'Today: $' + sp.toFixed(4) + ' / $' + curCap.toFixed(2) + ' (' + pct.toFixed(0) + '%)'
-            + '</div>'
-          : '<div style="font-size:11px;color:#d97757;margin-top:6px">⚠ Unrestricted — runaway could drain balance</div>';
+        // Today-spend cell with mini progress
+        let spendCell;
+        if (p.paid) {{
+          if (curCap != null && curCap > 0) {{
+            const pct = Math.min(100, (sp / curCap) * 100);
+            const barColor = pct >= 90 ? '#d97757' : (pct >= 70 ? '#e8a849' : '#6db585');
+            spendCell = '<div>$' + sp.toFixed(4) + ' <span style="color:#8a92a0;font-size:11px">('
+              + pct.toFixed(0) + '%)</span></div>'
+              + '<div style="background:#2b2e36;border-radius:2px;height:4px;overflow:hidden;margin-top:2px;width:100px">'
+              + '<div style="background:' + barColor + ';width:' + pct.toFixed(0) + '%;height:100%"></div>'
+              + '</div>';
+          }} else {{
+            spendCell = '$' + sp.toFixed(4);
+          }}
+        }} else {{
+          spendCell = '<span style="color:#8a92a0">—</span>';
+        }}
 
-        const balDisplay = '$<span class="inline-edit" contenteditable="true" '
-          + 'data-kind="balance" data-provider="' + p.provider + '" '
-          + 'style="border-bottom:1px dashed #e8a849;color:#e8a849;'
-          + 'padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
-          + bal.toFixed(2) + '</span>';
+        const nameColor = p.paid ? '#e8a849' : '#6db585';
+        const disabled = (p.price_note || '').includes('402');
+        const nameCell = '<span style="color:' + (disabled ? '#8a92a0' : nameColor)
+          + ';text-transform:capitalize;font-weight:' + (p.paid ? '600' : '400') + '">'
+          + p.provider + (disabled ? ' (disabled)' : '') + '</span>';
 
-        cards += '<div style="border:1px solid #2b2e36;border-radius:6px;padding:12px;background:#1a1c22">'
-          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-          + '<span style="font-size:18px" title="' + dotTitle + '">' + dot + '</span>'
-          + '<b style="color:#e8a849;text-transform:capitalize;font-size:15px">' + p.provider + '</b>'
-          + '<span style="font-family:monospace;font-size:12px;color:#8a92a0">' + p.primary_model + '</span>'
-          + '<span style="font-size:12px;color:#8a92a0;margin-left:auto">' + p.price_note + '</span>'
-          + '</div>'
-          + '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">'
-          + '<div><span style="color:#8a92a0">Balance:</span> ' + balDisplay + '</div>'
-          + '<div><span style="color:#8a92a0">Daily cap:</span> ' + capDisplay
-          + (curCap == null && rec > 0
-              ? ' <a href="#" style="color:#6db585;font-size:12px;text-decoration:none;margin-left:6px" '
-                + 'onclick="event.preventDefault();applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">'
-                + '⚡ apply rec</a>'
-              : '')
-          + '</div>'
-          + '<div><span style="color:#8a92a0">Used for:</span> <span style="font-size:12px">' + p.use + '</span></div>'
-          + '</div>'
-          + barHtml
-          + '</div>';
+        html += '<tr>'
+          + '<td style="font-size:16px">' + dot + '</td>'
+          + '<td>' + nameCell + '</td>'
+          + '<td>' + balCell + '</td>'
+          + '<td>' + capCell + '</td>'
+          + '<td>' + spendCell + '</td>'
+          + '<td style="font-family:monospace;font-size:12px">' + p.primary_model + '</td>'
+          + '<td style="font-size:12px;color:#8a92a0">' + p.price_note + '</td>'
+          + '<td style="font-size:12px;color:#8a92a0">' + p.use + '</td>'
+          + '</tr>';
       }}
-      cards += '</div>';
-
-      // Free providers summary line
-      const freeNames = free.map(f => {{
-        const disabled = (f.price_note || '').includes('402');
-        return '<span style="text-transform:capitalize' + (disabled ? ';color:#8a92a0' : ';color:#6db585') + '">'
-          + f.provider + (disabled ? ' (disabled)' : '') + '</span>';
-      }}).join(' · ');
-      cards += '<div style="margin-top:12px;padding:10px 12px;border:1px solid #2b2e36;border-radius:6px;'
-        + 'background:#1a1c22;font-size:13px">'
-        + '🟢 <b>Free tier</b> (no caps, $0): ' + freeNames
-        + ' <span style="color:#8a92a0;font-size:12px">· used for triage and fallback</span>'
-        + '</div>';
-
-      document.getElementById('provider-cards').innerHTML = cards;
+      html += '</table>';
+      document.getElementById('provider-cards').innerHTML = html;
       wireInlineEdits();
     }}
 
