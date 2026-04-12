@@ -1126,6 +1126,28 @@ async def get_ai_usage(
         provider_cost_map[r.provider] = provider_cost_map.get(r.provider, 0.0) + \
             ((r.tok or 0) / 1_000_000.0) * in_price
 
+    # Per-provider reference info (balances, recommended caps, primary models)
+    from app.ai.pricing import PROVIDER_INFO
+    provider_info = [
+        {"provider": name, **info} for name, info in PROVIDER_INFO.items()
+    ]
+
+    # Spend-so-far for each paid provider (today, UTC) — used to show progress bars
+    spend_today_map: dict[str, float] = {}
+    spend_rows_today = (await db.execute(
+        select(
+            AIUsageLog.provider, AIUsageLog.model,
+            func.sum(AIUsageLog.tokens_estimated).label("tok"),
+        ).where(
+            AIUsageLog.called_at >= today_start,
+            AIUsageLog.status == "ok",
+        ).group_by(AIUsageLog.provider, AIUsageLog.model)
+    )).all()
+    for r in spend_rows_today:
+        in_price, _ = get_price(r.provider, r.model)
+        spend_today_map[r.provider] = spend_today_map.get(r.provider, 0.0) + \
+            ((r.tok or 0) / 1_000_000.0) * in_price
+
     # Daily cost caps
     limit_rows = (await db.execute(select(AICostLimit))).scalars().all()
     limits_list = [
@@ -1147,6 +1169,8 @@ async def get_ai_usage(
             "last_30d": round(cost_30d, 6),
         },
         "limits": limits_list,
+        "provider_info": provider_info,
+        "spend_today": {k: round(v, 6) for k, v in spend_today_map.items()},
         "provider_stats": [
             {
                 "provider": r.provider,
@@ -1382,6 +1406,8 @@ Paid spend comes from Anthropic (refinement) + OpenAI (embeddings).
 <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
 Block further calls once today's spend or token count hits the cap. Use <code>*</code> as model for a provider-wide cap.
 </div>
+
+<div id="provider-info" style="margin-bottom:12px"><em style="color:#8a92a0">Loading provider info...</em></div>
 <form id="limit-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:end">
   <div><label style="font-size:12px;color:#8a92a0">Provider</label><br>
     <select id="lim-provider" style="padding:6px">
@@ -1471,6 +1497,44 @@ async function loadUsageData() {{
       document.getElementById('cost-today').textContent = '$' + data.cost_summary.today.toFixed(4);
       document.getElementById('cost-7d').textContent = '$' + data.cost_summary.last_7d.toFixed(4);
       document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
+    }}
+
+    // Provider info table (balance, recommended cap, primary model, spend today)
+    if (data.provider_info) {{
+      const limitsByProvider = {{}};
+      (data.limits || []).forEach(l => {{
+        if (l.model === '*') limitsByProvider[l.provider] = l.daily_cost_usd;
+      }});
+      const spend = data.spend_today || {{}};
+      let ihtml = '<table style="font-size:13px"><tr>' +
+        '<th>Provider</th><th>Balance</th><th>Rec. $ cap</th><th>Current $ cap</th>' +
+        '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Used for</th></tr>';
+      for (const p of data.provider_info) {{
+        const paidBadge = p.paid
+          ? '<span style="color:#e8a849;font-weight:600;text-transform:capitalize">' + p.provider + '</span>'
+          : '<span style="color:#6db585;text-transform:capitalize">' + p.provider + '</span>';
+        const bal = p.balance_usd > 0 ? '$' + p.balance_usd.toFixed(2) : '<span style="color:#8a92a0">free</span>';
+        const rec = p.recommended_cap_usd > 0 ? '$' + p.recommended_cap_usd.toFixed(2) : '—';
+        const curCap = limitsByProvider[p.provider] != null
+          ? '$' + limitsByProvider[p.provider].toFixed(2)
+          : '<span style="color:#d97757">unset</span>';
+        const sp = spend[p.provider] || 0;
+        const spStr = p.paid
+          ? (sp > 0 ? '$' + sp.toFixed(4) : '<span style="color:#8a92a0">$0</span>')
+          : '<span style="color:#8a92a0">—</span>';
+        ihtml += '<tr>' +
+          '<td>' + paidBadge + '</td>' +
+          '<td>' + bal + '</td>' +
+          '<td>' + rec + '</td>' +
+          '<td>' + curCap + '</td>' +
+          '<td>' + spStr + '</td>' +
+          '<td style="font-family:monospace;font-size:12px">' + p.primary_model + '</td>' +
+          '<td style="font-size:12px;color:#8a92a0">' + p.price_note + '</td>' +
+          '<td style="font-size:12px;color:#8a92a0">' + p.use + '</td>' +
+          '</tr>';
+      }}
+      ihtml += '</table>';
+      document.getElementById('provider-info').innerHTML = ihtml;
     }}
 
     // Limits table

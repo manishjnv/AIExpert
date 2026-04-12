@@ -50,6 +50,52 @@ PRICING: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 
+# Admin reference info — shown in the Daily Cost Caps section. Edit when
+# credits are topped up or caps are re-tuned. Not used for enforcement —
+# enforcement reads ai_cost_limit rows set by the admin UI.
+PROVIDER_INFO: dict[str, dict] = {
+    "openai": {
+        "balance_usd": 10.00,
+        "recommended_cap_usd": 0.50,
+        "paid": True,
+        "primary_model": "text-embedding-3-small",
+        "price_note": "$0.02 / 1M tokens (embeddings)",
+        "use": "Semantic topic dedup (embeddings only)",
+    },
+    "gemini": {
+        "balance_usd": 12.00,   # ~₹1000
+        "recommended_cap_usd": 0.40,
+        "paid": True,
+        "primary_model": "gemini-2.5-flash",
+        "price_note": "$0.075 in / $0.30 out per 1M (free tier first)",
+        "use": "Generation, review, refine — hot path",
+    },
+    "anthropic": {
+        "balance_usd": 10.00,
+        "recommended_cap_usd": 0.50,
+        "paid": True,
+        "primary_model": "claude-sonnet-4-6",
+        "price_note": "$3 in / $15 out per 1M (batch = 50% off, caching ~90% off input)",
+        "use": "Surgical refinement only",
+    },
+    "groq":      {"balance_usd": 0, "recommended_cap_usd": 0, "paid": False,
+                   "primary_model": "llama-3.3-70b-versatile", "price_note": "Free tier",
+                   "use": "Triage, fallback"},
+    "cerebras":  {"balance_usd": 0, "recommended_cap_usd": 0, "paid": False,
+                   "primary_model": "llama3.1-8b", "price_note": "Free tier",
+                   "use": "Ultra-fast fallback"},
+    "mistral":   {"balance_usd": 0, "recommended_cap_usd": 0, "paid": False,
+                   "primary_model": "mistral-small-latest", "price_note": "Free tier",
+                   "use": "Classifier fallback"},
+    "sambanova": {"balance_usd": 0, "recommended_cap_usd": 0, "paid": False,
+                   "primary_model": "Meta-Llama-3.3-70B-Instruct", "price_note": "Free tier",
+                   "use": "Fast Llama fallback"},
+    "deepseek":  {"balance_usd": 0, "recommended_cap_usd": 0, "paid": False,
+                   "primary_model": "deepseek-chat", "price_note": "Free tier (currently 402)",
+                   "use": "Reasoning fallback (disabled)"},
+}
+
+
 def get_price(provider: str, model: str) -> tuple[float, float]:
     """Return (input_per_1M, output_per_1M) USD prices for a provider+model."""
     key = (provider.lower(), model)
