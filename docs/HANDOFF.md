@@ -2,11 +2,99 @@
 
 > This file is rewritten at the end of every session. Read after CLAUDE.md.
 
-## Current state as of 2026-04-12 (session 5)
+## Current state as of 2026-04-12 (session 7)
 
-**Last worked on:** Template persistence, 15-dim scorer, quality gate, proposals page, clickable admin, content lifecycle
-**Branch:** master
+**Last worked on:** Cost-tracking system — OpenAI embeddings dedup, admin usage dashboard, provider-authoritative spend sync, proactive alerts
+**Branch:** master (HEAD: 9cfc8ea)
 **Live site:** https://automateedge.cloud
+**Alembic head:** d5a61f8e93c4
+
+## Session 7 (2026-04-12) — Cost tracking system
+
+### 1. OpenAI embeddings for semantic topic dedup
+- `backend/app/ai/openai_embeddings.py`: `embed()` with 90d cache + cost-cap gate
+- `backend/app/ai/pricing.py`: central price table + `compute_cost()` + `check_cost_limit()` + `CostLimitExceeded` + `PROVIDER_INFO` reference dict
+- Migration `f9b2c3d47a18`: `discovered_topics.embedding` (LargeBinary) + `ai_cost_limit` table
+- 2-stage topic dedup: exact normalized_name → cosine ≥0.88 via text-embedding-3-small
+
+### 2. AI Usage admin dashboard
+- Cost cards: Today / Last 7d / Last 30d (computed from `ai_usage_log × pricing`)
+- "Tokens this month" card (real, was previously fake from stale counter)
+- **Provider Caps & Balances** 8-col table with inline-editable Balance and Current $ cap (click → type → Enter/blur autosaves)
+- "Apply all recommended caps" button for first-time setup
+- Per-provider daily $ cap enforcement (OpenAI embeddings + Anthropic refinement)
+
+### 3. Persistent usage analytics
+- `/api/ai-usage/analytics` returns: all-time per model, monthly (12mo), daily (30d), top tasks by cost, 7d-vs-prior-7d trend, failure rate per provider
+- Source: `ai_usage_log` with real token counts from API responses (Gemini `usageMetadata`, OpenAI-compat `usage.total_tokens`, Anthropic `usage.input/output_tokens`, OpenAI embeddings `resp.usage.total_tokens`)
+
+### 4. Provider-authoritative daily spend sync (Layer 2)
+- Migration `c7d19e8a4f63`: `provider_daily_spend` table
+- `services/provider_usage_sync.py`: `sync_openai()`, `sync_anthropic()`, `run_daily_sync()`, `archive_old_usage_logs()`
+- OpenAI via `/v1/organization/usage/completions` + `/embeddings` (admin key)
+- Anthropic via `/v1/organizations/usage_report/messages` + `cost_report` (admin key)
+- Gemini honestly not synced (no public usage API)
+- Daily cron in `pipeline_scheduler` + manual Sync now button
+- Reconciliation section shows drift vs local estimate (>10% red, >3% amber)
+
+### 5. Proactive admin alerts
+- Migration `d5a61f8e93c4`: `admin_alert` table
+- `services/cost_alerts.py`: 3 rules — `cap_breach`, `balance_low` (runway <15d), `pricing_drift` (>20%)
+- Banner at top of `/ai-usage` with severity icon + dismiss button
+- Auto-resolve when condition clears
+
+### 6. Admin-editable provider balance
+- Migration `a3e8d51c7b42`: `provider_balance` table, seeded with defaults
+- Static metadata (price, model, purpose) stays in `PROVIDER_INFO`
+- Dynamic fields (balance, rec cap) in DB, editable via UI
+
+### 7. CLAUDE.md rules added
+- **#11** AI efficiency checklist mandatory on every AI call (memory: `feedback_ai_efficiency.md`)
+- **#12** OpenAI embeddings-only scope lock (memory: `reference_openai_usage.md`)
+
+### 8. Infrastructure polish
+- All 5 OpenAI-compat providers now share `ai/limits.py` for right-sized max_tokens per task
+- All providers capture actual token usage via module-level `_last_usage` dict
+- Gemini structured output schemas enabled for generation + quality review (with graceful fallback)
+- Claude calls now gated by cost caps + log actual input+output tokens
+
+## Credentials status
+
+| Credential | Status |
+|-----------|--------|
+| OpenAI regular (`OPENAI_API_KEY`) | Live on VPS — $10 balance |
+| OpenAI admin (`OPENAI_ADMIN_API_KEY`) | Live on VPS — Usage API working |
+| Anthropic regular (`ANTHROPIC_API_KEY`) | Live on VPS — $10 balance |
+| Anthropic admin (`ANTHROPIC_ADMIN_API_KEY`) | Live on VPS — Usage API working |
+| Gemini (`GEMINI_API_KEY`) | Live on VPS — ₹1000 (~$12) balance, paid tier |
+| Groq / Cerebras / Mistral / Sambanova | Free tier |
+| DeepSeek | 402 insufficient balance (disabled) |
+
+⚠ **Rotate these — exposed in chat during this session:**
+- `sk-proj-UOr06u...` (OpenAI regular)
+- `sk-admin-g8KJK...` (OpenAI admin)
+- `sk-ant-admin01-PBnpR...` (Anthropic admin)
+
+## Deploy process (documented in memory: `feedback_deploy_rebuild.md`)
+
+**Backend code changes require full rebuild**, not `restart`, because `/app` is baked into the image (only `./data`, `./scripts`, `./data/templates` are bind-mounted).
+
+```bash
+# From local machine after committing + pushing
+ssh a11yos-vps
+cd /srv/roadmap
+git pull origin master
+docker compose build backend
+docker compose up -d --force-recreate backend
+docker compose exec -T backend alembic upgrade head  # if there's a new migration
+```
+
+One-liner:
+```bash
+ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose build backend && docker compose up -d --force-recreate backend && docker compose exec -T backend alembic upgrade head"
+```
+
+**Env var changes (new keys in .env):** safer to `up -d --force-recreate` than `restart` — `env_file` is re-read on container creation, not on restart.
 
 ## What got done this session (2026-04-12, session 5)
 
@@ -86,28 +174,9 @@
 - 1 pending (Agentic AI and Tool-Using LLMs)
 - Topic #5 (Adversarial Robustness) was the only clean 5/5 generation
 
-## Session 6 additions (2026-04-12)
+## Prior session notes merged into Session 7 above
 
-### OpenAI embeddings for semantic topic dedup
-- New: `backend/app/ai/openai_embeddings.py` — `embed()`, cosine sim, pack/unpack float32 vectors, cache 90d, cost-limit gate
-- New: `backend/app/ai/pricing.py` — central price table, `compute_cost()`, `check_cost_limit()`, `CostLimitExceeded`
-- New migration `f9b2c3d47a18`: adds `discovered_topics.embedding` (LargeBinary) + `ai_cost_limit` table
-- Dedup now 2-stage: exact normalized_name → semantic cosine ≥0.88 via `text-embedding-3-small`
-- Config: `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`, `topic_dedup_similarity_threshold=0.88`
-
-### AI Usage admin widget (cost + caps)
-- `/admin/pipeline/ai-usage` now shows Today / 7d / 30d cost cards
-- Per-provider cost column in usage table
-- Per-call cost in Recent Calls table
-- New "Daily Cost Caps" form — admin can set `daily_cost_usd` + `daily_token_limit` per provider (or `*` for all models)
-- Endpoints: `POST /api/ai-usage/set-limit`, `POST /api/ai-usage/delete-limit`
-- Caps enforced via `check_cost_limit()` inside paid-provider clients (currently wired into `openai_embeddings.embed()`)
-
-### Needs follow-up
-- Wire `check_cost_limit("anthropic", model)` into `app.ai.anthropic.complete()` before API call
-- After `docker compose exec backend alembic upgrade head` runs the new migration, admin can configure caps live
-
-## Next session priorities
+## Next session priorities (continued from session 7)
 
 1. **Re-run generation** for topics with missing variants (when rate limits allow)
 2. **Approve topic #11** (Agentic AI) and generate
