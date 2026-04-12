@@ -2257,13 +2257,33 @@ async function loadUsageData() {{
 }}
 
 async function syncNow() {{
-  if (!confirm('Trigger provider spend sync now? This hits OpenAI + Anthropic Usage APIs.')) return;
-  const resp = await fetch('/admin/pipeline/api/ai-usage/sync-now', {{
-    method:'POST', credentials:'same-origin',
-    headers:{{'Content-Type':'application/json'}},
-  }});
-  const r = await resp.json();
-  alert('Sync result: ' + JSON.stringify(r, null, 2));
+  if (!confirm('Sync provider spend from OpenAI + Anthropic Usage APIs now?')) return;
+  const btn = event && event.target;
+  if (btn) {{ btn.textContent = 'Syncing...'; btn.disabled = true; }}
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage/sync-now', {{
+      method:'POST', credentials:'same-origin',
+      headers:{{'Content-Type':'application/json'}},
+    }});
+    const r = await resp.json();
+    if (!resp.ok) {{ alert('Sync failed: ' + (r.detail || resp.status)); return; }}
+    // Build a friendly summary
+    const day = r.sync && r.sync.day ? r.sync.day : '?';
+    const parts = [];
+    const provs = (r.sync && r.sync.providers) || {{}};
+    for (const [name, info] of Object.entries(provs)) {{
+      if (info.status === 'ok')       parts.push('✅ ' + name + ': ' + info.rows + ' row(s)');
+      else if (info.status === 'skipped') parts.push('⏭ ' + name + ': skipped — ' + (info.reason || ''));
+      else                             parts.push('❌ ' + name + ': ' + (info.error || 'error'));
+    }}
+    const arch = r.archive || {{}};
+    const archStr = arch.status === 'ok'
+      ? ' · Archive: deleted ' + (arch.deleted_rows || 0) + ' old rows'
+      : '';
+    alert('Synced ' + day + '\\n\\n' + parts.join('\\n') + archStr);
+  }} finally {{
+    if (btn) {{ btn.textContent = 'Sync now'; btn.disabled = false; }}
+  }}
   loadReconciliation();
 }}
 
