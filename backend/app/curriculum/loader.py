@@ -71,6 +71,50 @@ class PlanTemplate(BaseModel):
     def total_checks(self) -> int:
         return sum(len(w.checks) for m in self.months for w in m.weeks)
 
+    @property
+    def total_hours(self) -> int:
+        return sum(w.hours for m in self.months for w in m.weeks)
+
+    @property
+    def total_topics(self) -> int:
+        """Distinct focus areas / topics covered across all weeks."""
+        return sum(len(w.focus) for m in self.months for w in m.weeks)
+
+    @property
+    def has_certification(self) -> bool:
+        """True if any resource or deliverable mentions a certification/certificate."""
+        needles = ("certif", "certificate")
+        for m in self.months:
+            for w in m.weeks:
+                for r in w.resources:
+                    if any(n in r.name.lower() for n in needles):
+                        return True
+                for d in w.deliv:
+                    if any(n in d.lower() for n in needles):
+                        return True
+                for c in w.checks:
+                    if any(n in c.lower() for n in needles):
+                        return True
+        return False
+
+    @property
+    def has_github_practice(self) -> bool:
+        """True if curriculum includes GitHub-based practice (repo, commits, portfolio)."""
+        for m in self.months:
+            for w in m.weeks:
+                for r in w.resources:
+                    if "github.com" in r.url.lower() or "github" in r.name.lower():
+                        return True
+                for d in w.deliv:
+                    dl = d.lower()
+                    if "github" in dl or "repo" in dl or "commit" in dl or "pull request" in dl:
+                        return True
+                for f in w.focus:
+                    fl = f.lower()
+                    if "github" in fl or "repo" in fl:
+                        return True
+        return False
+
     def week_by_number(self, n: int) -> Week | None:
         for m in self.months:
             for w in m.weeks:

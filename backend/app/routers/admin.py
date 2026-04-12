@@ -789,7 +789,10 @@ async def admin_templates_page(
                 actions.append(f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>')
             actions_html = " ".join(actions)
 
-            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
+            cert_cell = '<span style="color:#6db585" title="Certification resource found">✓</span>' if tpl.has_certification else '<span style="color:#5a6472">—</span>'
+            gh_cell = '<span style="color:#6db585" title="GitHub practice required">✓</span>' if tpl.has_github_practice else '<span style="color:#5a6472">—</span>'
+
+            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_hours}</td><td>{tpl.total_topics}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{cert_cell}</td><td style='text-align:center'>{gh_cell}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
         except Exception:
             continue
 
@@ -820,7 +823,7 @@ async def admin_templates_page(
   <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
-<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Checks</th><th>Subscribers</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th>Topics</th><th>Checks</th><th title="Curriculum includes a certification-track resource or deliverable">Cert</th><th title="Curriculum requires GitHub practice (repo, commits, portfolio)">GitHub</th><th>Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
 
 <script>
 async function generateTemplate() {{
