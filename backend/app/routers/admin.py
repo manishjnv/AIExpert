@@ -563,6 +563,34 @@ async def admin_users_page(
         for pr in plan_rows:
             user_plans[pr.user_id] = pr.template_key
 
+    # ---- Recent profile audit log (last 50 changes) ----
+    from app.models.user_audit import UserAuditLog
+    audit_rows = (await db.execute(
+        select(UserAuditLog, User.email)
+        .join(User, User.id == UserAuditLog.user_id, isouter=True)
+        .order_by(UserAuditLog.changed_at.desc())
+        .limit(50)
+    )).all()
+
+    def _truncate(s: str | None, n: int = 40) -> str:
+        if s is None:
+            return '<span style="color:#5a6472">null</span>'
+        s = s if len(s) <= n else s[:n] + "…"
+        return esc(s)
+
+    audit_html = ""
+    for a, email in audit_rows:
+        audit_html += (
+            f"<tr>"
+            f"<td style='font-size:12px;white-space:nowrap'>{fmt_ist(a.changed_at)}</td>"
+            f"<td style='font-size:12px'>{esc(email or f'user#{a.user_id}')}</td>"
+            f"<td style='font-size:12px'><strong>{esc(a.field)}</strong></td>"
+            f"<td style='font-size:12px;color:#8a92a0'>{_truncate(a.old_value)}</td>"
+            f"<td style='font-size:12px;color:#d0cbc2'>{_truncate(a.new_value)}</td>"
+            f"<td style='font-size:12px;color:#8a92a0'>{esc(a.source)}</td>"
+            f"</tr>"
+        )
+
     rows_html = ""
     for u in rows:
         sess = last_sessions.get(u.id)
@@ -661,6 +689,16 @@ async def admin_users_page(
   }}
 }})();
 </script>
+
+<h2 style="margin-top:32px">Recent Profile Changes</h2>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+  Every write to a user's profile field is logged here (source: <code>profile_patch</code>, <code>google_login</code>). Use this to trace any accidental clearing or unexpected change.
+</div>
+{'<p style="color:#8a92a0;font-size:13px">No profile changes logged yet.</p>' if not audit_html else f'''<table>
+<tr><th>When (IST)</th><th>User</th><th>Field</th><th>Old</th><th>New</th><th>Source</th></tr>
+{audit_html}
+</table>
+<div style="margin-top:6px;font-size:12px;color:#8a92a0">Showing last 50 entries.</div>'''}
 </div></body></html>"""
 
 
