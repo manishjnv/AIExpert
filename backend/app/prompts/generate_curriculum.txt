@@ -11,9 +11,9 @@ OUTPUT: Return a valid JSON object with this exact structure. No markdown, no ex
 {{
   "key": "{key}",
   "version": "1.0",
-  "title": "{topic} — {duration_months}-Month Roadmap",
+  "title": "{topic} — {level_title} {duration_months}-Month Roadmap",
   "level": "{level}",
-  "goal": "{goal}",
+  "goal": "<one sentence, 15–30 words, describing the concrete capability the learner will have at the end — e.g. 'Ship a production-ready agent that plans, calls tools, and evaluates its own answers across 3 real-world domains.'>",
   "duration_months": {duration_months},
   "months": [
     {{

@@ -47,7 +47,6 @@ async def generate_curriculum(
     duration_str = duration_map.get(duration_months, f"{duration_months}mo")
     total_weeks = duration_months * 4
     key = _make_key(topic, duration_str, level)
-    goal = re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_")
 
     prompt_template = PROMPT_PATH.read_text(encoding="utf-8")
     prompt = prompt_template.format(
@@ -55,8 +54,8 @@ async def generate_curriculum(
         duration_months=duration_months,
         total_weeks=total_weeks,
         level=level,
+        level_title=level.capitalize(),
         key=key,
-        goal=goal,
     )
 
     # Stage 1a: Try Gemini with structured output schema first — guarantees
