@@ -84,10 +84,18 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         db.add(user)
         await db.flush()
     else:
-        # Update fields from Google on each login
-        user.name = name or user.name
-        user.avatar_url = avatar_url or user.avatar_url
-        if google_sub:
+        # Update fields from Google on each login — audit every change
+        from app.models.user_audit import UserAuditLog
+        new_name = name or user.name
+        new_avatar = avatar_url or user.avatar_url
+        if new_name != user.name:
+            db.add(UserAuditLog(user_id=user.id, field="name", old_value=user.name, new_value=new_name, source="google_login"))
+            user.name = new_name
+        if new_avatar != user.avatar_url:
+            db.add(UserAuditLog(user_id=user.id, field="avatar_url", old_value=user.avatar_url, new_value=new_avatar, source="google_login"))
+            user.avatar_url = new_avatar
+        if google_sub and user.provider_id != google_sub:
+            db.add(UserAuditLog(user_id=user.id, field="provider_id", old_value=user.provider_id, new_value=google_sub, source="google_login"))
             user.provider_id = google_sub
 
     # Issue JWT

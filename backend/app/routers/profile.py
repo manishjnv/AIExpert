@@ -152,17 +152,43 @@ async def patch_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Partial update of profile fields."""
-    updates = body.model_dump(exclude_unset=True)
-    if not updates:
+    raw = body.model_dump(exclude_unset=True)
+    if not raw:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # Validate experience_level
-    if "experience_level" in updates and updates["experience_level"] is not None:
+    # Booleans are written as sent. For text fields, null is treated as
+    # "leave alone" (not "clear") so a save with a blank input never wipes
+    # a previously populated value. To clear, send an empty string.
+    BOOL_FIELDS = {"email_notifications", "public_profile"}
+    updates = {}
+    for field, value in raw.items():
+        if field in BOOL_FIELDS:
+            updates[field] = value
+        elif value is None:
+            continue  # skip — preserves existing value
+        else:
+            updates[field] = value
+
+    if not updates:
+        # Nothing to apply; still return current profile without error.
+        return await _profile_dict(user, db)
+
+    if "experience_level" in updates:
         if updates["experience_level"] not in ("beginner", "intermediate", "advanced"):
             raise HTTPException(status_code=400, detail="experience_level must be beginner, intermediate, or advanced")
 
+    # Write audit log + apply updates
+    from app.models.user_audit import UserAuditLog
     for field, value in updates.items():
-        setattr(user, field, value)
+        old = getattr(user, field, None)
+        if old != value:
+            db.add(UserAuditLog(
+                user_id=user.id, field=field,
+                old_value=str(old) if old is not None else None,
+                new_value=str(value) if value is not None else None,
+                source="profile_patch",
+            ))
+            setattr(user, field, value)
 
     await db.flush()
     return await _profile_dict(user, db)
