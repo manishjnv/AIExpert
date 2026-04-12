@@ -1748,34 +1748,14 @@ Paid spend comes from Anthropic (refinement) + OpenAI (embeddings).
 <h2 style="display:flex;align-items:center;gap:12px">
   Provider Caps &amp; Balances
   <button class="btn" style="font-size:12px;padding:4px 10px" onclick="applyAllRecommended()">Apply all recommended caps</button>
-  <button class="btn" style="font-size:12px;padding:4px 10px;background:#2b2e36" onclick="toggleOverrides()">+ Per-model override</button>
 </h2>
 <div style="font-size:13px;color:#8a92a0;margin-bottom:12px">
-Paid providers enforce daily $ caps. Click <b>edit</b> next to any value to change it inline.
-Cap breach blocks further calls that day — calls fall through to a cheaper provider or skip gracefully.
+Click any <span style="border-bottom:1px dashed #e8a849;color:#e8a849">balance</span>
+or <span style="border-bottom:1px dashed #e8a849;color:#e8a849">cap</span> value below to edit — saves on Enter / blur.
+Cap breach blocks further calls that day; calls fall through to a cheaper provider or skip gracefully.
 </div>
 
 <div id="provider-cards" style="margin-bottom:16px"><em style="color:#8a92a0">Loading...</em></div>
-
-<div id="override-form" style="display:none;margin:12px 0;padding:12px;border:1px solid #2b2e36;border-radius:6px">
-  <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
-    Add a cap scoped to a specific <i>model</i> (rather than provider-wide). Rarely needed.
-  </div>
-  <form style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-    <div><label style="font-size:12px;color:#8a92a0">Provider</label><br>
-      <select id="lim-provider" style="padding:6px">
-        <option value="openai">openai</option>
-        <option value="anthropic">anthropic</option>
-        <option value="gemini">gemini</option>
-      </select></div>
-    <div><label style="font-size:12px;color:#8a92a0">Model</label><br>
-      <input id="lim-model" placeholder="claude-opus-4-6" style="padding:6px;width:200px"></div>
-    <div><label style="font-size:12px;color:#8a92a0">Daily $ cap</label><br>
-      <input id="lim-cost" type="number" step="0.01" min="0" value="1.00" style="padding:6px;width:100px"></div>
-    <button type="button" class="btn" onclick="saveLimit()">Save override</button>
-  </form>
-  <div id="override-list" style="margin-top:12px"><em style="color:#8a92a0">Loading overrides...</em></div>
-</div>
 
 <h2>Provider Health</h2>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
@@ -1889,9 +1869,68 @@ async function runAlertChecks() {{
   loadAlerts();
 }}
 
-function toggleOverrides() {{
-  const el = document.getElementById('override-form');
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+// Wire up inline-editable balance + cap spans. Saves on blur or Enter.
+function wireInlineEdits() {{
+  const spans = document.querySelectorAll('.inline-edit');
+  spans.forEach(span => {{
+    const prev = span.textContent.trim();
+    span.dataset.prev = prev;
+
+    span.addEventListener('focus', () => {{
+      if (span.textContent.trim() === 'unset') span.textContent = '';
+      // select all on focus
+      const r = document.createRange(); r.selectNodeContents(span);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    }});
+
+    span.addEventListener('keydown', (e) => {{
+      if (e.key === 'Enter') {{ e.preventDefault(); span.blur(); }}
+      if (e.key === 'Escape') {{ span.textContent = span.dataset.prev; span.blur(); }}
+    }});
+
+    span.addEventListener('blur', async () => {{
+      const raw = span.textContent.trim().replace(/[^0-9.]/g, '');
+      if (raw === span.dataset.prev) return; // no change
+      const num = parseFloat(raw || '0');
+      if (isNaN(num) || num < 0) {{
+        alert('Invalid number'); span.textContent = span.dataset.prev; return;
+      }}
+      const kind = span.dataset.kind;
+      const provider = span.dataset.provider;
+      if (kind === 'balance') {{
+        const existing = (window.__lastInfo || []).find(p => p.provider === provider) || {{}};
+        const rec = existing.recommended_cap_usd || 0;
+        const resp = await fetch('/admin/pipeline/api/ai-usage/set-balance', {{
+          method:'POST', credentials:'same-origin',
+          headers:{{'Content-Type':'application/json'}},
+          body: JSON.stringify({{provider, balance_usd: num, recommended_cap_usd: rec}}),
+        }});
+        if (!resp.ok) {{ alert('Save failed'); span.textContent = span.dataset.prev; return; }}
+      }} else if (kind === 'cap') {{
+        if (num === 0) {{
+          // Remove cap
+          const resp0 = await fetch('/admin/pipeline/api/ai-usage', {{credentials:'same-origin'}});
+          const d0 = await resp0.json();
+          const row = (d0.limits || []).find(l => l.provider === provider && l.model === '*');
+          if (row) {{
+            await fetch('/admin/pipeline/api/ai-usage/delete-limit', {{
+              method:'POST', credentials:'same-origin',
+              headers:{{'Content-Type':'application/json'}},
+              body: JSON.stringify({{id: row.id}}),
+            }});
+          }}
+        }} else {{
+          const resp = await fetch('/admin/pipeline/api/ai-usage/set-limit', {{
+            method:'POST', credentials:'same-origin',
+            headers:{{'Content-Type':'application/json'}},
+            body: JSON.stringify({{provider, model:'*', daily_cost_usd: num, daily_token_limit: 0}}),
+          }});
+          if (!resp.ok) {{ alert('Save failed'); span.textContent = span.dataset.prev; return; }}
+        }}
+      }}
+      loadUsageData();
+    }});
+  }});
 }}
 
 async function editBalanceOnly(provider, currentBal) {{
@@ -2057,16 +2096,17 @@ async function loadUsageData() {{
           else {{ dot = '🟢'; dotTitle = 'Healthy'; }}
         }}
 
-        // Cap cell: show recommended if different/unset
-        let capDisplay;
-        if (curCap == null) {{
-          capDisplay = '<span style="color:#d97757">unset</span>'
-            + (rec > 0 ? ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>' : '');
-        }} else {{
-          capDisplay = '<b>$' + curCap.toFixed(2) + '</b>';
-          if (rec > 0 && Math.abs(curCap - rec) > 0.01) {{
-            capDisplay += ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>';
-          }}
+        // Editable cap — contenteditable span, autosaves on blur/Enter
+        const capValStr = curCap != null ? curCap.toFixed(2) : '';
+        const capPlaceholder = curCap == null ? 'unset' : '';
+        const capColor = curCap == null ? '#d97757' : '#e8a849';
+        let capDisplay = '$<span class="inline-edit" contenteditable="true" '
+          + 'data-kind="cap" data-provider="' + p.provider + '" '
+          + 'style="border-bottom:1px dashed ' + capColor + ';color:' + capColor
+          + ';padding:1px 4px;min-width:40px;display:inline-block;font-weight:600"'
+          + '>' + (capValStr || capPlaceholder) + '</span>';
+        if (rec > 0 && (curCap == null || Math.abs(curCap - rec) > 0.01)) {{
+          capDisplay += ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>';
         }}
 
         // Progress bar
@@ -2079,14 +2119,11 @@ async function loadUsageData() {{
             + '</div>'
           : '<div style="font-size:11px;color:#d97757;margin-top:6px">⚠ Unrestricted — runaway could drain balance</div>';
 
-        // Per-model overrides for this provider
-        const overrides = allLimits.filter(l => l.provider === p.provider && l.model !== '*');
-        let overrideInfo = '';
-        if (overrides.length > 0) {{
-          overrideInfo = '<div style="font-size:11px;color:#8a92a0;margin-top:6px">'
-            + overrides.length + ' model override' + (overrides.length === 1 ? '' : 's')
-            + '</div>';
-        }}
+        const balDisplay = '$<span class="inline-edit" contenteditable="true" '
+          + 'data-kind="balance" data-provider="' + p.provider + '" '
+          + 'style="border-bottom:1px dashed #e8a849;color:#e8a849;'
+          + 'padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
+          + bal.toFixed(2) + '</span>';
 
         cards += '<div style="border:1px solid #2b2e36;border-radius:6px;padding:12px;background:#1a1c22">'
           + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
@@ -2096,13 +2133,8 @@ async function loadUsageData() {{
           + '<span style="font-size:12px;color:#8a92a0;margin-left:auto">' + p.price_note + '</span>'
           + '</div>'
           + '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">'
-          + '<div><span style="color:#8a92a0">Balance:</span> <b>$' + bal.toFixed(2) + '</b> '
-          + '<a href="#" style="color:#e8a849;font-size:12px;text-decoration:none" '
-          + 'onclick="event.preventDefault();editBalanceOnly(\\'' + p.provider + '\\',' + bal + ')">edit</a></div>'
-          + '<div><span style="color:#8a92a0">Daily cap:</span> ' + capDisplay + ' '
-          + '<a href="#" style="color:#e8a849;font-size:12px;text-decoration:none" '
-          + 'onclick="event.preventDefault();editCapOnly(\\'' + p.provider + '\\','
-          + (curCap != null ? curCap : rec) + ')">edit</a>'
+          + '<div><span style="color:#8a92a0">Balance:</span> ' + balDisplay + '</div>'
+          + '<div><span style="color:#8a92a0">Daily cap:</span> ' + capDisplay
           + (curCap == null && rec > 0
               ? ' <a href="#" style="color:#6db585;font-size:12px;text-decoration:none;margin-left:6px" '
                 + 'onclick="event.preventDefault();applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">'
@@ -2112,7 +2144,6 @@ async function loadUsageData() {{
           + '<div><span style="color:#8a92a0">Used for:</span> <span style="font-size:12px">' + p.use + '</span></div>'
           + '</div>'
           + barHtml
-          + overrideInfo
           + '</div>';
       }}
       cards += '</div>';
@@ -2130,25 +2161,7 @@ async function loadUsageData() {{
         + '</div>';
 
       document.getElementById('provider-cards').innerHTML = cards;
-
-      // Populate the overrides list inside the collapsible form
-      const overrideRows = allLimits.filter(l => l.model !== '*');
-      let ohtml;
-      if (overrideRows.length === 0) {{
-        ohtml = '<p style="color:#8a92a0;font-size:12px">No per-model overrides set.</p>';
-      }} else {{
-        ohtml = '<table style="font-size:13px"><tr><th>Provider</th><th>Model</th>'
-          + '<th>Daily $ cap</th><th></th></tr>';
-        for (const l of overrideRows) {{
-          ohtml += '<tr><td style="text-transform:capitalize">' + l.provider + '</td>'
-            + '<td style="font-family:monospace;font-size:12px">' + l.model + '</td>'
-            + '<td>$' + l.daily_cost_usd.toFixed(2) + '</td>'
-            + '<td><button class="btn" style="font-size:11px;padding:3px 7px" '
-            + 'onclick="deleteLimit(' + l.id + ')">Remove</button></td></tr>';
-        }}
-        ohtml += '</table>';
-      }}
-      document.getElementById('override-list').innerHTML = ohtml;
+      wireInlineEdits();
     }}
 
     // (Consolidated caps/balances rendered above in provider-cards; no separate limits table.)
