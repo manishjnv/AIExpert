@@ -1803,12 +1803,12 @@ All data from <code>ai_usage_log</code> — survives deploys and rebuilds. Costs
 <h3 style="color:#e8a849;margin:14px 0 6px 0;display:flex;align-items:center;gap:12px">
   Provider-Authoritative Reconciliation (last 30 days)
   <button class="btn" style="font-size:12px;padding:4px 10px" onclick="syncNow()">Sync now</button>
-  <span id="sync-status" style="font-size:12px;color:#8a92a0;margin-left:auto"></span>
 </h3>
-<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+<div style="font-size:13px;color:#8a92a0;margin-bottom:4px">
 Pulled nightly from OpenAI + Anthropic Usage APIs (requires admin API keys in <code>.env</code>).
 Drift column = our local estimate vs provider-reported spend. Gemini not available — no public usage API.
 </div>
+<div id="sync-status" style="font-size:13px;margin-bottom:8px;min-height:20px"></div>
 <div id="reconciliation"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2 style="margin-top:28px">Recent Calls (last 50)</h2>
@@ -2311,8 +2311,13 @@ async function loadReconciliation() {{
     const resp = await fetch('/admin/pipeline/api/ai-usage/reconciliation', {{credentials:'same-origin'}});
     const d = await resp.json();
     if (!d.rows || d.rows.length === 0) {{
+      const syncEl = document.getElementById('sync-status');
+      const hasSyncRun = syncEl && syncEl.textContent.trim().length > 0;
+      const msg = hasSyncRun
+        ? 'Sync completed · no paid-tier spend to reconcile yet. Any billed calls (OpenAI embeddings / Claude refinement) will appear here after the next sync.'
+        : 'No sync data yet. Click <b>Sync now</b>, or wait for the 06:00 UTC scheduled run. Reconciliation rows appear only when a provider has reported billed usage for a past day.';
       document.getElementById('reconciliation').innerHTML =
-        '<p style="color:#8a92a0">No sync data yet. Click <b>Sync now</b> or wait for the scheduled run.</p>';
+        '<p style="color:#8a92a0">' + msg + '</p>';
       return;
     }}
     let h = '<table><tr><th>Day</th><th>Provider</th><th>Model</th><th>In tokens</th><th>Out tokens</th><th>Provider cost</th><th>Our estimate</th><th>Drift</th></tr>';
