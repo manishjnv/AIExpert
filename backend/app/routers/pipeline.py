@@ -1357,6 +1357,7 @@ async def ai_usage_analytics(
     using real token counts captured from provider API responses.
     """
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    from sqlalchemy import case
     from app.ai.pricing import get_price
 
     # --- All-time per-model totals ---
@@ -1652,9 +1653,18 @@ async def ai_usage_page(
     from app.ai.health import get_all_health
 
     s = await _get_settings(db)
-    budget_pct = 0
-    if s.max_tokens_per_run > 0:
-        budget_pct = int((s.tokens_used_this_month / s.max_tokens_per_run) * 100)
+
+    # Real tokens-this-month from ai_usage_log (not the stale track_tokens counter,
+    # which was incremented by hardcoded estimates regardless of actual usage).
+    from datetime import datetime as _dt, timezone as _tz
+    now_utc = _dt.now(_tz.utc).replace(tzinfo=None)
+    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    tokens_this_month_real = await db.scalar(
+        select(func.sum(AIUsageLog.tokens_estimated)).where(
+            AIUsageLog.called_at >= month_start,
+            AIUsageLog.status == "ok",
+        )
+    ) or 0
 
     # Provider health for status indicators
     health = get_all_health()
@@ -1737,8 +1747,7 @@ async def ai_usage_page(
 <div class="stat"><div class="num" id="cost-today" style="color:#6db585">$0.0000</div><div class="lbl">Today</div></div>
 <div class="stat"><div class="num" id="cost-7d" style="color:#e8a849">$0.0000</div><div class="lbl">Last 7 days</div></div>
 <div class="stat"><div class="num" id="cost-30d" style="color:#d97757">$0.0000</div><div class="lbl">Last 30 days</div></div>
-<div class="stat"><div class="num">{s.tokens_used_this_month:,}</div><div class="lbl">Tokens / month</div></div>
-<div class="stat"><div class="num">{budget_pct}%</div><div class="lbl">Budget used</div></div>
+<div class="stat"><div class="num">{tokens_this_month_real:,}</div><div class="lbl">Tokens this month</div></div>
 </div>
 <div style="font-size:12px;color:#8a92a0;margin-bottom:24px">
 Free-tier providers (Gemini / Groq / Cerebras / Mistral / Sambanova) contribute $0.00.
