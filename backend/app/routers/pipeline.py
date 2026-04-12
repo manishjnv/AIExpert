@@ -205,6 +205,47 @@ async def trigger_refine(
     return result
 
 
+@router.post("/api/refine-one/{template_key}")
+async def refine_one_template(
+    template_key: str,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run the quality pipeline on a single template. Returns before/after scores."""
+    _check_origin(request)
+    import json as _json
+    from app.curriculum.loader import load_template, update_quality_score
+    from app.services.quality_pipeline import run_quality_pipeline, _quick_heuristic_score
+    from app.services.curriculum_generator import save_curriculum_draft
+
+    try:
+        tpl = load_template(template_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    plan = _json.loads(tpl.model_dump_json())
+    before = _quick_heuristic_score(plan)
+
+    qr = await run_quality_pipeline(plan, "unknown", db)
+    after = qr["final_score"]
+    update_quality_score(template_key, after)
+
+    improved = qr["plan"] != plan and after > before
+    if improved:
+        await save_curriculum_draft(qr["plan"])
+
+    return {
+        "key": template_key,
+        "score_before": before,
+        "score_after": after,
+        "improved": improved,
+        "stages_run": qr.get("stages_run", []),
+        "models_used": qr.get("models_used", {}),
+        "skipped": qr.get("skipped", []),
+    }
+
+
 @router.post("/api/run-refresh")
 async def trigger_refresh(
     request: Request,

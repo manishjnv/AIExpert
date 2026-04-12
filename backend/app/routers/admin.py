@@ -826,7 +826,7 @@ async def admin_templates_page(
                 elif q_score == 0:
                     actions.append(f'<button class="btn primary" onclick="checkQuality(&quot;{key}&quot;)" title="Score quality; auto-publishes if score >= 90">Check quality</button>')
                 else:
-                    actions.append(f'<a href="/admin/pipeline/" class="btn" title="Score {q_score} below 90. Run Pipeline → Refine Quality.">Refine →</a>')
+                    actions.append(f'<button class="btn" onclick="refineOne(&quot;{key}&quot;)" title="Score {q_score} below 90. Run quality pipeline on this template only.">Refine</button>')
             if not is_default:
                 actions.append(f'<button class="btn danger" onclick="deleteTemplate(&quot;{key}&quot;)">Delete</button>')
             actions_html = " ".join(actions)
@@ -926,6 +926,33 @@ async function unpublishTemplate(key) {{
   const resp = await fetch('/admin/pipeline/api/quality/' + key + '/unpublish', {{method: 'POST', credentials: 'same-origin'}});
   if (resp.ok) window.location.reload();
   else alert('Unpublish failed');
+}}
+
+async function refineOne(key) {{
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Refining…';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/refine-one/' + encodeURIComponent(key), {{
+      method: 'POST', credentials: 'same-origin',
+    }});
+    const data = await resp.json().catch(() => ({{}}));
+    if (resp.ok) {{
+      const before = data.score_before, after = data.score_after;
+      const msg = data.improved
+        ? `Score: ${{before}} → ${{after}} ✓ improved`
+        : `Score: ${{before}} → ${{after}} (no improvement saved)`;
+      alert(msg + '\\nStages: ' + (data.stages_run||[]).join(', '));
+      window.location.reload();
+    }} else {{
+      alert('Refine failed: ' + (data.detail || resp.statusText));
+      btn.disabled = false; btn.textContent = orig;
+    }}
+  }} catch(e) {{
+    alert('Network error: ' + e.message);
+    btn.disabled = false; btn.textContent = orig;
+  }}
 }}
 
 async function checkQuality(key) {{
