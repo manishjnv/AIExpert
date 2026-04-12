@@ -835,7 +835,7 @@ async def admin_templates_page(
             cert_cell = f'<span style="color:#6db585;font-weight:600" title="{cert_n} resource(s)/deliverable(s) reference a certification">{cert_n}</span>' if cert_n else '<span style="color:#5a6472">0</span>'
             gh_cell = f'<span style="color:#6db585;font-weight:600" title="{gh_n} resource(s) link to github.com">{gh_n}</span>' if gh_n else '<span style="color:#5a6472">0</span>'
 
-            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_hours}</td><td>{tpl.total_topics}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{cert_cell}</td><td style='text-align:center'>{gh_cell}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
+            rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_hours}</td><td>{tpl.total_focus_areas}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{cert_cell}</td><td style='text-align:center'>{gh_cell}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
         except Exception:
             continue
 
@@ -853,6 +853,7 @@ async def admin_templates_page(
     <li><strong>Unpublish</strong> if a template becomes stale, or <strong>Delete</strong> to remove entirely.</li>
   </ol>
   <div style="color:#8a92a0;font-size:12px">Score legend: <span style="color:#6db585">≥90 ready</span> · <span style="color:#e8a849">70–89 needs refine</span> · <span style="color:#d97757">&lt;70 weak, regenerate</span> · <span style="color:#8a92a0">— not yet scored</span></div>
+  <div style="color:#8a92a0;font-size:12px;margin-top:4px"><strong style="color:#d0cbc2">Terminology:</strong> <strong>Topic</strong> = course subject (<a href="/admin/pipeline/topics" style="color:#e8a849">Topics</a> tab). <strong>Template</strong> = a specific course variant (level × duration). <strong>Focus areas</strong> = subtopics covered inside a week.</div>
 </div>
 
 <div style="background:#1d242e;padding:16px;border-radius:6px;margin-bottom:24px">
@@ -866,7 +867,7 @@ async def admin_templates_page(
   <div id="genStatus" style="margin-top:8px;font-size:12px;color:#8a92a0"></div>
 </div>
 
-<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th>Topics</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Count of resources that link to github.com (concrete GitHub practice)">GH Repos</th><th>Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+<table><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th title="Sum of per-week focus areas across all weeks in this template (not to be confused with Topic, which is the course subject on the Topics tab)">Focus areas</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Count of resources that link to github.com (concrete GitHub practice)">GH Repos</th><th>Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
 
 <script>
 async function generateTemplate() {{

@@ -76,8 +76,12 @@ class PlanTemplate(BaseModel):
         return sum(w.hours for m in self.months for w in m.weeks)
 
     @property
-    def total_topics(self) -> int:
-        """Distinct focus areas / topics covered across all weeks."""
+    def total_focus_areas(self) -> int:
+        """Sum of per-week focus areas across all weeks.
+
+        Note: 'focus areas' are the subtopics taught inside a template.
+        Not to be confused with DiscoveredTopic (course subject).
+        """
         return sum(len(w.focus) for m in self.months for w in m.weeks)
 
     @property
