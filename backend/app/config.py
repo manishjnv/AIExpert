@@ -79,7 +79,8 @@ class Settings(BaseSettings):
     # provider-authoritative daily spend sync. Revoke independently if compromised.
     # Create at:
     #   OpenAI:    https://platform.openai.com/settings/organization/admin-keys
-    #   Anthropic: https://console.anthropic.com/settings/admin-keys
+    #   Anthropic: https://platform.claude.com/settings/admin-keys
+    #              (requires Organization account — individual accounts can't create admin keys)
     openai_admin_api_key: str = ""
     anthropic_admin_api_key: str = ""
 

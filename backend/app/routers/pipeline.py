@@ -1688,33 +1688,37 @@ Free-tier providers (Gemini / Groq / Cerebras / Mistral / Sambanova) contribute 
 Paid spend comes from Anthropic (refinement) + OpenAI (embeddings).
 </div>
 
-<h2>Daily Cost Caps</h2>
-<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
-Block further calls once today's spend or token count hits the cap. Use <code>*</code> as model for a provider-wide cap.
+<h2 style="display:flex;align-items:center;gap:12px">
+  Provider Caps &amp; Balances
+  <button class="btn" style="font-size:12px;padding:4px 10px" onclick="applyAllRecommended()">Apply all recommended caps</button>
+  <button class="btn" style="font-size:12px;padding:4px 10px;background:#2b2e36" onclick="toggleOverrides()">+ Per-model override</button>
+</h2>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:12px">
+Paid providers enforce daily $ caps. Click <b>edit</b> next to any value to change it inline.
+Cap breach blocks further calls that day — calls fall through to a cheaper provider or skip gracefully.
 </div>
 
-<div id="provider-info" style="margin-bottom:12px"><em style="color:#8a92a0">Loading provider info...</em></div>
-<form id="limit-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:end">
-  <div><label style="font-size:12px;color:#8a92a0">Provider</label><br>
-    <select id="lim-provider" style="padding:6px">
-      <option value="openai">openai</option>
-      <option value="anthropic">anthropic</option>
-      <option value="gemini">gemini</option>
-      <option value="groq">groq</option>
-      <option value="cerebras">cerebras</option>
-      <option value="mistral">mistral</option>
-      <option value="sambanova">sambanova</option>
-      <option value="deepseek">deepseek</option>
-    </select></div>
-  <div><label style="font-size:12px;color:#8a92a0">Model (or *)</label><br>
-    <input id="lim-model" value="*" style="padding:6px;width:180px"></div>
-  <div><label style="font-size:12px;color:#8a92a0">Daily $ cap</label><br>
-    <input id="lim-cost" type="number" step="0.01" min="0" value="1.00" style="padding:6px;width:100px"></div>
-  <div><label style="font-size:12px;color:#8a92a0">Daily token cap</label><br>
-    <input id="lim-tokens" type="number" min="0" value="0" style="padding:6px;width:120px"></div>
-  <button type="button" class="btn" onclick="saveLimit()">Save cap</button>
-</form>
-<div id="limits-table" style="margin-bottom:24px"><em style="color:#8a92a0">Loading...</em></div>
+<div id="provider-cards" style="margin-bottom:16px"><em style="color:#8a92a0">Loading...</em></div>
+
+<div id="override-form" style="display:none;margin:12px 0;padding:12px;border:1px solid #2b2e36;border-radius:6px">
+  <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+    Add a cap scoped to a specific <i>model</i> (rather than provider-wide). Rarely needed.
+  </div>
+  <form style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    <div><label style="font-size:12px;color:#8a92a0">Provider</label><br>
+      <select id="lim-provider" style="padding:6px">
+        <option value="openai">openai</option>
+        <option value="anthropic">anthropic</option>
+        <option value="gemini">gemini</option>
+      </select></div>
+    <div><label style="font-size:12px;color:#8a92a0">Model</label><br>
+      <input id="lim-model" placeholder="claude-opus-4-6" style="padding:6px;width:200px"></div>
+    <div><label style="font-size:12px;color:#8a92a0">Daily $ cap</label><br>
+      <input id="lim-cost" type="number" step="0.01" min="0" value="1.00" style="padding:6px;width:100px"></div>
+    <button type="button" class="btn" onclick="saveLimit()">Save override</button>
+  </form>
+  <div id="override-list" style="margin-top:12px"><em style="color:#8a92a0">Loading overrides...</em></div>
+</div>
 
 <h2>Provider Health</h2>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
@@ -1778,6 +1782,76 @@ function fmtCost(usd) {{
   if (usd < 0.01) return '$' + usd.toFixed(6);
   if (usd < 1) return '$' + usd.toFixed(4);
   return '$' + usd.toFixed(2);
+}}
+
+function toggleOverrides() {{
+  const el = document.getElementById('override-form');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}}
+
+async function editBalanceOnly(provider, currentBal) {{
+  const s = prompt('Credit remaining for ' + provider + ' (USD):', currentBal.toFixed(2));
+  if (s === null) return;
+  const bal = parseFloat(s);
+  if (isNaN(bal) || bal < 0) {{ alert('Invalid balance'); return; }}
+  // Preserve existing recommended cap
+  const existing = (window.__lastInfo || []).find(p => p.provider === provider) || {{}};
+  const rec = existing.recommended_cap_usd || 0;
+  const resp = await fetch('/admin/pipeline/api/ai-usage/set-balance', {{
+    method:'POST', credentials:'same-origin',
+    headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{provider, balance_usd: bal, recommended_cap_usd: rec}}),
+  }});
+  if (!resp.ok) {{ alert('Save failed'); return; }}
+  loadUsageData();
+}}
+
+async function editCapOnly(provider, currentCap) {{
+  const s = prompt('Daily $ cap for ' + provider + ' (0 to remove):', currentCap.toFixed(2));
+  if (s === null) return;
+  const cap = parseFloat(s);
+  if (isNaN(cap) || cap < 0) {{ alert('Invalid cap'); return; }}
+  if (cap === 0) {{
+    // Remove: find the provider-wide cap row and delete it
+    const resp0 = await fetch('/admin/pipeline/api/ai-usage', {{credentials:'same-origin'}});
+    const d0 = await resp0.json();
+    const row = (d0.limits || []).find(l => l.provider === provider && l.model === '*');
+    if (row) {{
+      await fetch('/admin/pipeline/api/ai-usage/delete-limit', {{
+        method:'POST', credentials:'same-origin',
+        headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{id: row.id}}),
+      }});
+    }}
+    loadUsageData();
+    return;
+  }}
+  const resp = await fetch('/admin/pipeline/api/ai-usage/set-limit', {{
+    method:'POST', credentials:'same-origin',
+    headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{provider, model:'*', daily_cost_usd: cap, daily_token_limit: 0}}),
+  }});
+  if (!resp.ok) {{ alert('Save failed'); return; }}
+  loadUsageData();
+}}
+
+async function applyAllRecommended() {{
+  const resp0 = await fetch('/admin/pipeline/api/ai-usage', {{credentials:'same-origin'}});
+  const d0 = await resp0.json();
+  const todo = (d0.provider_info || []).filter(p =>
+    p.paid && p.recommended_cap_usd > 0
+  );
+  if (todo.length === 0) {{ alert('Nothing to apply.'); return; }}
+  if (!confirm('Set daily caps for ' + todo.map(p => p.provider).join(', ') + ' to their recommended values?')) return;
+  for (const p of todo) {{
+    await fetch('/admin/pipeline/api/ai-usage/set-limit', {{
+      method:'POST', credentials:'same-origin',
+      headers:{{'Content-Type':'application/json'}},
+      body: JSON.stringify({{provider: p.provider, model:'*',
+        daily_cost_usd: p.recommended_cap_usd, daily_token_limit: 0}}),
+    }});
+  }}
+  loadUsageData();
 }}
 
 async function editBalance(provider, currentBal, currentRec) {{
@@ -1847,75 +1921,132 @@ async function loadUsageData() {{
       document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
     }}
 
-    // Provider info table (balance, recommended cap, primary model, spend today)
+    // Consolidated provider cards (paid) + collapsed free summary
     if (data.provider_info) {{
+      window.__lastInfo = data.provider_info;  // for editBalanceOnly preserving rec cap
       const limitsByProvider = {{}};
-      (data.limits || []).forEach(l => {{
+      const allLimits = data.limits || [];
+      allLimits.forEach(l => {{
         if (l.model === '*') limitsByProvider[l.provider] = l.daily_cost_usd;
       }});
       const spend = data.spend_today || {{}};
-      let ihtml = '<table style="font-size:13px"><tr>' +
-        '<th>Provider</th><th>Balance</th><th>Rec. $ cap</th><th>Current $ cap</th>' +
-        '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Actions</th></tr>';
-      for (const p of data.provider_info) {{
-        const paidBadge = p.paid
-          ? '<span style="color:#e8a849;font-weight:600;text-transform:capitalize">' + p.provider + '</span>'
-          : '<span style="color:#6db585;text-transform:capitalize">' + p.provider + '</span>';
-        const bal = p.balance_usd > 0 ? '$' + p.balance_usd.toFixed(2) : '<span style="color:#8a92a0">free</span>';
-        const rec = p.recommended_cap_usd > 0 ? '$' + p.recommended_cap_usd.toFixed(2) : '—';
-        const curCapVal = limitsByProvider[p.provider];
-        const curCap = curCapVal != null
-          ? '$' + curCapVal.toFixed(2)
-          : '<span style="color:#d97757">unset</span>';
+
+      const paid = data.provider_info.filter(p => p.paid);
+      const free = data.provider_info.filter(p => !p.paid);
+
+      let cards = '<div style="display:grid;gap:10px">';
+      for (const p of paid) {{
+        const curCap = limitsByProvider[p.provider];
+        const rec = p.recommended_cap_usd || 0;
+        const bal = p.balance_usd || 0;
         const sp = spend[p.provider] || 0;
-        const spStr = p.paid
-          ? (sp > 0 ? '$' + sp.toFixed(4) : '<span style="color:#8a92a0">$0</span>')
-          : '<span style="color:#8a92a0">—</span>';
-        let actions = '';
-        if (p.paid) {{
-          actions += '<button class="btn" style="font-size:11px;padding:3px 7px;margin-right:4px" '
-                  + 'onclick="editBalance(\\'' + p.provider + '\\',' + p.balance_usd
-                  + ',' + p.recommended_cap_usd + ')">Edit balance</button>';
-          if (curCapVal == null && p.recommended_cap_usd > 0) {{
-            actions += '<button class="btn" style="font-size:11px;padding:3px 7px;background:#6db585" '
-                    + 'onclick="applyRecommendedCap(\\'' + p.provider + '\\','
-                    + p.recommended_cap_usd + ')">Apply rec. cap</button>';
-          }}
+
+        // Status dot + utilization
+        let dot, dotTitle, pct = 0, barColor = '#6db585';
+        if (curCap == null) {{
+          dot = '🔴'; dotTitle = 'No cap set';
         }} else {{
-          actions = '<span style="color:#8a92a0;font-size:12px">' + p.use + '</span>';
+          pct = curCap > 0 ? Math.min(100, (sp / curCap) * 100) : 0;
+          if (pct >= 90) {{ dot = '🔴'; dotTitle = 'Near cap'; barColor = '#d97757'; }}
+          else if (pct >= 70) {{ dot = '🟡'; dotTitle = 'Approaching cap'; barColor = '#e8a849'; }}
+          else {{ dot = '🟢'; dotTitle = 'Healthy'; }}
         }}
-        ihtml += '<tr>' +
-          '<td>' + paidBadge + '</td>' +
-          '<td>' + bal + '</td>' +
-          '<td>' + rec + '</td>' +
-          '<td>' + curCap + '</td>' +
-          '<td>' + spStr + '</td>' +
-          '<td style="font-family:monospace;font-size:12px">' + p.primary_model + '</td>' +
-          '<td style="font-size:12px;color:#8a92a0">' + p.price_note + '</td>' +
-          '<td>' + actions + '</td>' +
-          '</tr>';
+
+        // Cap cell: show recommended if different/unset
+        let capDisplay;
+        if (curCap == null) {{
+          capDisplay = '<span style="color:#d97757">unset</span>'
+            + (rec > 0 ? ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>' : '');
+        }} else {{
+          capDisplay = '<b>$' + curCap.toFixed(2) + '</b>';
+          if (rec > 0 && Math.abs(curCap - rec) > 0.01) {{
+            capDisplay += ' <span style="color:#8a92a0;font-size:12px">(rec: $' + rec.toFixed(2) + ')</span>';
+          }}
+        }}
+
+        // Progress bar
+        const barHtml = curCap != null
+          ? '<div style="background:#2b2e36;border-radius:3px;height:6px;overflow:hidden;margin-top:6px">'
+            + '<div style="background:' + barColor + ';width:' + pct.toFixed(0) + '%;height:100%"></div>'
+            + '</div>'
+            + '<div style="font-size:11px;color:#8a92a0;margin-top:2px">'
+            + 'Today: $' + sp.toFixed(4) + ' / $' + curCap.toFixed(2) + ' (' + pct.toFixed(0) + '%)'
+            + '</div>'
+          : '<div style="font-size:11px;color:#d97757;margin-top:6px">⚠ Unrestricted — runaway could drain balance</div>';
+
+        // Per-model overrides for this provider
+        const overrides = allLimits.filter(l => l.provider === p.provider && l.model !== '*');
+        let overrideInfo = '';
+        if (overrides.length > 0) {{
+          overrideInfo = '<div style="font-size:11px;color:#8a92a0;margin-top:6px">'
+            + overrides.length + ' model override' + (overrides.length === 1 ? '' : 's')
+            + '</div>';
+        }}
+
+        cards += '<div style="border:1px solid #2b2e36;border-radius:6px;padding:12px;background:#1a1c22">'
+          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+          + '<span style="font-size:18px" title="' + dotTitle + '">' + dot + '</span>'
+          + '<b style="color:#e8a849;text-transform:capitalize;font-size:15px">' + p.provider + '</b>'
+          + '<span style="font-family:monospace;font-size:12px;color:#8a92a0">' + p.primary_model + '</span>'
+          + '<span style="font-size:12px;color:#8a92a0;margin-left:auto">' + p.price_note + '</span>'
+          + '</div>'
+          + '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px">'
+          + '<div><span style="color:#8a92a0">Balance:</span> <b>$' + bal.toFixed(2) + '</b> '
+          + '<a href="#" style="color:#e8a849;font-size:12px;text-decoration:none" '
+          + 'onclick="event.preventDefault();editBalanceOnly(\\'' + p.provider + '\\',' + bal + ')">edit</a></div>'
+          + '<div><span style="color:#8a92a0">Daily cap:</span> ' + capDisplay + ' '
+          + '<a href="#" style="color:#e8a849;font-size:12px;text-decoration:none" '
+          + 'onclick="event.preventDefault();editCapOnly(\\'' + p.provider + '\\','
+          + (curCap != null ? curCap : rec) + ')">edit</a>'
+          + (curCap == null && rec > 0
+              ? ' <a href="#" style="color:#6db585;font-size:12px;text-decoration:none;margin-left:6px" '
+                + 'onclick="event.preventDefault();applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">'
+                + '⚡ apply rec</a>'
+              : '')
+          + '</div>'
+          + '<div><span style="color:#8a92a0">Used for:</span> <span style="font-size:12px">' + p.use + '</span></div>'
+          + '</div>'
+          + barHtml
+          + overrideInfo
+          + '</div>';
       }}
-      ihtml += '</table>';
-      document.getElementById('provider-info').innerHTML = ihtml;
+      cards += '</div>';
+
+      // Free providers summary line
+      const freeNames = free.map(f => {{
+        const disabled = (f.price_note || '').includes('402');
+        return '<span style="text-transform:capitalize' + (disabled ? ';color:#8a92a0' : ';color:#6db585') + '">'
+          + f.provider + (disabled ? ' (disabled)' : '') + '</span>';
+      }}).join(' · ');
+      cards += '<div style="margin-top:12px;padding:10px 12px;border:1px solid #2b2e36;border-radius:6px;'
+        + 'background:#1a1c22;font-size:13px">'
+        + '🟢 <b>Free tier</b> (no caps, $0): ' + freeNames
+        + ' <span style="color:#8a92a0;font-size:12px">· used for triage and fallback</span>'
+        + '</div>';
+
+      document.getElementById('provider-cards').innerHTML = cards;
+
+      // Populate the overrides list inside the collapsible form
+      const overrideRows = allLimits.filter(l => l.model !== '*');
+      let ohtml;
+      if (overrideRows.length === 0) {{
+        ohtml = '<p style="color:#8a92a0;font-size:12px">No per-model overrides set.</p>';
+      }} else {{
+        ohtml = '<table style="font-size:13px"><tr><th>Provider</th><th>Model</th>'
+          + '<th>Daily $ cap</th><th></th></tr>';
+        for (const l of overrideRows) {{
+          ohtml += '<tr><td style="text-transform:capitalize">' + l.provider + '</td>'
+            + '<td style="font-family:monospace;font-size:12px">' + l.model + '</td>'
+            + '<td>$' + l.daily_cost_usd.toFixed(2) + '</td>'
+            + '<td><button class="btn" style="font-size:11px;padding:3px 7px" '
+            + 'onclick="deleteLimit(' + l.id + ')">Remove</button></td></tr>';
+        }}
+        ohtml += '</table>';
+      }}
+      document.getElementById('override-list').innerHTML = ohtml;
     }}
 
-    // Limits table
-    if (data.limits && data.limits.length > 0) {{
-      let lhtml = '<table><tr><th>Provider</th><th>Model</th><th>Daily $ cap</th><th>Daily token cap</th><th></th></tr>';
-      for (const l of data.limits) {{
-        lhtml += `<tr>
-          <td style="text-transform:capitalize">${{l.provider}}</td>
-          <td><code>${{l.model}}</code></td>
-          <td>$${{l.daily_cost_usd.toFixed(2)}}</td>
-          <td>${{l.daily_token_limit ? l.daily_token_limit.toLocaleString() : '—'}}</td>
-          <td><button class="btn" style="font-size:12px" onclick="deleteLimit(${{l.id}})">Remove</button></td>
-        </tr>`;
-      }}
-      lhtml += '</table>';
-      document.getElementById('limits-table').innerHTML = lhtml;
-    }} else {{
-      document.getElementById('limits-table').innerHTML = '<p style="color:#8a92a0">No caps configured — paid providers can run unrestricted.</p>';
-    }}
+    // (Consolidated caps/balances rendered above in provider-cards; no separate limits table.)
 
     // Provider stats table
     if (data.provider_stats.length > 0) {{
