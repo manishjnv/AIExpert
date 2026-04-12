@@ -21,7 +21,7 @@ from typing import Optional
 from app.auth.deps import get_current_admin
 from app.db import get_db
 from app.models.curriculum import (
-    AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic,
+    AdminAlert, AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic,
     ProviderBalance, ProviderDailySpend,
 )
 from app.models.user import User
@@ -1243,6 +1243,61 @@ async def get_ai_usage(
     }
 
 
+@router.get("/api/ai-usage/alerts")
+async def list_alerts(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return unresolved admin alerts."""
+    rows = (await db.execute(
+        select(AdminAlert)
+        .where(AdminAlert.resolved_at.is_(None))
+        .order_by(AdminAlert.created_at.desc())
+    )).scalars().all()
+    return {
+        "alerts": [
+            {
+                "id": a.id, "kind": a.kind, "key": a.key,
+                "severity": a.severity, "message": a.message,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in rows
+        ]
+    }
+
+
+@router.post("/api/ai-usage/alerts/dismiss")
+async def dismiss_alert(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _check_origin(request)
+    body = await request.json()
+    alert_id = body.get("id")
+    if not alert_id:
+        raise HTTPException(status_code=400, detail="id required")
+    row = await db.get(AdminAlert, int(alert_id))
+    if row is not None:
+        from datetime import datetime as _dt, timezone as _tz
+        row.resolved_at = _dt.now(_tz.utc).replace(tzinfo=None)
+        await db.commit()
+    return {"ok": True}
+
+
+@router.post("/api/ai-usage/alerts/run-checks")
+async def run_alert_checks(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger alert rule evaluation."""
+    _check_origin(request)
+    from app.services.cost_alerts import run_all_checks
+    res = await run_all_checks(db)
+    return res
+
+
 @router.post("/api/ai-usage/sync-now")
 async def trigger_sync_now(
     request: Request,
@@ -1675,6 +1730,8 @@ async def ai_usage_page(
 <h1>AI Usage Dashboard</h1>
 <div class="subtitle">Provider health, usage per task, token budget</div>
 
+<div id="alerts-banner" style="margin:12px 0"></div>
+
 <h2>Cost (USD)</h2>
 <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
 <div class="stat"><div class="num" id="cost-today" style="color:#6db585">$0.0000</div><div class="lbl">Today</div></div>
@@ -1782,6 +1839,54 @@ function fmtCost(usd) {{
   if (usd < 0.01) return '$' + usd.toFixed(6);
   if (usd < 1) return '$' + usd.toFixed(4);
   return '$' + usd.toFixed(2);
+}}
+
+async function loadAlerts() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage/alerts', {{credentials:'same-origin'}});
+    const d = await resp.json();
+    const el = document.getElementById('alerts-banner');
+    if (!d.alerts || d.alerts.length === 0) {{ el.innerHTML = ''; return; }}
+    let html = '';
+    for (const a of d.alerts) {{
+      const color = a.severity === 'critical' ? '#d97757'
+        : (a.severity === 'warn' ? '#e8a849' : '#6db585');
+      const icon = a.severity === 'critical' ? '🚨'
+        : (a.severity === 'warn' ? '⚠️' : 'ℹ️');
+      const label = {{cap_breach:'Cap breached',
+                       balance_low:'Balance low',
+                       pricing_drift:'Pricing drift'}}[a.kind] || a.kind;
+      html += '<div style="border-left:3px solid ' + color + ';background:#1a1c22;'
+        + 'padding:10px 14px;margin-bottom:6px;border-radius:4px;'
+        + 'display:flex;align-items:center;gap:10px">'
+        + '<span style="font-size:18px">' + icon + '</span>'
+        + '<span style="color:' + color + ';font-weight:600;font-size:13px">' + label + ':</span>'
+        + '<span style="font-size:13px;flex:1">' + a.message + '</span>'
+        + '<button class="btn" style="font-size:11px;padding:3px 10px" '
+        + 'onclick="dismissAlert(' + a.id + ')">Dismiss</button>'
+        + '</div>';
+    }}
+    el.innerHTML = html;
+  }} catch(e) {{ /* silent */ }}
+}}
+
+async function dismissAlert(id) {{
+  await fetch('/admin/pipeline/api/ai-usage/alerts/dismiss', {{
+    method:'POST', credentials:'same-origin',
+    headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{id}}),
+  }});
+  loadAlerts();
+}}
+
+async function runAlertChecks() {{
+  const resp = await fetch('/admin/pipeline/api/ai-usage/alerts/run-checks', {{
+    method:'POST', credentials:'same-origin',
+    headers:{{'Content-Type':'application/json'}},
+  }});
+  const r = await resp.json();
+  alert('Alert checks: ' + JSON.stringify(r));
+  loadAlerts();
 }}
 
 function toggleOverrides() {{
@@ -2279,6 +2384,7 @@ async function loadAnalytics() {{
 loadUsageData();
 loadAnalytics();
 loadReconciliation();
+loadAlerts();
 </script>
 </div>
 </body></html>"""

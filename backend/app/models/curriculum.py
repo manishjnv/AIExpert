@@ -160,6 +160,28 @@ class DiscoveredTopic(PrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class AdminAlert(PrimaryKeyMixin, TimestampMixin, Base):
+    """Proactive admin alerts — surfaced as a banner on /ai-usage.
+
+    Written by the daily cost-alerts cron. Deduped by (kind, key) so repeated
+    checks don't spam (one alert per provider per condition per day).
+    Admin can dismiss via UI → sets resolved_at.
+    """
+
+    __tablename__ = "admin_alert"
+
+    kind: Mapped[str] = mapped_column(String, nullable=False)  # cap_breach / balance_low / pricing_drift
+    key: Mapped[str] = mapped_column(String, nullable=False)  # provider or provider:model
+    severity: Mapped[str] = mapped_column(String, nullable=False, default="warn")  # info / warn / critical
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("kind", "key", name="uq_admin_alert_kind_key"),
+        Index("ix_admin_alert_resolved", "resolved_at"),
+    )
+
+
 class ProviderDailySpend(PrimaryKeyMixin, TimestampMixin, Base):
     """Provider-authoritative daily spend from their Usage API.
 

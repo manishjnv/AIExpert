@@ -77,6 +77,9 @@ async def pipeline_scheduler(session_factory: async_sessionmaker) -> None:
                             logger.info("Daily spend sync: %s", sync_res)
                             arch_res = await archive_old_usage_logs(db)
                             logger.info("Usage log archive: %s", arch_res)
+                            from app.services.cost_alerts import run_all_checks
+                            alert_res = await run_all_checks(db)
+                            logger.info("Cost alert checks: %s", alert_res)
                             # Mark completed (in-memory, resets on restart — that's fine)
                             setattr(settings, "_last_spend_sync", today_utc)
                         except Exception as e:
