@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -148,8 +148,34 @@ class DiscoveredTopic(PrimaryKeyMixin, TimestampMixin, Base):
     templates_generated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     generation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Semantic dedup: OpenAI text-embedding-3-small vector (float32 packed).
+    # Populated at discovery time; compared via cosine similarity against
+    # future topics to catch near-duplicates that normalized_name misses.
+    embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+
     __table_args__ = (
         Index("ix_discovered_topics_status", "status"),
         Index("ix_discovered_topics_category", "category"),
         Index("ix_discovered_topics_discovery_run", "discovery_run"),
+    )
+
+
+class AICostLimit(PrimaryKeyMixin, TimestampMixin, Base):
+    """Admin-configured daily USD cost cap per provider/model.
+
+    model='*' means the cap applies across all models for that provider.
+    Checked before each paid provider call; exceeding blocks further calls
+    for the rest of the UTC day.
+    """
+
+    __tablename__ = "ai_cost_limit"
+
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    model: Mapped[str] = mapped_column(String, nullable=False, default="*")
+    daily_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    daily_token_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("provider", "model", name="uq_ai_cost_limit_provider_model"),
     )

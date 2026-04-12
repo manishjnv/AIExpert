@@ -86,6 +86,27 @@
 - 1 pending (Agentic AI and Tool-Using LLMs)
 - Topic #5 (Adversarial Robustness) was the only clean 5/5 generation
 
+## Session 6 additions (2026-04-12)
+
+### OpenAI embeddings for semantic topic dedup
+- New: `backend/app/ai/openai_embeddings.py` — `embed()`, cosine sim, pack/unpack float32 vectors, cache 90d, cost-limit gate
+- New: `backend/app/ai/pricing.py` — central price table, `compute_cost()`, `check_cost_limit()`, `CostLimitExceeded`
+- New migration `f9b2c3d47a18`: adds `discovered_topics.embedding` (LargeBinary) + `ai_cost_limit` table
+- Dedup now 2-stage: exact normalized_name → semantic cosine ≥0.88 via `text-embedding-3-small`
+- Config: `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`, `topic_dedup_similarity_threshold=0.88`
+
+### AI Usage admin widget (cost + caps)
+- `/admin/pipeline/ai-usage` now shows Today / 7d / 30d cost cards
+- Per-provider cost column in usage table
+- Per-call cost in Recent Calls table
+- New "Daily Cost Caps" form — admin can set `daily_cost_usd` + `daily_token_limit` per provider (or `*` for all models)
+- Endpoints: `POST /api/ai-usage/set-limit`, `POST /api/ai-usage/delete-limit`
+- Caps enforced via `check_cost_limit()` inside paid-provider clients (currently wired into `openai_embeddings.embed()`)
+
+### Needs follow-up
+- Wire `check_cost_limit("anthropic", model)` into `app.ai.anthropic.complete()` before API call
+- After `docker compose exec backend alembic upgrade head` runs the new migration, admin can configure caps live
+
 ## Next session priorities
 
 1. **Re-run generation** for topics with missing variants (when rate limits allow)

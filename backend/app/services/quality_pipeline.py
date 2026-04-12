@@ -299,12 +299,24 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
 
     try:
         if model_name == "gemini":
-            from app.ai.gemini import complete
-            result = await complete(
-                user_part, json_response=True,
-                task="quality_review",
-                system_instruction=system_part,
-            )
+            from app.ai.gemini import complete, GeminiError
+            from app.ai.schemas import QUALITY_REVIEW_SCHEMA
+            # Try structured output first (guarantees valid schema — no retry loops)
+            try:
+                result = await complete(
+                    user_part, json_response=True,
+                    task="quality_review",
+                    system_instruction=system_part,
+                    json_schema=QUALITY_REVIEW_SCHEMA,
+                )
+            except GeminiError as e:
+                # If the schema is rejected (e.g. model doesn't support it), fall back
+                logger.warning("Gemini schema review failed, retrying without schema: %s", e)
+                result = await complete(
+                    user_part, json_response=True,
+                    task="quality_review",
+                    system_instruction=system_part,
+                )
         elif model_name == "groq":
             from app.ai.groq import complete
             result = await complete(prompt, json_response=True)
@@ -371,6 +383,8 @@ async def _run_refinement(
             fixed_weeks = await complete(
                 user_content, json_response=True,
                 system_prompt=system_rules,
+                db=db, task="quality_refine",
+                subtask=plan.get("title", "")[:50] or None,
             )
         elif model_name == "gemini":
             from app.ai.gemini import complete

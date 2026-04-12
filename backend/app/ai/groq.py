@@ -26,11 +26,19 @@ class GroqRateLimited(Exception):
     pass
 
 
-async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
-    """Call Groq and return the response.
+# Populated after each successful call so provider.py can log actual token usage
+_last_usage: dict = {}
 
-    Same interface as gemini.complete().
-    """
+
+async def complete(
+    prompt: str,
+    *,
+    json_response: bool = True,
+    task: str = "default",
+) -> dict | str:
+    """Call Groq and return the response. Same interface as gemini.complete()."""
+    from app.ai.limits import get_max_tokens, get_timeout
+
     settings = get_settings()
     if not settings.groq_api_key:
         raise GroqError("GROQ_API_KEY not configured")
@@ -39,13 +47,13 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         "model": settings.groq_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 8192,
+        "max_tokens": get_max_tokens(task),
     }
 
     if json_response:
         body["response_format"] = {"type": "json_object"}
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=get_timeout(task)) as client:
         resp = await client.post(
             GROQ_URL,
             headers={
@@ -62,6 +70,8 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         raise GroqError(f"Groq API error: {resp.status_code}")
 
     data = resp.json()
+    global _last_usage
+    _last_usage = data.get("usage") or {}
     try:
         text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as e:

@@ -20,7 +20,7 @@ from typing import Optional
 
 from app.auth.deps import get_current_admin
 from app.db import get_db
-from app.models.curriculum import AIUsageLog, CurriculumSettings, DiscoveredTopic
+from app.models.curriculum import AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic
 from app.models.user import User
 
 
@@ -1046,8 +1046,35 @@ async def get_ai_usage(
     db: AsyncSession = Depends(get_db),
 ):
     """Get AI usage stats for admin dashboard."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
     from sqlalchemy import case, cast, Float as SAFloat
     from app.ai.health import get_all_health
+    from app.ai.pricing import compute_cost, get_price
+
+    now_utc = _dt.now(_tz.utc).replace(tzinfo=None)
+    today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now_utc - _td(days=7)
+    thirty_days_ago = now_utc - _td(days=30)
+
+    async def _sum_cost(since: _dt) -> float:
+        rows = (await db.execute(
+            select(
+                AIUsageLog.provider, AIUsageLog.model,
+                func.sum(AIUsageLog.tokens_estimated).label("tok"),
+            ).where(
+                AIUsageLog.called_at >= since,
+                AIUsageLog.status == "ok",
+            ).group_by(AIUsageLog.provider, AIUsageLog.model)
+        )).all()
+        total = 0.0
+        for r in rows:
+            in_price, _ = get_price(r.provider, r.model)
+            total += ((r.tok or 0) / 1_000_000.0) * in_price
+        return total
+
+    cost_today = await _sum_cost(today_start)
+    cost_7d = await _sum_cost(seven_days_ago)
+    cost_30d = await _sum_cost(thirty_days_ago)
 
     # Per-provider stats
     provider_stats = (await db.execute(
@@ -1085,7 +1112,41 @@ async def get_ai_usage(
     # Health state
     health = get_all_health()
 
+    # Cost rollup per provider (all-time, approximate using input price)
+    provider_cost_rows = (await db.execute(
+        select(
+            AIUsageLog.provider, AIUsageLog.model,
+            func.sum(AIUsageLog.tokens_estimated).label("tok"),
+        ).where(AIUsageLog.status == "ok")
+        .group_by(AIUsageLog.provider, AIUsageLog.model)
+    )).all()
+    provider_cost_map: dict[str, float] = {}
+    for r in provider_cost_rows:
+        in_price, _ = get_price(r.provider, r.model)
+        provider_cost_map[r.provider] = provider_cost_map.get(r.provider, 0.0) + \
+            ((r.tok or 0) / 1_000_000.0) * in_price
+
+    # Daily cost caps
+    limit_rows = (await db.execute(select(AICostLimit))).scalars().all()
+    limits_list = [
+        {
+            "id": lim.id,
+            "provider": lim.provider,
+            "model": lim.model,
+            "daily_cost_usd": lim.daily_cost_usd,
+            "daily_token_limit": lim.daily_token_limit,
+            "notes": lim.notes or "",
+        }
+        for lim in limit_rows
+    ]
+
     return {
+        "cost_summary": {
+            "today": round(cost_today, 6),
+            "last_7d": round(cost_7d, 6),
+            "last_30d": round(cost_30d, 6),
+        },
+        "limits": limits_list,
         "provider_stats": [
             {
                 "provider": r.provider,
@@ -1095,6 +1156,7 @@ async def get_ai_usage(
                 "errors": r.errors or 0,
                 "total_tokens": r.total_tokens or 0,
                 "avg_latency_ms": int(r.avg_latency_ms or 0),
+                "cost_usd": round(provider_cost_map.get(r.provider, 0.0), 6),
             }
             for r in provider_stats
         ],
@@ -1121,6 +1183,7 @@ async def get_ai_usage(
                 "error_message": r.error_message or "",
                 "tokens_estimated": r.tokens_estimated,
                 "latency_ms": r.latency_ms,
+                "cost_usd": round(compute_cost(r.provider, r.model, r.tokens_estimated), 6),
             }
             for r in recent
         ],
@@ -1136,6 +1199,67 @@ async def get_ai_usage(
             for name, s in health.items()
         },
     }
+
+
+@router.post("/api/ai-usage/set-limit")
+async def set_cost_limit(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upsert a daily cost/token cap for a provider+model. model='*' = provider-wide."""
+    _check_origin(request)
+    body = await request.json()
+    provider = (body.get("provider") or "").strip().lower()
+    model = (body.get("model") or "*").strip()
+    try:
+        daily_cost = float(body.get("daily_cost_usd", 0))
+        daily_tokens = int(body.get("daily_token_limit", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid numeric values")
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider required")
+    if daily_cost < 0 or daily_tokens < 0:
+        raise HTTPException(status_code=400, detail="limits cannot be negative")
+
+    existing = (await db.execute(
+        select(AICostLimit).where(
+            AICostLimit.provider == provider, AICostLimit.model == model,
+        )
+    )).scalar_one_or_none()
+
+    if existing is None:
+        lim = AICostLimit(
+            provider=provider, model=model,
+            daily_cost_usd=daily_cost, daily_token_limit=daily_tokens,
+            notes=body.get("notes"),
+        )
+        db.add(lim)
+    else:
+        existing.daily_cost_usd = daily_cost
+        existing.daily_token_limit = daily_tokens
+        if "notes" in body:
+            existing.notes = body.get("notes")
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/api/ai-usage/delete-limit")
+async def delete_cost_limit(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _check_origin(request)
+    body = await request.json()
+    lim_id = body.get("id")
+    if not lim_id:
+        raise HTTPException(status_code=400, detail="id required")
+    lim = await db.get(AICostLimit, int(lim_id))
+    if lim is not None:
+        await db.delete(lim)
+        await db.commit()
+    return {"ok": True}
 
 
 @router.post("/api/ai-usage/reset-provider")
@@ -1241,13 +1365,44 @@ async def ai_usage_page(
 <h1>AI Usage Dashboard</h1>
 <div class="subtitle">Provider health, usage per task, token budget</div>
 
-<h2>Token Budget</h2>
-<div style="display:flex;gap:8px;margin-bottom:24px">
-<div class="stat"><div class="num">{s.tokens_used_this_month:,}</div><div class="lbl">Tokens Used</div></div>
-<div class="stat"><div class="num">{s.max_tokens_per_run:,}</div><div class="lbl">Monthly Limit</div></div>
-<div class="stat"><div class="num">{budget_pct}%</div><div class="lbl">Budget Used</div></div>
-<div class="stat"><div class="num">{esc(s.budget_month or 'N/A')}</div><div class="lbl">Budget Month</div></div>
+<h2>Cost (USD)</h2>
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+<div class="stat"><div class="num" id="cost-today" style="color:#6db585">$0.0000</div><div class="lbl">Today</div></div>
+<div class="stat"><div class="num" id="cost-7d" style="color:#e8a849">$0.0000</div><div class="lbl">Last 7 days</div></div>
+<div class="stat"><div class="num" id="cost-30d" style="color:#d97757">$0.0000</div><div class="lbl">Last 30 days</div></div>
+<div class="stat"><div class="num">{s.tokens_used_this_month:,}</div><div class="lbl">Tokens / month</div></div>
+<div class="stat"><div class="num">{budget_pct}%</div><div class="lbl">Budget used</div></div>
 </div>
+<div style="font-size:12px;color:#8a92a0;margin-bottom:24px">
+Free-tier providers (Gemini / Groq / Cerebras / Mistral / Sambanova) contribute $0.00.
+Paid spend comes from Anthropic (refinement) + OpenAI (embeddings).
+</div>
+
+<h2>Daily Cost Caps</h2>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+Block further calls once today's spend or token count hits the cap. Use <code>*</code> as model for a provider-wide cap.
+</div>
+<form id="limit-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:end">
+  <div><label style="font-size:12px;color:#8a92a0">Provider</label><br>
+    <select id="lim-provider" style="padding:6px">
+      <option value="openai">openai</option>
+      <option value="anthropic">anthropic</option>
+      <option value="gemini">gemini</option>
+      <option value="groq">groq</option>
+      <option value="cerebras">cerebras</option>
+      <option value="mistral">mistral</option>
+      <option value="sambanova">sambanova</option>
+      <option value="deepseek">deepseek</option>
+    </select></div>
+  <div><label style="font-size:12px;color:#8a92a0">Model (or *)</label><br>
+    <input id="lim-model" value="*" style="padding:6px;width:180px"></div>
+  <div><label style="font-size:12px;color:#8a92a0">Daily $ cap</label><br>
+    <input id="lim-cost" type="number" step="0.01" min="0" value="1.00" style="padding:6px;width:100px"></div>
+  <div><label style="font-size:12px;color:#8a92a0">Daily token cap</label><br>
+    <input id="lim-tokens" type="number" min="0" value="0" style="padding:6px;width:120px"></div>
+  <button type="button" class="btn" onclick="saveLimit()">Save cap</button>
+</form>
+<div id="limits-table" style="margin-bottom:24px"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2>Provider Health</h2>
 <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
@@ -1273,14 +1428,72 @@ async function resetProvider(name) {{
   window.location.reload();
 }}
 
+function fmtCost(usd) {{
+  if (usd === 0) return '<span style="color:#8a92a0">$0.00</span>';
+  if (usd < 0.01) return '$' + usd.toFixed(6);
+  if (usd < 1) return '$' + usd.toFixed(4);
+  return '$' + usd.toFixed(2);
+}}
+
+async function saveLimit() {{
+  const body = {{
+    provider: document.getElementById('lim-provider').value,
+    model: document.getElementById('lim-model').value || '*',
+    daily_cost_usd: parseFloat(document.getElementById('lim-cost').value) || 0,
+    daily_token_limit: parseInt(document.getElementById('lim-tokens').value) || 0,
+  }};
+  const resp = await fetch('/admin/pipeline/api/ai-usage/set-limit', {{
+    method: 'POST', credentials: 'same-origin',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify(body),
+  }});
+  if (!resp.ok) {{ alert('Failed to save limit'); return; }}
+  loadUsageData();
+}}
+
+async function deleteLimit(id) {{
+  if (!confirm('Remove this cap?')) return;
+  await fetch('/admin/pipeline/api/ai-usage/delete-limit', {{
+    method: 'POST', credentials: 'same-origin',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{id}}),
+  }});
+  loadUsageData();
+}}
+
 async function loadUsageData() {{
   try {{
     const resp = await fetch('/admin/pipeline/api/ai-usage', {{credentials: 'same-origin'}});
     const data = await resp.json();
 
+    // Cost cards
+    if (data.cost_summary) {{
+      document.getElementById('cost-today').textContent = '$' + data.cost_summary.today.toFixed(4);
+      document.getElementById('cost-7d').textContent = '$' + data.cost_summary.last_7d.toFixed(4);
+      document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
+    }}
+
+    // Limits table
+    if (data.limits && data.limits.length > 0) {{
+      let lhtml = '<table><tr><th>Provider</th><th>Model</th><th>Daily $ cap</th><th>Daily token cap</th><th></th></tr>';
+      for (const l of data.limits) {{
+        lhtml += `<tr>
+          <td style="text-transform:capitalize">${{l.provider}}</td>
+          <td><code>${{l.model}}</code></td>
+          <td>$${{l.daily_cost_usd.toFixed(2)}}</td>
+          <td>${{l.daily_token_limit ? l.daily_token_limit.toLocaleString() : '—'}}</td>
+          <td><button class="btn" style="font-size:12px" onclick="deleteLimit(${{l.id}})">Remove</button></td>
+        </tr>`;
+      }}
+      lhtml += '</table>';
+      document.getElementById('limits-table').innerHTML = lhtml;
+    }} else {{
+      document.getElementById('limits-table').innerHTML = '<p style="color:#8a92a0">No caps configured — paid providers can run unrestricted.</p>';
+    }}
+
     // Provider stats table
     if (data.provider_stats.length > 0) {{
-      let html = '<table><tr><th>Provider</th><th>Total Calls</th><th>Succeeded</th><th>Rate Limited</th><th>Failed</th><th>Avg Speed</th></tr>';
+      let html = '<table><tr><th>Provider</th><th>Total Calls</th><th>Succeeded</th><th>Rate Limited</th><th>Failed</th><th>Avg Speed</th><th>Cost</th></tr>';
       for (const p of data.provider_stats) {{
         const successRate = p.total_calls > 0 ? Math.round(p.success / p.total_calls * 100) : 0;
         const speedLabel = p.avg_latency_ms < 1000 ? p.avg_latency_ms + 'ms' : (p.avg_latency_ms / 1000).toFixed(1) + 's';
@@ -1291,6 +1504,7 @@ async function loadUsageData() {{
           <td style="color:#e8a849">${{p.rate_limited}}</td>
           <td style="color:#d97757">${{p.errors}}</td>
           <td>${{speedLabel}}</td>
+          <td>${{fmtCost(p.cost_usd || 0)}}</td>
         </tr>`;
       }}
       html += '</table>';
@@ -1331,7 +1545,7 @@ async function loadUsageData() {{
       }}
       function friendlyTime(ms) {{ return ms < 1000 ? ms + 'ms' : (ms/1000).toFixed(1) + 's'; }}
 
-      let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Result</th><th>Speed</th></tr>';
+      let html = '<table><tr><th>Time</th><th>Provider</th><th>Task</th><th>Result</th><th>Speed</th><th>Cost</th></tr>';
       for (const r of data.recent) {{
         html += `<tr>
           <td style="font-size:12px;white-space:nowrap">${{r.called_at.slice(11)}}</td>
@@ -1339,6 +1553,7 @@ async function loadUsageData() {{
           <td>${{r.task}}${{r.subtask ? ' <span style="color:#8a92a0;font-size:12px">(' + r.subtask.slice(0,30) + ')</span>' : ''}}</td>
           <td>${{friendlyStatus(r.status, r.error_message)}}</td>
           <td>${{friendlyTime(r.latency_ms)}}</td>
+          <td>${{fmtCost(r.cost_usd || 0)}}</td>
         </tr>`;
       }}
       html += '</table>';

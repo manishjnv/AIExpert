@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from typing import Optional
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 
@@ -39,6 +42,9 @@ async def complete(
     json_response: bool = True,
     max_tokens: int = 4096,
     system_prompt: str | None = None,
+    db: Optional[AsyncSession] = None,
+    task: str = "refinement",
+    subtask: Optional[str] = None,
 ) -> dict | str:
     """Call Claude and return the response.
 
@@ -47,10 +53,18 @@ async def complete(
         json_response: Parse response as JSON
         max_tokens: Max output tokens
         system_prompt: Optional system prompt (cached via prompt caching for ~90% input discount)
+        db: Optional async session — if provided, enforces daily cost cap
+            (raises CostLimitExceeded from app.ai.pricing) and logs actual
+            token usage to ai_usage_log.
     """
     settings = get_settings()
     if not settings.anthropic_api_key:
         raise AnthropicError("ANTHROPIC_API_KEY not configured")
+
+    # Cost-cap gate (no-op if no cap configured or no db session)
+    if db is not None:
+        from app.ai.pricing import check_cost_limit
+        await check_cost_limit(db, "anthropic", settings.anthropic_model)
 
     body = {
         "model": settings.anthropic_model,
@@ -71,24 +85,65 @@ async def complete(
             }
         ]
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            ANTHROPIC_URL,
-            headers={
-                "x-api-key": settings.anthropic_api_key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
-            json=body,
-        )
+    start = time.time()
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                ANTHROPIC_URL,
+                headers={
+                    "x-api-key": settings.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json=body,
+            )
+    except Exception as e:
+        latency = int((time.time() - start) * 1000)
+        if db is not None:
+            from app.ai.health import log_usage
+            await log_usage(
+                db, "anthropic", settings.anthropic_model, task, "error",
+                subtask=subtask, error_message=str(e)[:500], latency_ms=latency,
+            )
+        raise
+
+    latency = int((time.time() - start) * 1000)
 
     if resp.status_code == 429:
+        if db is not None:
+            from app.ai.health import log_usage
+            await log_usage(
+                db, "anthropic", settings.anthropic_model, task, "rate_limited",
+                subtask=subtask, latency_ms=latency,
+            )
         raise AnthropicRateLimited("Claude rate limited")
     if resp.status_code != 200:
         logger.error("Claude error %d: %s", resp.status_code, resp.text[:500])
+        if db is not None:
+            from app.ai.health import log_usage
+            await log_usage(
+                db, "anthropic", settings.anthropic_model, task, "error",
+                subtask=subtask,
+                error_message=f"{resp.status_code}: {resp.text[:400]}",
+                latency_ms=latency,
+            )
         raise AnthropicError(f"Claude API error: {resp.status_code}")
 
     data = resp.json()
+
+    # Actual token usage for accurate cost + logging
+    usage = data.get("usage", {}) or {}
+    tokens_in = int(usage.get("input_tokens", 0) or 0)
+    tokens_out = int(usage.get("output_tokens", 0) or 0)
+    if db is not None:
+        from app.ai.health import log_usage
+        await log_usage(
+            db, "anthropic", settings.anthropic_model, task, "ok",
+            subtask=subtask,
+            tokens_estimated=tokens_in + tokens_out,
+            latency_ms=latency,
+        )
+
     try:
         text = data["content"][0]["text"]
     except (KeyError, IndexError) as e:

@@ -26,11 +26,15 @@ class DeepSeekRateLimited(Exception):
     pass
 
 
-async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
-    """Call DeepSeek and return the response.
+_last_usage: dict = {}
 
-    Same interface as gemini.complete() / groq.complete().
-    """
+
+async def complete(
+    prompt: str, *, json_response: bool = True, task: str = "default",
+) -> dict | str:
+    """Call DeepSeek and return the response. Same interface as gemini.complete()."""
+    from app.ai.limits import get_max_tokens, get_timeout
+
     settings = get_settings()
     if not settings.deepseek_api_key:
         raise DeepSeekError("DEEPSEEK_API_KEY not configured")
@@ -39,13 +43,13 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         "model": settings.deepseek_model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 4096,
+        "max_tokens": get_max_tokens(task),
     }
 
     if json_response:
         body["response_format"] = {"type": "json_object"}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=get_timeout(task)) as client:
         resp = await client.post(
             DEEPSEEK_URL,
             headers={
@@ -62,6 +66,8 @@ async def complete(prompt: str, *, json_response: bool = True) -> dict | str:
         raise DeepSeekError(f"DeepSeek API error: {resp.status_code}")
 
     data = resp.json()
+    global _last_usage
+    _last_usage = data.get("usage") or {}
     try:
         text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as e:

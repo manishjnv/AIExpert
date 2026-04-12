@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     sambanova_model: str = "Meta-Llama-3.3-70B-Instruct"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
+    openai_api_key: str = ""
+    openai_embedding_model: str = "text-embedding-3-small"
+    topic_dedup_similarity_threshold: float = 0.88
 
     # ----- GitHub (optional) -----
     github_token: str = ""

@@ -59,12 +59,45 @@ async def generate_curriculum(
         goal=goal,
     )
 
-    # Stage 1: Generate via fallback chain
-    result, model = await ai_complete(
-        prompt, json_response=True,
-        task="generation", subtask=f"{topic} {duration_str} {level}",
-        db=db,
-    )
+    # Stage 1a: Try Gemini with structured output schema first — guarantees
+    # valid JSON shape and eliminates parse-retry loops. Falls through to the
+    # normal provider chain on any failure.
+    result = None
+    model = None
+    try:
+        from app.config import get_settings as _app_settings
+        if _app_settings().gemini_api_key:
+            from app.ai.gemini import complete as gemini_complete, GeminiError
+            from app.ai.schemas import PLAN_TEMPLATE_SCHEMA
+            try:
+                result = await gemini_complete(
+                    prompt, json_response=True,
+                    task="generation",
+                    json_schema=PLAN_TEMPLATE_SCHEMA,
+                )
+                model = _app_settings().gemini_model
+                if db is not None:
+                    from app.ai.health import log_usage
+                    from app.ai.gemini import _last_usage as _gem_usage
+                    await log_usage(
+                        db, "gemini", model, "generation", "ok",
+                        subtask=f"{topic} {duration_str} {level} [schema]",
+                        tokens_estimated=int((_gem_usage or {}).get("total_tokens", 0)),
+                    )
+            except GeminiError as e:
+                logger.warning("Gemini structured generation failed, using fallback chain: %s", e)
+                result = None
+    except Exception as e:
+        logger.warning("Structured generation path error (falling through): %s", e)
+        result = None
+
+    # Stage 1b: Fallback to provider chain if structured path didn't succeed
+    if result is None:
+        result, model = await ai_complete(
+            prompt, json_response=True,
+            task="generation", subtask=f"{topic} {duration_str} {level}",
+            db=db,
+        )
 
     if isinstance(result, str):
         result = json.loads(result)

@@ -120,21 +120,43 @@ async def complete(
         for attempt in range(MAX_RETRIES + 1):
             start = time.time()
             try:
-                # Pass task to Gemini for right-sized tokens/timeout
-                kwargs = {"json_response": json_response}
-                if name == "gemini":
-                    kwargs["task"] = task
-                result = await complete_fn(prompt, **kwargs)
+                # Every provider now accepts `task` for right-sized max_tokens/timeouts
+                # (efficiency rule #3). Kept as an explicit kwargs dict so older
+                # clients without the param still work via TypeError fallback.
+                kwargs = {"json_response": json_response, "task": task}
+                try:
+                    result = await complete_fn(prompt, **kwargs)
+                except TypeError:
+                    kwargs.pop("task", None)
+                    result = await complete_fn(prompt, **kwargs)
                 latency = int((time.time() - start) * 1000)
 
                 record_success(name)
 
-                # Log success
+                # Best-effort actual-token capture. Providers that return raw JSON
+                # results (json_response=True) have already parsed-away the usage
+                # metadata, so we fall back to an estimate from prompt length.
+                # Providers that expose usage via a module-level _last_usage dict
+                # (optional) are preferred.
+                tokens_used = 0
+                try:
+                    mod = __import__(f"app.ai.{name}", fromlist=["_last_usage"])
+                    last = getattr(mod, "_last_usage", None)
+                    if last:
+                        tokens_used = int(last.get("total_tokens") or 0)
+                except Exception:
+                    pass
+                if tokens_used == 0:
+                    # Rough fallback: ~4 chars per token
+                    tokens_used = max(1, len(prompt) // 4)
+
                 if db is not None:
                     from app.ai.health import log_usage
                     await log_usage(
                         db, name, model, task, "ok",
-                        subtask=subtask, latency_ms=latency,
+                        subtask=subtask,
+                        tokens_estimated=tokens_used,
+                        latency_ms=latency,
                     )
 
                 return result, model

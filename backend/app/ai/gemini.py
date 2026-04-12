@@ -53,6 +53,11 @@ class GeminiRateLimited(Exception):
     pass
 
 
+# Populated after each successful call — provider.py reads this for accurate
+# token-usage logging to ai_usage_log. Key: "total_tokens".
+_last_usage: dict = {}
+
+
 async def complete(
     prompt: str,
     *,
@@ -122,6 +127,11 @@ async def complete(
         raise GeminiError(f"Gemini API error: {resp.status_code}")
 
     data = resp.json()
+
+    # Record actual token usage for the admin cost widget
+    global _last_usage
+    um = data.get("usageMetadata") or {}
+    _last_usage = {"total_tokens": int(um.get("totalTokenCount") or 0)}
 
     # Check for truncation (MAX_TOKENS finish reason)
     finish_reason = ""

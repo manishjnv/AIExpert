@@ -87,6 +87,63 @@ async def _get_existing_topic_names(db: AsyncSession) -> list[str]:
     return [row[0] for row in result.all()]
 
 
+async def _semantic_dedup_match(
+    db: AsyncSession, candidate_name: str, candidate_category: str,
+) -> tuple[Optional[DiscoveredTopic], float, Optional[list[float]]]:
+    """Return (matched_existing_topic, best_similarity, candidate_vector).
+
+    Uses OpenAI text-embedding-3-small + cosine similarity. If OpenAI is
+    not configured or the cost cap is hit, fails open (returns None, 0, None).
+    Threshold comes from settings.topic_dedup_similarity_threshold (default 0.88).
+    """
+    from app.ai.openai_embeddings import (
+        cosine_similarity, embed, pack_vector, unpack_vector,
+        OpenAIEmbeddingError,
+    )
+    from app.ai.pricing import CostLimitExceeded
+    from app.config import get_settings as _get_app_settings
+
+    app_settings = _get_app_settings()
+    if not app_settings.openai_api_key:
+        return None, 0.0, None
+
+    # Load existing topics that have embeddings
+    rows = (await db.execute(
+        select(DiscoveredTopic).where(DiscoveredTopic.embedding.is_not(None))
+    )).scalars().all()
+
+    # Embed candidate (single input)
+    candidate_text = f"{candidate_name} ({candidate_category})"
+    try:
+        vecs = await embed([candidate_text], db=db, task="embedding",
+                            subtask=f"dedup:{candidate_name[:40]}")
+    except (OpenAIEmbeddingError, CostLimitExceeded) as e:
+        logger.warning("Semantic dedup skipped (%s): %s", type(e).__name__, e)
+        return None, 0.0, None
+
+    if not vecs:
+        return None, 0.0, None
+    cand_vec = vecs[0]
+
+    # Compare against existing embeddings
+    threshold = app_settings.topic_dedup_similarity_threshold
+    best_topic: Optional[DiscoveredTopic] = None
+    best_sim = 0.0
+    for row in rows:
+        try:
+            existing_vec = unpack_vector(row.embedding)
+        except Exception:
+            continue
+        sim = cosine_similarity(cand_vec, existing_vec)
+        if sim > best_sim:
+            best_sim = sim
+            best_topic = row
+
+    if best_topic is not None and best_sim >= threshold:
+        return best_topic, best_sim, cand_vec
+    return None, best_sim, cand_vec
+
+
 async def run_discovery(db: AsyncSession) -> dict:
     """Run a full topic discovery cycle.
 
@@ -184,12 +241,24 @@ async def _process_discovery_results(
     for topic_data in validated.topics:
         normalized = _normalize_topic_name(topic_data.topic_name)
 
-        # Dedup check (per normalization blueprint)
+        # Stage 1: exact dedup via normalized_name (free, instant)
         existing = await db.execute(
             select(DiscoveredTopic).where(DiscoveredTopic.normalized_name == normalized)
         )
         if existing.scalar_one_or_none() is not None:
-            logger.info("Skipping duplicate topic: %s", topic_data.topic_name)
+            logger.info("Skipping duplicate topic (exact): %s", topic_data.topic_name)
+            skipped_dedup += 1
+            continue
+
+        # Stage 2: semantic dedup via OpenAI embeddings (catches paraphrases)
+        matched, similarity, cand_vec = await _semantic_dedup_match(
+            db, topic_data.topic_name, topic_data.category,
+        )
+        if matched is not None:
+            logger.info(
+                "Skipping duplicate topic (semantic %.3f): %s ≈ %s",
+                similarity, topic_data.topic_name, matched.topic_name,
+            )
             skipped_dedup += 1
             continue
 
@@ -203,6 +272,7 @@ async def _process_discovery_results(
 
         # Save to DB
         try:
+            from app.ai.openai_embeddings import pack_vector
             initial_status = "approved" if settings.auto_approve_topics else "pending"
             topic = DiscoveredTopic(
                 topic_name=topic_data.topic_name,
@@ -215,6 +285,7 @@ async def _process_discovery_results(
                 status=initial_status,
                 discovery_run=run_id,
                 ai_model_used=model_used,
+                embedding=pack_vector(cand_vec) if cand_vec else None,
             )
             db.add(topic)
             await db.flush()
