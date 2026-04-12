@@ -203,6 +203,7 @@ async def reject_proposal(
 async def generate_template(
     request: Request,
     _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
 ):
     """Generate a new curriculum template using AI."""
     _check_origin(request)
@@ -222,7 +223,7 @@ async def generate_template(
     from app.ai.provider import AIProviderError
 
     try:
-        plan_data = await generate_curriculum(topic, duration, level)
+        plan_data = await generate_curriculum(topic, duration, level, db=db)
         path = await save_curriculum_draft(plan_data)
         return {
             "ok": True,
