@@ -763,7 +763,14 @@ async def admin_templates_page(
                 status_badge = '<span style="background:#2a2520;color:#e8a849;padding:2px 8px;border-radius:10px;font-size:11px">Draft</span>'
 
             score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
-            score_display = f'<span style="color:{score_color};font-weight:600">{q_score}</span>' if q_score > 0 else '<span style="color:#8a92a0">—</span>'
+            if q_score == 0:
+                score_display = '<span style="color:#8a92a0" title="Not yet scored">—</span>'
+            elif q_score >= 90:
+                score_display = f'<span style="color:{score_color};font-weight:600" title="At or above publish threshold (90)">{q_score} ✓ ready</span>'
+            elif pub_status == "published":
+                score_display = f'<span style="color:{score_color};font-weight:600">{q_score}</span>'
+            else:
+                score_display = f'<span style="color:{score_color};font-weight:600" title="Below publish threshold (90). Run Pipeline → Refine Quality.">{q_score} · needs refine</span>'
 
             subs = subscriber_counts.get(key, 0)
             subs_display = f'<span style="font-weight:600">{subs}</span>' if subs > 0 else '<span style="color:#8a92a0">0</span>'
@@ -776,7 +783,10 @@ async def admin_templates_page(
 {ADMIN_NAV}
 <div class="page">
 <h1>Plan Templates</h1>
-<p style="color:#8a92a0;font-size:13px;margin-bottom:16px">Add new templates by topic. AI generates the full curriculum automatically.</p>
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin-bottom:16px;font-size:13px;line-height:1.6">
+  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">choose what to publish to users.</span>
+  <span style="color:#8a92a0">AI writes curricula and scores them (0–100); publish threshold is 90. Anything below needs refinement (see Pipeline → Refine Quality) before it reaches users.</span>
+</div>
 
 <div style="background:#1d242e;padding:16px;border-radius:6px;margin-bottom:24px">
   <h2 style="font-size:16px;margin-bottom:12px">Generate New Template</h2>

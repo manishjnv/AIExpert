@@ -437,6 +437,9 @@ async def pipeline_dashboard_page(
     approved = await db.scalar(
         select(func.count()).select_from(DiscoveredTopic).where(DiscoveredTopic.status == "approved")
     ) or 0
+    pending_topics = await db.scalar(
+        select(func.count()).select_from(DiscoveredTopic).where(DiscoveredTopic.status == "pending")
+    ) or 0
 
     from app.curriculum.loader import list_templates
     template_count = len(list_templates())
@@ -451,7 +454,22 @@ async def pipeline_dashboard_page(
 <div class="page">
 <h1>Pipeline Actions</h1>
 <div class="subtitle">Run tasks, review pipeline status · Provider health on <a href="/admin/pipeline/ai-usage" style="color:#e8a849">AI Usage</a></div>
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin:12px 0 20px;font-size:13px;line-height:1.6">
+  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">set the schedule and budget — these stages run automatically on cron.</span>
+  <span style="color:#8a92a0">The buttons below are manual overrides for when you want to trigger a stage early. Normal flow: <strong style="color:#d0cbc2">1 Discover → 2 Generate → 3 Refine → 4 Refresh</strong>. Each feeds the next, so running out of order is rarely useful.</span>
+</div>
 
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0f1419;border:1px solid #2a323d;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#8a92a0;flex-wrap:wrap">
+  <span><span style="color:#e8a849">Discover</span></span>
+  <span style="color:#5a6472">→</span>
+  <span><a href="/admin/pipeline/topics" style="color:#d0cbc2;text-decoration:none"><strong style="color:#e8a849">{pending_topics}</strong> pending</a> · <strong>{approved}</strong> approved</span>
+  <span style="color:#5a6472">→</span>
+  <span><span style="color:#e8a849">Generate</span></span>
+  <span style="color:#5a6472">→</span>
+  <span><a href="/admin/templates" style="color:#d0cbc2;text-decoration:none"><strong>{template_count}</strong> templates</a></span>
+  <span style="color:#5a6472">→</span>
+  <span><span style="color:#e8a849">Refine</span> / <span style="color:#e8a849">Refresh</span></span>
+</div>
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px">
 
 <div class="card">
@@ -802,7 +820,7 @@ async def pipeline_topics_page(
 <td>{t.id}</td>
 <td><strong><a href="#" onclick="viewTopic({t.id});return false" style="color:#e8a849">{esc(t.topic_name)}</a></strong><div style="font-size:12px;color:#8a92a0">{esc(t.category)}{(' / ' + esc(t.subcategory)) if t.subcategory else ''}</div></td>
 <td style="font-size:12px;max-width:300px">{esc(t.justification[:150])}{'...' if len(t.justification) > 150 else ''}</td>
-<td>{t.confidence_score}</td>
+<td><span title="AI's confidence this topic is relevant, trending, and non-duplicate (0–100). Treat this as a hint — read the justification to make your call. ≥70 is usually safe to approve." style="cursor:help;border-bottom:1px dotted #5a6472">{t.confidence_score}</span></td>
 <td style="text-align:center">{_topic_quality_cell(topic_scores.get(t.id, {}))}</td>
 <td><span class="badge {t.status}">{t.status}</span>{error_html}</td>
 <td>{t.templates_generated}</td>
@@ -816,9 +834,9 @@ async def pipeline_topics_page(
 <div class="page">
 <h1>Discovered Topics ({len(rows)})</h1>
 <div class="subtitle">AI-discovered trending topics for curriculum generation</div>
-<div style="background:#1d242e;padding:12px 16px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#8a92a0;line-height:1.6">
-    <strong style="color:#d0cbc2">Workflow:</strong>
-    Discover topics (Pipeline page) &rarr; <strong style="color:#6db585">Approve</strong> here &rarr; Generate Curricula (Pipeline page) &rarr; AI creates 5 template variants per approved topic &rarr; Review &amp; Publish
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
+  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">approve topics worth turning into curricula; reject the rest.</span>
+  <span style="color:#8a92a0">AI discovers and scores each topic for confidence (relevance + trend + non-duplicate). Read the <em>justification</em> first — the score is a hint, not the decision. Flow: Discover → <strong style="color:#6db585">Approve here</strong> → Generate → Review in Templates.</span>
 </div>
 <div style="margin-bottom:16px">{filter_html}</div>
 
@@ -942,9 +960,11 @@ async def pipeline_settings_page(
 <div class="form-row">
   <div class="form-group">
     <label><input type="checkbox" name="auto_approve_topics" {_chk(s.auto_approve_topics)}> Auto-approve discovered topics</label>
+    <div style="font-size:11px;color:#8a92a0;margin-top:4px;line-height:1.5">Skips your review on the Topics page — every discovered topic goes straight to "approved". Leave off if you want to curate.</div>
   </div>
   <div class="form-group">
     <label><input type="checkbox" name="auto_generate_variants" {_chk(s.auto_generate_variants)}> Auto-generate variants after approval</label>
+    <div style="font-size:11px;color:#8a92a0;margin-top:4px;line-height:1.5">As soon as a topic is approved (by you or auto-approve), queue generation of all level × duration variants. Combined with auto-approve = fully hands-off.</div>
   </div>
 </div>
 
@@ -2787,9 +2807,12 @@ async def proposals_page(
 </style></head><body>
 {NAV_HTML}
 <div class="page">
-<h1>Curriculum Proposals</h1>
+<h1>Curriculum Proposals <span style="font-size:11px;background:#3a2a1a;color:#e8a849;padding:3px 8px;border-radius:3px;vertical-align:middle;margin-left:8px;letter-spacing:0.08em">LEGACY</span></h1>
+<div style="background:#1d242e;border-left:3px solid #8a92a0;padding:10px 14px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
+  <strong style="color:#d0cbc2">Legacy page — mostly replaced by the <a href="/admin/pipeline/" style="color:#e8a849">Pipeline</a>.</strong>
+  <span style="color:#8a92a0">Old quarterly-sync proposals still land here; safe to ignore unless you have pending items to resolve. New curricula flow through Topics → Pipeline → Templates.</span>
+</div>
 <p style="color:#8a92a0;font-size:13px;margin-bottom:16px">
-    Quarterly sync generates proposals to update, add, or retire topics. Review and approve/reject below.
     {f'<span style="color:#e8a849;font-weight:600">{pending_count} pending</span>' if pending_count else '<span style="color:#6db585">All reviewed</span>'}
 </p>
 
