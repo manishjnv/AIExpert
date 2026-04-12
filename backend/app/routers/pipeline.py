@@ -20,7 +20,7 @@ from typing import Optional
 
 from app.auth.deps import get_current_admin
 from app.db import get_db
-from app.models.curriculum import AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic
+from app.models.curriculum import AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic, ProviderBalance
 from app.models.user import User
 
 
@@ -1126,11 +1126,26 @@ async def get_ai_usage(
         provider_cost_map[r.provider] = provider_cost_map.get(r.provider, 0.0) + \
             ((r.tok or 0) / 1_000_000.0) * in_price
 
-    # Per-provider reference info (balances, recommended caps, primary models)
+    # Per-provider reference info.
+    # Static technical fields (price, primary model, purpose) come from
+    # PROVIDER_INFO constants; admin-editable fields (balance, recommended
+    # cap) come from the provider_balance DB table. Admin edits the DB row
+    # via the inline UI — no code changes needed.
     from app.ai.pricing import PROVIDER_INFO
-    provider_info = [
-        {"provider": name, **info} for name, info in PROVIDER_INFO.items()
-    ]
+
+    balance_rows = (await db.execute(select(ProviderBalance))).scalars().all()
+    balance_map = {b.provider: b for b in balance_rows}
+    provider_info = []
+    for name, info in PROVIDER_INFO.items():
+        b = balance_map.get(name)
+        provider_info.append({
+            "provider": name,
+            **info,
+            "balance_usd": b.balance_usd if b else info.get("balance_usd", 0.0),
+            "recommended_cap_usd": (b.recommended_cap_usd if b
+                                     else info.get("recommended_cap_usd", 0.0)),
+            "notes": (b.notes if b else "") or "",
+        })
 
     # Spend-so-far for each paid provider (today, UTC) — used to show progress bars
     spend_today_map: dict[str, float] = {}
@@ -1223,6 +1238,227 @@ async def get_ai_usage(
             for name, s in health.items()
         },
     }
+
+
+@router.get("/api/ai-usage/analytics")
+async def ai_usage_analytics(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persistent usage analytics — all-time + monthly + daily, grouped per model.
+
+    Source of truth: ai_usage_log (written on every AI call). Survives deploys,
+    container rebuilds, and restarts. Cost computed via ai.pricing.compute_cost
+    using real token counts captured from provider API responses.
+    """
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    from app.ai.pricing import get_price
+
+    # --- All-time per-model totals ---
+    alltime_rows = (await db.execute(
+        select(
+            AIUsageLog.provider, AIUsageLog.model,
+            func.count().label("calls"),
+            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("success"),
+            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
+        )
+        .where(AIUsageLog.status == "ok")
+        .group_by(AIUsageLog.provider, AIUsageLog.model)
+        .order_by(func.sum(AIUsageLog.tokens_estimated).desc())
+    )).all()
+
+    alltime = []
+    for r in alltime_rows:
+        in_p, _ = get_price(r.provider, r.model)
+        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
+        alltime.append({
+            "provider": r.provider, "model": r.model,
+            "calls": r.calls, "success": r.success or 0,
+            "tokens": int(r.tokens or 0),
+            "cost_usd": round(cost, 6),
+        })
+
+    # --- Monthly per-model (last 12 months) ---
+    monthly_rows = (await db.execute(
+        select(
+            func.strftime("%Y-%m", AIUsageLog.called_at).label("month"),
+            AIUsageLog.provider, AIUsageLog.model,
+            func.count().label("calls"),
+            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
+        )
+        .where(AIUsageLog.status == "ok")
+        .group_by("month", AIUsageLog.provider, AIUsageLog.model)
+        .order_by("month")
+    )).all()
+
+    monthly = []
+    for r in monthly_rows:
+        in_p, _ = get_price(r.provider, r.model)
+        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
+        monthly.append({
+            "month": r.month, "provider": r.provider, "model": r.model,
+            "calls": r.calls,
+            "tokens": int(r.tokens or 0),
+            "cost_usd": round(cost, 6),
+        })
+
+    # --- Daily per-model (last 30 days) ---
+    thirty_days_ago = _dt.now(_tz.utc).replace(tzinfo=None) - _td(days=30)
+    daily_rows = (await db.execute(
+        select(
+            func.strftime("%Y-%m-%d", AIUsageLog.called_at).label("day"),
+            AIUsageLog.provider, AIUsageLog.model,
+            func.count().label("calls"),
+            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
+        )
+        .where(
+            AIUsageLog.status == "ok",
+            AIUsageLog.called_at >= thirty_days_ago,
+        )
+        .group_by("day", AIUsageLog.provider, AIUsageLog.model)
+        .order_by("day")
+    )).all()
+
+    daily = []
+    for r in daily_rows:
+        in_p, _ = get_price(r.provider, r.model)
+        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
+        daily.append({
+            "day": r.day, "provider": r.provider, "model": r.model,
+            "calls": r.calls,
+            "tokens": int(r.tokens or 0),
+            "cost_usd": round(cost, 6),
+        })
+
+    # --- Top tasks by cost (last 30d) — where the money is going ---
+    task_rows = (await db.execute(
+        select(
+            AIUsageLog.task, AIUsageLog.provider, AIUsageLog.model,
+            func.count().label("calls"),
+            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
+            func.avg(AIUsageLog.latency_ms).label("avg_latency"),
+        )
+        .where(
+            AIUsageLog.status == "ok",
+            AIUsageLog.called_at >= thirty_days_ago,
+        )
+        .group_by(AIUsageLog.task, AIUsageLog.provider, AIUsageLog.model)
+    )).all()
+    top_tasks_by_cost = []
+    for r in task_rows:
+        in_p, _ = get_price(r.provider, r.model)
+        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
+        top_tasks_by_cost.append({
+            "task": r.task, "provider": r.provider, "model": r.model,
+            "calls": r.calls,
+            "tokens": int(r.tokens or 0),
+            "avg_latency_ms": int(r.avg_latency or 0),
+            "cost_usd": round(cost, 6),
+        })
+    top_tasks_by_cost.sort(key=lambda x: -x["cost_usd"])
+    top_tasks_by_cost = top_tasks_by_cost[:20]
+
+    # --- 7d vs prior 7d trend ---
+    now_utc = _dt.now(_tz.utc).replace(tzinfo=None)
+    seven = now_utc - _td(days=7)
+    fourteen = now_utc - _td(days=14)
+
+    async def _sum_cost(since, until):
+        rows = (await db.execute(
+            select(AIUsageLog.provider, AIUsageLog.model,
+                    func.sum(AIUsageLog.tokens_estimated).label("tok"))
+            .where(
+                AIUsageLog.status == "ok",
+                AIUsageLog.called_at >= since,
+                AIUsageLog.called_at < until,
+            )
+            .group_by(AIUsageLog.provider, AIUsageLog.model)
+        )).all()
+        total = 0.0
+        for r in rows:
+            in_p, _ = get_price(r.provider, r.model)
+            total += ((r.tok or 0) / 1_000_000.0) * in_p
+        return total
+
+    cost_7d = await _sum_cost(seven, now_utc)
+    cost_prior_7d = await _sum_cost(fourteen, seven)
+    pct_change = None
+    if cost_prior_7d > 0:
+        pct_change = round(((cost_7d - cost_prior_7d) / cost_prior_7d) * 100, 1)
+
+    trend = {
+        "last_7d": round(cost_7d, 6),
+        "prior_7d": round(cost_prior_7d, 6),
+        "pct_change": pct_change,
+    }
+
+    # --- Fallback rate: how often a non-first provider served a task ---
+    # (A rough proxy: count non-ok statuses per provider as "needed fallback".)
+    fallback_rows = (await db.execute(
+        select(
+            AIUsageLog.provider,
+            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("ok_cnt"),
+            func.sum(case((AIUsageLog.status != "ok", 1), else_=0)).label("fail_cnt"),
+        )
+        .where(AIUsageLog.called_at >= thirty_days_ago)
+        .group_by(AIUsageLog.provider)
+    )).all()
+    fallback_rate = []
+    for r in fallback_rows:
+        total = (r.ok_cnt or 0) + (r.fail_cnt or 0)
+        if total > 0:
+            fallback_rate.append({
+                "provider": r.provider,
+                "ok": r.ok_cnt or 0,
+                "fail": r.fail_cnt or 0,
+                "fail_pct": round((r.fail_cnt or 0) / total * 100, 1),
+            })
+    fallback_rate.sort(key=lambda x: -x["fail_pct"])
+
+    return {
+        "alltime": alltime, "monthly": monthly, "daily": daily,
+        "top_tasks_by_cost": top_tasks_by_cost,
+        "trend": trend,
+        "fallback_rate": fallback_rate,
+    }
+
+
+@router.post("/api/ai-usage/set-balance")
+async def set_provider_balance(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upsert the admin-visible balance/recommended-cap for a provider."""
+    _check_origin(request)
+    body = await request.json()
+    provider = (body.get("provider") or "").strip().lower()
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider required")
+    try:
+        balance = float(body.get("balance_usd", 0))
+        rec_cap = float(body.get("recommended_cap_usd", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid numeric values")
+    if balance < 0 or rec_cap < 0:
+        raise HTTPException(status_code=400, detail="values cannot be negative")
+
+    existing = (await db.execute(
+        select(ProviderBalance).where(ProviderBalance.provider == provider)
+    )).scalar_one_or_none()
+    if existing is None:
+        row = ProviderBalance(
+            provider=provider, balance_usd=balance,
+            recommended_cap_usd=rec_cap, notes=body.get("notes"),
+        )
+        db.add(row)
+    else:
+        existing.balance_usd = balance
+        existing.recommended_cap_usd = rec_cap
+        if "notes" in body:
+            existing.notes = body.get("notes")
+    await db.commit()
+    return {"ok": True}
 
 
 @router.post("/api/ai-usage/set-limit")
@@ -1441,7 +1677,30 @@ Block further calls once today's spend or token count hits the cap. Use <code>*<
 <h2>Usage by Task</h2>
 <div id="task-stats"><em style="color:#8a92a0">Loading...</em></div>
 
-<h2>Recent Calls (last 50)</h2>
+<h2>Usage Analytics (persistent)</h2>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+All data from <code>ai_usage_log</code> — survives deploys and rebuilds. Costs use real token counts from provider API responses.
+</div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">Cost Trend — last 7 days vs prior 7 days</h3>
+<div id="trend-card"><em style="color:#8a92a0">Loading...</em></div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">All-Time Usage by Model</h3>
+<div id="alltime-stats"><em style="color:#8a92a0">Loading...</em></div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">Top Tasks by Cost (last 30 days)</h3>
+<div id="top-tasks"><em style="color:#8a92a0">Loading...</em></div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">Monthly Usage by Model (last 12 months)</h3>
+<div id="monthly-stats"><em style="color:#8a92a0">Loading...</em></div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">Daily Usage by Model (last 30 days)</h3>
+<div id="daily-stats" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
+
+<h3 style="color:#e8a849;margin:14px 0 6px 0">Reliability — Failure Rate by Provider (last 30 days)</h3>
+<div id="fallback-stats"><em style="color:#8a92a0">Loading...</em></div>
+
+<h2 style="margin-top:28px">Recent Calls (last 50)</h2>
 <div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
 
 <script>
@@ -1459,6 +1718,35 @@ function fmtCost(usd) {{
   if (usd < 0.01) return '$' + usd.toFixed(6);
   if (usd < 1) return '$' + usd.toFixed(4);
   return '$' + usd.toFixed(2);
+}}
+
+async function editBalance(provider, currentBal, currentRec) {{
+  const balStr = prompt('Credit remaining for ' + provider + ' (USD):', currentBal.toFixed(2));
+  if (balStr === null) return;
+  const balance = parseFloat(balStr);
+  if (isNaN(balance) || balance < 0) {{ alert('Invalid balance'); return; }}
+  const recStr = prompt('Recommended daily cap for ' + provider + ' (USD):', currentRec.toFixed(2));
+  if (recStr === null) return;
+  const rec_cap = parseFloat(recStr);
+  if (isNaN(rec_cap) || rec_cap < 0) {{ alert('Invalid cap'); return; }}
+  const resp = await fetch('/admin/pipeline/api/ai-usage/set-balance', {{
+    method: 'POST', credentials: 'same-origin',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{provider, balance_usd: balance, recommended_cap_usd: rec_cap}}),
+  }});
+  if (!resp.ok) {{ alert('Save failed'); return; }}
+  loadUsageData();
+}}
+
+async function applyRecommendedCap(provider, cap) {{
+  if (!confirm('Set daily cap for ' + provider + ' to $' + cap.toFixed(2) + '?')) return;
+  const resp = await fetch('/admin/pipeline/api/ai-usage/set-limit', {{
+    method: 'POST', credentials: 'same-origin',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{provider, model: '*', daily_cost_usd: cap, daily_token_limit: 0}}),
+  }});
+  if (!resp.ok) {{ alert('Save failed'); return; }}
+  loadUsageData();
 }}
 
 async function saveLimit() {{
@@ -1508,20 +1796,34 @@ async function loadUsageData() {{
       const spend = data.spend_today || {{}};
       let ihtml = '<table style="font-size:13px"><tr>' +
         '<th>Provider</th><th>Balance</th><th>Rec. $ cap</th><th>Current $ cap</th>' +
-        '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Used for</th></tr>';
+        '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Actions</th></tr>';
       for (const p of data.provider_info) {{
         const paidBadge = p.paid
           ? '<span style="color:#e8a849;font-weight:600;text-transform:capitalize">' + p.provider + '</span>'
           : '<span style="color:#6db585;text-transform:capitalize">' + p.provider + '</span>';
         const bal = p.balance_usd > 0 ? '$' + p.balance_usd.toFixed(2) : '<span style="color:#8a92a0">free</span>';
         const rec = p.recommended_cap_usd > 0 ? '$' + p.recommended_cap_usd.toFixed(2) : '—';
-        const curCap = limitsByProvider[p.provider] != null
-          ? '$' + limitsByProvider[p.provider].toFixed(2)
+        const curCapVal = limitsByProvider[p.provider];
+        const curCap = curCapVal != null
+          ? '$' + curCapVal.toFixed(2)
           : '<span style="color:#d97757">unset</span>';
         const sp = spend[p.provider] || 0;
         const spStr = p.paid
           ? (sp > 0 ? '$' + sp.toFixed(4) : '<span style="color:#8a92a0">$0</span>')
           : '<span style="color:#8a92a0">—</span>';
+        let actions = '';
+        if (p.paid) {{
+          actions += '<button class="btn" style="font-size:11px;padding:3px 7px;margin-right:4px" '
+                  + 'onclick="editBalance(\\'' + p.provider + '\\',' + p.balance_usd
+                  + ',' + p.recommended_cap_usd + ')">Edit balance</button>';
+          if (curCapVal == null && p.recommended_cap_usd > 0) {{
+            actions += '<button class="btn" style="font-size:11px;padding:3px 7px;background:#6db585" '
+                    + 'onclick="applyRecommendedCap(\\'' + p.provider + '\\','
+                    + p.recommended_cap_usd + ')">Apply rec. cap</button>';
+          }}
+        }} else {{
+          actions = '<span style="color:#8a92a0;font-size:12px">' + p.use + '</span>';
+        }}
         ihtml += '<tr>' +
           '<td>' + paidBadge + '</td>' +
           '<td>' + bal + '</td>' +
@@ -1530,7 +1832,7 @@ async function loadUsageData() {{
           '<td>' + spStr + '</td>' +
           '<td style="font-family:monospace;font-size:12px">' + p.primary_model + '</td>' +
           '<td style="font-size:12px;color:#8a92a0">' + p.price_note + '</td>' +
-          '<td style="font-size:12px;color:#8a92a0">' + p.use + '</td>' +
+          '<td>' + actions + '</td>' +
           '</tr>';
       }}
       ihtml += '</table>';
@@ -1630,7 +1932,114 @@ async function loadUsageData() {{
   }}
 }}
 
+async function loadAnalytics() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage/analytics', {{credentials:'same-origin'}});
+    const d = await resp.json();
+
+    // Trend card
+    if (d.trend) {{
+      const pct = d.trend.pct_change;
+      let pctHtml;
+      if (pct === null) pctHtml = '<span style="color:#8a92a0">no prior data</span>';
+      else if (pct > 0) pctHtml = '<span style="color:#d97757">▲ +' + pct + '%</span>';
+      else if (pct < 0) pctHtml = '<span style="color:#6db585">▼ ' + pct + '%</span>';
+      else pctHtml = '<span style="color:#8a92a0">flat</span>';
+      document.getElementById('trend-card').innerHTML =
+        '<div style="display:flex;gap:12px">'
+        + '<div class="stat"><div class="num">$' + d.trend.last_7d.toFixed(4) + '</div><div class="lbl">Last 7 days</div></div>'
+        + '<div class="stat"><div class="num">$' + d.trend.prior_7d.toFixed(4) + '</div><div class="lbl">Prior 7 days</div></div>'
+        + '<div class="stat"><div class="num">' + pctHtml + '</div><div class="lbl">Change</div></div>'
+        + '</div>';
+    }}
+
+    // All-time per model
+    if (d.alltime && d.alltime.length > 0) {{
+      let h = '<table><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Success</th><th>Tokens</th><th>Cost</th></tr>';
+      for (const r of d.alltime) {{
+        h += '<tr><td style="text-transform:capitalize">' + r.provider + '</td>'
+          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
+          + '<td>' + r.calls + '</td><td style="color:#6db585">' + r.success + '</td>'
+          + '<td>' + r.tokens.toLocaleString() + '</td>'
+          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
+      }}
+      h += '</table>';
+      document.getElementById('alltime-stats').innerHTML = h;
+    }} else {{
+      document.getElementById('alltime-stats').innerHTML = '<p style="color:#8a92a0">No usage logged yet.</p>';
+    }}
+
+    // Top tasks by cost
+    if (d.top_tasks_by_cost && d.top_tasks_by_cost.length > 0) {{
+      let h = '<table><tr><th>Task</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Avg latency</th><th>Cost</th></tr>';
+      for (const r of d.top_tasks_by_cost) {{
+        const lat = r.avg_latency_ms < 1000 ? r.avg_latency_ms + 'ms' : (r.avg_latency_ms/1000).toFixed(1)+'s';
+        h += '<tr><td>' + r.task + '</td>'
+          + '<td style="text-transform:capitalize">' + r.provider + '</td>'
+          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
+          + '<td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td>'
+          + '<td>' + lat + '</td><td>' + fmtCost(r.cost_usd) + '</td></tr>';
+      }}
+      h += '</table>';
+      document.getElementById('top-tasks').innerHTML = h;
+    }} else {{
+      document.getElementById('top-tasks').innerHTML = '<p style="color:#8a92a0">No successful calls in last 30 days.</p>';
+    }}
+
+    // Monthly per model
+    if (d.monthly && d.monthly.length > 0) {{
+      let h = '<table><tr><th>Month</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>';
+      for (const r of d.monthly) {{
+        h += '<tr><td>' + r.month + '</td>'
+          + '<td style="text-transform:capitalize">' + r.provider + '</td>'
+          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
+          + '<td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td>'
+          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
+      }}
+      h += '</table>';
+      document.getElementById('monthly-stats').innerHTML = h;
+    }} else {{
+      document.getElementById('monthly-stats').innerHTML = '<p style="color:#8a92a0">No monthly data yet.</p>';
+    }}
+
+    // Daily per model
+    if (d.daily && d.daily.length > 0) {{
+      let h = '<table><tr><th>Date</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>';
+      for (const r of d.daily) {{
+        h += '<tr><td style="white-space:nowrap;font-size:12px">' + r.day + '</td>'
+          + '<td style="text-transform:capitalize">' + r.provider + '</td>'
+          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
+          + '<td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td>'
+          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
+      }}
+      h += '</table>';
+      document.getElementById('daily-stats').innerHTML = h;
+    }} else {{
+      document.getElementById('daily-stats').innerHTML = '<p style="color:#8a92a0">No daily data yet.</p>';
+    }}
+
+    // Fallback / reliability
+    if (d.fallback_rate && d.fallback_rate.length > 0) {{
+      let h = '<table><tr><th>Provider</th><th>Successes</th><th>Failures</th><th>Failure rate</th></tr>';
+      for (const r of d.fallback_rate) {{
+        const color = r.fail_pct > 20 ? '#d97757' : (r.fail_pct > 5 ? '#e8a849' : '#6db585');
+        h += '<tr><td style="text-transform:capitalize">' + r.provider + '</td>'
+          + '<td style="color:#6db585">' + r.ok + '</td>'
+          + '<td style="color:#d97757">' + r.fail + '</td>'
+          + '<td style="color:' + color + '">' + r.fail_pct + '%</td></tr>';
+      }}
+      h += '</table>';
+      document.getElementById('fallback-stats').innerHTML = h;
+    }} else {{
+      document.getElementById('fallback-stats').innerHTML = '<p style="color:#8a92a0">No reliability data yet.</p>';
+    }}
+  }} catch(e) {{
+    document.getElementById('alltime-stats').innerHTML = '<p style="color:#d97757">Failed: ' + e.message + '</p>';
+  }}
+}}
+
 loadUsageData();
+loadAnalytics();
 </script>
 </div>
 </body></html>"""

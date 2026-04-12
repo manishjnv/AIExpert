@@ -160,6 +160,23 @@ class DiscoveredTopic(PrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class ProviderBalance(PrimaryKeyMixin, TimestampMixin, Base):
+    """Admin-editable credit balance and recommended daily cap per provider.
+
+    Displayed on the AI Usage dashboard so admin can keep balances in sync
+    with the actual credit remaining at each provider (updated manually
+    when a top-up happens). Static metadata (price, primary model, purpose)
+    stays in app.ai.pricing.PROVIDER_INFO.
+    """
+
+    __tablename__ = "provider_balance"
+
+    provider: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    balance_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    recommended_cap_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class AICostLimit(PrimaryKeyMixin, TimestampMixin, Base):
     """Admin-configured daily USD cost cap per provider/model.
 
