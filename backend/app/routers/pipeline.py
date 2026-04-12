@@ -455,9 +455,18 @@ async def pipeline_dashboard_page(
 <div class="page">
 <h1>Pipeline Actions</h1>
 <div class="subtitle">Run tasks, review pipeline status · Provider health on <a href="/admin/pipeline/ai-usage" style="color:#e8a849">AI Usage</a></div>
-<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin:12px 0 20px;font-size:13px;line-height:1.6">
-  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">set the schedule and budget — these stages run automatically on cron.</span>
-  <span style="color:#8a92a0">The buttons below are manual overrides for when you want to trigger a stage early. Normal flow: <strong style="color:#d0cbc2">1 Discover → 2 Generate → 3 Refine → 4 Refresh</strong>. Each feeds the next, so running out of order is rarely useful.</span>
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
+  <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — how the pipeline runs</div>
+  <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
+    <li><strong>Configure once</strong> — scroll to <em>Pipeline Settings</em> to set frequency (weekly/monthly/quarterly), daily token budget, and the AI models used per stage. Everything below then runs on cron.</li>
+    <li><strong>Discover</strong> <span style="color:#8a92a0">(auto · manual override below)</span> → AI scans universities, papers, and industry for trending AI/ML topics. Results land on <a href="/admin/pipeline/topics" style="color:#e8a849">Topics</a>.</li>
+    <li><strong>Approve topics</strong> → on the Topics tab. Or flip <em>auto-approve</em> in Settings to skip manual review.</li>
+    <li><strong>Generate</strong> <span style="color:#8a92a0">(auto · manual override below)</span> → creates curriculum variants (3/6/9/12 mo × beginner/intermediate/advanced) for each approved topic. Quality pipeline runs automatically: Generate → Score → Review → Refine → Validate.</li>
+    <li><strong>Refine</strong> <span style="color:#8a92a0">(manual)</span> → re-runs the quality pipeline on any draft below the publish threshold (90). Use when you want to salvage a weak template before regenerating.</li>
+    <li><strong>Refresh</strong> <span style="color:#8a92a0">(auto · manual override below)</span> → checks that resource links still resolve and that published content is still current.</li>
+    <li><strong>Publish</strong> → happens on <a href="/admin/templates" style="color:#e8a849">Templates</a> tab once a draft scores ≥ 90.</li>
+  </ol>
+  <div style="color:#8a92a0;font-size:12px">Normal order: <strong style="color:#d0cbc2">Discover → Generate → Refine → Refresh</strong>. The 4 buttons below are manual overrides; each stage feeds the next, so running out of order is rarely useful. Monitor the <em>Pipeline Status</em> and <em>Template Quality</em> tables further down.</div>
 </div>
 
 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0f1419;border:1px solid #2a323d;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#8a92a0;flex-wrap:wrap">
@@ -835,9 +844,18 @@ async def pipeline_topics_page(
 <div class="page">
 <h1>Discovered Topics ({len(rows)})</h1>
 <div class="subtitle">AI-discovered trending topics for curriculum generation</div>
-<div style="background:#1d242e;border-left:3px solid #e8a849;padding:10px 14px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
-  <strong style="color:#e8a849">Your role:</strong> <span style="color:#d0cbc2">approve topics worth turning into curricula; reject the rest.</span>
-  <span style="color:#8a92a0">AI discovers and scores each topic for confidence (relevance + trend + non-duplicate). Read the <em>justification</em> first — the score is a hint, not the decision. Flow: Discover → <strong style="color:#6db585">Approve here</strong> → Generate → Review in Templates.</span>
+<div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
+  <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — what to do on this page</div>
+  <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
+    <li><strong>Wait for topics to appear</strong> — Discovery runs on the <a href="/admin/pipeline/" style="color:#e8a849">Pipeline</a> schedule (weekly/monthly/quarterly) or when you click <em>Run Discovery Now</em>.</li>
+    <li><strong>Read the justification</strong> — this is your primary signal. It explains why AI thinks the topic is valuable (trend, sources, audience). The score alone is not enough.</li>
+    <li><strong>Glance at the confidence score</strong> — a hint, not a verdict. <span style="color:#6db585">≥70</span> is usually safe; below that, scrutinise.</li>
+    <li><strong>Approve or Reject</strong> in the Actions column. Delete (×) removes obvious noise or duplicates.</li>
+    <li><strong>Re-approve</strong> a rejected topic anytime (same button reappears).</li>
+    <li><strong>Generation</strong> happens next — approved topics are picked up by <a href="/admin/pipeline/" style="color:#e8a849">Pipeline → Generate</a> (auto on schedule, or click to trigger now). 5 template variants are created per topic.</li>
+    <li><strong>Review output</strong> on the <a href="/admin/templates" style="color:#e8a849">Templates</a> tab — check quality, refine if needed, publish when ≥ 90.</li>
+  </ol>
+  <div style="color:#8a92a0;font-size:12px">Status flow: <span class="badge pending" style="padding:1px 6px;border-radius:3px;background:#2a2520;color:#e8a849">pending</span> → <span class="badge approved" style="padding:1px 6px;border-radius:3px;background:#1d3525;color:#6db585">approved</span> → <span style="color:#d0cbc2">generating</span> → <span style="color:#d0cbc2">generated</span>. Enable <em>auto-approve</em> in Pipeline Settings to skip step 4 for trusted runs.</div>
 </div>
 <div style="margin-bottom:16px">{filter_html}</div>
 
@@ -2810,9 +2828,15 @@ async def proposals_page(
 {NAV_HTML}
 <div class="page">
 <h1>Curriculum Proposals <span style="font-size:11px;background:#3a2a1a;color:#e8a849;padding:3px 8px;border-radius:3px;vertical-align:middle;margin-left:8px;letter-spacing:0.08em">LEGACY</span></h1>
-<div style="background:#1d242e;border-left:3px solid #8a92a0;padding:10px 14px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
-  <strong style="color:#d0cbc2">Legacy page — mostly replaced by the <a href="/admin/pipeline/" style="color:#e8a849">Pipeline</a>.</strong>
-  <span style="color:#8a92a0">Old quarterly-sync proposals still land here; safe to ignore unless you have pending items to resolve. New curricula flow through Topics → Pipeline → Templates.</span>
+<div style="background:#1d242e;border-left:3px solid #8a92a0;padding:12px 16px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
+  <div style="color:#d0cbc2;font-weight:600;margin-bottom:6px">Your workflow — what to do on this page</div>
+  <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
+    <li><strong>Check for pending items</strong> — old proposals from the quarterly sync land here. If you see "All reviewed" below, you're done.</li>
+    <li><strong>Open each pending proposal</strong> via the Preview column to see the suggested add/update/retire actions.</li>
+    <li><strong>Apply</strong> to accept the proposed change, or <strong>Reject</strong> to dismiss it. Both actions are recorded with a reviewer stamp.</li>
+    <li><strong>Do NOT generate new curricula from here</strong> — use <a href="/admin/pipeline/topics" style="color:#e8a849">Topics</a> → <a href="/admin/pipeline/" style="color:#e8a849">Pipeline</a> → <a href="/admin/templates" style="color:#e8a849">Templates</a> instead. That's the live flow.</li>
+  </ol>
+  <div style="color:#8a92a0;font-size:12px"><strong>Legacy:</strong> the quarterly sync cron (Jan / Apr / Jul / Oct 1st) still fills this page, but the auto-curriculum pipeline replaces it for day-to-day work. Safe to ignore this tab unless pending items are shown.</div>
 </div>
 <p style="color:#8a92a0;font-size:13px;margin-bottom:16px">
     {f'<span style="color:#e8a849;font-weight:600">{pending_count} pending</span>' if pending_count else '<span style="color:#6db585">All reviewed</span>'}
