@@ -44,9 +44,14 @@ OUTPUT: Return a valid JSON object with this exact structure. No markdown, no ex
 STRUCTURE RULES:
 1. Generate exactly {duration_months} months with exactly 4 weeks each ({total_weeks} weeks total)
 2. Week numbers must be sequential from 1 to {total_weeks}
-3. Each week MUST have: 4 focus items, 2-3 deliverables, 3 resources with REAL URLs, 5 checklist items
-4. Each week should have 14-18 hours of work
-5. Last month MUST be a capstone project + job preparation (portfolio, resume, interview prep)
+3. Last month MUST be a capstone project + job preparation (portfolio, resume, interview prep)
+4. Weekly load MUST be calibrated to the "{level}" level (see LEVEL LOAD below)
+
+LEVEL LOAD — do not deviate from these ranges for the "{level}" level:
+- beginner:     10–12 hours/week, 3 focus items, 2 deliverables, 3 resources, 3–4 checklist items
+- intermediate: 14–16 hours/week, 4 focus items, 2–3 deliverables, 3 resources, 5 checklist items
+- advanced:     18–22 hours/week, 5 focus items, 3 deliverables, 4 resources, 6 checklist items
+Rationale: beginners need breathing room to absorb fundamentals; advanced learners can sustain denser, research-heavy weeks. A 3-month beginner plan MUST NOT have the same weekly load as a 3-month advanced plan.
 
 BLOOM'S TAXONOMY — progressive cognitive levels by month position:
 - First 25% of months: Remember/Understand (define, explain, identify core concepts)
