@@ -21,6 +21,7 @@ from typing import Optional
 from app.auth.deps import get_current_admin
 from app.db import get_db
 from app.utils.time_fmt import fmt_ist, FMT_SHORT, FMT_DATE, iso_utc_z
+from app.utils.admin_ui import workflow_steps
 from app.models.curriculum import (
     AdminAlert, AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic,
     ProviderBalance, ProviderDailySpend,
@@ -455,6 +456,7 @@ async def pipeline_dashboard_page(
 <div class="page">
 <h1>Pipeline Actions</h1>
 <div class="subtitle">Run tasks, review pipeline status · Provider health on <a href="/admin/pipeline/ai-usage" style="color:#e8a849">AI Usage</a></div>
+{workflow_steps(2)}
 <div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
   <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — how the pipeline runs</div>
   <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
@@ -844,6 +846,7 @@ async def pipeline_topics_page(
 <div class="page">
 <h1>Discovered Topics ({len(rows)})</h1>
 <div class="subtitle">AI-discovered trending topics for curriculum generation</div>
+{workflow_steps(1)}
 <div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin:12px 0 16px;font-size:13px;line-height:1.6">
   <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — what to do on this page</div>
   <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape as esc
 
 from app.utils.time_fmt import fmt_ist, FMT_SHORT, FMT_DATE, iso_utc_z
+from app.utils.admin_ui import workflow_steps
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -843,6 +844,7 @@ async def admin_templates_page(
 {ADMIN_NAV}
 <div class="page">
 <h1>Plan Templates</h1>
+{workflow_steps(3)}
 <div style="background:#1d242e;border-left:3px solid #e8a849;padding:12px 16px;border-radius:4px;margin-bottom:16px;font-size:13px;line-height:1.6">
   <div style="color:#e8a849;font-weight:600;margin-bottom:6px">Your workflow — what to do on this page</div>
   <ol style="margin:0 0 8px 18px;padding:0;color:#d0cbc2">
