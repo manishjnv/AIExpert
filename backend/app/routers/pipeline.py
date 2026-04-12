@@ -1803,6 +1803,7 @@ All data from <code>ai_usage_log</code> — survives deploys and rebuilds. Costs
 <h3 style="color:#e8a849;margin:14px 0 6px 0;display:flex;align-items:center;gap:12px">
   Provider-Authoritative Reconciliation (last 30 days)
   <button class="btn" style="font-size:12px;padding:4px 10px" onclick="syncNow()">Sync now</button>
+  <span id="sync-status" style="font-size:12px;color:#8a92a0;margin-left:auto"></span>
 </h3>
 <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
 Pulled nightly from OpenAI + Anthropic Usage APIs (requires admin API keys in <code>.env</code>).
@@ -2256,31 +2257,49 @@ async function loadUsageData() {{
   }}
 }}
 
+function setSyncStatus(html) {{
+  const el = document.getElementById('sync-status');
+  if (el) el.innerHTML = html;
+}}
+
 async function syncNow() {{
-  if (!confirm('Sync provider spend from OpenAI + Anthropic Usage APIs now?')) return;
   const btn = event && event.target;
   if (btn) {{ btn.textContent = 'Syncing...'; btn.disabled = true; }}
+  setSyncStatus('<span style="color:#e8a849">⏳ Syncing...</span>');
   try {{
     const resp = await fetch('/admin/pipeline/api/ai-usage/sync-now', {{
       method:'POST', credentials:'same-origin',
       headers:{{'Content-Type':'application/json'}},
     }});
     const r = await resp.json();
-    if (!resp.ok) {{ alert('Sync failed: ' + (r.detail || resp.status)); return; }}
-    // Build a friendly summary
+    if (!resp.ok) {{
+      setSyncStatus('<span style="color:#d97757">✗ failed: ' + (r.detail || resp.status) + '</span>');
+      return;
+    }}
     const day = r.sync && r.sync.day ? r.sync.day : '?';
-    const parts = [];
     const provs = (r.sync && r.sync.providers) || {{}};
+    const bits = [];
+    let hasError = false;
     for (const [name, info] of Object.entries(provs)) {{
-      if (info.status === 'ok')       parts.push('✅ ' + name + ': ' + info.rows + ' row(s)');
-      else if (info.status === 'skipped') parts.push('⏭ ' + name + ': skipped — ' + (info.reason || ''));
-      else                             parts.push('❌ ' + name + ': ' + (info.error || 'error'));
+      if (info.status === 'ok') {{
+        const color = info.rows > 0 ? '#6db585' : '#8a92a0';
+        bits.push('<span style="color:' + color + '">' + name + ' ' + info.rows + 'r</span>');
+      }} else if (info.status === 'skipped') {{
+        bits.push('<span style="color:#8a92a0">' + name + ' skipped</span>');
+      }} else {{
+        hasError = true;
+        bits.push('<span style="color:#d97757">' + name + ' err</span>');
+      }}
     }}
     const arch = r.archive || {{}};
-    const archStr = arch.status === 'ok'
-      ? ' · Archive: deleted ' + (arch.deleted_rows || 0) + ' old rows'
-      : '';
-    alert('Synced ' + day + '\\n\\n' + parts.join('\\n') + archStr);
+    const archStr = arch.status === 'ok' && (arch.deleted_rows || 0) > 0
+      ? ' · archived ' + arch.deleted_rows : '';
+    const icon = hasError ? '⚠' : '✓';
+    const iconColor = hasError ? '#d97757' : '#6db585';
+    const now = new Date().toLocaleTimeString();
+    setSyncStatus('<span style="color:' + iconColor + '">' + icon + '</span> '
+      + day + ' · ' + bits.join(' · ') + archStr
+      + ' <span style="color:#4a4f5a">@ ' + now + '</span>');
   }} finally {{
     if (btn) {{ btn.textContent = 'Sync now'; btn.disabled = false; }}
   }}
