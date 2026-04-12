@@ -13,12 +13,13 @@ CONTEXT:
 - These weeks are from month {month_context} of a {duration_months}-month course
 
 REQUIREMENTS FOR EACH FIX:
-1. Checklist items MUST start with action verbs: Build, Implement, Train, Deploy, Fine-tune, Write, Evaluate, Submit, Benchmark, Compare, Design, Test, Debug, Optimize, Document
-2. Replace any vague items ("Understand X", "Learn about Y") with specific, measurable items
-3. Resources must be real URLs from: huggingface.co, arxiv.org, fast.ai, pytorch.org, kaggle.com, coursera.org, d2l.ai, paperswithcode.com, github.com, youtube.com
-4. Match Bloom's level to month position: early months = Understand/Apply, late months = Analyze/Create
-5. Ensure at least 1 hands-on deliverable per week (notebook, code, model, API)
-6. Keep the week schema identical: n, t, hours, focus, deliv, resources, checks
+1. Address every `detail` in ISSUES TO FIX above — they are concrete, pattern-specific instructions (action-verb counts, measurability thresholds, Bloom's level per month). If an issue says "rewrite at least 6 checks in weeks [9,10,11,12] to start with Build/Design/Deploy", you MUST do exactly that.
+2. Checklist items MUST start with action verbs: Build, Implement, Train, Deploy, Fine-tune, Write, Evaluate, Submit, Benchmark, Compare, Design, Test, Debug, Optimize, Document. Never: Understand, Learn, Know, Study, Explore, Review, Familiarize.
+3. At least 10% of checklist items across the fixed weeks MUST include a measurable numeric threshold: "Train a CNN achieving >85% accuracy on CIFAR-10", "Build an API handling 100 req/s with p99 < 200ms", "Fine-tune with F1 > 0.7 on held-out set", "Write tests with >80% coverage".
+4. Resources must be real URLs from: huggingface.co, arxiv.org, fast.ai, pytorch.org, kaggle.com, coursera.org, d2l.ai, paperswithcode.com, github.com, youtube.com
+5. Match Bloom's level to month position: early months = Understand/Apply, late months = Analyze/Create (Build/Design/Deploy/Train must dominate the final month's checks).
+6. Ensure at least 1 hands-on deliverable per week (notebook, code, model, API)
+7. Keep the week schema identical: n, t, hours, focus, deliv, resources, checks
 
 Return ONLY the JSON array of fixed weeks:
 [{{"n": 3, "t": "...", "hours": 16, "focus": [...], "deliv": [...], "resources": [...], "checks": [...]}}, ...]

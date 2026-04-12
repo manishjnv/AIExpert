@@ -116,6 +116,13 @@ async def run_quality_pipeline(
     result["review"] = review
     result["stages_run"].append("review")
 
+    # Heuristic diagnostics — pattern-specific failures the AI review won't see.
+    # These are merged into critical_fixes so the refiner knows exactly what to rewrite.
+    heuristic_fixes, heuristic_weeks = _heuristic_diagnostics(plan)
+    if heuristic_fixes:
+        logger.info("Quality pipeline: %d heuristic fix(es) added — weeks %s",
+                    len(heuristic_fixes), heuristic_weeks)
+
     # Check if refinement needed
     failing_dims = review.get("dimensions_below_threshold", [])
     if not failing_dims:
@@ -128,21 +135,22 @@ async def run_quality_pipeline(
             if isinstance(dim_data, dict) and dim_data.get("score", 10) < SKIP_REFINE_THRESHOLD:
                 failing_dims.append(dim_key)
 
-    if not failing_dims:
+    if not failing_dims and not heuristic_fixes:
         result["final_score"] = heuristic_score
-        result["skipped"].append("refine: all dimensions >= threshold")
+        result["skipped"].append("refine: all dimensions >= threshold and no heuristic fixes")
         logger.info("Quality pipeline: skipping refinement (all dimensions pass)")
         return result
 
     # ---- Stage 3: Refinement (Claude for many issues, Gemini for few) ----
-    critical_fixes = review.get("critical_fixes", [])
+    critical_fixes = list(review.get("critical_fixes", []) or []) + heuristic_fixes
+
     if not critical_fixes:
         result["final_score"] = heuristic_score
         result["skipped"].append("refine: no critical fixes identified")
         return result
 
-    # Determine which weeks need fixing
-    fix_week_nums = list(set(f.get("week", 0) for f in critical_fixes if f.get("week")))
+    # Determine which weeks need fixing (union of AI + heuristic)
+    fix_week_nums = list({f.get("week", 0) for f in critical_fixes if f.get("week")} | set(heuristic_weeks))
     if not fix_week_nums:
         result["final_score"] = heuristic_score
         result["skipped"].append("refine: no specific weeks identified")
@@ -264,6 +272,101 @@ def _quick_heuristic_score(plan: dict) -> int:
             score -= 5
 
     return max(0, min(100, score))
+
+
+def _heuristic_diagnostics(plan: dict) -> tuple[list[dict], list[int]]:
+    """Return actionable fixes for heuristic-detectable failures.
+
+    The AI review is blind to very specific pattern rules (action verbs in
+    last month, measurable numeric criteria, vague verbs). This surfaces them
+    as concrete instructions for the refiner so free models can target them.
+
+    Returns (critical_fixes, fix_week_nums).
+    """
+    from app.curriculum.loader import PlanTemplate
+    import re
+    try:
+        tpl = PlanTemplate(**plan)
+    except Exception:
+        return [], []
+
+    fixes: list[dict] = []
+    weeks: set[int] = set()
+
+    vague_patterns = [r"^understand\b", r"^learn\b", r"^know\b", r"^study\b",
+                      r"^read about\b", r"^explore\b", r"^review\b", r"^familiarize\b"]
+    create_verbs = [r"^build\b", r"^design\b", r"^create\b", r"^deploy\b",
+                    r"^develop\b", r"^train\b", r"^fine-tune\b", r"^architect\b"]
+    measurable_re = re.compile(r"\d+\s*%|\d+\s*(accuracy|f1|auc|precision|recall|mAP|BLEU|ROUGE|req/s|qps|ms)", re.I)
+
+    # 1. Vague verbs — per week
+    for m in tpl.months:
+        for w in m.weeks:
+            vague_in_week = [c for c in w.checks
+                             if any(re.match(p, c.strip(), re.I) for p in vague_patterns)]
+            if vague_in_week:
+                weeks.add(w.n)
+                fixes.append({
+                    "week": w.n,
+                    "issue": "vague_verbs",
+                    "detail": f"Week {w.n} has {len(vague_in_week)} check(s) starting with vague verbs "
+                              f"(Understand/Learn/Study/Explore). Rewrite each to start with a concrete "
+                              f"action verb (Implement/Build/Train/Deploy/Benchmark/Write/Evaluate). "
+                              f"Examples to fix: {vague_in_week[:2]}",
+                    "priority": "high",
+                })
+
+    # 2. Last-month Create verbs
+    if tpl.months:
+        last_m = tpl.months[-1]
+        last_checks = [c for w in last_m.weeks for c in w.checks]
+        if last_checks:
+            create_count = sum(1 for c in last_checks
+                               if any(re.match(v, c.strip(), re.I) for v in create_verbs))
+            create_pct = create_count / len(last_checks)
+            if create_pct < 0.30:
+                needed = max(0, int(len(last_checks) * 0.30) - create_count)
+                last_week_nums = [w.n for w in last_m.weeks]
+                for wn in last_week_nums:
+                    weeks.add(wn)
+                fixes.append({
+                    "week": last_week_nums[0] if last_week_nums else 0,
+                    "applies_to_weeks": last_week_nums,
+                    "issue": "blooms_last_month_create_verbs",
+                    "detail": f"Last month only {create_count}/{len(last_checks)} ({create_pct*100:.0f}%) "
+                              f"of checklist items start with a Create-level verb "
+                              f"(Build/Design/Deploy/Train/Fine-tune/Develop/Architect). "
+                              f"Rewrite at least {needed} more checks across weeks "
+                              f"{last_week_nums} to start with these verbs. "
+                              f"The last month must demonstrate shipping (Bloom's Create level).",
+                    "priority": "high",
+                })
+
+    # 3. Measurable criteria across all checks
+    all_checks = [(m, w, c) for m in tpl.months for w in m.weeks for c in w.checks]
+    if all_checks:
+        measurable_count = sum(1 for _, _, c in all_checks if measurable_re.search(c))
+        measurable_pct = measurable_count / len(all_checks)
+        if measurable_pct < 0.10:
+            needed = max(0, int(len(all_checks) * 0.10) - measurable_count)
+            # Target a sampling of weeks across the plan
+            sample_week_nums = sorted({w.n for m in tpl.months for w in m.weeks})[:6]
+            for wn in sample_week_nums:
+                weeks.add(wn)
+            fixes.append({
+                "week": sample_week_nums[0] if sample_week_nums else 0,
+                "applies_to_weeks": sample_week_nums,
+                "issue": "measurable_criteria",
+                "detail": f"Only {measurable_count}/{len(all_checks)} ({measurable_pct*100:.1f}%) "
+                          f"checklist items include measurable numeric criteria. "
+                          f"Rewrite at least {needed} more checks across the plan to include a "
+                          f"quantified threshold. Examples: 'Train a CNN achieving >85% accuracy "
+                          f"on CIFAR-10', 'Build an API handling 100 req/s with p99 < 200ms', "
+                          f"'Fine-tune with F1 > 0.7 on test set', 'Write tests with >80% coverage'.",
+                "priority": "high",
+            })
+
+    return fixes, sorted(weeks)
 
 
 def _pick_review_model(generator_model: str) -> str:
