@@ -20,7 +20,10 @@ from typing import Optional
 
 from app.auth.deps import get_current_admin
 from app.db import get_db
-from app.models.curriculum import AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic, ProviderBalance
+from app.models.curriculum import (
+    AICostLimit, AIUsageLog, CurriculumSettings, DiscoveredTopic,
+    ProviderBalance, ProviderDailySpend,
+)
 from app.models.user import User
 
 
@@ -1240,6 +1243,53 @@ async def get_ai_usage(
     }
 
 
+@router.post("/api/ai-usage/sync-now")
+async def trigger_sync_now(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger the daily provider-spend sync (normally runs at 06:00 UTC)."""
+    _check_origin(request)
+    from app.services.provider_usage_sync import run_daily_sync, archive_old_usage_logs
+    sync_res = await run_daily_sync(db)
+    arch_res = await archive_old_usage_logs(db)
+    return {"sync": sync_res, "archive": arch_res}
+
+
+@router.get("/api/ai-usage/reconciliation")
+async def reconciliation_view(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compare local ai_usage_log cost vs provider-reported cost (last 30 days)."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    thirty_days_ago_str = (_dt.now(_tz.utc) - _td(days=30)).date().isoformat()
+
+    rows = (await db.execute(
+        select(ProviderDailySpend)
+        .where(ProviderDailySpend.day >= thirty_days_ago_str)
+        .order_by(ProviderDailySpend.day.desc(),
+                   ProviderDailySpend.provider, ProviderDailySpend.model)
+    )).scalars().all()
+
+    return {
+        "rows": [
+            {
+                "day": r.day,
+                "provider": r.provider,
+                "model": r.model,
+                "input_tokens": r.input_tokens,
+                "output_tokens": r.output_tokens,
+                "cost_provider": round(r.cost_usd_provider, 6),
+                "cost_local": round(r.cost_usd_local, 6),
+                "drift_pct": r.drift_pct,
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.get("/api/ai-usage/analytics")
 async def ai_usage_analytics(
     _user: User = Depends(get_current_admin),
@@ -1700,6 +1750,16 @@ All data from <code>ai_usage_log</code> — survives deploys and rebuilds. Costs
 <h3 style="color:#e8a849;margin:14px 0 6px 0">Reliability — Failure Rate by Provider (last 30 days)</h3>
 <div id="fallback-stats"><em style="color:#8a92a0">Loading...</em></div>
 
+<h3 style="color:#e8a849;margin:14px 0 6px 0;display:flex;align-items:center;gap:12px">
+  Provider-Authoritative Reconciliation (last 30 days)
+  <button class="btn" style="font-size:12px;padding:4px 10px" onclick="syncNow()">Sync now</button>
+</h3>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+Pulled nightly from OpenAI + Anthropic Usage APIs (requires admin API keys in <code>.env</code>).
+Drift column = our local estimate vs provider-reported spend. Gemini not available — no public usage API.
+</div>
+<div id="reconciliation"><em style="color:#8a92a0">Loading...</em></div>
+
 <h2 style="margin-top:28px">Recent Calls (last 50)</h2>
 <div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
 
@@ -1932,6 +1992,53 @@ async function loadUsageData() {{
   }}
 }}
 
+async function syncNow() {{
+  if (!confirm('Trigger provider spend sync now? This hits OpenAI + Anthropic Usage APIs.')) return;
+  const resp = await fetch('/admin/pipeline/api/ai-usage/sync-now', {{
+    method:'POST', credentials:'same-origin',
+    headers:{{'Content-Type':'application/json'}},
+  }});
+  const r = await resp.json();
+  alert('Sync result: ' + JSON.stringify(r, null, 2));
+  loadReconciliation();
+}}
+
+async function loadReconciliation() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage/reconciliation', {{credentials:'same-origin'}});
+    const d = await resp.json();
+    if (!d.rows || d.rows.length === 0) {{
+      document.getElementById('reconciliation').innerHTML =
+        '<p style="color:#8a92a0">No sync data yet. Click <b>Sync now</b> or wait for the scheduled run.</p>';
+      return;
+    }}
+    let h = '<table><tr><th>Day</th><th>Provider</th><th>Model</th><th>In tokens</th><th>Out tokens</th><th>Provider cost</th><th>Our estimate</th><th>Drift</th></tr>';
+    for (const r of d.rows) {{
+      let driftCell;
+      if (r.drift_pct === null) driftCell = '<span style="color:#8a92a0">—</span>';
+      else {{
+        const abs = Math.abs(r.drift_pct);
+        const color = abs > 10 ? '#d97757' : (abs > 3 ? '#e8a849' : '#6db585');
+        const sign = r.drift_pct > 0 ? '+' : '';
+        driftCell = '<span style="color:' + color + '">' + sign + r.drift_pct + '%</span>';
+      }}
+      h += '<tr><td style="font-size:12px">' + r.day + '</td>'
+        + '<td style="text-transform:capitalize">' + r.provider + '</td>'
+        + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
+        + '<td>' + r.input_tokens.toLocaleString() + '</td>'
+        + '<td>' + r.output_tokens.toLocaleString() + '</td>'
+        + '<td>' + fmtCost(r.cost_provider) + '</td>'
+        + '<td>' + fmtCost(r.cost_local) + '</td>'
+        + '<td>' + driftCell + '</td></tr>';
+    }}
+    h += '</table>';
+    document.getElementById('reconciliation').innerHTML = h;
+  }} catch(e) {{
+    document.getElementById('reconciliation').innerHTML =
+      '<p style="color:#d97757">Failed: ' + e.message + '</p>';
+  }}
+}}
+
 async function loadAnalytics() {{
   try {{
     const resp = await fetch('/admin/pipeline/api/ai-usage/analytics', {{credentials:'same-origin'}});
@@ -2040,6 +2147,7 @@ async function loadAnalytics() {{
 
 loadUsageData();
 loadAnalytics();
+loadReconciliation();
 </script>
 </div>
 </body></html>"""

@@ -160,6 +160,34 @@ class DiscoveredTopic(PrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class ProviderDailySpend(PrimaryKeyMixin, TimestampMixin, Base):
+    """Provider-authoritative daily spend from their Usage API.
+
+    Pulled nightly by provider_usage_sync. One row per (day, provider, model).
+    Used for reconciliation against our ai_usage_log and for long-term
+    archival (ai_usage_log is purged after 90 days — this table is permanent).
+    """
+
+    __tablename__ = "provider_daily_spend"
+
+    day: Mapped[str] = mapped_column(String, nullable=False)  # YYYY-MM-DD UTC
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    model: Mapped[str] = mapped_column(String, nullable=False, default="*")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cost_usd_provider: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    cost_usd_local: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    drift_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    raw_response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("day", "provider", "model",
+                          name="uq_provider_daily_spend_day_provider_model"),
+        Index("ix_provider_daily_spend_day", "day"),
+        Index("ix_provider_daily_spend_provider", "provider"),
+    )
+
+
 class ProviderBalance(PrimaryKeyMixin, TimestampMixin, Base):
     """Admin-editable credit balance and recommended daily cap per provider.
 

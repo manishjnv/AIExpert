@@ -75,6 +75,19 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     topic_dedup_similarity_threshold: float = 0.88
 
+    # Admin API keys — separate from regular API keys, used ONLY for the
+    # provider-authoritative daily spend sync. Revoke independently if compromised.
+    # Create at:
+    #   OpenAI:    https://platform.openai.com/settings/organization/admin-keys
+    #   Anthropic: https://console.anthropic.com/settings/admin-keys
+    openai_admin_api_key: str = ""
+    anthropic_admin_api_key: str = ""
+
+    # How many days of raw ai_usage_log rows to keep. Older rows are archived
+    # into ai_usage_log_archive (or deleted if archive disabled). Long-term
+    # aggregates live in provider_daily_spend.
+    ai_usage_log_retention_days: int = 90
+
     # ----- GitHub (optional) -----
     github_token: str = ""
 

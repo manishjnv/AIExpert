@@ -64,6 +64,24 @@ async def pipeline_scheduler(session_factory: async_sessionmaker) -> None:
                             gen_result = await run_batch_generation(db)
                             logger.info("Auto-generation result: %s", gen_result.get("status"))
 
+                    # Daily provider spend sync + log archive.
+                    # Runs once per UTC day; idempotent (upserts on duplicate key).
+                    last_sync_marker = getattr(settings, "_last_spend_sync", None)
+                    today_utc = datetime.now(timezone.utc).date()
+                    if last_sync_marker != today_utc:
+                        try:
+                            from app.services.provider_usage_sync import (
+                                run_daily_sync, archive_old_usage_logs,
+                            )
+                            sync_res = await run_daily_sync(db)
+                            logger.info("Daily spend sync: %s", sync_res)
+                            arch_res = await archive_old_usage_logs(db)
+                            logger.info("Usage log archive: %s", arch_res)
+                            # Mark completed (in-memory, resets on restart — that's fine)
+                            setattr(settings, "_last_spend_sync", today_utc)
+                        except Exception as e:
+                            logger.exception("Daily spend sync failed: %s", e)
+
                     # Check refresh schedule
                     refresh_days = FREQUENCY_DAYS.get(settings.refresh_frequency, 90)
                     if settings.last_refresh_run is None or \
