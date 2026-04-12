@@ -1942,14 +1942,15 @@ function wireInlineEdits() {{
   }});
 }}
 
-async function editBalanceOnly(provider, currentBal) {{
-  const s = prompt('Credit remaining for ' + provider + ' (USD):', currentBal.toFixed(2));
-  if (s === null) return;
-  const bal = parseFloat(s);
+async function editBalancePrompt(provider, currentBal, currentRec) {{
+  const balStr = prompt('Credit remaining for ' + provider + ' (USD):', currentBal.toFixed(2));
+  if (balStr === null) return;
+  const bal = parseFloat(balStr);
   if (isNaN(bal) || bal < 0) {{ alert('Invalid balance'); return; }}
-  // Preserve existing recommended cap
-  const existing = (window.__lastInfo || []).find(p => p.provider === provider) || {{}};
-  const rec = existing.recommended_cap_usd || 0;
+  const recStr = prompt('Recommended daily cap for ' + provider + ' (USD):', currentRec.toFixed(2));
+  if (recStr === null) return;
+  const rec = parseFloat(recStr);
+  if (isNaN(rec) || rec < 0) {{ alert('Invalid cap'); return; }}
   const resp = await fetch('/admin/pipeline/api/ai-usage/set-balance', {{
     method:'POST', credentials:'same-origin',
     headers:{{'Content-Type':'application/json'}},
@@ -2074,11 +2075,11 @@ async function loadUsageData() {{
       document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
     }}
 
-    // Single consolidated table — paid providers on top (editable), free at bottom
+    // Consolidated provider table — Provider | Balance | Rec. $ cap |
+    // Current $ cap | Today spend | Primary model | Price | Actions
+    // Balance and Current $ cap are inline-editable (click → type → autosave).
     if (data.provider_info) {{
       window.__lastInfo = data.provider_info;
-      // Only provider-wide caps (model === '*') appear here. Per-model
-      // overrides are intentionally hidden — admin UI is paved-path.
       const limitsByProvider = {{}};
       (data.limits || []).forEach(l => {{
         if (l.model === '*') limitsByProvider[l.provider] = l.daily_cost_usd;
@@ -2086,25 +2087,23 @@ async function loadUsageData() {{
       const spend = data.spend_today || {{}};
 
       let html = '<table style="font-size:13px"><tr>'
-        + '<th></th><th>Provider</th><th>Balance</th><th>Daily $ cap</th>'
-        + '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Used for</th></tr>';
+        + '<th>Provider</th><th>Balance</th><th>Rec. $ cap</th><th>Current $ cap</th>'
+        + '<th>Today spend</th><th>Primary model</th><th>Price</th><th>Actions</th></tr>';
 
       for (const p of data.provider_info) {{
         const curCap = limitsByProvider[p.provider];
         const rec = p.recommended_cap_usd || 0;
         const bal = p.balance_usd || 0;
         const sp = spend[p.provider] || 0;
+        const disabled = (p.price_note || '').includes('402');
 
-        // Status dot
-        let dot;
-        if (!p.paid) dot = '🟢';
-        else if (curCap == null) dot = '🔴';
-        else {{
-          const pct = curCap > 0 ? (sp / curCap) * 100 : 0;
-          dot = pct >= 90 ? '🔴' : (pct >= 70 ? '🟡' : '🟢');
-        }}
+        // Provider name
+        const nameColor = p.paid ? '#e8a849' : '#6db585';
+        const nameCell = '<span style="color:' + (disabled ? '#8a92a0' : nameColor)
+          + ';text-transform:capitalize;font-weight:' + (p.paid ? '600' : '400') + '">'
+          + p.provider + '</span>';
 
-        // Balance cell
+        // Balance — inline editable for paid
         let balCell;
         if (p.paid) {{
           balCell = '$<span class="inline-edit" contenteditable="true" '
@@ -2116,60 +2115,63 @@ async function loadUsageData() {{
           balCell = '<span style="color:#8a92a0">free</span>';
         }}
 
-        // Cap cell
+        // Rec. $ cap (read-only display)
+        const recCell = p.paid && rec > 0
+          ? '$' + rec.toFixed(2)
+          : '<span style="color:#8a92a0">—</span>';
+
+        // Current $ cap — inline editable, "unset" red for paid with no cap
         let capCell;
         if (p.paid) {{
-          const capValStr = curCap != null ? curCap.toFixed(2) : '';
-          const capColor = curCap == null ? '#d97757' : '#e8a849';
-          capCell = '$<span class="inline-edit" contenteditable="true" '
-            + 'data-kind="cap" data-provider="' + p.provider + '" '
-            + 'style="border-bottom:1px dashed ' + capColor + ';color:' + capColor
-            + ';padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
-            + (capValStr || 'unset') + '</span>';
-          if (curCap == null && rec > 0) {{
-            capCell += ' <a href="#" style="color:#6db585;font-size:11px;text-decoration:none;margin-left:4px" '
-              + 'onclick="event.preventDefault();applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">'
-              + '⚡$' + rec.toFixed(2) + '</a>';
-          }} else if (rec > 0 && curCap != null && Math.abs(curCap - rec) > 0.01) {{
-            capCell += ' <span style="color:#8a92a0;font-size:11px">(rec $' + rec.toFixed(2) + ')</span>';
+          if (curCap != null) {{
+            capCell = '$<span class="inline-edit" contenteditable="true" '
+              + 'data-kind="cap" data-provider="' + p.provider + '" '
+              + 'style="border-bottom:1px dashed #e8a849;color:#e8a849;'
+              + 'padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
+              + curCap.toFixed(2) + '</span>';
+          }} else {{
+            capCell = '<span class="inline-edit" contenteditable="true" '
+              + 'data-kind="cap" data-provider="' + p.provider + '" '
+              + 'style="border-bottom:1px dashed #d97757;color:#d97757;'
+              + 'padding:1px 4px;min-width:40px;display:inline-block;font-weight:600">'
+              + 'unset</span>';
           }}
         }} else {{
-          capCell = '<span style="color:#8a92a0">—</span>';
+          capCell = '<span style="color:#8a92a0">unset</span>';
         }}
 
-        // Today-spend cell with mini progress
+        // Today spend
         let spendCell;
         if (p.paid) {{
-          if (curCap != null && curCap > 0) {{
-            const pct = Math.min(100, (sp / curCap) * 100);
-            const barColor = pct >= 90 ? '#d97757' : (pct >= 70 ? '#e8a849' : '#6db585');
-            spendCell = '<div>$' + sp.toFixed(4) + ' <span style="color:#8a92a0;font-size:11px">('
-              + pct.toFixed(0) + '%)</span></div>'
-              + '<div style="background:#2b2e36;border-radius:2px;height:4px;overflow:hidden;margin-top:2px;width:100px">'
-              + '<div style="background:' + barColor + ';width:' + pct.toFixed(0) + '%;height:100%"></div>'
-              + '</div>';
-          }} else {{
-            spendCell = '$' + sp.toFixed(4);
-          }}
+          spendCell = sp > 0 ? '$' + sp.toFixed(4) : '<span style="color:#8a92a0">$0</span>';
         }} else {{
           spendCell = '<span style="color:#8a92a0">—</span>';
         }}
 
-        const nameColor = p.paid ? '#e8a849' : '#6db585';
-        const disabled = (p.price_note || '').includes('402');
-        const nameCell = '<span style="color:' + (disabled ? '#8a92a0' : nameColor)
-          + ';text-transform:capitalize;font-weight:' + (p.paid ? '600' : '400') + '">'
-          + p.provider + (disabled ? ' (disabled)' : '') + '</span>';
+        // Actions
+        let actionCell;
+        if (p.paid) {{
+          actionCell = '<button class="btn" style="font-size:11px;padding:3px 8px" '
+            + 'onclick="editBalancePrompt(\\'' + p.provider + '\\',' + bal + ','
+            + rec + ')">Edit balance</button>';
+          if (curCap == null && rec > 0) {{
+            actionCell += ' <button class="btn" style="font-size:11px;padding:3px 8px;background:#6db585" '
+              + 'onclick="applyRecommendedCap(\\'' + p.provider + '\\',' + rec + ')">Apply rec</button>';
+          }}
+        }} else {{
+          actionCell = '<span style="color:#8a92a0;font-size:12px">' + p.use
+            + (disabled ? ' (disabled)' : '') + '</span>';
+        }}
 
         html += '<tr>'
-          + '<td style="font-size:16px">' + dot + '</td>'
           + '<td>' + nameCell + '</td>'
           + '<td>' + balCell + '</td>'
+          + '<td>' + recCell + '</td>'
           + '<td>' + capCell + '</td>'
           + '<td>' + spendCell + '</td>'
           + '<td style="font-family:monospace;font-size:12px">' + p.primary_model + '</td>'
           + '<td style="font-size:12px;color:#8a92a0">' + p.price_note + '</td>'
-          + '<td style="font-size:12px;color:#8a92a0">' + p.use + '</td>'
+          + '<td>' + actionCell + '</td>'
           + '</tr>';
       }}
       html += '</table>';
