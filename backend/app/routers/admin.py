@@ -832,9 +832,9 @@ async def admin_templates_page(
             actions_html = " ".join(actions)
 
             cert_n = tpl.certification_count
-            gh_n = tpl.github_resource_count
+            gh_n = tpl.repos_required
             cert_cell = f'<span style="color:#6db585;font-weight:600" title="{cert_n} resource(s)/deliverable(s) reference a certification">{cert_n}</span>' if cert_n else '<span style="color:#5a6472">0</span>'
-            gh_cell = f'<span style="color:#6db585;font-weight:600" title="{gh_n} resource(s) link to github.com">{gh_n}</span>' if gh_n else '<span style="color:#5a6472">0</span>'
+            gh_cell = f'<span style="color:#6db585;font-weight:600" title="{gh_n} GitHub-linkable deliverable(s) the learner must produce (repos, notebooks, demos, services). User progress: linked / required.">{gh_n}</span>' if gh_n else '<span style="color:#5a6472">0</span>'
 
             rows_html += f"<tr><td><a href='/admin/templates/{key}' style='color:#e8a849'>{esc(tpl.title)}</a></td><td>{esc(tpl.level)}</td><td>{tpl.duration_months}mo</td><td>{tpl.total_weeks}</td><td>{tpl.total_hours}</td><td>{tpl.total_focus_areas}</td><td>{tpl.total_checks}</td><td style='text-align:center'>{cert_cell}</td><td style='text-align:center'>{gh_cell}</td><td style='text-align:center'>{subs_display}</td><td style='text-align:center'>{status_badge}</td><td style='text-align:center'>{score_display}</td><td style='white-space:nowrap'>{actions_html}</td></tr>"
         except Exception:
@@ -870,7 +870,7 @@ async def admin_templates_page(
 </div>
 
 <div style="overflow-x:auto;border:1px solid #2a323d;border-radius:4px">
-<table style="min-width:1100px;margin:0"><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th title="Sum of per-week focus areas across all weeks in this template (not to be confused with Topic, which is the course subject on the Topics tab)">Focus areas</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Count of resources that link to github.com (concrete GitHub practice)">GH Repos</th><th title="Active subscribers / enrollments">Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
+<table style="min-width:1100px;margin:0"><tr><th>Title</th><th>Level</th><th>Duration</th><th>Weeks</th><th>Hours</th><th title="Sum of per-week focus areas across all weeks in this template (not to be confused with Topic, which is the course subject on the Topics tab)">Focus areas</th><th>Checks</th><th title="Count of resources/deliverables/checks that reference a certification">Certs</th><th title="Deliverables the learner must produce as a GitHub-trackable artifact (repo, notebook, demo, service). User progress on /account shows as linked/required (e.g. 4/15).">Repos Required</th><th title="Active subscribers / enrollments">Subs</th><th>Status</th><th>Quality</th><th>Actions</th></tr>{rows_html}</table>
 </div>
 
 <script>

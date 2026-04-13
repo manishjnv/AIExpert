@@ -116,12 +116,57 @@ class PlanTemplate(BaseModel):
 
     @property
     def github_resource_count(self) -> int:
-        """Count of resources whose URL points to github.com — concrete GitHub practice."""
+        """DEPRECATED — retained for backward compat. Counts github.com URLs in resources."""
         n = 0
         for m in self.months:
             for w in m.weeks:
                 for r in w.resources:
                     if "github.com" in r.url.lower():
+                        n += 1
+        return n
+
+    @property
+    def repos_required(self) -> int:
+        """Count of deliverables that the learner must produce as a GitHub artifact.
+
+        Scans deliv[] across all weeks for artifact keywords (repo, notebook,
+        project, app, API, service, demo, dashboard, pipeline, etc.) — each
+        match is a github-linkable deliverable the user should produce.
+
+        User-facing completion maps to: linked_repos / repos_required (e.g. 4/5).
+        """
+        import re as _re
+        patterns = [
+            r"\brepo(sitor(y|ies))?\b",
+            r"\bnotebook\b",
+            r"\bproject\b",
+            r"\bapp(lication)?\b",
+            r"\bapi\b",
+            r"\bservice\b",
+            r"\bserver\b",
+            r"\bdemo\b",
+            r"\bdashboard\b",
+            r"\bpipeline\b",
+            r"\bportfolio\b",
+            r"\bharness\b",
+            r"\bsuite\b",
+            r"\blibrary\b",
+            r"\bcli\b",
+            r"\bsdk\b",
+            r"\bpackage\b",
+            r"\bbenchmark\b",
+            r"\bmiddleware\b",
+            r"\bmodel\b",
+            r"\bagent\b",
+            r"\bmicroservice\b",
+            r"\bsite\b",
+        ]
+        regex = _re.compile("|".join(patterns), _re.IGNORECASE)
+        n = 0
+        for m in self.months:
+            for w in m.weeks:
+                for d in w.deliv:
+                    if isinstance(d, str) and regex.search(d):
                         n += 1
         return n
 

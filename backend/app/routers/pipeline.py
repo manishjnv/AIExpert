@@ -355,6 +355,7 @@ async def get_topic_detail(
                     "total_checks": tpl.total_checks,
                     "certification_count": tpl.certification_count,
                     "github_resource_count": tpl.github_resource_count,
+                    "repos_required": tpl.repos_required,
                     "top_resources_count": len(tpl.top_resources or []),
                     "certifications_count": len(tpl.certifications or []),
                     "goal": tpl.goal,
@@ -1754,7 +1755,7 @@ async function viewTopic(id) {{
             <span>${{tp.total_checks}} checks</span>
             <span>${{tp.top_resources_count}} anchor resources</span>
             <span>${{tp.certifications_count}} cert(s)</span>
-            <span>${{tp.github_resource_count}} GH repos</span>
+            <span>${{tp.repos_required}} repos required</span>
           </div>
         </div>
       `;
