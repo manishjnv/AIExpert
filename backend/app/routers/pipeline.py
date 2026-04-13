@@ -390,50 +390,24 @@ async def claude_prompt(
     total_weeks = duration * 4
     key = _re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_") + f"_{duration_str}_{level}"
 
-    prompt_path = _Path(__file__).parent.parent / "prompts" / "generate_curriculum.txt"
+    # Render the rich Claude Opus prompt with the admin's inputs substituted.
+    # Uses {{PLACEHOLDER}} tokens (not Python .format) so the JSON schema
+    # examples inside the prompt don't get mangled.
+    prompt_path = _Path(__file__).parent.parent / "prompts" / "claude_opus_manual.txt"
     template = prompt_path.read_text(encoding="utf-8")
-    rendered = template.format(
-        topic=topic,
-        duration_months=duration,
-        total_weeks=total_weeks,
-        level=level,
-        level_title=level.capitalize(),
-        key=key,
-    )
-
-    # Claude-chat-specific preamble — makes the request unambiguous and
-    # encourages Claude to return raw JSON (not fenced markdown).
-    preamble = (
-        "You are generating a curriculum template for the AI Learning Roadmap platform. "
-        "Return ONLY the JSON object — no code fences, no preamble, no commentary. "
-        "The JSON will be validated against a Pydantic schema; any prose wrapper will break the upload.\n\n"
+    rendered = (
+        template
+        .replace("{{TOPIC}}", topic)
+        .replace("{{DURATION_MONTHS}}", str(duration))
+        .replace("{{TOTAL_WEEKS}}", str(total_weeks))
+        .replace("{{LEVEL}}", level)
+        .replace("{{KEY}}", key)
     )
     return {
-        "prompt": preamble + rendered,
+        "prompt": rendered,
         "key": key,
         "expected_weeks": total_weeks,
     }
-
-
-@router.get("/api/claude-opus-prompt-template")
-async def claude_opus_prompt_template(_user: User = Depends(get_current_admin)):
-    """Download the master prompt template for manual curriculum generation in Claude.ai chat.
-
-    Admin fills in Topic/Duration/Level at the top, pastes the rest into Claude Opus,
-    and Claude returns a JSON template that passes our schema + quality gates.
-    """
-    from pathlib import Path as _Path
-    from fastapi.responses import PlainTextResponse
-
-    prompt_path = _Path(__file__).parent.parent / "prompts" / "claude_opus_manual.txt"
-    text = prompt_path.read_text(encoding="utf-8")
-    return PlainTextResponse(
-        content=text,
-        headers={
-            "Content-Disposition": "attachment; filename=claude-opus-curriculum-prompt.txt",
-            "Content-Type": "text/plain; charset=utf-8",
-        },
-    )
 
 
 @router.get("/api/sample-template")
@@ -1160,8 +1134,7 @@ async def pipeline_topics_page(
   <div>{filter_html}</div>
   <div style="display:flex;gap:8px;align-items:center">
     <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Sample JSON</a>
-    <a href="/admin/pipeline/api/claude-opus-prompt-template" download="claude-opus-curriculum-prompt.txt" style="font-size:12px;color:#8a92a0;text-decoration:underline" title="Master prompt for Claude Opus 4.6 — paste into Claude.ai chat, fill in topic/duration/level at top">Opus prompt (.txt)</a>
-    <button class="btn" onclick="document.getElementById('promptModal').style.display='flex'" title="Generate a topic-specific prompt (rendered with your inputs) to paste into Claude.ai chat">Quick prompt</button>
+    <button class="btn" onclick="document.getElementById('promptModal').style.display='flex'" title="Fill topic/duration/level, Generate, Copy, paste into Claude.ai">Claude prompt</button>
     <button class="btn primary" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload Template JSON</button>
   </div>
 </div>
@@ -1172,7 +1145,7 @@ async def pipeline_topics_page(
     <button onclick="document.getElementById('promptModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
     <h2 style="margin-top:0;color:#e8a849">Generate Claude prompt</h2>
     <p style="color:#8a92a0;font-size:13px;line-height:1.6">
-      Paste the generated prompt into <a href="https://claude.ai" target="_blank" style="color:#e8a849">Claude.ai</a> chat. Claude returns a full curriculum JSON. Copy that response, click <em>Upload Template JSON</em>, paste → publish.
+      Fill in topic / duration / level and click <strong>Generate</strong>. The prompt below is the full Claude Opus 4.6 curriculum spec with your inputs pre-filled — schema, level-calibrated load, Bloom's progression, action-verb + measurability thresholds, URL-quality rules, top-3 course resources, certifications, and a 12-point self-check. Paste it into <a href="https://claude.ai" target="_blank" style="color:#e8a849">Claude.ai</a> chat → Claude returns a full curriculum JSON → <strong>+ Upload Template JSON</strong> → Paste from Claude → upload.
     </p>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">
       <div><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Topic</label>
@@ -1185,9 +1158,13 @@ async def pipeline_topics_page(
     </div>
     <div id="promptMeta" style="font-size:12px;color:#8a92a0;min-height:18px"></div>
     <textarea id="promptOutput" readonly placeholder="Prompt will appear here. Copy, paste into Claude.ai chat." style="width:100%;min-height:300px;padding:10px;background:#0f1419;border:1px solid #2a323d;color:#e8e2d3;border-radius:3px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;margin-top:8px"></textarea>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button class="btn" onclick="copyPromptToClipboard()">Copy prompt</button>
-      <button class="btn" onclick="document.getElementById('promptModal').style.display='none'">Close</button>
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:12px;flex-wrap:wrap">
+      <button class="btn danger" onclick="clearPrompt()" title="Reset inputs and clear output">Clear</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn success" onclick="copyPromptToClipboard()">Copy prompt</button>
+        <a href="https://claude.ai" target="_blank" class="btn" style="text-decoration:none">Open Claude.ai ↗</a>
+        <button class="btn" onclick="document.getElementById('promptModal').style.display='none'">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1277,6 +1254,15 @@ async function generateClaudePrompt() {{
   }} catch(e) {{
     meta.innerHTML = '<span style="color:#d97757">' + e.message + '</span>';
   }}
+}}
+
+function clearPrompt() {{
+  document.getElementById('ptTopic').value = '';
+  document.getElementById('ptDuration').value = '6';
+  document.getElementById('ptLevel').value = 'intermediate';
+  document.getElementById('promptOutput').value = '';
+  document.getElementById('promptMeta').textContent = '';
+  document.getElementById('ptTopic').focus();
 }}
 
 async function copyPromptToClipboard() {{

@@ -6,11 +6,12 @@ TASK
 ====
 Generate ONE complete curriculum template for the AI Learning Roadmap platform. The output will be validated against a strict Pydantic schema and uploaded directly to a live platform — any prose wrapper, code fence, or deviation from the schema will break the upload.
 
-INPUTS (fill these in before pasting)
-=====================================
-- Topic: <e.g. Retrieval-Augmented Generation>
-- Duration: <3 | 6 | 9 | 12> months
-- Level: <beginner | intermediate | advanced>
+INPUTS
+======
+- Topic: {{TOPIC}}
+- Duration: {{DURATION_MONTHS}} months ({{TOTAL_WEEKS}} weeks)
+- Level: {{LEVEL}}
+- Expected template key: {{KEY}}
 
 OUTPUT FORMAT (ABSOLUTE)
 ========================
