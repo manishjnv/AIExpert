@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ credential_id }} — AutomateEdge Certificate</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: "DejaVu Serif", "Fraunces", Georgia, serif;
+      color: #1f1610;
+    }
+    .page {
+      width: 297mm; height: 210mm;
+      padding: 18mm 22mm;
+      background: #fffaf1;
+      border: 2mm solid #b45309; /* amber-700 */
+      position: relative;
+    }
+    .inner-frame {
+      position: absolute;
+      inset: 6mm;
+      border: 0.5mm solid #d97706; /* amber-600 */
+    }
+    .brand-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-family: "DejaVu Sans", "Inter", sans-serif;
+      font-size: 11pt; letter-spacing: 2pt; text-transform: uppercase;
+      color: #92400e;
+    }
+    .brand-left { font-weight: 700; }
+    .brand-right { font-weight: 400; }
+    .eyebrow {
+      text-align: center;
+      margin-top: 18mm;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 10pt; letter-spacing: 5pt; text-transform: uppercase;
+      color: #92400e;
+    }
+    .title {
+      text-align: center;
+      font-size: 44pt; font-weight: 400;
+      margin: 4mm 0 0 0;
+      color: #78350f; /* amber-900 */
+      letter-spacing: 0.5pt;
+    }
+    .awarded {
+      text-align: center;
+      margin-top: 14mm;
+      font-size: 13pt; color: #57534e;
+    }
+    .name {
+      text-align: center;
+      margin-top: 3mm;
+      font-size: 36pt; font-style: italic;
+      color: #1f1610;
+      border-bottom: 0.3mm solid #d97706;
+      display: inline-block;
+      padding: 0 18mm 2mm 18mm;
+    }
+    .name-wrapper { text-align: center; }
+    .body {
+      text-align: center;
+      margin-top: 8mm;
+      font-size: 13pt; line-height: 1.55;
+      color: #44403c;
+      padding: 0 10mm;
+    }
+    .body strong { color: #1f1610; font-weight: 600; }
+    .stats {
+      display: flex; justify-content: center; gap: 14mm;
+      margin-top: 10mm;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 9pt; color: #78350f;
+      text-transform: uppercase; letter-spacing: 1.5pt;
+    }
+    .stats .stat { text-align: center; }
+    .stats .stat .val {
+      display: block; font-size: 16pt;
+      font-family: "DejaVu Serif", Georgia, serif;
+      font-weight: 700; color: #1f1610;
+      letter-spacing: 0;
+    }
+    .footer {
+      position: absolute;
+      bottom: 14mm; left: 22mm; right: 22mm;
+      display: flex; align-items: flex-end; justify-content: space-between;
+    }
+    .sig {
+      text-align: center;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 9pt; color: #57534e;
+      min-width: 60mm;
+    }
+    .sig .sig-name {
+      font-family: "DejaVu Serif", Georgia, serif;
+      font-style: italic; font-size: 16pt; color: #1f1610;
+      border-bottom: 0.3mm solid #78350f;
+      padding-bottom: 1mm; margin-bottom: 1mm;
+    }
+    .cred-block { text-align: center; }
+    .cred-block img {
+      width: 30mm; height: 30mm;
+    }
+    .cred-id {
+      font-family: "DejaVu Sans Mono", monospace;
+      font-size: 9pt;
+      color: #57534e;
+      margin-top: 2mm;
+      letter-spacing: 1pt;
+    }
+    .verify-note {
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 7.5pt; color: #78350f;
+      margin-top: 1mm; letter-spacing: 0.5pt;
+    }
+    .tier-badge {
+      position: absolute;
+      top: 18mm; right: 22mm;
+      background: {{ tier_color }};
+      color: #fffaf1;
+      padding: 2mm 5mm;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 9pt; letter-spacing: 2pt;
+      text-transform: uppercase; font-weight: 700;
+      border-radius: 1mm;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="inner-frame"></div>
+
+    <div class="brand-row">
+      <div class="brand-left">AutomateEdge</div>
+      <div class="brand-right">AI Learning Platform</div>
+    </div>
+
+    {% if tier != 'completion' %}
+    <div class="tier-badge">With {{ tier | capitalize }}</div>
+    {% endif %}
+
+    <div class="eyebrow">Certificate of Completion</div>
+    <h1 class="title">{{ course_title }}</h1>
+
+    <div class="awarded">This is to certify that</div>
+    <div class="name-wrapper">
+      <div class="name">{{ display_name }}</div>
+    </div>
+
+    <div class="body">
+      has successfully completed the <strong>{{ duration_months }}-month {{ level }}</strong>
+      AI learning program, shipping <strong>{{ repos_linked }} GitHub
+      {{ 'repository' if repos_linked == 1 else 'repositories' }}</strong>
+      and finishing <strong>{{ checks_done }} / {{ checks_total }}</strong> curriculum milestones
+      across an estimated <strong>{{ total_hours }} hours</strong> of work.
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="val">{{ total_hours }}</span>Hours</div>
+      <div class="stat"><span class="val">{{ checks_done }}/{{ checks_total }}</span>Milestones</div>
+      <div class="stat"><span class="val">{{ repos_linked }}</span>Projects</div>
+      <div class="stat"><span class="val">{{ issued_at_short }}</span>Issued</div>
+    </div>
+
+    <div class="footer">
+      <div class="sig">
+        <div class="sig-name">AutomateEdge</div>
+        <div>Issuing Authority</div>
+      </div>
+      <div class="cred-block">
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" />
+        <div class="cred-id">{{ credential_id }}</div>
+        <div class="verify-note">Verify at {{ verify_domain }}</div>
+      </div>
+      <div class="sig">
+        <div class="sig-name">{{ issued_at_long }}</div>
+        <div>Date of Issue</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

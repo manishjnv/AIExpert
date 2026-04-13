@@ -40,6 +40,12 @@ slowapi==0.1.9
 # ----- Templating (admin UI + share pages) -----
 jinja2==3.1.4
 
+# ----- Certificates (PDF rendering + QR) -----
+# weasyprint pulls in cairo/pango at the system level — Dockerfile installs
+# libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 to satisfy the runtime deps.
+weasyprint==62.3
+qrcode[pil]==7.4.2
+
 # ----- Utilities -----
 python-dateutil==2.9.0
 orjson==3.10.7                # faster JSON for responses

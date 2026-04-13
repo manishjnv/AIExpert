@@ -11,6 +11,12 @@ RUN apt-get update \
         sqlite3 \
         curl \
         ca-certificates \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
