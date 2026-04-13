@@ -1644,8 +1644,17 @@ async def cost_per_template(
         except Exception:
             continue
 
-        title = tpl.title.lower()
-        title_short = title[:50]
+        # Topic portion = title before " — ", lowercased, no leading/trailing punctuation.
+        # The generator logs subtasks like "Topic Xmo level" (no em-dash), and refines
+        # log "Topic Xmo level" truncated at 50. Best match: lowercased topic-portion
+        # substring of the subtask.
+        full_title = tpl.title.lower()
+        topic_portion = (tpl.title.split("—")[0].split("-")[0]).strip().lower()
+        # Drop trailing punctuation and collapse whitespace
+        import re as _re
+        topic_portion = _re.sub(r"[^a-z0-9 ]+", " ", topic_portion).strip()
+        topic_portion = _re.sub(r"\s+", " ", topic_portion)
+
         per_task: dict[str, dict] = {}
         total_cost = 0.0
         total_calls = 0
@@ -1655,8 +1664,15 @@ async def cost_per_template(
             sub = (r.subtask or "").lower()
             if not sub:
                 continue
-            # Match either the full title or the 50-char prefix used by refine
-            if sub != title and title_short not in sub and sub not in title:
+            sub_norm = _re.sub(r"[^a-z0-9 ]+", " ", sub)
+            sub_norm = _re.sub(r"\s+", " ", sub_norm).strip()
+            # Match if topic portion appears in subtask (covers "Topic 3mo beginner"
+            # style subtasks) OR the full title contains the subtask / vice versa.
+            if topic_portion and topic_portion in sub_norm:
+                pass
+            elif sub in full_title or full_title in sub:
+                pass
+            else:
                 continue
             in_p, _ = get_price(r.provider, r.model)
             tok = int(r.tokens_estimated or 0)
