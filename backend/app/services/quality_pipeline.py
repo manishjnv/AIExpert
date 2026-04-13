@@ -150,7 +150,14 @@ async def run_quality_pipeline(
         return result
 
     # Determine which weeks need fixing (union of AI + heuristic)
-    fix_week_nums = list({f.get("week", 0) for f in critical_fixes if f.get("week")} | set(heuristic_weeks))
+    fix_week_nums = sorted({f.get("week", 0) for f in critical_fixes if f.get("week")} | set(heuristic_weeks))
+    # Cap payload so the refiner's output fits in the token budget.
+    # Last-month weeks and vague-verb weeks are the highest signal — prioritise those.
+    MAX_WEEKS_PER_REFINE = 6
+    if len(fix_week_nums) > MAX_WEEKS_PER_REFINE:
+        logger.info("Quality pipeline: capping refine from %d to %d weeks (payload limit)",
+                    len(fix_week_nums), MAX_WEEKS_PER_REFINE)
+        fix_week_nums = fix_week_nums[-MAX_WEEKS_PER_REFINE:]  # keep latest weeks (last-month priority)
     if not fix_week_nums:
         result["final_score"] = heuristic_score
         result["skipped"].append("refine: no specific weeks identified")
@@ -349,8 +356,9 @@ def _heuristic_diagnostics(plan: dict) -> tuple[list[dict], list[int]]:
         measurable_pct = measurable_count / len(all_checks)
         if measurable_pct < 0.10:
             needed = max(0, int(len(all_checks) * 0.10) - measurable_count)
-            # Target a sampling of weeks across the plan
-            sample_week_nums = sorted({w.n for m in tpl.months for w in m.weeks})[:6]
+            # Target a small sampling of weeks across the plan — keep the
+            # refinement payload small enough for the model's output budget.
+            sample_week_nums = sorted({w.n for m in tpl.months for w in m.weeks})[:3]
             for wn in sample_week_nums:
                 weeks.add(wn)
             fixes.append({

@@ -29,7 +29,7 @@ TOKEN_LIMITS = {
     "discovery": 4096,
     "generation": 8192,
     "quality_review": 4096,
-    "quality_refine": 4096,
+    "quality_refine": 16384,
     "eval": 2048,
     "refresh": 2048,
     "default": 4096,
