@@ -1689,6 +1689,32 @@ async function uploadTemplate() {{
   }}
 }}
 
+async function publishTplFromTopic(key, btn) {{
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Publishing…';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/quality/' + encodeURIComponent(key) + '/publish', {{
+      method: 'POST', credentials: 'same-origin',
+    }});
+    const d = await resp.json().catch(() => ({{}}));
+    if (resp.ok) {{
+      btn.textContent = '✓ Published';
+      btn.style.background = '#1d3525';
+      btn.style.color = '#6db585';
+      setTimeout(() => window.location.reload(), 800);
+    }} else {{
+      btn.textContent = orig;
+      btn.disabled = false;
+      alert('Publish failed: ' + (d.detail || resp.statusText));
+    }}
+  }} catch(e) {{
+    btn.textContent = orig;
+    btn.disabled = false;
+    alert('Network error: ' + e.message);
+  }}
+}}
+
 async function viewTopic(id) {{
   const modal = document.getElementById('topicModal');
   const content = document.getElementById('topicContent');
@@ -1701,13 +1727,23 @@ async function viewTopic(id) {{
     const tplCards = (t.associated_templates || []).map(tp => {{
       const scoreColor = tp.quality_score >= 90 ? '#6db585' : tp.quality_score >= 70 ? '#e8a849' : '#d97757';
       const statusColor = tp.status === 'published' ? '#6db585' : '#e8a849';
+      // Inline action: Publish if draft and score >= 90, else a link to Templates page
+      let action = '';
+      if (tp.status !== 'published' && tp.quality_score >= 90) {{
+        action = `<button class="btn success" style="font-size:11px;padding:3px 10px" onclick="publishTplFromTopic('${{tp.key}}', this)">Publish</button>`;
+      }} else if (tp.status !== 'published') {{
+        action = `<a href="/admin/templates/${{tp.key}}" class="btn" style="font-size:11px;padding:3px 10px;text-decoration:none">Refine / Manage</a>`;
+      }} else {{
+        action = `<a href="/admin/templates/${{tp.key}}" class="btn" style="font-size:11px;padding:3px 10px;text-decoration:none">View</a>`;
+      }}
       return `
         <div style="background:#0f1419;border:1px solid #2a323d;border-left:3px solid ${{scoreColor}};padding:12px 14px;border-radius:4px;margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
             <a href="/admin/templates/${{tp.key}}" style="color:#e8a849;font-weight:600;font-size:14px;text-decoration:none">${{tp.title}}</a>
-            <div style="font-size:11px">
+            <div style="font-size:11px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span style="color:${{statusColor}};text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;background:#1d242e;border-radius:3px">${{tp.status}}</span>
-              <span style="color:${{scoreColor}};font-weight:600;margin-left:6px">score ${{tp.quality_score || '—'}}</span>
+              <span style="color:${{scoreColor}};font-weight:600">score ${{tp.quality_score || '—'}}</span>
+              ${{action}}
             </div>
           </div>
           <div style="color:#b0aaa0;font-size:12px;margin-bottom:6px;line-height:1.5">${{tp.goal || ''}}</div>
