@@ -1,9 +1,10 @@
 {
   "key": "generalist_12mo_beginner",
   "version": "1.0",
-  "title": "AI Generalist \u2014 12-Month Beginner Roadmap",
+  "title": "AI Generalist — 12-Month Beginner Roadmap",
   "level": "beginner",
   "goal": "generalist",
+  "summary": "A year-long beginner-friendly path for learners starting from scratch. Covers programming foundations, statistics, classical ML, neural networks, deep learning, LLMs and RAG, agents, and MLOps, with deliberate breathing room to cement each topic. Ends with a portfolio strong enough for junior AI / ML engineer applications.",
   "duration_months": 12,
   "months": [
     {
@@ -11,7 +12,7 @@
       "label": "Foundations",
       "title": "Python, SQL, math, first ML",
       "tagline": "Remove friction. By the end of this month, opening a Jupyter notebook should feel as natural as opening a terminal.",
-      "checkpoint": "Comfortable in Pandas/NumPy/SQL \u00b7 4 notebooks shipped \u00b7 Stats vocab nailed \u00b7 Repo public",
+      "checkpoint": "Comfortable in Pandas/NumPy/SQL · 4 notebooks shipped · Stats vocab nailed · Repo public",
       "weeks": [
         {
           "n": 1,
@@ -30,17 +31,17 @@
           ],
           "resources": [
             {
-              "name": "Pandas \u2014 Getting Started Tutorials",
+              "name": "Pandas — Getting Started Tutorials",
               "url": "https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html",
               "hrs": 5
             },
             {
-              "name": "SQLBolt \u2014 Interactive SQL Lessons",
+              "name": "SQLBolt — Interactive SQL Lessons",
               "url": "https://sqlbolt.com",
               "hrs": 4
             },
             {
-              "name": "Kaggle Learn \u2014 Pandas",
+              "name": "Kaggle Learn — Pandas",
               "url": "https://www.kaggle.com/learn/pandas",
               "hrs": 4
             }
@@ -70,17 +71,17 @@
           ],
           "resources": [
             {
-              "name": "3Blue1Brown \u2014 Essence of Linear Algebra",
+              "name": "3Blue1Brown — Essence of Linear Algebra",
               "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab",
               "hrs": 4
             },
             {
-              "name": "StatQuest \u2014 Statistics Fundamentals",
+              "name": "StatQuest — Statistics Fundamentals",
               "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9",
               "hrs": 5
             },
             {
-              "name": "Khan Academy \u2014 Statistics & Probability",
+              "name": "Khan Academy — Statistics & Probability",
               "url": "https://www.khanacademy.org/math/statistics-probability",
               "hrs": 5
             }
@@ -108,17 +109,17 @@
           ],
           "resources": [
             {
-              "name": "Andrew Ng \u2014 ML Specialization (audit free)",
+              "name": "Andrew Ng — ML Specialization (audit free)",
               "url": "https://www.coursera.org/specializations/machine-learning-introduction",
               "hrs": 8
             },
             {
-              "name": "scikit-learn \u2014 User Guide",
+              "name": "scikit-learn — User Guide",
               "url": "https://scikit-learn.org/stable/user_guide.html",
               "hrs": 4
             },
             {
-              "name": "StatQuest \u2014 Machine Learning Playlist",
+              "name": "StatQuest — Machine Learning Playlist",
               "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF",
               "hrs": 3
             }
@@ -146,17 +147,17 @@
           ],
           "resources": [
             {
-              "name": "Google ML Crash Course \u2014 Classification",
+              "name": "Google ML Crash Course — Classification",
               "url": "https://developers.google.com/machine-learning/crash-course/classification/video-lecture",
               "hrs": 5
             },
             {
-              "name": "scikit-learn \u2014 Model Evaluation",
+              "name": "scikit-learn — Model Evaluation",
               "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
               "hrs": 5
             },
             {
-              "name": "StatQuest \u2014 ROC and AUC explained",
+              "name": "StatQuest — ROC and AUC explained",
               "url": "https://www.youtube.com/watch?v=4jRBRDbJemM",
               "hrs": 2
             }
@@ -176,7 +177,7 @@
       "label": "Foundations Practice",
       "title": "Consolidate: Python, SQL, math, first ML",
       "tagline": "Practice month. Solidify what you learned in month 1. Build projects, review weak spots.",
-      "checkpoint": "Month 1 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 1 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 5,
@@ -193,12 +194,12 @@
           ],
           "resources": [
             {
-              "name": "Pandas \u2014 Getting Started Tutorials",
+              "name": "Pandas — Getting Started Tutorials",
               "url": "https://pandas.pydata.org/docs/getting_started/intro_tutorials/index.html",
               "hrs": 5
             },
             {
-              "name": "SQLBolt \u2014 Interactive SQL Lessons",
+              "name": "SQLBolt — Interactive SQL Lessons",
               "url": "https://sqlbolt.com",
               "hrs": 4
             }
@@ -226,12 +227,12 @@
           ],
           "resources": [
             {
-              "name": "3Blue1Brown \u2014 Essence of Linear Algebra",
+              "name": "3Blue1Brown — Essence of Linear Algebra",
               "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab",
               "hrs": 4
             },
             {
-              "name": "StatQuest \u2014 Statistics Fundamentals",
+              "name": "StatQuest — Statistics Fundamentals",
               "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9",
               "hrs": 5
             }
@@ -259,12 +260,12 @@
           ],
           "resources": [
             {
-              "name": "Andrew Ng \u2014 ML Specialization (audit free)",
+              "name": "Andrew Ng — ML Specialization (audit free)",
               "url": "https://www.coursera.org/specializations/machine-learning-introduction",
               "hrs": 8
             },
             {
-              "name": "scikit-learn \u2014 User Guide",
+              "name": "scikit-learn — User Guide",
               "url": "https://scikit-learn.org/stable/user_guide.html",
               "hrs": 4
             }
@@ -292,12 +293,12 @@
           ],
           "resources": [
             {
-              "name": "Google ML Crash Course \u2014 Classification",
+              "name": "Google ML Crash Course — Classification",
               "url": "https://developers.google.com/machine-learning/crash-course/classification/video-lecture",
               "hrs": 5
             },
             {
-              "name": "scikit-learn \u2014 Model Evaluation",
+              "name": "scikit-learn — Model Evaluation",
               "url": "https://scikit-learn.org/stable/modules/model_evaluation.html",
               "hrs": 5
             }
@@ -317,7 +318,7 @@
       "label": "Classical ML",
       "title": "Features, trees, time series, Kaggle",
       "tagline": "Most real-world ML in industry is still classical ML on tabular data. Don't skip this. Ship one real project by month-end.",
-      "checkpoint": "First real portfolio project shipped \u00b7 Kaggle profile active \u00b7 Feature engineering muscle built",
+      "checkpoint": "First real portfolio project shipped · Kaggle profile active · Feature engineering muscle built",
       "weeks": [
         {
           "n": 9,
@@ -334,17 +335,17 @@
           ],
           "resources": [
             {
-              "name": "Kaggle Learn \u2014 Feature Engineering",
+              "name": "Kaggle Learn — Feature Engineering",
               "url": "https://www.kaggle.com/learn/feature-engineering",
               "hrs": 5
             },
             {
-              "name": "scikit-learn \u2014 Pipelines & Composite Estimators",
+              "name": "scikit-learn — Pipelines & Composite Estimators",
               "url": "https://scikit-learn.org/stable/modules/compose.html",
               "hrs": 5
             },
             {
-              "name": "Kaggle Learn \u2014 Data Cleaning",
+              "name": "Kaggle Learn — Data Cleaning",
               "url": "https://www.kaggle.com/learn/data-cleaning",
               "hrs": 5
             }
@@ -373,17 +374,17 @@
           ],
           "resources": [
             {
-              "name": "XGBoost \u2014 Get Started",
+              "name": "XGBoost — Get Started",
               "url": "https://xgboost.readthedocs.io/en/stable/get_started.html",
               "hrs": 4
             },
             {
-              "name": "Kaggle \u2014 Titanic Getting Started",
+              "name": "Kaggle — Titanic Getting Started",
               "url": "https://www.kaggle.com/c/titanic",
               "hrs": 7
             },
             {
-              "name": "Kaggle Learn \u2014 Intermediate ML",
+              "name": "Kaggle Learn — Intermediate ML",
               "url": "https://www.kaggle.com/learn/intermediate-machine-learning",
               "hrs": 4
             }
@@ -411,17 +412,17 @@
           ],
           "resources": [
             {
-              "name": "scikit-learn \u2014 Clustering Guide",
+              "name": "scikit-learn — Clustering Guide",
               "url": "https://scikit-learn.org/stable/modules/clustering.html",
               "hrs": 5
             },
             {
-              "name": "Google \u2014 Recommendation Systems Crash Course",
+              "name": "Google — Recommendation Systems Crash Course",
               "url": "https://developers.google.com/machine-learning/recommendation",
               "hrs": 5
             },
             {
-              "name": "Surprise \u2014 Python recsys library docs",
+              "name": "Surprise — Python recsys library docs",
               "url": "https://surpriselib.com",
               "hrs": 4
             }
@@ -450,12 +451,12 @@
           ],
           "resources": [
             {
-              "name": "Kaggle Learn \u2014 Time Series",
+              "name": "Kaggle Learn — Time Series",
               "url": "https://www.kaggle.com/learn/time-series",
               "hrs": 5
             },
             {
-              "name": "Facebook Prophet \u2014 Quick Start",
+              "name": "Facebook Prophet — Quick Start",
               "url": "https://facebook.github.io/prophet/docs/quick_start.html",
               "hrs": 4
             },
@@ -468,7 +469,7 @@
           "checks": [
             "Prophet forecast on a real time series",
             "ARIMA concepts understood",
-            "End-to-end project: data \u2192 cleaning \u2192 features \u2192 model \u2192 eval",
+            "End-to-end project: data → cleaning → features → model → eval",
             "Project README explains problem, approach, results",
             "Kaggle submission improved (2nd attempt)"
           ]
@@ -480,7 +481,7 @@
       "label": "Classical ML Practice",
       "title": "Consolidate: Features, trees, time series, Kaggle",
       "tagline": "Practice month. Solidify what you learned in month 3. Build projects, review weak spots.",
-      "checkpoint": "Month 3 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 3 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 13,
@@ -497,12 +498,12 @@
           ],
           "resources": [
             {
-              "name": "Kaggle Learn \u2014 Feature Engineering",
+              "name": "Kaggle Learn — Feature Engineering",
               "url": "https://www.kaggle.com/learn/feature-engineering",
               "hrs": 5
             },
             {
-              "name": "scikit-learn \u2014 Pipelines & Composite Estimators",
+              "name": "scikit-learn — Pipelines & Composite Estimators",
               "url": "https://scikit-learn.org/stable/modules/compose.html",
               "hrs": 5
             }
@@ -530,12 +531,12 @@
           ],
           "resources": [
             {
-              "name": "XGBoost \u2014 Get Started",
+              "name": "XGBoost — Get Started",
               "url": "https://xgboost.readthedocs.io/en/stable/get_started.html",
               "hrs": 4
             },
             {
-              "name": "Kaggle \u2014 Titanic Getting Started",
+              "name": "Kaggle — Titanic Getting Started",
               "url": "https://www.kaggle.com/c/titanic",
               "hrs": 7
             }
@@ -563,12 +564,12 @@
           ],
           "resources": [
             {
-              "name": "scikit-learn \u2014 Clustering Guide",
+              "name": "scikit-learn — Clustering Guide",
               "url": "https://scikit-learn.org/stable/modules/clustering.html",
               "hrs": 5
             },
             {
-              "name": "Google \u2014 Recommendation Systems Crash Course",
+              "name": "Google — Recommendation Systems Crash Course",
               "url": "https://developers.google.com/machine-learning/recommendation",
               "hrs": 5
             }
@@ -596,12 +597,12 @@
           ],
           "resources": [
             {
-              "name": "Kaggle Learn \u2014 Time Series",
+              "name": "Kaggle Learn — Time Series",
               "url": "https://www.kaggle.com/learn/time-series",
               "hrs": 5
             },
             {
-              "name": "Facebook Prophet \u2014 Quick Start",
+              "name": "Facebook Prophet — Quick Start",
               "url": "https://facebook.github.io/prophet/docs/quick_start.html",
               "hrs": 4
             }
@@ -609,7 +610,7 @@
           "checks": [
             "Reviewed: Prophet forecast on a real time series",
             "Reviewed: ARIMA concepts understood",
-            "Reviewed: End-to-end project: data \u2192 cleaning \u2192 features \u2192 model \u2192 eval",
+            "Reviewed: End-to-end project: data → cleaning → features → model → eval",
             "Practice project completed",
             "Gaps identified and addressed"
           ]
@@ -620,15 +621,15 @@
       "month": 5,
       "label": "Deep Learning",
       "title": "Neural nets, vision, transformers",
-      "tagline": "Understand how modern AI models work internally \u2014 at code level, not just slides. Portfolio site goes live this month.",
-      "checkpoint": "Deep learning solid \u00b7 Transformer internals understood \u00b7 Portfolio site live",
+      "tagline": "Understand how modern AI models work internally — at code level, not just slides. Portfolio site goes live this month.",
+      "checkpoint": "Deep learning solid · Transformer internals understood · Portfolio site live",
       "weeks": [
         {
           "n": 17,
           "t": "NN Fundamentals + Portfolio Site",
           "hours": 16,
           "focus": [
-            "Perceptrons \u2192 MLPs \u2192 backprop",
+            "Perceptrons → MLPs → backprop",
             "Karpathy's NN Zero to Hero",
             "Activation functions, loss",
             "GitHub Pages portfolio site live"
@@ -639,23 +640,23 @@
           ],
           "resources": [
             {
-              "name": "Karpathy \u2014 Neural Networks: Zero to Hero",
+              "name": "Karpathy — Neural Networks: Zero to Hero",
               "url": "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ",
               "hrs": 8
             },
             {
-              "name": "3Blue1Brown \u2014 Neural Networks series",
+              "name": "3Blue1Brown — Neural Networks series",
               "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi",
               "hrs": 3
             },
             {
-              "name": "GitHub Pages \u2014 Get Started",
+              "name": "GitHub Pages — Get Started",
               "url": "https://pages.github.com",
               "hrs": 3
             }
           ],
           "checks": [
-            "Karpathy NN Zero to Hero Ep 1\u20132 watched",
+            "Karpathy NN Zero to Hero Ep 1–2 watched",
             "Micrograd-style NN built from scratch in NumPy",
             "Same NN re-implemented in PyTorch",
             "GitHub Pages portfolio site live (even barebones)",
@@ -677,17 +678,17 @@
           ],
           "resources": [
             {
-              "name": "PyTorch \u2014 60 Minute Blitz",
+              "name": "PyTorch — 60 Minute Blitz",
               "url": "https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html",
               "hrs": 4
             },
             {
-              "name": "PyTorch \u2014 Official Tutorials",
+              "name": "PyTorch — Official Tutorials",
               "url": "https://pytorch.org/tutorials/",
               "hrs": 7
             },
             {
-              "name": "Daniel Bourke \u2014 Learn PyTorch",
+              "name": "Daniel Bourke — Learn PyTorch",
               "url": "https://www.learnpytorch.io",
               "hrs": 5
             }
@@ -715,17 +716,17 @@
           ],
           "resources": [
             {
-              "name": "PyTorch \u2014 Transfer Learning Tutorial",
+              "name": "PyTorch — Transfer Learning Tutorial",
               "url": "https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html",
               "hrs": 5
             },
             {
-              "name": "Stanford CS231n \u2014 Course Notes",
+              "name": "Stanford CS231n — Course Notes",
               "url": "https://cs231n.github.io",
               "hrs": 6
             },
             {
-              "name": "fast.ai \u2014 Practical Deep Learning",
+              "name": "fast.ai — Practical Deep Learning",
               "url": "https://course.fast.ai",
               "hrs": 5
             }
@@ -743,7 +744,7 @@
           "t": "Sequences & Transformers",
           "hours": 17,
           "focus": [
-            "RNN/LSTM (briefly \u2014 historical)",
+            "RNN/LSTM (briefly — historical)",
             "Attention mechanism",
             "Transformer architecture",
             "Karpathy's Let's Build GPT"
@@ -753,12 +754,12 @@
           ],
           "resources": [
             {
-              "name": "Karpathy \u2014 Let's build GPT (from scratch)",
+              "name": "Karpathy — Let's build GPT (from scratch)",
               "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
               "hrs": 6
             },
             {
-              "name": "Jay Alammar \u2014 The Illustrated Transformer",
+              "name": "Jay Alammar — The Illustrated Transformer",
               "url": "https://jalammar.github.io/illustrated-transformer/",
               "hrs": 4
             },
@@ -783,14 +784,14 @@
       "label": "Deep Learning Practice",
       "title": "Consolidate: Neural nets, vision, transformers",
       "tagline": "Practice month. Solidify what you learned in month 5. Build projects, review weak spots.",
-      "checkpoint": "Month 5 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 5 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 21,
           "t": "Practice: NN Fundamentals + Portfolio Site",
           "hours": 12,
           "focus": [
-            "Review and practice: Perceptrons \u2192 MLPs \u2192 backprop",
+            "Review and practice: Perceptrons → MLPs → backprop",
             "Review and practice: Karpathy's NN Zero to Hero",
             "Build a mini-project applying this week's concepts",
             "Fill gaps from the learning month"
@@ -800,18 +801,18 @@
           ],
           "resources": [
             {
-              "name": "Karpathy \u2014 Neural Networks: Zero to Hero",
+              "name": "Karpathy — Neural Networks: Zero to Hero",
               "url": "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ",
               "hrs": 8
             },
             {
-              "name": "3Blue1Brown \u2014 Neural Networks series",
+              "name": "3Blue1Brown — Neural Networks series",
               "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi",
               "hrs": 3
             }
           ],
           "checks": [
-            "Reviewed: Karpathy NN Zero to Hero Ep 1\u20132 watched",
+            "Reviewed: Karpathy NN Zero to Hero Ep 1–2 watched",
             "Reviewed: Micrograd-style NN built from scratch in NumPy",
             "Reviewed: Same NN re-implemented in PyTorch",
             "Practice project completed",
@@ -833,12 +834,12 @@
           ],
           "resources": [
             {
-              "name": "PyTorch \u2014 60 Minute Blitz",
+              "name": "PyTorch — 60 Minute Blitz",
               "url": "https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html",
               "hrs": 4
             },
             {
-              "name": "PyTorch \u2014 Official Tutorials",
+              "name": "PyTorch — Official Tutorials",
               "url": "https://pytorch.org/tutorials/",
               "hrs": 7
             }
@@ -866,12 +867,12 @@
           ],
           "resources": [
             {
-              "name": "PyTorch \u2014 Transfer Learning Tutorial",
+              "name": "PyTorch — Transfer Learning Tutorial",
               "url": "https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html",
               "hrs": 5
             },
             {
-              "name": "Stanford CS231n \u2014 Course Notes",
+              "name": "Stanford CS231n — Course Notes",
               "url": "https://cs231n.github.io",
               "hrs": 6
             }
@@ -889,7 +890,7 @@
           "t": "Practice: Sequences & Transformers",
           "hours": 13,
           "focus": [
-            "Review and practice: RNN/LSTM (briefly \u2014 historical)",
+            "Review and practice: RNN/LSTM (briefly — historical)",
             "Review and practice: Attention mechanism",
             "Build a mini-project applying this week's concepts",
             "Fill gaps from the learning month"
@@ -899,12 +900,12 @@
           ],
           "resources": [
             {
-              "name": "Karpathy \u2014 Let's build GPT (from scratch)",
+              "name": "Karpathy — Let's build GPT (from scratch)",
               "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
               "hrs": 6
             },
             {
-              "name": "Jay Alammar \u2014 The Illustrated Transformer",
+              "name": "Jay Alammar — The Illustrated Transformer",
               "url": "https://jalammar.github.io/illustrated-transformer/",
               "hrs": 4
             }
@@ -924,7 +925,7 @@
       "label": "LLMs & GenAI",
       "title": "Prompts, RAG, agents, evals",
       "tagline": "Where the modern job market lives. Spend it wisely. Interview prep starts as a background activity this month.",
-      "checkpoint": "2 LLM apps shipped \u00b7 Interview prep underway \u00b7 RAG + agent fluency",
+      "checkpoint": "2 LLM apps shipped · Interview prep underway · RAG + agent fluency",
       "weeks": [
         {
           "n": 25,
@@ -942,17 +943,17 @@
           ],
           "resources": [
             {
-              "name": "Hugging Face \u2014 NLP Course",
+              "name": "Hugging Face — NLP Course",
               "url": "https://huggingface.co/learn/nlp-course",
               "hrs": 8
             },
             {
-              "name": "spaCy \u2014 Advanced NLP with spaCy course",
+              "name": "spaCy — Advanced NLP with spaCy course",
               "url": "https://course.spacy.io",
               "hrs": 5
             },
             {
-              "name": "Tiktokenizer \u2014 explore tokenizers visually",
+              "name": "Tiktokenizer — explore tokenizers visually",
               "url": "https://tiktokenizer.vercel.app",
               "hrs": 2
             }
@@ -981,17 +982,17 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Claude API docs",
+              "name": "Anthropic — Claude API docs",
               "url": "https://docs.anthropic.com",
               "hrs": 5
             },
             {
-              "name": "OpenAI \u2014 API Reference",
+              "name": "OpenAI — API Reference",
               "url": "https://platform.openai.com/docs",
               "hrs": 5
             },
             {
-              "name": "Hugging Face \u2014 Transformers docs",
+              "name": "Hugging Face — Transformers docs",
               "url": "https://huggingface.co/docs/transformers",
               "hrs": 5
             }
@@ -1019,17 +1020,17 @@
           ],
           "resources": [
             {
-              "name": "LangChain \u2014 RAG Tutorial",
+              "name": "LangChain — RAG Tutorial",
               "url": "https://python.langchain.com/docs/tutorials/rag/",
               "hrs": 6
             },
             {
-              "name": "Chroma \u2014 Getting Started",
+              "name": "Chroma — Getting Started",
               "url": "https://docs.trychroma.com",
               "hrs": 5
             },
             {
-              "name": "Pinecone Learn \u2014 Vector DB primer",
+              "name": "Pinecone Learn — Vector DB primer",
               "url": "https://www.pinecone.io/learn/",
               "hrs": 5
             }
@@ -1058,17 +1059,17 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Tool Use docs",
+              "name": "Anthropic — Tool Use docs",
               "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
               "hrs": 5
             },
             {
-              "name": "LangGraph \u2014 Tutorials",
+              "name": "LangGraph — Tutorials",
               "url": "https://langchain-ai.github.io/langgraph/",
               "hrs": 6
             },
             {
-              "name": "Ragas \u2014 Evaluation framework docs",
+              "name": "Ragas — Evaluation framework docs",
               "url": "https://docs.ragas.io",
               "hrs": 5
             }
@@ -1088,7 +1089,7 @@
       "label": "LLMs & GenAI Practice",
       "title": "Consolidate: Prompts, RAG, agents, evals",
       "tagline": "Practice month. Solidify what you learned in month 7. Build projects, review weak spots.",
-      "checkpoint": "Month 7 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 7 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 29,
@@ -1105,12 +1106,12 @@
           ],
           "resources": [
             {
-              "name": "Hugging Face \u2014 NLP Course",
+              "name": "Hugging Face — NLP Course",
               "url": "https://huggingface.co/learn/nlp-course",
               "hrs": 8
             },
             {
-              "name": "spaCy \u2014 Advanced NLP with spaCy course",
+              "name": "spaCy — Advanced NLP with spaCy course",
               "url": "https://course.spacy.io",
               "hrs": 5
             }
@@ -1138,12 +1139,12 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Claude API docs",
+              "name": "Anthropic — Claude API docs",
               "url": "https://docs.anthropic.com",
               "hrs": 5
             },
             {
-              "name": "OpenAI \u2014 API Reference",
+              "name": "OpenAI — API Reference",
               "url": "https://platform.openai.com/docs",
               "hrs": 5
             }
@@ -1171,12 +1172,12 @@
           ],
           "resources": [
             {
-              "name": "LangChain \u2014 RAG Tutorial",
+              "name": "LangChain — RAG Tutorial",
               "url": "https://python.langchain.com/docs/tutorials/rag/",
               "hrs": 6
             },
             {
-              "name": "Chroma \u2014 Getting Started",
+              "name": "Chroma — Getting Started",
               "url": "https://docs.trychroma.com",
               "hrs": 5
             }
@@ -1204,12 +1205,12 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Tool Use docs",
+              "name": "Anthropic — Tool Use docs",
               "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
               "hrs": 5
             },
             {
-              "name": "LangGraph \u2014 Tutorials",
+              "name": "LangGraph — Tutorials",
               "url": "https://langchain-ai.github.io/langgraph/",
               "hrs": 6
             }
@@ -1228,8 +1229,8 @@
       "month": 9,
       "label": "MLOps & Deploy",
       "title": "FastAPI, Docker, cloud, responsible AI",
-      "tagline": "Knowing how to ship AI is what separates hobbyists from professionals. Buffer week built in \u2014 life happens.",
-      "checkpoint": "Deployed cloud app \u00b7 Open-source contributor \u00b7 Backlog cleared \u00b7 Interview ready",
+      "tagline": "Knowing how to ship AI is what separates hobbyists from professionals. Buffer week built in — life happens.",
+      "checkpoint": "Deployed cloud app · Open-source contributor · Backlog cleared · Interview ready",
       "weeks": [
         {
           "n": 33,
@@ -1246,17 +1247,17 @@
           ],
           "resources": [
             {
-              "name": "FastAPI \u2014 Official Tutorial",
+              "name": "FastAPI — Official Tutorial",
               "url": "https://fastapi.tiangolo.com/tutorial/",
               "hrs": 6
             },
             {
-              "name": "Streamlit \u2014 Documentation",
+              "name": "Streamlit — Documentation",
               "url": "https://docs.streamlit.io",
               "hrs": 5
             },
             {
-              "name": "Real Python \u2014 FastAPI Web APIs",
+              "name": "Real Python — FastAPI Web APIs",
               "url": "https://realpython.com/fastapi-python-web-apis/",
               "hrs": 4
             }
@@ -1284,12 +1285,12 @@
           ],
           "resources": [
             {
-              "name": "Docker \u2014 Get Started Guide",
+              "name": "Docker — Get Started Guide",
               "url": "https://docs.docker.com/get-started/",
               "hrs": 6
             },
             {
-              "name": "Play with Docker \u2014 browser playground",
+              "name": "Play with Docker — browser playground",
               "url": "https://labs.play-with-docker.com",
               "hrs": 4
             },
@@ -1322,17 +1323,17 @@
           ],
           "resources": [
             {
-              "name": "AWS Skill Builder \u2014 free training catalog",
+              "name": "AWS Skill Builder — free training catalog",
               "url": "https://skillbuilder.aws",
               "hrs": 6
             },
             {
-              "name": "St\u00e9phane Maarek \u2014 AIF-C01 (Udemy)",
+              "name": "Stéphane Maarek — AIF-C01 (Udemy)",
               "url": "https://www.udemy.com/course/aws-ai-practitioner-certified/",
               "hrs": 8
             },
             {
-              "name": "AWS \u2014 Bedrock User Guide",
+              "name": "AWS — Bedrock User Guide",
               "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/what-is-bedrock.html",
               "hrs": 3
             }
@@ -1352,7 +1353,7 @@
           "focus": [
             "Catch-up time for any slipped weeks",
             "Responsible AI: bias, fairness, model cards",
-            "One open-source PR \u2014 even docs counts",
+            "One open-source PR — even docs counts",
             "Interview prep ramps up"
           ],
           "deliv": [
@@ -1362,17 +1363,17 @@
           ],
           "resources": [
             {
-              "name": "Google \u2014 Responsible AI Practices",
+              "name": "Google — Responsible AI Practices",
               "url": "https://ai.google/responsibility/responsible-ai-practices/",
               "hrs": 3
             },
             {
-              "name": "First Contributions \u2014 beginner OSS guide",
+              "name": "First Contributions — beginner OSS guide",
               "url": "https://github.com/firstcontributions/first-contributions",
               "hrs": 4
             },
             {
-              "name": "Chip Huyen \u2014 ML Interviews Book (free)",
+              "name": "Chip Huyen — ML Interviews Book (free)",
               "url": "https://github.com/chiphuyen/ml-interviews-book",
               "hrs": 6
             }
@@ -1392,7 +1393,7 @@
       "label": "MLOps & Deploy Practice",
       "title": "Consolidate: FastAPI, Docker, cloud, responsible AI",
       "tagline": "Practice month. Solidify what you learned in month 9. Build projects, review weak spots.",
-      "checkpoint": "Month 9 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 9 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 37,
@@ -1409,12 +1410,12 @@
           ],
           "resources": [
             {
-              "name": "FastAPI \u2014 Official Tutorial",
+              "name": "FastAPI — Official Tutorial",
               "url": "https://fastapi.tiangolo.com/tutorial/",
               "hrs": 6
             },
             {
-              "name": "Streamlit \u2014 Documentation",
+              "name": "Streamlit — Documentation",
               "url": "https://docs.streamlit.io",
               "hrs": 5
             }
@@ -1442,12 +1443,12 @@
           ],
           "resources": [
             {
-              "name": "Docker \u2014 Get Started Guide",
+              "name": "Docker — Get Started Guide",
               "url": "https://docs.docker.com/get-started/",
               "hrs": 6
             },
             {
-              "name": "Play with Docker \u2014 browser playground",
+              "name": "Play with Docker — browser playground",
               "url": "https://labs.play-with-docker.com",
               "hrs": 4
             }
@@ -1475,12 +1476,12 @@
           ],
           "resources": [
             {
-              "name": "AWS Skill Builder \u2014 free training catalog",
+              "name": "AWS Skill Builder — free training catalog",
               "url": "https://skillbuilder.aws",
               "hrs": 6
             },
             {
-              "name": "St\u00e9phane Maarek \u2014 AIF-C01 (Udemy)",
+              "name": "Stéphane Maarek — AIF-C01 (Udemy)",
               "url": "https://www.udemy.com/course/aws-ai-practitioner-certified/",
               "hrs": 8
             }
@@ -1508,12 +1509,12 @@
           ],
           "resources": [
             {
-              "name": "Google \u2014 Responsible AI Practices",
+              "name": "Google — Responsible AI Practices",
               "url": "https://ai.google/responsibility/responsible-ai-practices/",
               "hrs": 3
             },
             {
-              "name": "First Contributions \u2014 beginner OSS guide",
+              "name": "First Contributions — beginner OSS guide",
               "url": "https://github.com/firstcontributions/first-contributions",
               "hrs": 4
             }
@@ -1532,8 +1533,8 @@
       "month": 11,
       "label": "Capstone & Job Hunt",
       "title": "Ship, publish, apply",
-      "tagline": "Months 1\u20135 collapse into one ambitious project. By Week 24 you're not starting interviews \u2014 you're already in them.",
-      "checkpoint": "Capstone deployed + blogged \u00b7 Portfolio live \u00b7 15+ applications out \u00b7 Mock interviews done",
+      "tagline": "Months 1–5 collapse into one ambitious project. By Week 24 you're not starting interviews — you're already in them.",
+      "checkpoint": "Capstone deployed + blogged · Portfolio live · 15+ applications out · Mock interviews done",
       "weeks": [
         {
           "n": 41,
@@ -1555,12 +1556,12 @@
               "hrs": 4
             },
             {
-              "name": "Hugging Face Spaces \u2014 examples",
+              "name": "Hugging Face Spaces — examples",
               "url": "https://huggingface.co/spaces",
               "hrs": 4
             },
             {
-              "name": "Made With ML \u2014 applied ML examples",
+              "name": "Made With ML — applied ML examples",
               "url": "https://madewithml.com",
               "hrs": 6
             }
@@ -1588,17 +1589,17 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Claude API docs (reference)",
+              "name": "Anthropic — Claude API docs (reference)",
               "url": "https://docs.anthropic.com",
               "hrs": 4
             },
             {
-              "name": "Hugging Face \u2014 Models hub",
+              "name": "Hugging Face — Models hub",
               "url": "https://huggingface.co/models",
               "hrs": 4
             },
             {
-              "name": "GitHub \u2014 Issues & Projects (your own)",
+              "name": "GitHub — Issues & Projects (your own)",
               "url": "https://github.com",
               "hrs": 10
             }
@@ -1636,7 +1637,7 @@
               "hrs": 4
             },
             {
-              "name": "Dev.to \u2014 write & publish",
+              "name": "Dev.to — write & publish",
               "url": "https://dev.to",
               "hrs": 6
             }
@@ -1657,25 +1658,25 @@
             "Resume polished for AI/ML roles",
             "LinkedIn About + Featured updated",
             "Mock interviews done",
-            "Apply to 15\u201320 roles"
+            "Apply to 15–20 roles"
           ],
           "deliv": [
-            "15\u201320 applications submitted",
+            "15–20 applications submitted",
             "Mock interviews completed"
           ],
           "resources": [
             {
-              "name": "Chip Huyen \u2014 ML Interviews Book (free)",
+              "name": "Chip Huyen — ML Interviews Book (free)",
               "url": "https://github.com/chiphuyen/ml-interviews-book",
               "hrs": 5
             },
             {
-              "name": "Pramp \u2014 free peer mock interviews",
+              "name": "Pramp — free peer mock interviews",
               "url": "https://www.pramp.com",
               "hrs": 4
             },
             {
-              "name": "LinkedIn Jobs \u2014 AI/ML filter",
+              "name": "LinkedIn Jobs — AI/ML filter",
               "url": "https://www.linkedin.com/jobs/",
               "hrs": 5
             }
@@ -1683,7 +1684,7 @@
           "checks": [
             "Resume rewritten for AI/ML roles",
             "LinkedIn About + Featured section updated",
-            "15\u201320 applications submitted",
+            "15–20 applications submitted",
             "2+ mock interviews done with peer or coach",
             "Cert exam taken (AIF-C01 or MLA-C01)"
           ]
@@ -1695,7 +1696,7 @@
       "label": "Capstone & Job Hunt Practice",
       "title": "Consolidate: Ship, publish, apply",
       "tagline": "Practice month. Solidify what you learned in month 11. Build projects, review weak spots.",
-      "checkpoint": "Month 11 material solid \u00b7 Extra projects done \u00b7 Gaps filled",
+      "checkpoint": "Month 11 material solid · Extra projects done · Gaps filled",
       "weeks": [
         {
           "n": 45,
@@ -1717,7 +1718,7 @@
               "hrs": 4
             },
             {
-              "name": "Hugging Face Spaces \u2014 examples",
+              "name": "Hugging Face Spaces — examples",
               "url": "https://huggingface.co/spaces",
               "hrs": 4
             }
@@ -1745,12 +1746,12 @@
           ],
           "resources": [
             {
-              "name": "Anthropic \u2014 Claude API docs (reference)",
+              "name": "Anthropic — Claude API docs (reference)",
               "url": "https://docs.anthropic.com",
               "hrs": 4
             },
             {
-              "name": "Hugging Face \u2014 Models hub",
+              "name": "Hugging Face — Models hub",
               "url": "https://huggingface.co/models",
               "hrs": 4
             }
@@ -1811,12 +1812,12 @@
           ],
           "resources": [
             {
-              "name": "Chip Huyen \u2014 ML Interviews Book (free)",
+              "name": "Chip Huyen — ML Interviews Book (free)",
               "url": "https://github.com/chiphuyen/ml-interviews-book",
               "hrs": 5
             },
             {
-              "name": "Pramp \u2014 free peer mock interviews",
+              "name": "Pramp — free peer mock interviews",
               "url": "https://www.pramp.com",
               "hrs": 4
             }
@@ -1824,7 +1825,7 @@
           "checks": [
             "Reviewed: Resume rewritten for AI/ML roles",
             "Reviewed: LinkedIn About + Featured section updated",
-            "Reviewed: 15\u201320 applications submitted",
+            "Reviewed: 15–20 applications submitted",
             "Practice project completed",
             "Gaps identified and addressed"
           ]

@@ -44,6 +44,7 @@ SCHEMA (this is the exact shape the platform validates)
   "title": "<Topic> — <Level-Cap> <Duration>-Month Roadmap",
   "level": "beginner|intermediate|advanced",
   "goal": "<one sentence, 15–30 words, describing the concrete production capability at course end>",
+  "summary": "<2–3 sentences (40–80 words) in plain English answering 'what does this course teach?'. State the topic, the core techniques covered, and the kind of projects the learner will ship. This appears on the home-page hero, the public verification page, and the search preview — write it for a recruiter or prospective learner, not the current student. Do NOT repeat the title verbatim.>",
   "duration_months": <int 3|6|9|12>,
   "top_resources": [
     { "name": "<best-in-class anchor resource>", "url": "https://real-url", "hrs": <int> },

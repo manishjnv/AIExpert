@@ -1967,16 +1967,22 @@ async function loadActivePlan() {
       goal: plan.goal,
     };
 
-    // Hero title — derive from the plan itself, never hardcode a curriculum-specific phrase.
-    // Format: "{N} Months. {Topic}." where Topic = title before " — " dash, fallback Plan title.
-    const DURATION_TITLES_TOP = {3: "Three Months.", 6: "Six Months.", 9: "Nine Months.", 12: "Twelve Months."};
-    const topTitle = DURATION_TITLES_TOP[plan.duration_months] || (totalWeeks + " Weeks.");
+    // Hero — topic front and center, duration as a small line below.
+    // Topic = title before " — " (e.g. "AI Generalist" from "AI Generalist — 3-Month Accelerated Roadmap").
+    // Subtitle prefers the plan's `summary` (recruiter-facing course description)
+    // and falls back to `goal` only if the template is missing summary.
+    const DURATION_LABELS = {3: "Three Months", 6: "Six Months", 9: "Nine Months", 12: "Twelve Months"};
+    const durLabel = DURATION_LABELS[plan.duration_months] || (totalWeeks + " Weeks");
     const titleHead = (plan.title || "").split(/\s+[—\-–]\s+/)[0].trim() || "Your Plan";
-    document.getElementById("heroTitle").innerHTML = `${topTitle} <em>${titleHead}.</em>`;
-    // Subtitle — use the plan's goal if available; fall back to a generic builder message.
-    const subtitleText = plan.goal
-      ? plan.goal
-      : `${totalWeeks} weeks of building, shipping, and learning by doing.`;
+    document.getElementById("heroTitle").innerHTML =
+      `<em>${titleHead}.</em>` +
+      `<div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);font-family:var(--mono);margin-top:10px;font-style:normal">${durLabel} · ${plan.level || ''}</div>`;
+    // Prefer course summary (rich description). Fall back to goal only if
+    // summary is missing (older templates). Hide the old 'generalist' string.
+    const isShortOldGoal = plan.goal && plan.goal.length < 40 && !plan.goal.includes(' ');
+    const subtitleText = plan.summary
+      ? plan.summary
+      : (plan.goal && !isShortOldGoal ? plan.goal : `${totalWeeks} weeks of building, shipping, and learning by doing.`);
     document.getElementById("heroSubtitle").textContent = subtitleText;
 
     render();

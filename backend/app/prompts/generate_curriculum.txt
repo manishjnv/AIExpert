@@ -14,6 +14,7 @@ OUTPUT: Return a valid JSON object with this exact structure. No markdown, no ex
   "title": "{topic} — {level_title} {duration_months}-Month Roadmap",
   "level": "{level}",
   "goal": "<one sentence, 15–30 words, describing the concrete capability the learner will have at the end — e.g. 'Ship a production-ready agent that plans, calls tools, and evaluates its own answers across 3 real-world domains.'>",
+  "summary": "<2–3 sentences (40–80 words) answering 'what does this course teach?' — the plain-English description a recruiter or prospective learner reads on the home page and the verify page. State the topic, the core techniques covered, and the kind of projects the learner will ship. Do NOT repeat the title.>",
   "duration_months": {duration_months},
   "months": [
     {{

@@ -70,6 +70,10 @@ class PlanTemplate(BaseModel):
     level: str
     goal: str
     duration_months: int
+    # Short 2–3 sentence course description shown on the hero + cert pages.
+    # Optional so older templates that predate the field still load; newer
+    # auto-generated and Claude-Opus-generated templates always emit it.
+    summary: Optional[str] = None
     months: list[Month]
     # Optional course-level metadata (newer templates). Backward-compatible:
     # existing templates that don't carry these just get None.
