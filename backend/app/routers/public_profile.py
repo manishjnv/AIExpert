@@ -550,7 +550,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
   <div class="stat"><div class="n">{total_learners}</div><div class="l">Learners</div></div>
   <div class="stat"><div class="n">{total_xp_all:,}</div><div class="l">Total XP</div></div>
   <div class="stat"><div class="n">{total_tasks_all}</div><div class="l">Tasks Done</div></div>
-  <div class="stat"><div class="n">{total_repos_all}</div><div class="l">Repos Shipped</div></div>
+  <div class="stat"><div class="n">{total_repos_all}</div><div class="l">Projects Built</div></div>
   <div class="stat"><div class="n">🎓 {total_certs_all}</div><div class="l">Certificates</div></div>
   <div class="stat"><div class="n">🔥 {top_streak}w</div><div class="l">Top Streak</div></div>
   <div class="stat"><div class="n">{completers}</div><div class="l">Graduated</div></div>
