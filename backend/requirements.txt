@@ -43,7 +43,8 @@ jinja2==3.1.4
 # ----- Certificates (PDF rendering + QR) -----
 # weasyprint pulls in cairo/pango at the system level — Dockerfile installs
 # libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 to satisfy the runtime deps.
-weasyprint==62.3
+weasyprint==63.1
+pydyf==0.11.0
 qrcode[pil]==7.4.2
 
 # ----- Utilities -----
