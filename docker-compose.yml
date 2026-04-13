@@ -40,6 +40,7 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+      - CHAT_RATE_DIR=/data
     volumes:
       - ./data:/data
       - ./scripts:/app/scripts:ro

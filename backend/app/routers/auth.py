@@ -196,7 +196,7 @@ async def otp_verify(
         key="auth_token",
         value=jwt_token,
         httponly=True,
-        secure=settings.is_prod,
+        secure=True,
         samesite="lax",
         max_age=settings.jwt_expiry_days * 86400,
         path="/",

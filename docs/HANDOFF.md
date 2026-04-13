@@ -1,6 +1,70 @@
 # Handoff
 
 > This file is rewritten at the end of every session. Read after CLAUDE.md.
+>
+> **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
+
+## Current state as of 2026-04-13 (session 10 — security batch A)
+
+**Last worked on:** Security audit of `automateedge.cloud` + fixes for the 6 highest-severity defects.
+**Branch:** master (HEAD: will update after commit)
+**Live site:** https://automateedge.cloud
+**Alembic head:** b3f5a9e21c04 (no new migrations)
+
+### Session 10 — security fixes #1–#6 (of 20)
+
+Full audit findings are in the session-10 transcript; prevention + root-cause for each fix is in `docs/RCA.md` entries 016–021. Summary:
+
+**Fixed (6 of 20 audit items):**
+- **#1 Cookie `Secure` flag** — [auth.py:199](backend/app/routers/auth.py#L199) OTP cookie was `secure=settings.is_prod`; now `secure=True`. Matches Google-OAuth cookie. Localhost is a secure context in all modern browsers so dev still works. RCA 016.
+- **#2 CORS `allow_headers`** — [main.py:115](backend/app/main.py#L115) `["*"]` + credentials was OWASP-unsafe; now `["content-type", "authorization", "x-requested-with"]`. Frontend audit confirmed only Content-Type is actually sent. RCA 017.
+- **#3 OAuth redirect hygiene** — [config.py:140](backend/app/config.py#L140) `_validate_prod_settings()` now requires `public_base_url` to be `https://` with a real hostname (no localhost/127.0.0.1/::1). Defence-in-depth against a misconfigured prod `.env` causing the callback to hand auth cookies to the wrong origin. RCA 018.
+- **#4 Chat rate limit persistence** — [chat.py:28-66](backend/app/routers/chat.py#L28) in-memory `defaultdict` replaced with JSON-file-backed tracker under a `threading.Lock`, atomic write via `.tmp` + `os.replace`. Opt-in via `CHAT_RATE_DIR` env (tests stay in-memory, prod sets `/data` via docker-compose). Test state-leak fix: `_rate_tracker.clear()` instead of int-keyed reset. RCA 019.
+- **#5 GitHub URL SSRF hardening** — [github_client.py:85](backend/app/services/github_client.py#L85) `parse_repo_input` rewritten to require `https://` + `hostname == "github.com"` via urlparse, plus `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$` regex on owner/name. Strips `.git` suffix. RCA 020.
+- **#6 `/api/health` disclosure** — [main.py:193](backend/app/main.py#L193) trimmed from `{status, version, env}` to `{status: "ok"}`. Version/env remain on authenticated admin endpoints. RCA 021.
+
+**Test results:** 127 passed, 1 skipped, 0 failed (unchanged baseline; chat + repos + auth + otp re-verified green locally).
+
+### Remaining session-10 backlog (14 audit items)
+
+Pending for **session 11** (deploy batch A first, confirm nothing broke, then resume):
+
+| # | Severity | Item | Rough scope |
+|---|---|---|---|
+| 7 | Medium | OTP verify brute-force (10/15min) | slowapi limit change + lockout counter |
+| 8 | Medium | Public profile IDOR / `public_profile=True` filter audit | review public_profile.py queries |
+| 9 | Medium | GitHub token plaintext in `Settings` | fernet encrypt-at-rest + keyring |
+| 10 | Medium | `CERT_HMAC_SECRET` derived from `jwt_secret` | require independent prod env var |
+| 11 | Medium | Admin CSRF / SameSite=Strict cookie | careful — may break OAuth same-site redirect |
+| 12 | Medium | `ai/sanitize.py` regex (JSON/base64 secrets) | extend patterns + test vectors |
+| 13 | Medium | Uvicorn `--forwarded-allow-ips='*'` | pin to nginx container IP |
+| 14 | Medium | JWT revocation race window | reorder: check session row before decode |
+| 15 | Medium | Admin dashboard returns emails | strip PII from recent_signups |
+| 16 | Low | Quarterly-sync test-mode env in prod | gate on `settings.env == "dev"` |
+| 17 | Low | Dependency audit (weasyprint/pydyf/uvicorn) | add `pip-audit` to CI |
+| 18 | Low | Affiliate ID not validated | regex `^[A-Za-z0-9_-]{1,32}$` at load |
+| 19 | Info | Contact form logs full message | DEBUG-level + PII strip in prod |
+| 20 | Info | CSP `'unsafe-inline'` | move to nonce-based CSP in nginx |
+
+### Docker-compose change
+
+Backend service gained `CHAT_RATE_DIR=/data` env var — the rate-limit JSON lives in the existing `./data:/data` volume. No new volumes, no migration.
+
+### Next action
+
+1. User deploys session-10 batch A (1 commit, no migrations):
+   ```
+   cd /srv/roadmap && git pull
+   docker compose up -d --force-recreate backend
+   ```
+2. Smoke-check: OTP login, Google login, chat rate limit, GitHub repo link, `/api/health` returns `{status:ok}` only.
+3. If green → new session for batch B (#7–#20).
+
+### Standing instruction for every future session
+
+**Before any code change, read `docs/RCA.md` — at least the last 5 entries and the "Patterns to watch for" table at the bottom.** The table is updated alongside each entry. Every new bugfix or security change MUST add an entry and (if a new failure mode) update the pattern table.
+
+---
 
 ## Current state as of 2026-04-13 (session 9)
 

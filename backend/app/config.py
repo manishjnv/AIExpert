@@ -150,6 +150,17 @@ class Settings(BaseSettings):
             raise ValueError("In prod, jwt_secret must be at least 32 characters")
         if not self.google_client_id or not self.google_client_secret:
             raise ValueError("Google OAuth credentials are required in prod")
+        # Prevent OAuth open-redirect / cookie leak via a misconfigured base URL.
+        # public_base_url is where the Google callback sends the user after login
+        # and where auth cookies are scoped; in prod it must be an https:// URL
+        # with a real hostname (no localhost, no IP literal).
+        from urllib.parse import urlparse
+        parsed = urlparse(self.public_base_url)
+        if parsed.scheme != "https":
+            raise ValueError("In prod, public_base_url must use https://")
+        host = (parsed.hostname or "").lower()
+        if not host or host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+            raise ValueError("In prod, public_base_url must have a real hostname")
         # Claude Code: add more prod-required checks as features are added
         # (e.g. gemini_api_key once evaluation is wired)
 

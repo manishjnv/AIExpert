@@ -85,9 +85,9 @@ async def test_chat_rate_limit():
     user_id, token = await _user_token("ratelimit@test.com")
     app = _app()
 
-    # Clear any existing rate tracker entries
+    # Clear any existing rate tracker entries (handler keys by str)
     from app.routers.chat import _rate_tracker
-    _rate_tracker[user_id] = []
+    _rate_tracker.clear()
 
     async def mock_stream(messages):
         yield "ok"

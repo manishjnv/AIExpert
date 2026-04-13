@@ -112,7 +112,7 @@ app.add_middleware(
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["*"],
+    allow_headers=["content-type", "authorization", "x-requested-with"],
 )
 
 
@@ -192,8 +192,10 @@ def get_anon_stats() -> dict:
 
 @app.get("/api/health", tags=["public"])
 async def health():
-    """Liveness probe. Always returns ok if the process is up."""
-    return {"status": "ok", "version": settings.app_version, "env": settings.env}
+    """Liveness probe. Minimal payload — version/env were removed to avoid
+    leaking build metadata to unauthenticated clients. Admins can read
+    those from /api/admin/* which is behind auth."""
+    return {"status": "ok"}
 
 
 # In-memory cache for learner count (60s TTL).
