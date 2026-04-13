@@ -83,6 +83,10 @@ async def evaluate(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Evaluation failed. Please try again.")
 
+    # A high-scoring capstone-week eval can trigger the Honors upgrade.
+    from app.services.certificates import safe_check_and_issue
+    await safe_check_and_issue(db, user, plan)
+
     return {
         "id": evaluation.id,
         "score": evaluation.score,

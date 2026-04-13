@@ -309,6 +309,14 @@ async def update_progress(
             updated_at=now,
         ))
 
+    await db.flush()
+
+    # Certificate issuance hook — only runs on check-completion ticks so we
+    # don't hit the service on every uncheck. Never raises.
+    if body.done:
+        from app.services.certificates import safe_check_and_issue
+        await safe_check_and_issue(db, user, plan)
+
     return Response(status_code=204)
 
 

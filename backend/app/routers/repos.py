@@ -101,6 +101,11 @@ async def link_repo(
         ))
 
     await db.flush()
+
+    # Linking a new repo can cross the Distinction repos-required gate.
+    from app.services.certificates import safe_check_and_issue
+    await safe_check_and_issue(db, user, plan)
+
     return repo_info
 
 

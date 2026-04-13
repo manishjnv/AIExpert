@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     # ----- GitHub (optional) -----
     github_token: str = ""
 
+    # ----- Certificates -----
+    # HMAC secret for the tamper-evident signature on each certificate. If
+    # unset, the service layer derives a stable value from jwt_secret. Setting
+    # this explicitly lets us rotate cert signatures without rotating JWTs.
+    cert_hmac_secret: str = ""
+
     # ----- Maintainer -----
     maintainer_email: str = "you@example.com"
 

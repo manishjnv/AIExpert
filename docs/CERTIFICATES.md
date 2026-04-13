@@ -45,6 +45,11 @@ Each certificate has a `signed_hash`: `HMAC-SHA256(credential_id + '|' + user_id
 
 See [backend/app/models/certificate.py](backend/app/models/certificate.py). Migration: `b3f5a9e21c04_add_certificates_table.py`.
 
+## Implementation log
+
+- **Step 1** (2026-04-13) — Certificate ORM model + Alembic migration `b3f5a9e21c04` + this design doc.
+- **Step 2** (2026-04-13) — Issuance engine landed in [backend/app/services/certificates.py](backend/app/services/certificates.py). Public API: `generate_credential_id()`, `sign_credential()`, `verify_signature()`, `check_and_issue()`, `safe_check_and_issue()`. Trigger hooks wired into `PATCH /api/progress` (on `done=True` only), `POST /api/repos/link`, and `POST /api/evaluate`. `CERT_HMAC_SECRET` env var added to `config.py` with derivation fallback from `jwt_secret`. Unit tests in [backend/tests/test_certificates.py](backend/tests/test_certificates.py) cover credential format, signature determinism, all four tier gates (capstone, completion, distinction, honors), idempotence, upgrade path, and the no-downgrade invariant.
+
 ## Endpoints (planned)
 
 - `GET /api/certificates` — list current user's certificates.
