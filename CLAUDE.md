@@ -120,10 +120,10 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-12 (session 4)
-**Last session summary:** AI Quality Pipeline built (Generate→Review→Refine→Validate). Gemini cost optimizations (context caching, right-sized tokens, structured output, system instructions). Claude wired for surgical refinement only (prompt caching). Improved generation prompt (Bloom's taxonomy, action verbs, theory-practice ratio). Quality scorer (5 heuristic + 10 AI-reviewed dimensions). All admin UI readability fixed (37 inline color fixes, 31 font size fixes). Pipeline Settings full-width. Templates volume issue identified (generated templates lost on rebuild).
-**Tests passing:** 88 (2 flaky from GitHub API rate limit)
+**Last session date:** 2026-04-13 (session 5)
+**Last session summary:** Admin UX overhaul (role banners, workflow steps 1→2→3 pills, unified prompt UX, cost per template). IST time formatting site-wide (FMT helpers + JS fmtIST). Quality pipeline hardening: smart Pro dispatch (pattern vs reasoning dims), deterministic prefix stage, OpenAI embedding guardrail, structural fingerprint cache, triage cascade (Groq→Cerebras→Mistral), fallbacks for Pro rate limit + embedding outage. Claude replaced with Gemini 2.5 Pro for deep refinement (Tier 1 gating). Manual template JSON upload on Topics tab with Claude Opus prompt generator + lenient cleanup + auto-publish. Topic delete cascade. Plan-switch progress leakage fixed + re-enrollment restores prior progress. Certificate system step 1 shipped (model + migration + design doc).
+**Tests passing:** 88 (2 flaky)
 **Tests failing:** 2 flaky (test_repos — external)
-**Blockers:** DeepSeek 402. Generated templates lost on container rebuild (need volume mount). 
-**Next action:** Fix template volume mount. Run discovery + generation with quality pipeline. Implement 10 new scoring dimensions in heuristic scorer.
-**Open questions for the user:** None — Claude approved for refinement.
+**Blockers:** Anthropic Tier 1 gate (needs $40 cumulative for reliable API — using Gemini Pro instead; Claude Max chat used for manual template generation).
+**Next action:** Certificate system steps 2-8. See [docs/CERTIFICATES.md](docs/CERTIFICATES.md) for full design. Next: step 2 = issuance engine (threshold detection, tier upgrades, idempotent issue); then 3=weasyprint PDF gen; 4=public /verify/{id} page with OG tags; 5=My Certificates section on /account; 6=completion modal on home; 7=profile name guidance note; 8=LinkedIn share button.
+**Open questions for the user:** None — design approved, LinkedIn Company Page deferred to Phase 2.
