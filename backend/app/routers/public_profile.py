@@ -187,6 +187,9 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
     active_done = 0
     active_total = 120
     template = None
+    course_short = None         # e.g. "AI Generalist"
+    duration_months = None
+    current_month = None        # month index the learner is currently working in
     if active_plan:
         active_done = (await db.execute(
             select(func.count()).select_from(Progress).where(
@@ -198,6 +201,27 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
         try:
             tpl = load_template(active_plan.template_key)
             active_total = tpl.total_checks
+            # Short course name = text before the em-dash separator in the
+            # template title (e.g. 'AI Generalist — 3-Month Accelerated'
+            # → 'AI Generalist'). Falls back to the full title.
+            course_short = (tpl.title or "").split(" — ")[0].strip() or tpl.title
+            duration_months = tpl.duration_months
+            # Current month = month containing the highest week the learner
+            # has any completion in. Empty → month 1 (just started).
+            max_done_week = (await db.execute(
+                select(func.max(Progress.week_num)).where(
+                    Progress.user_plan_id == active_plan.id,
+                    Progress.done == True,  # noqa: E712
+                )
+            )).scalar()
+            if max_done_week is not None:
+                for m in tpl.months:
+                    week_nums = [w.n for w in m.weeks]
+                    if week_nums and max_done_week in week_nums:
+                        current_month = m.month
+                        break
+            if current_month is None:
+                current_month = 1
         except Exception:
             active_total = 120
 
@@ -216,6 +240,9 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
         "honors_count": honors_count,
         "distinction_count": distinction_count,
         "last_activity": last_activity,
+        "course_short": course_short,
+        "duration_months": duration_months,
+        "current_month": current_month,
     }
 
 
@@ -422,10 +449,24 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             xp_to_next = 0
         badges = _compute_badges(stats, streak)
 
+        # Build the subtitle phrase about what they're currently studying.
+        # Active plan → 'Studying: <course> · Month X of Y'.
+        # No active plan but has history → 'Between courses'.
+        # Brand-new with nothing → 'New learner'.
+        if stats.get("course_short") and stats.get("current_month") and stats.get("duration_months"):
+            plan_phrase = (
+                f'Studying: {esc(stats["course_short"])} · '
+                f'Month {stats["current_month"]} of {stats["duration_months"]}'
+            )
+        elif stats.get("plans_count", 0) > 0:
+            plan_phrase = "Between courses"
+        else:
+            plan_phrase = "New learner"
+
         entries.append({
             "id": user.id,
             "name": esc((user.name or "Learner")),
-            "plan": PLAN_LABELS.get(stats["template"] or "", "Not enrolled yet"),
+            "plan": plan_phrase,
             "done": stats["done"],
             "total": stats["total"],
             "pct": stats["pct"],
