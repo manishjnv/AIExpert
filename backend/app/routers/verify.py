@@ -235,11 +235,23 @@ def _not_found_html(credential_id: str) -> str:
 </div></body></html>"""
 
 
+def _module_titles(template_key: str) -> list[str]:
+    """Pull the month titles from the plan template — these are the
+    curated module names ('Foundations', 'Classical ML', etc.)."""
+    try:
+        from app.curriculum.loader import load_template
+        tpl = load_template(template_key)
+        return [m.title for m in tpl.months if m.title]
+    except Exception:
+        return []
+
+
 def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
     verify_url = f"{base}/verify/{cert.credential_id}"
     og_image_url = f"{base}/verify/{cert.credential_id}/og.svg"
+    modules = _module_titles(cert.template_key)
 
     issued_iso = cert.issued_at.strftime("%B %d, %Y") if cert.issued_at else ""
     tier_label = _TIER_LABEL.get(cert.tier, "Certificate")
@@ -337,8 +349,9 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
         <dt>Level</dt><dd>{_esc(cert.level.capitalize())}</dd>
         <dt>Duration</dt><dd>{_esc(cert.duration_months)} months · {_esc(cert.total_hours)} hours</dd>
         <dt>Milestones</dt><dd>{_esc(cert.checks_done)} / {_esc(cert.checks_total)} completed</dd>
-        <dt>Projects shipped</dt><dd>{_esc(cert.repos_linked)} GitHub {'repository' if cert.repos_linked == 1 else 'repositories'}</dd>
+        {f'<dt>Projects shipped</dt><dd>{_esc(cert.repos_linked)} GitHub {"repository" if cert.repos_linked == 1 else "repositories"}</dd>' if cert.repos_linked > 0 else ''}
       </dl>
+      {('<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #e7e5e4"><div style="font-family:system-ui,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px">Modules Completed</div><ol style="margin:0;padding-left:22px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.7;color:#44403c">' + ''.join(f'<li>{_esc(m)}</li>' for m in modules) + '</ol></div>') if modules else ''}
     </div>
 
     <div class="cta" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">

@@ -93,6 +93,19 @@
       bottom: 12mm; left: 22mm; right: 22mm;
       display: flex; align-items: flex-end; justify-content: space-between;
     }
+    .modules {
+      text-align: center;
+      margin-top: 6mm;
+      padding: 0 26mm;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 8.5pt;
+      color: #57534e;
+      line-height: 1.4;
+    }
+    .modules .modules-label {
+      color: #92400e; font-weight: 700;
+      letter-spacing: 0.5pt; text-transform: uppercase;
+    }
     .sig {
       text-align: center;
       font-family: "DejaVu Sans", sans-serif;
@@ -172,6 +185,12 @@
       {% endif %}
       <div class="stat"><span class="val">{{ issued_at_short }}</span>Issued</div>
     </div>
+
+    {% if modules %}
+    <div class="modules">
+      <span class="modules-label">Modules covered:</span> {{ modules | join(' · ') }}
+    </div>
+    {% endif %}
 
     <div class="footer">
       <div class="sig">

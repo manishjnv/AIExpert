@@ -50,6 +50,18 @@ def _qr_png_base64(payload: str) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
+def _module_titles(template_key: str) -> list[str]:
+    """Curated month titles from the plan template — printed as a small
+    'Modules covered' line beneath the body so a recruiter scanning the
+    PDF gets a quick read of what was actually studied."""
+    try:
+        from app.curriculum.loader import load_template
+        tpl = load_template(template_key)
+        return [m.title for m in tpl.months if m.title]
+    except Exception:
+        return []
+
+
 def render_certificate_pdf(cert: Certificate) -> bytes:
     """Render a certificate to PDF bytes.
 
@@ -66,6 +78,7 @@ def render_certificate_pdf(cert: Certificate) -> bytes:
     issued_short = issued.strftime("%Y-%m-%d")
 
     ctx = {
+        "modules": _module_titles(cert.template_key),
         "credential_id": cert.credential_id,
         "course_title": cert.course_title,
         "display_name": cert.display_name,
