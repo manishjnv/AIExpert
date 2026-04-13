@@ -232,6 +232,12 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
           </div>
         </div>
 
+        <!-- My Certificates -->
+        <div class="section" id="certsSection" style="display:none">
+          <div class="section-title">My Certificates</div>
+          <div id="certsList" style="display:flex;flex-direction:column;gap:12px;margin-top:8px"></div>
+        </div>
+
         <!-- Course History -->
         <div class="section" id="historySection" style="display:none">
           <div class="section-title">Course History</div>
@@ -317,6 +323,9 @@ function render() {
   document.getElementById('fEmailNotif').checked = profile.email_notifications !== false;
   document.getElementById('fPublicProfile').checked = profile.public_profile === true;
 
+  // My Certificates — loaded async, rendered if any exist
+  loadCertificates();
+
   // Course history timeline
   const history = profile.plan_history || [];
   if (history.length > 0) {
@@ -342,6 +351,78 @@ function render() {
       '</div>';
     }).join('');
   }
+}
+
+// ---- Certificates ----
+
+const TIER_LABEL = {
+  completion: 'Certificate of Completion',
+  distinction: 'With Distinction',
+  honors: 'With Honors',
+};
+
+async function loadCertificates() {
+  try {
+    const resp = await fetch('/api/certificates', { credentials: 'same-origin' });
+    if (!resp.ok) return;
+    const certs = await resp.json();
+    if (!certs.length) return;
+    document.getElementById('certsSection').style.display = 'block';
+    const listEl = document.getElementById('certsList');
+    listEl.innerHTML = certs.map(renderCertRow).join('');
+  } catch {}
+}
+
+function renderCertRow(c) {
+  const tierBadge = c.tier === 'completion'
+    ? '<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-soft)">Completion</span>'
+    : '<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);font-weight:700">' + (c.tier === 'honors' ? 'With Honors' : 'With Distinction') + '</span>';
+  const issued = c.issued_at ? window.fmtISTFullMY(c.issued_at) : '';
+  const revokedBadge = c.revoked_at
+    ? '<span style="font-size:10px;color:var(--danger, #ef4444);font-weight:700;margin-left:6px">REVOKED</span>'
+    : '';
+  const verifyUrl = location.origin + '/verify/' + encodeURIComponent(c.credential_id);
+  const pdfDisabled = c.revoked_at ? ' disabled style="opacity:0.4;pointer-events:none"' : '';
+  const shareDisabled = c.revoked_at ? pdfDisabled : '';
+  return '' +
+    '<div style="border:1px solid var(--line);border-radius:6px;padding:14px 16px;background:var(--bg-2)">' +
+      '<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:6px">' +
+        '<div style="min-width:0">' +
+          '<div style="font-size:14px;color:var(--paper);font-weight:600">' + escapeHtml(c.course_title) + '</div>' +
+          '<div style="margin-top:2px">' + tierBadge + revokedBadge + '</div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--ink-soft);text-align:right;flex-shrink:0">' + escapeHtml(issued) + '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--ink-soft);font-family:monospace;margin-bottom:10px">' + escapeHtml(c.credential_id) + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<a class="btn" href="/api/certificates/' + encodeURIComponent(c.credential_id) + '/pdf" target="_blank"' + pdfDisabled + ' style="font-size:10px">Download PDF</a>' +
+        '<button class="btn" onclick="shareOnLinkedIn(\'' + c.credential_id + '\')"' + shareDisabled + ' style="font-size:10px">Share on LinkedIn</button>' +
+        '<button class="btn" onclick="copyVerifyLink(\'' + verifyUrl + '\')" style="font-size:10px">Copy verification link</button>' +
+        '<a class="btn" href="' + verifyUrl + '" target="_blank" style="font-size:10px">View public page</a>' +
+      '</div>' +
+    '</div>';
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+async function shareOnLinkedIn(credentialId) {
+  const verifyUrl = location.origin + '/verify/' + encodeURIComponent(credentialId);
+  // Record the share (non-blocking — the popup should open fast)
+  fetch('/api/certificates/' + encodeURIComponent(credentialId) + '/share-linkedin', {
+    method: 'POST', credentials: 'same-origin',
+  }).catch(() => {});
+  const url = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(verifyUrl);
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function copyVerifyLink(url) {
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Verification link copied'),
+    () => showToast('Copy failed — link: ' + url),
+  );
 }
 
 async function saveProfile() {
