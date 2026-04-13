@@ -165,7 +165,6 @@
           <a href="/blog/01" class="ftr-link">Blog</a>
           <a href="/verify" class="ftr-link">Verify Credential</a>
           <a href="/#contact" class="ftr-link" data-open-contact>Contact</a>
-          <a href="https://github.com/manishjnv/AIExpert" target="_blank" rel="noopener noreferrer" class="ftr-link">Source Code</a>
         </nav>
 
         <div class="ftr-motto">Build &gt; watch. Ship &gt; learn. One commit a day keeps drift away.</div>
