@@ -140,4 +140,45 @@
       window.location = '/';
     }
   };
+
+  // ---------- Global footer ----------
+  // Rendered on every page that loads nav.js so branding and key links are
+  // consistent. Pages no longer ship their own footer — remove it from
+  // any template that still does.
+  const year = new Date().getFullYear();
+  const footer = document.createElement('footer');
+  footer.id = 'shared-footer';
+  footer.className = 'shared-footer';
+  footer.innerHTML = `
+    <div class="ftr-inner">
+      <div class="ftr-brand">
+        <div class="ftr-brand-row">${LOGO}<span class="ftr-brand-name">AutomateEdge</span></div>
+        <div class="ftr-tag">AI Learning Roadmap · A free, self-paced platform for anyone learning modern AI.</div>
+      </div>
+
+      <nav class="ftr-links" aria-label="Footer navigation">
+        <a href="/#about" class="ftr-link" data-open-about>About</a>
+        <a href="/leaderboard" class="ftr-link">Leaderboard</a>
+        <a href="/verify" class="ftr-link">Verify Credential</a>
+        <a href="mailto:contact@automateedge.cloud?subject=AutomateEdge%20Feedback" class="ftr-link">Contact</a>
+        <a href="https://github.com/manishjnv/AIExpert" target="_blank" rel="noopener noreferrer" class="ftr-link">Source Code</a>
+      </nav>
+
+      <div class="ftr-motto">Build &gt; watch. Ship &gt; learn. One commit a day keeps drift away.</div>
+      <div class="ftr-copy">&copy; ${year} AutomateEdge · All rights reserved.</div>
+    </div>
+  `;
+  document.body.appendChild(footer);
+
+  // About link: if we're already on home, open the in-page modal; otherwise
+  // navigate to home with the hash and let home's hashchange handler pick up.
+  footer.querySelectorAll('[data-open-about]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const isHome = location.pathname === '/' || location.pathname === '/index.html';
+      if (isHome && typeof window.openAboutModal === 'function') {
+        e.preventDefault();
+        window.openAboutModal();
+      }
+    });
+  });
 })();

@@ -461,23 +461,16 @@
 
 <main id="content"></main>
 
-<footer>
-  <div style="text-align:center">
-    <div style="font-family:var(--serif);font-size:18px;color:var(--accent);margin-bottom:6px">AI Learning Roadmap</div>
-    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px">A free, self-paced learning platform for AI/ML engineers.</div>
-    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:16px">
-      <a href="#" onclick="openAboutModal();return false" style="color:var(--paper-dim);text-decoration:none;font-size:12px">About</a>
-      <span style="color:var(--line)">·</span>
-      <a href="/leaderboard" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Leaderboard</a>
-      <span style="color:var(--line)">·</span>
-      <a href="#" onclick="openContactModal();return false" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Contact Us</a>
-      <span style="color:var(--line)">·</span>
-      <a href="https://github.com/manishjnv/AIExpert" target="_blank" style="color:var(--paper-dim);text-decoration:none;font-size:12px">Source Code</a>
-    </div>
-    <div style="font-style:italic;color:var(--ink-soft);font-size:11px;margin-bottom:6px">Build > watch. Ship > learn. One commit a day keeps drift away.</div>
-    <div style="font-size:10px;color:var(--ink-soft)">&copy; 2026 AutomateEdge. All rights reserved.</div>
-  </div>
-</footer>
+<!-- Global footer lives in /nav.js (.shared-footer) so every page gets it. -->
+<script>
+  // If we arrived via /#about (from a footer on another page), open the modal.
+  window.addEventListener('DOMContentLoaded', () => {
+    if (location.hash === '#about' && typeof openAboutModal === 'function') {
+      openAboutModal();
+      history.replaceState({}, '', location.pathname);  // clean URL
+    }
+  });
+</script>
 
 <!-- About Modal -->
 <div id="aboutModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAboutModal()">
