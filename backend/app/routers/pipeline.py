@@ -490,6 +490,7 @@ async def upload_manual_template(
         raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
 
     overwrite = bool(body.pop("overwrite", False))
+    auto_publish = bool(body.pop("auto_publish", False))
     # Accept either {"template": {...}} or the template dict at the top level
     plan_data = body.get("template") if isinstance(body.get("template"), dict) else body
 
@@ -547,6 +548,28 @@ async def upload_manual_template(
         await db.flush()
         topic_id = new_topic.id
 
+    # Auto-score + optional auto-publish
+    quality_score = None
+    published = False
+    publish_reason = None
+    try:
+        from app.services.quality_scorer import score_template
+        result = await score_template(tpl, db)
+        quality_score = int(result.get("composite_score", 0))
+        # Persist the score on the template metadata
+        from app.curriculum.loader import update_quality_score, publish_template, PUBLISH_THRESHOLD
+        update_quality_score(key, quality_score)
+        if auto_publish:
+            if quality_score >= PUBLISH_THRESHOLD:
+                if publish_template(key, quality_score):
+                    published = True
+                else:
+                    publish_reason = f"publish_template declined (score={quality_score})"
+            else:
+                publish_reason = f"score {quality_score} < {PUBLISH_THRESHOLD} threshold"
+    except Exception as e:
+        publish_reason = f"scoring failed: {type(e).__name__}"
+
     return {
         "ok": True,
         "key": key,
@@ -555,6 +578,9 @@ async def upload_manual_template(
         "overwritten": existing_topic is not None and overwrite,
         "weeks": tpl.total_weeks,
         "hours": tpl.total_hours,
+        "quality_score": quality_score,
+        "published": published,
+        "publish_reason": publish_reason,
     }
 
 
@@ -1142,13 +1168,27 @@ async def pipeline_topics_page(
     <button onclick="document.getElementById('uploadModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
     <h2 style="margin-top:0;color:#e8a849">Upload Template JSON</h2>
     <p style="color:#8a92a0;font-size:13px;line-height:1.6">
-      Upload a fully-formed curriculum template (same schema as AI-generated templates). The file is validated, saved, and a Topic row is created with status <code>generated</code>. You can publish it immediately from the <a href="/admin/templates" style="color:#e8a849">Templates</a> tab if it scores ≥ 90 on the quality check.
-      <br><br>
-      <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="color:#e8a849">Download sample JSON</a> to see the required shape.
+      Upload a fully-formed curriculum (same schema as AI-generated). Validated, saved, and a Topic row is created with status <code>generated</code>. <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="color:#e8a849">Sample JSON</a>.
     </p>
-    <input type="file" id="uploadFile" accept="application/json,.json" style="margin:12px 0;color:#d0cbc2">
-    <div>
-      <label style="font-size:13px;color:#d0cbc2"><input type="checkbox" id="uploadOverwrite"> Overwrite if template with this key already exists</label>
+    <div style="display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #2a323d">
+      <button id="tabFile" class="tab-btn active" onclick="switchUploadTab('file')" style="padding:8px 16px;background:none;border:none;color:#e8a849;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;border-bottom:2px solid #e8a849;cursor:pointer">File upload</button>
+      <button id="tabPaste" class="tab-btn" onclick="switchUploadTab('paste')" style="padding:8px 16px;background:none;border:none;color:#8a92a0;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;border-bottom:2px solid transparent;cursor:pointer">Paste from Claude</button>
+    </div>
+    <div id="panelFile">
+      <input type="file" id="uploadFile" accept="application/json,.json" style="margin:12px 0;color:#d0cbc2">
+    </div>
+    <div id="panelPaste" style="display:none">
+      <p style="color:#8a92a0;font-size:12px;line-height:1.5;margin:4px 0 8px">Paste Claude's response — prose, <code>```json</code> fences, and commentary are auto-stripped. First <code>{{...}}</code> block is extracted.</p>
+      <textarea id="uploadPaste" placeholder='Paste Claude response here. Example:
+```json
+{{ "key": "...", "title": "...", "months": [...] }}
+```
+(fences optional)' style="width:100%;min-height:200px;padding:10px;background:#0f1419;border:1px solid #2a323d;color:#e8e2d3;border-radius:3px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical" oninput="previewPaste()"></textarea>
+    </div>
+    <div id="uploadPreview" style="margin:10px 0;font-size:12px;color:#8a92a0;min-height:18px"></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px;color:#d0cbc2"><input type="checkbox" id="uploadOverwrite"> Overwrite existing</label>
+      <label style="font-size:13px;color:#d0cbc2" title="After upload, run quality check. If score >= 90, auto-publish."><input type="checkbox" id="uploadAutoPublish" checked> Auto-publish if score ≥ 90</label>
     </div>
     <div id="uploadStatus" style="margin:12px 0;font-size:13px;min-height:20px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
@@ -1223,31 +1263,89 @@ async function copyPromptToClipboard() {{
   }}
 }}
 
+function switchUploadTab(which) {{
+  const file = document.getElementById('panelFile'), paste = document.getElementById('panelPaste');
+  const tF = document.getElementById('tabFile'), tP = document.getElementById('tabPaste');
+  if (which === 'file') {{
+    file.style.display = ''; paste.style.display = 'none';
+    tF.style.color = '#e8a849'; tF.style.borderBottomColor = '#e8a849';
+    tP.style.color = '#8a92a0'; tP.style.borderBottomColor = 'transparent';
+  }} else {{
+    file.style.display = 'none'; paste.style.display = '';
+    tP.style.color = '#e8a849'; tP.style.borderBottomColor = '#e8a849';
+    tF.style.color = '#8a92a0'; tF.style.borderBottomColor = 'transparent';
+  }}
+  document.getElementById('uploadPreview').textContent = '';
+  document.getElementById('uploadStatus').textContent = '';
+}}
+
+// Extract a JSON object from a text blob that may include markdown fences,
+// Claude's preamble/commentary, trailing prose, etc. Returns {{ok, parsed, raw, err}}.
+function smartExtractJSON(text) {{
+  if (!text || !text.trim()) return {{ok: false, err: 'Empty'}};
+  let t = text.trim();
+  // Strip ```json ... ``` or ``` ... ```
+  const fence = t.match(/```(?:json)?\\s*([\\s\\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  // Find first and last braces
+  const first = t.indexOf('{{');
+  const last = t.lastIndexOf('}}');
+  if (first < 0 || last < 0 || last < first) return {{ok: false, err: 'No JSON object found'}};
+  const raw = t.slice(first, last + 1);
+  try {{
+    return {{ok: true, parsed: JSON.parse(raw), raw}};
+  }} catch(e) {{
+    return {{ok: false, raw, err: e.message}};
+  }}
+}}
+
+function previewPaste() {{
+  const txt = document.getElementById('uploadPaste').value;
+  const prev = document.getElementById('uploadPreview');
+  if (!txt.trim()) {{ prev.textContent = ''; return; }}
+  const r = smartExtractJSON(txt);
+  if (!r.ok) {{
+    prev.innerHTML = '<span style="color:#d97757">Cannot parse: ' + r.err + '</span>';
+    return;
+  }}
+  const p = r.parsed;
+  const months = Array.isArray(p.months) ? p.months.length : 0;
+  const weeks = Array.isArray(p.months) ? p.months.reduce((a,m) => a + (Array.isArray(m.weeks) ? m.weeks.length : 0), 0) : 0;
+  prev.innerHTML = '<span style="color:#6db585">✓</span> <strong>' + (p.title || '?') + '</strong> · '
+    + '<code>' + (p.key || '?') + '</code> · ' + (p.level || '?') + ' · '
+    + (p.duration_months || '?') + 'mo · ' + months + ' months, ' + weeks + ' weeks';
+}}
+
 async function uploadTemplate() {{
-  const fileInput = document.getElementById('uploadFile');
-  const overwrite = document.getElementById('uploadOverwrite').checked;
   const status = document.getElementById('uploadStatus');
-  if (!fileInput.files || !fileInput.files[0]) {{
-    status.innerHTML = '<span style="color:#d97757">Pick a JSON file first</span>';
-    return;
-  }}
-  const file = fileInput.files[0];
-  status.textContent = 'Reading file…';
-  let text;
-  try {{
-    text = await file.text();
-  }} catch(e) {{
-    status.innerHTML = '<span style="color:#d97757">Failed to read file: ' + e.message + '</span>';
-    return;
-  }}
-  let parsed;
-  try {{
-    parsed = JSON.parse(text);
-  }} catch(e) {{
-    status.innerHTML = '<span style="color:#d97757">Invalid JSON: ' + e.message + '</span>';
-    return;
+  const overwrite = document.getElementById('uploadOverwrite').checked;
+  const autoPublish = document.getElementById('uploadAutoPublish').checked;
+  const fileTabActive = document.getElementById('panelFile').style.display !== 'none';
+
+  let parsed = null;
+  if (fileTabActive) {{
+    const fileInput = document.getElementById('uploadFile');
+    if (!fileInput.files || !fileInput.files[0]) {{
+      status.innerHTML = '<span style="color:#d97757">Pick a JSON file first</span>';
+      return;
+    }}
+    try {{
+      const text = await fileInput.files[0].text();
+      parsed = JSON.parse(text);
+    }} catch(e) {{
+      status.innerHTML = '<span style="color:#d97757">Invalid JSON: ' + e.message + '</span>';
+      return;
+    }}
+  }} else {{
+    const r = smartExtractJSON(document.getElementById('uploadPaste').value);
+    if (!r.ok) {{
+      status.innerHTML = '<span style="color:#d97757">Cannot parse pasted JSON: ' + r.err + '</span>';
+      return;
+    }}
+    parsed = r.parsed;
   }}
   parsed.overwrite = overwrite;
+  parsed.auto_publish = autoPublish;
   status.textContent = 'Uploading…';
   try {{
     const resp = await fetch('/admin/pipeline/api/topics/upload-template', {{
@@ -1257,9 +1355,12 @@ async function uploadTemplate() {{
     }});
     const data = await resp.json().catch(() => ({{}}));
     if (resp.ok) {{
-      status.innerHTML = '<span style="color:#6db585">✓ ' + data.title + ' uploaded ('
-        + data.weeks + ' weeks, ' + data.hours + 'h). Reloading…</span>';
-      setTimeout(() => window.location.reload(), 1500);
+      let msg = '✓ ' + data.title + ' uploaded (' + data.weeks + ' weeks, ' + data.hours + 'h)';
+      if (typeof data.quality_score !== 'undefined') msg += ' · score ' + data.quality_score;
+      if (data.published) msg += ' · <strong>published</strong>';
+      else if (data.publish_reason) msg += ' · not published (' + data.publish_reason + ')';
+      status.innerHTML = '<span style="color:#6db585">' + msg + '. Reloading…</span>';
+      setTimeout(() => window.location.reload(), 1800);
     }} else {{
       status.innerHTML = '<span style="color:#d97757">✗ ' + (data.detail || resp.statusText) + '</span>';
     }}
