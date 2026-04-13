@@ -67,20 +67,46 @@ async def share_page(
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <style>
-  body {{ font-family: system-ui, sans-serif; background: #0f1419; color: #f5f1e8; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }}
-  .card {{ text-align: center; max-width: 500px; padding: 48px; }}
-  h1 {{ font-size: 28px; margin-bottom: 8px; color: #e8a849; }}
-  p {{ font-size: 16px; opacity: 0.7; }}
-  .cta {{ display: inline-block; margin-top: 24px; padding: 12px 24px; background: #e8a849; color: #0f1419; text-decoration: none; border-radius: 4px; font-weight: 600; }}
-  .cta:hover {{ background: #c98e2f; }}
+  *{{box-sizing:border-box}}
+  html,body{{margin:0;padding:0;background:#0f1419;color:#f5f1e8;font-family:system-ui,sans-serif;min-height:100vh}}
+  .nav{{background:#0a0e13;border-bottom:1px solid #1f2937;padding:14px 28px;display:flex;align-items:center;justify-content:space-between}}
+  .brand{{display:flex;align-items:center;gap:10px;font-weight:700;color:#e8a849;font-size:16px;text-decoration:none}}
+  .brand-dot{{width:10px;height:10px;border-radius:50%;background:#e8a849}}
+  .nav .home-link{{color:#a8a29e;text-decoration:none;font-size:13px}}
+  .nav .home-link:hover{{color:#e8a849}}
+  .wrap{{max-width:680px;margin:0 auto;padding:60px 24px 80px;text-align:center}}
+  .badge{{display:inline-flex;align-items:center;gap:8px;background:rgba(232,168,73,0.12);border:1px solid rgba(232,168,73,0.3);color:#e8a849;padding:6px 14px;border-radius:20px;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px}}
+  h1{{font-size:42px;margin:0 0 10px;color:#e8a849;line-height:1.15;font-weight:700}}
+  .subtitle{{font-size:17px;opacity:0.8;margin:0 0 8px}}
+  .name{{font-size:14px;opacity:0.55;margin-bottom:36px}}
+  .ctas{{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:30px}}
+  .cta{{display:inline-block;padding:13px 26px;text-decoration:none;border-radius:5px;font-weight:600;font-size:14px}}
+  .cta-primary{{background:#e8a849;color:#0f1419}}
+  .cta-primary:hover{{background:#c98e2f}}
+  .cta-secondary{{background:transparent;color:#e8a849;border:1px solid #e8a849}}
+  .cta-secondary:hover{{background:rgba(232,168,73,0.08)}}
+  .meta{{margin-top:50px;padding-top:24px;border-top:1px solid #1f2937;font-size:12px;opacity:0.5}}
+  .meta a{{color:#e8a849}}
 </style>
 </head>
 <body>
-<div class="card">
-  <p style="font-size:12px;letter-spacing:0.15em;text-transform:uppercase;opacity:0.5">AI Generalist Roadmap</p>
+<nav class="nav">
+  <a class="brand" href="{base_url}"><span class="brand-dot"></span> AutomateEdge</a>
+  <a class="home-link" href="{base_url}">← Back to roadmap</a>
+</nav>
+<div class="wrap">
+  <div class="badge">★ Milestone Reached</div>
   <h1>{milestone['title']}</h1>
-  <p>{first_name} completed: {milestone['subtitle']}</p>
-  <a class="cta" href="{base_url}">Start Your Own Roadmap</a>
+  <p class="subtitle">{milestone['subtitle']}</p>
+  <p class="name">— shipped by {first_name}</p>
+  <div class="ctas">
+    <a class="cta cta-primary" href="{base_url}">Start your own roadmap</a>
+    <a class="cta cta-secondary" href="https://www.linkedin.com/sharing/share-offsite/?url={share_url}" target="_blank" rel="noopener">Share on LinkedIn</a>
+  </div>
+  <div class="meta">
+    Course completion certificates with verifiable credential IDs are issued at the end of each program.<br>
+    Visit <a href="{base_url}">{base_url.replace('https://','').replace('http://','')}</a> to enroll.
+  </div>
 </div>
 </body>
 </html>"""

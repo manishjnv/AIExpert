@@ -316,7 +316,10 @@
     <div class="meta-item" title="GitHub-trackable deliverables the learner must produce. Format: linked / required.">Repos<strong id="metaRepos">0 / 0</strong></div>
     <div class="meta-item">Public posts<strong>1+</strong></div>
     <div class="meta-item">Kaggle subs<strong>2+</strong></div>
-    <div class="meta-item" style="margin-left:auto"><button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:8px 18px;border-color:var(--accent);color:var(--accent)">Export Learning Plan</button></div>
+    <div class="meta-item" style="margin-left:auto;display:flex;gap:8px">
+      <button id="shareCertBtn" class="btn" onclick="shareLatestCert()" style="display:none;font-size:10px;padding:8px 18px;background:#0a66c2;color:white;border-color:#0a66c2">🎓 Share Certificate</button>
+      <button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:8px 18px;border-color:var(--accent);color:var(--accent)">Export Learning Plan</button>
+    </div>
   </div>
   <div class="progress-overall">
     <svg viewBox="0 0 110 110">
@@ -1673,6 +1676,7 @@ async function checkAuth() {
       const firstName = (currentUser.name || "").split(" ")[0] || "there";
       document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · Loading plan...`;
       updateConnectionBadges();
+      refreshShareCertButton();
       return true;
     }
   } catch {}
@@ -1714,12 +1718,47 @@ function syncTick(weekN, idx, done) {
       if (resp.ok || resp.status === 204) {
         setSyncBadge("synced", "Synced");
         // Newly-completed check may have crossed a certificate threshold.
-        if (done) maybeShowCertificateModal();
+        if (done) {
+          maybeShowCertificateModal();
+          refreshShareCertButton();
+        }
       } else {
         setSyncBadge("error", "Sync failed");
       }
     } catch { setSyncBadge("error", "Sync failed"); }
   }, 800);
+}
+
+// ---- Share latest certificate (toolbar button) ----
+
+let _latestCertCache = null;
+
+async function refreshShareCertButton() {
+  const btn = document.getElementById('shareCertBtn');
+  if (!btn || !currentUser) return;
+  try {
+    const resp = await fetch('/api/certificates', { credentials: 'same-origin' });
+    if (!resp.ok) return;
+    const certs = await resp.json();
+    if (certs.length && !certs[0].revoked_at) {
+      _latestCertCache = certs[0];
+      btn.style.display = 'inline-block';
+      btn.title = 'Share your ' + (certs[0].tier === 'completion' ? 'completion' : 'with-' + certs[0].tier) + ' certificate on LinkedIn';
+    } else {
+      btn.style.display = 'none';
+    }
+  } catch {}
+}
+
+function shareLatestCert() {
+  if (!_latestCertCache) return;
+  const cid = _latestCertCache.credential_id;
+  const verifyUrl = location.origin + '/verify/' + encodeURIComponent(cid);
+  fetch('/api/certificates/' + encodeURIComponent(cid) + '/share-linkedin', {
+    method: 'POST', credentials: 'same-origin',
+  }).catch(() => {});
+  const url = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(verifyUrl);
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 // ---- Certificate completion modal ----
