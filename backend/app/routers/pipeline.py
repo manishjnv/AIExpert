@@ -1144,9 +1144,30 @@ async def pipeline_topics_page(
   <div style="background:#1d242e;border-radius:8px;padding:24px;max-width:780px;width:90%;max-height:85vh;overflow-y:auto;color:#d0cbc2">
     <button onclick="document.getElementById('promptModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
     <h2 style="margin-top:0;color:#e8a849">Generate Claude prompt</h2>
-    <p style="color:#8a92a0;font-size:13px;line-height:1.6">
-      Fill in topic / duration / level and click <strong>Generate</strong>. The prompt below is the full Claude Opus 4.6 curriculum spec with your inputs pre-filled — schema, level-calibrated load, Bloom's progression, action-verb + measurability thresholds, URL-quality rules, top-3 course resources, certifications, and a 12-point self-check. Paste it into <a href="https://claude.ai" target="_blank" style="color:#e8a849">Claude.ai</a> chat → Claude returns a full curriculum JSON → <strong>+ Upload Template JSON</strong> → Paste from Claude → upload.
+    <p style="color:#8a92a0;font-size:13px;line-height:1.6;margin-bottom:10px">
+      Create a curriculum manually via Claude.ai (free under your Max plan) and upload the JSON for auto-publish. The generated prompt embeds the full Opus 4.6 spec — schema, level-calibrated load, Bloom's progression, action-verb + measurability thresholds, URL-quality rules, top-3 resources, certifications, 12-point self-check.
     </p>
+    <details style="background:#0f1419;border:1px solid #2a323d;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:13px;line-height:1.6">
+      <summary style="cursor:pointer;color:#e8a849;font-weight:600;user-select:none">End-to-end steps (click to expand)</summary>
+      <ol style="margin:10px 0 4px 18px;padding:0;color:#d0cbc2">
+        <li><strong>Fill inputs</strong> — enter Topic (e.g. <em>Retrieval-Augmented Generation</em>), pick Duration and Level.</li>
+        <li><strong>Click Generate</strong> — the full prompt appears in the textarea. Meta line confirms key + expected week count.</li>
+        <li><strong>Click Copy prompt</strong> — clipboard gets the whole thing.</li>
+        <li><strong>Click Open Claude.ai ↗</strong> — opens a new tab. Start a fresh conversation, use <strong>Claude Opus 4.6</strong> (model picker top-right). Paste and send.</li>
+        <li><strong>Wait ~60–90s</strong> — Claude returns a raw JSON object. If it wrapped it in <code>```json</code>, that's fine — our paste parser strips fences automatically.</li>
+        <li><strong>Copy Claude's entire response</strong> — triple-click, Ctrl+A in the message, or just copy the whole chat bubble.</li>
+        <li><strong>Come back to this page</strong> (Topics tab) and click <strong>+ Upload Template JSON</strong>.</li>
+        <li><strong>Switch to "Paste from Claude" tab</strong> in the upload modal.</li>
+        <li><strong>Paste</strong> — a green preview line confirms title, key, level, duration, month + week counts. Red means parse error; fix and retry.</li>
+        <li><strong>Leave "Auto-publish if score ≥ 90" ticked</strong> (default). Tick "Overwrite existing" only if replacing a template with the same key.</li>
+        <li><strong>Click Upload</strong> — backend validates schema, scores across 15 quality dimensions, auto-publishes if ≥ 90.</li>
+        <li><strong>Done</strong> — success banner shows: uploaded, hours, score, published. Page reloads; template is live on the <a href="/admin/templates" style="color:#e8a849">Templates</a> tab.</li>
+      </ol>
+      <div style="margin-top:8px;color:#8a92a0;font-size:12px">
+        <strong>If score &lt; 90:</strong> template lands as Draft. Use the per-row <em>Refine</em> button on Templates, or edit the JSON and re-upload with <em>Overwrite existing</em>. If Claude cuts off mid-JSON, start a new chat and ask it to continue from the last valid object.<br>
+        <strong>Cost:</strong> zero — Claude Max chat is unmetered; the platform does one free OpenAI embedding call for the similarity guardrail.
+      </div>
+    </details>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">
       <div><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Topic</label>
         <input id="ptTopic" placeholder="e.g. Retrieval-Augmented Generation" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"></div>
