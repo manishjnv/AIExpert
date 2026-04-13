@@ -157,6 +157,25 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
     honors_count = sum(1 for t in cert_tiers if t == "honors")
     distinction_count = sum(1 for t in cert_tiers if t == "distinction")
 
+    # Last activity timestamp — most recent of: progress tick, repo link.
+    # Drives the 'Last Active' column. Real MAX() from the DB, no synthesis.
+    last_activity = None
+    if plan_ids:
+        last_progress = (await db.execute(
+            select(func.max(Progress.completed_at)).where(
+                Progress.user_plan_id.in_(plan_ids),
+                Progress.done == True,  # noqa: E712
+            )
+        )).scalar()
+        last_repo = (await db.execute(
+            select(func.max(RepoLink.linked_at)).where(
+                RepoLink.user_plan_id.in_(plan_ids)
+            )
+        )).scalar()
+        candidates = [t for t in (last_progress, last_repo) if t is not None]
+        if candidates:
+            last_activity = max(candidates)
+
     # Active plan stats for current progress
     active_done = 0
     active_total = 120
@@ -189,7 +208,44 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
         "cert_tiers": cert_tiers,
         "honors_count": honors_count,
         "distinction_count": distinction_count,
+        "last_activity": last_activity,
     }
+
+
+def _fmt_last_active(ts) -> tuple[str, str]:
+    """Render a relative 'Last Active' label.
+
+    Returns (text, color). Tuned so any activity within the last day
+    reads as fresh; a month+ of silence shades muted so recruiters see
+    who's still in the fight.
+    """
+    if ts is None:
+        return ("—", "#5a6473")
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # ts may be tz-aware or naive (SQLite strips tzinfo on read); normalise.
+    if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+    delta = now - ts
+    secs = int(delta.total_seconds())
+    if secs < 0:
+        secs = 0
+    if secs < 3600:
+        return ("Just now", "#6db585")
+    if secs < 86400:
+        h = secs // 3600
+        return (f"{h}h ago", "#6db585")
+    days = secs // 86400
+    if days < 7:
+        return (f"{days}d ago", "#6db585" if days <= 2 else "#e8a849")
+    weeks = days // 7
+    if weeks < 5:
+        return (f"{weeks}w ago", "#e8a849")
+    months = days // 30
+    if months < 12:
+        return (f"{months}mo ago", "#8a92a0")
+    years = days // 365
+    return (f"{years}y ago", "#5a6473")
 
 
 # ---------------- Gamification: XP + Tiers + Badges ----------------
@@ -375,6 +431,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             "linkedin": user.linkedin_url,
             "joined": joined,
             "streak": streak,
+            "last_activity": stats.get("last_activity"),
             "xp": xp,
             "tier": tier,
             "next_tier": nxt,
@@ -402,6 +459,8 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             li_href = e["linkedin"] if e["linkedin"].startswith("http") else "https://" + e["linkedin"]
             li_link = f'<a href="{esc(li_href)}" target="_blank" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#0a66c2"><svg width="14" height="14" viewBox="0 0 16 16" fill="#fff"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>'
         streak_display = f'🔥 {e["streak"]}w' if e["streak"] > 0 else "—"
+        la_text, la_color = _fmt_last_active(e["last_activity"])
+        last_active_display = f'<span style="color:{la_color};font-weight:500">{la_text}</span>'
         repos_display = (
             f'<span style="font-weight:600">{e["lifetime_repos"]}</span>'
             if e["lifetime_repos"] > 0 else '<span style="color:#5a6473">—</span>'
@@ -461,11 +520,12 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px">{streak_display}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="GitHub repos linked lifetime">{repos_display}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="Course completion certificates earned">{certs_display}</td>
+            <td style="text-align:center;font-size:12px;vertical-align:top;padding-top:16px" title="Most recent progress tick or repo link">{last_active_display}</td>
             <td style="text-align:center;vertical-align:top;padding-top:14px">{gh_link}{li_link}</td>
         </tr>"""
 
     if not rows:
-        rows = '<tr><td colspan="8" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
+        rows = '<tr><td colspan="9" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
 
     # Summary stats
     total_learners = len(entries)
@@ -518,6 +578,9 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
       <div class="help-tile"><span class="big">🔥</span> 4-week Streak · 🔥🔥 10-week Hot Streak</div>
     </div>
 
+    <h4>Last Active</h4>
+    <p>Shows the most recent moment you moved the needle — either ticking a task or linking a GitHub repo. Fresh (within 48h) renders green, amber within a week, muted thereafter. No XP attached; it's a pure recency signal.</p>
+
     <h4>Privacy</h4>
     <p style="margin-bottom:0">You only appear here if you opt in under <a href="/account">Account Settings → Show my profile on the public leaderboard</a>. Name and counts are the only things shown — email is never exposed.</p>
   </div>
@@ -532,6 +595,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
   <th style="text-align:center">Streak</th>
   <th style="text-align:center">Repos</th>
   <th style="text-align:center">Certs</th>
+  <th style="text-align:center">Last Active</th>
   <th style="text-align:center">Links</th>
 </tr>
 {rows}
