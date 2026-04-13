@@ -75,6 +75,110 @@ _TIER_LABEL = {
 }
 
 
+_INDEX_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify a Credential — AutomateEdge</title>
+<meta name="description" content="Look up an AutomateEdge course completion certificate by credential ID.">
+<style>
+  :root{--amber:#b45309;--ink:#1f1610}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#fffaf1;color:var(--ink);font-family:Georgia,serif;min-height:100vh}
+  .nav{background:#0a0e13;border-bottom:1px solid #1f2937;padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#e8a849;font-size:16px;text-decoration:none}
+  .brand-dot{width:10px;height:10px;border-radius:50%;background:#e8a849}
+  .home-link{color:#a8a29e;text-decoration:none;font-size:13px}
+  .home-link:hover{color:#e8a849}
+  .wrap{max-width:640px;margin:0 auto;padding:64px 24px}
+  .eyebrow{font-family:system-ui,sans-serif;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--amber);text-align:center;margin-bottom:10px}
+  h1{font-size:34px;font-weight:400;text-align:center;margin:0 0 12px;color:var(--ink)}
+  .lede{text-align:center;color:#57534e;font-size:15px;line-height:1.55;font-family:system-ui,sans-serif;margin:0 0 36px;padding:0 8px}
+  form{background:white;border:1px solid #e7e5e4;border-radius:8px;padding:24px 26px;margin-bottom:24px}
+  label{display:block;font-family:system-ui,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:8px;font-weight:600}
+  .row{display:flex;gap:8px}
+  input[type=text]{flex:1;padding:11px 14px;border:1px solid #d6d3d1;border-radius:5px;font-family:ui-monospace,monospace;font-size:14px;color:var(--ink);background:#fafaf9;letter-spacing:1px;text-transform:uppercase}
+  input[type=text]:focus{outline:none;border-color:var(--amber);background:white}
+  button{padding:11px 22px;border:none;border-radius:5px;background:var(--amber);color:white;font-family:system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer}
+  button:hover{background:#92400e}
+  .hint{font-family:system-ui,sans-serif;font-size:12px;color:#78716c;margin-top:10px}
+  .error{display:%(err_disp)s;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;padding:10px 14px;border-radius:5px;font-family:system-ui,sans-serif;font-size:13px;margin-bottom:18px}
+  .info{background:white;border:1px solid #e7e5e4;border-radius:8px;padding:20px 24px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.6;color:#44403c}
+  .info strong{color:var(--ink)}
+  .info code{font-family:ui-monospace,monospace;background:#f5f5f4;padding:2px 6px;border-radius:3px;color:var(--amber)}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="%(base)s"><span class="brand-dot"></span> AutomateEdge</a>
+  <a class="home-link" href="%(base)s">← Back to roadmap</a>
+</nav>
+<div class="wrap">
+  <div class="eyebrow">Credential Verification</div>
+  <h1>Verify a Certificate</h1>
+  <p class="lede">Enter the credential ID printed on the certificate (or scanned from its QR code) to confirm it was issued by AutomateEdge and has not been revoked.</p>
+
+  <div class="error">%(err_msg)s</div>
+
+  <form method="get" action="/verify/lookup" autocomplete="off">
+    <label for="cid">Credential ID</label>
+    <div class="row">
+      <input id="cid" name="id" type="text" placeholder="AER-2026-04-XXXXXX" pattern="AER-[0-9]{4}-[0-9]{2}-[A-Z0-9]{6}" required maxlength="18" autofocus>
+      <button type="submit">Verify</button>
+    </div>
+    <div class="hint">Format: <code style="font-family:ui-monospace,monospace">AER-YYYY-MM-XXXXXX</code> — case-insensitive.</div>
+  </form>
+
+  <div class="info">
+    <strong>How it works.</strong> Each certificate carries an HMAC-SHA256 signature
+    over its credential ID, the recipient's user ID, and the issue timestamp. When
+    you submit an ID we look it up, recompute the signature server-side, and show
+    a green badge if it matches the stored hash and the certificate hasn't been
+    revoked. Tampered or revoked credentials show a red badge.
+  </div>
+</div>
+</body>
+</html>"""
+
+
+def _index_html(error: str = "") -> str:
+    base = get_settings().public_base_url.rstrip("/")
+    return _INDEX_HTML % {
+        "base": base,
+        "err_msg": _html.escape(error),
+        "err_disp": "block" if error else "none",
+    }
+
+
+@router.get("/verify", response_class=HTMLResponse)
+@router.get("/verify/", response_class=HTMLResponse)
+async def verify_index():
+    """Paste-an-ID lookup form. Recruiters who don't have the full URL
+    (e.g. they only have the printed credential ID from a PDF) can land
+    here and look it up."""
+    return HTMLResponse(_index_html())
+
+
+@router.get("/verify/lookup", response_class=HTMLResponse)
+async def verify_lookup(request: Request):
+    """Form target — normalize the ID and either redirect to the cert
+    page or re-render the form with an inline error."""
+    raw = (request.query_params.get("id") or "").strip().upper()
+    # Allow users to paste the full URL — extract the trailing segment.
+    if "/verify/" in raw.lower():
+        raw = raw.split("/verify/", 1)[1].split("/", 1)[0].split("?", 1)[0]
+    import re
+    if not re.fullmatch(r"AER-\d{4}-\d{2}-[A-Z0-9]{6}", raw):
+        return HTMLResponse(
+            _index_html(f"That doesn't look like a valid credential ID. Expected format: AER-YYYY-MM-XXXXXX."),
+            status_code=400,
+        )
+    # Redirect to the canonical verify page
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/verify/{raw}", status_code=303)
+
+
 @router.get("/verify/{credential_id}", response_class=HTMLResponse)
 async def verify_page(
     credential_id: str,
@@ -237,7 +341,7 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
 
     <div class="foot">
       To independently verify, re-enter the credential ID at
-      <a href="{base}/verify/">{_esc(settings.public_base_url.replace('https://','').replace('http://','').rstrip('/'))}/verify/…</a>
+      <a href="{base}/verify">{_esc(settings.public_base_url.replace('https://','').replace('http://','').rstrip('/'))}/verify</a>
     </div>
   </div>
 </body>
