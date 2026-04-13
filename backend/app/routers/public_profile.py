@@ -135,14 +135,21 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
         )).scalar() or 0
         lifetime_done += done
 
-    # Lifetime repo links across all plans (active + archived)
+    # Distinct GitHub repos the learner has produced for their courses
+    # (active + archived plans). We dedupe by (owner, name) so re-linking
+    # the same repo to multiple weeks counts once — matches the intuitive
+    # 'how many repos did you build for learning' number.
     plan_ids = [p.id for p in all_plans]
     lifetime_repos = 0
     if plan_ids:
+        distinct_subq = (
+            select(RepoLink.repo_owner, RepoLink.repo_name)
+            .where(RepoLink.user_plan_id.in_(plan_ids))
+            .distinct()
+            .subquery()
+        )
         lifetime_repos = (await db.execute(
-            select(func.count()).select_from(RepoLink).where(
-                RepoLink.user_plan_id.in_(plan_ids)
-            )
+            select(func.count()).select_from(distinct_subq)
         )).scalar() or 0
 
     # Lifetime non-revoked certificates (need tier-level detail for XP scoring)
@@ -518,7 +525,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             <td style="vertical-align:top;padding-top:14px">{tier_chip}</td>
             <td style="vertical-align:top;padding-top:12px">{xp_cell}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px">{streak_display}</td>
-            <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="GitHub repos linked lifetime">{repos_display}</td>
+            <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="Distinct GitHub repos built as part of learning">{repos_display}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="Course completion certificates earned">{certs_display}</td>
             <td style="text-align:center;font-size:12px;vertical-align:top;padding-top:16px" title="Most recent progress tick or repo link">{last_active_display}</td>
             <td style="text-align:center;vertical-align:top;padding-top:14px">{gh_link}{li_link}</td>
@@ -557,7 +564,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     <h4>How XP is earned</h4>
     <div class="help-grid">
       <div class="help-tile"><span class="big">✅</span> <strong>+{XP_PER_TASK} XP</strong> per checklist task you tick off<div class="thr">LIFETIME — NEVER RESETS</div></div>
-      <div class="help-tile"><span class="big">🔗</span> <strong>+{XP_PER_REPO} XP</strong> per GitHub repo linked to a week<div class="thr">ONE REPO PER WEEK</div></div>
+      <div class="help-tile"><span class="big">🔗</span> <strong>+{XP_PER_REPO} XP</strong> per distinct GitHub repo built for a course<div class="thr">SAME REPO ACROSS WEEKS COUNTS ONCE</div></div>
       <div class="help-tile"><span class="big">🎓</span> <strong>+{XP_CERT_COMPLETION} XP</strong> — Completion certificate<div class="thr">≥90% PLAN + CAPSTONE 100%</div></div>
       <div class="help-tile"><span class="big">🥈</span> <strong>+{XP_CERT_DISTINCTION} XP</strong> — With Distinction<div class="thr">100% + ≥80% REPOS</div></div>
       <div class="help-tile"><span class="big">🏆</span> <strong>+{XP_CERT_HONORS} XP</strong> — With Honors<div class="thr">DISTINCTION + AI EVAL ≥ 8/10</div></div>
