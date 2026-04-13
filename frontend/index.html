@@ -463,10 +463,16 @@
 
 <!-- Global footer lives in /nav.js (.shared-footer) so every page gets it. -->
 <script>
-  // If we arrived via /#about (from a footer on another page), open the modal.
+  // If we arrived via /#about or /#contact (from a footer on another page),
+  // open the matching modal. The Contact modal posts to /api/contact which
+  // ships the message via Resend + Cloudflare — mailto was a regression.
   window.addEventListener('DOMContentLoaded', () => {
-    if (location.hash === '#about' && typeof openAboutModal === 'function') {
-      openAboutModal();
+    const opener = {
+      '#about':   typeof openAboutModal === 'function' ? openAboutModal : null,
+      '#contact': typeof openContactModal === 'function' ? openContactModal : null,
+    }[location.hash];
+    if (opener) {
+      opener();
       history.replaceState({}, '', location.pathname);  // clean URL
     }
   });

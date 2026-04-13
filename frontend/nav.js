@@ -163,7 +163,7 @@
           <a href="/#about" class="ftr-link" data-open-about>About</a>
           <a href="/leaderboard" class="ftr-link">Leaderboard</a>
           <a href="/verify" class="ftr-link">Verify Credential</a>
-          <a href="mailto:contact@automateedge.cloud?subject=AutomateEdge%20Feedback" class="ftr-link">Contact</a>
+          <a href="/#contact" class="ftr-link" data-open-contact>Contact</a>
           <a href="https://github.com/manishjnv/AIExpert" target="_blank" rel="noopener noreferrer" class="ftr-link">Source Code</a>
         </nav>
 
@@ -173,12 +173,23 @@
     `;
     document.body.appendChild(footer);
 
+    // If we're on the home page and the modal fn exists, open it inline.
+    // Otherwise the href takes the user to /#about or /#contact and the
+    // DOMContentLoaded handler in index.html opens the modal on arrival.
+    const isHome = () => location.pathname === '/' || location.pathname === '/index.html';
     footer.querySelectorAll('[data-open-about]').forEach(a => {
       a.addEventListener('click', (e) => {
-        const isHome = location.pathname === '/' || location.pathname === '/index.html';
-        if (isHome && typeof window.openAboutModal === 'function') {
+        if (isHome() && typeof window.openAboutModal === 'function') {
           e.preventDefault();
           window.openAboutModal();
+        }
+      });
+    });
+    footer.querySelectorAll('[data-open-contact]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        if (isHome() && typeof window.openContactModal === 'function') {
+          e.preventDefault();
+          window.openContactModal();
         }
       });
     });
