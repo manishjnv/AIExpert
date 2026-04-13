@@ -69,9 +69,12 @@ SCHEMA (this is the exact shape the platform validates)
           "focus": ["<subtopic 1>", "<subtopic 2>", "<subtopic 3>", "<subtopic 4>"],
           "deliv": ["<concrete artifact 1>", "<concrete artifact 2>"],
           "resources": [
-            { "name": "<course/tutorial>",       "url": "https://real-url", "hrs": <int> },
-            { "name": "<docs/paper>",            "url": "https://real-url", "hrs": <int> },
-            { "name": "<hands-on practice>",     "url": "https://real-url", "hrs": <int> }
+            { "name": "<video course 1 — e.g. YouTube/Coursera/fast.ai lecture>",  "url": "https://real-url", "hrs": <int> },
+            { "name": "<video course 2>",                                           "url": "https://real-url", "hrs": <int> },
+            { "name": "<video course 3>",                                           "url": "https://real-url", "hrs": <int> },
+            { "name": "<docs/paper 1 — official documentation or arxiv>",           "url": "https://real-url", "hrs": <int> },
+            { "name": "<docs/paper 2 or hands-on — kaggle/github/colab>",           "url": "https://real-url", "hrs": <int> },
+            { "name": "<hands-on 3 — real-world practice>",                         "url": "https://real-url", "hrs": <int> }
           ],
           "checks": ["<action-verb verifiable check>", "..."]
         }
@@ -108,9 +111,11 @@ Calibrate the weekly hour budget and item counts to the chosen level. DO NOT mak
 
 | Level        | Hours/week | focus items/week | deliverables/week | resources/week | checklist items/week |
 |--------------|-----------:|-----------------:|------------------:|---------------:|---------------------:|
-| beginner     | 10–12      | 3                | 2                 | 3              | 3–4                  |
-| intermediate | 14–16      | 4                | 2–3               | 3              | 5                    |
-| advanced     | 18–22      | 5                | 3                 | 4              | 6                    |
+| beginner     | 10–12      | 3                | 2                 | 6              | 3–4                  |
+| intermediate | 14–16      | 4                | 2–3               | 6              | 5                    |
+| advanced     | 18–22      | 5                | 3                 | 6              | 6                    |
+
+Every week MUST ship exactly 6 resources split as 3 video + 3 non-video — see RESOURCE MIX below. The UI renders them in two columns; missing one side leaves the page looking empty.
 
 TOTAL COURSE TIME
 =================
@@ -141,17 +146,39 @@ Every checklist item (`checks[]`) MUST:
 5. The final month MUST have at least 30% of its checks starting with Create-level verbs (Build, Design, Deploy, Train, Fine-tune, Develop, Architect, Ship).
 6. No vague artifacts ("a model", "an app") — name concrete things ("a ResNet-50 classifier on CIFAR-10", "a Streamlit dashboard on HuggingFace Spaces").
 
-RESOURCE QUALITY (every url MUST be real, free-accessible, and current)
-=======================================================================
-Per-week resources: 1 course/tutorial, 1 docs/paper, 1 hands-on. Pull from (not exhaustive):
-- Courses: coursera.org, fast.ai, deeplearning.ai, d2l.ai, cs231n.stanford.edu, cs224n.stanford.edu, karpathy.ai, 3blue1brown.com
-- Docs/papers: pytorch.org, tensorflow.org, huggingface.co/docs, scikit-learn.org, arxiv.org, paperswithcode.com, nvidia.com/deep-learning-institute
-- Hands-on: kaggle.com, github.com (real repos), colab.research.google.com, huggingface.co/spaces
+RESOURCE MIX — EXACTLY 6 PER WEEK, 3 VIDEO + 3 NON-VIDEO
+=========================================================
+The platform renders weekly resources in two side-by-side columns:
+  "▶ Video Courses"       (left)
+  "📄 Docs & Practice"    (right)
+
+Each week MUST ship 3 resources on each side. A week with only 2 videos or
+only 1 doc will render an unbalanced page.
+
+VIDEO (exactly 3) — pull from (not exhaustive):
+- youtube.com official channels: 3Blue1Brown, StatQuest, Karpathy, fast.ai,
+  MIT OCW, Stanford Online, DeepLearning.AI, Two Minute Papers
+- coursera.org/learn or /specializations (audit-free)
+- fast.ai, deeplearning.ai/courses, deeplearning.ai/short-courses
+- udacity.com/course, khanacademy.org, vimeo.com
+Name the specific lecture, playlist, or course — not just "YouTube".
+
+NON-VIDEO (exactly 3) — docs, papers, hands-on:
+- Docs: pytorch.org, tensorflow.org, huggingface.co/docs, scikit-learn.org,
+  pandas.pydata.org, jax.readthedocs.io
+- Papers: arxiv.org, paperswithcode.com, distill.pub
+- Hands-on: kaggle.com, kaggle.com/learn, github.com (real repos),
+  colab.research.google.com, huggingface.co/spaces, sqlbolt.com
+
+Detection rule the UI uses: a resource counts as "video" iff its URL matches
+/youtube\\.com|youtu\\.be|vimeo\\.com|coursera\\.org\\/(learn|specializations)|
+fast\\.ai|deeplearning\\.ai\\/(courses|short-courses|programs)|udacity\\.com|
+khanacademy\\.org/. Pick URLs that fall on the correct side of that split.
 
 URL requirements:
 - Full `https://` prefix.
 - Specific page, not homepage (e.g. `https://pytorch.org/tutorials/intermediate/ddp_tutorial.html`, not `https://pytorch.org`).
-- Must resolve as of 2026.
+- Must resolve as of 2026. Every URL must be real and free-accessible.
 - No placeholder `example.com`.
 
 DELIVERABLE QUALITY
@@ -176,6 +203,7 @@ PROHIBITED PATTERNS (auto-reject triggers)
 - Duplicate resources across weeks (each URL should appear at most twice in the whole course).
 - More than one "theory-only" week in a row without hands-on practice.
 - Empty `focus`, `deliv`, `resources`, or `checks` arrays.
+- Any week with `resources.length !== 6`, or with < 3 videos, or with < 3 non-videos.
 - Hours outside LEVEL LOAD range (e.g. beginner week with 20 hours).
 
 SELF-CHECK BEFORE RETURNING (run mentally, then return)
@@ -192,6 +220,8 @@ SELF-CHECK BEFORE RETURNING (run mentally, then return)
 10. ☐ Final month has ≥ 30% Create-level verbs in checks.
 11. ☐ No duplicate URLs.
 12. ☐ Final month is capstone + job-prep.
+13. ☐ `summary` field is present with a 40–80 word plain-English course description.
+14. ☐ Every week has exactly 6 resources, split 3 video + 3 non-video (check each URL against the video-host regex in RESOURCE MIX).
 
 =========================================================================
 FINAL REMINDER — OUTPUT IS RAW JSON ONLY

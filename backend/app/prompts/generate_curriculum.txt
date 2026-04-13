@@ -49,10 +49,10 @@ STRUCTURE RULES:
 4. Weekly load MUST be calibrated to the "{level}" level (see LEVEL LOAD below)
 
 LEVEL LOAD — do not deviate from these ranges for the "{level}" level:
-- beginner:     10–12 hours/week, 3 focus items, 2 deliverables, 3 resources, 3–4 checklist items
-- intermediate: 14–16 hours/week, 4 focus items, 2–3 deliverables, 3 resources, 5 checklist items
-- advanced:     18–22 hours/week, 5 focus items, 3 deliverables, 4 resources, 6 checklist items
-Rationale: beginners need breathing room to absorb fundamentals; advanced learners can sustain denser, research-heavy weeks. A 3-month beginner plan MUST NOT have the same weekly load as a 3-month advanced plan.
+- beginner:     10–12 hours/week, 3 focus items, 2 deliverables, 6 resources, 3–4 checklist items
+- intermediate: 14–16 hours/week, 4 focus items, 2–3 deliverables, 6 resources, 5 checklist items
+- advanced:     18–22 hours/week, 5 focus items, 3 deliverables, 6 resources, 6 checklist items
+Every week MUST have exactly 6 resources (see RESOURCE MIX below — 3 video + 3 non-video). Rationale: beginners need breathing room to absorb fundamentals; advanced learners can sustain denser, research-heavy weeks. A 3-month beginner plan MUST NOT have the same weekly load as a 3-month advanced plan.
 
 BLOOM'S TAXONOMY — progressive cognitive levels by month position:
 - First 25% of months: Remember/Understand (define, explain, identify core concepts)
@@ -66,13 +66,32 @@ CHECKLIST QUALITY — every item MUST:
 - At least 2 of 5 items per week MUST include measurable criteria with numbers (e.g. "Train a CNN achieving >90% accuracy on CIFAR-10", "Build an API handling 100 req/s", "Write tests with >80% coverage")
 - The other items should reference concrete artifacts: "Build a notebook", "Deploy to HuggingFace Spaces", "Submit PR with pipeline code"
 
-RESOURCE QUALITY:
-- Resources must be REAL, FREE, and currently accessible
-- Each week should have a MIX of resource types:
-  * 1 structured learning (course/tutorial from: coursera.org, fast.ai, deeplearning.ai, d2l.ai, cs231n.stanford.edu, youtube.com)
-  * 1 official documentation or paper (pytorch.org, tensorflow.org, huggingface.co/docs, arxiv.org, scikit-learn.org)
-  * 1 hands-on practice (kaggle.com, github.com repos, colab notebooks, paperswithcode.com)
-- URLs must be full https:// links you are confident exist as of 2026
+RESOURCE MIX — EXACTLY 6 RESOURCES PER WEEK, 3 VIDEO + 3 NON-VIDEO:
+
+The frontend renders two side-by-side columns labelled "▶ Video Courses" and
+"📄 Docs & Practice". To fill both cleanly every week needs:
+
+  VIDEO (exactly 3)      — choose the best-quality video lectures/courses
+                            available for this week's topic. Prefer hosts:
+                            youtube.com (official channels — 3Blue1Brown,
+                            StatQuest, Karpathy, fast.ai, DeepLearning.AI,
+                            MIT OCW, Stanford Online), coursera.org/learn
+                            or /specializations (audit-free), fast.ai,
+                            deeplearning.ai/courses, udacity.com/course,
+                            khanacademy.org, vimeo.com
+  NON-VIDEO (exactly 3)  — docs, papers, and hands-on practice:
+                            pytorch.org, tensorflow.org, huggingface.co/docs,
+                            arxiv.org, scikit-learn.org, kaggle.com/learn,
+                            paperswithcode.com, github.com repos, colab
+                            notebooks, pandas.pydata.org, sqlbolt.com, etc.
+
+Detection rule the UI uses: a resource counts as "video" if its URL matches
+/youtube\\.com|youtu\\.be|vimeo\\.com|coursera\\.org\\/(learn|specializations)|
+fast\\.ai|deeplearning\\.ai\\/(courses|short-courses|programs)|udacity\\.com|
+khanacademy\\.org/. Pick URLs that fall on the correct side of that split.
+
+Resources must be REAL, FREE (or audit-free), and currently accessible.
+URLs must be full https:// links you are confident exist as of 2026.
 
 THEORY-PRACTICE BALANCE:
 - Weeks 1-2 of each month: 60% theory (concepts, lectures, papers), 40% practice
