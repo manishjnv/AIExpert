@@ -1532,7 +1532,13 @@ async function uploadTemplate() {{
       status.innerHTML = '<span style="color:#6db585">' + msg + '. Reloading…</span>';
       setTimeout(() => window.location.reload(), 2500);
     }} else {{
-      status.innerHTML = '<span style="color:#d97757">✗ ' + (data.detail || resp.statusText) + '</span>';
+      const detail = (typeof data.detail === 'string' ? data.detail : (data.detail ? JSON.stringify(data.detail) : '')) || resp.statusText || ('HTTP ' + resp.status);
+      // 409 = key collision — add a specific hint so admin knows to tick overwrite
+      let hint = '';
+      if (resp.status === 409) {{
+        hint = '<div style="color:#e8a849;font-size:12px;margin-top:6px">&rarr; Tick <strong>Overwrite existing</strong> above and click Upload again.</div>';
+      }}
+      status.innerHTML = '<div style="color:#d97757;background:#2a1a1a;padding:8px 10px;border-radius:4px;border-left:3px solid #d97757;word-break:break-word">✗ <strong>HTTP ' + resp.status + '</strong> — ' + detail + '</div>' + hint;
     }}
   }} catch(e) {{
     status.innerHTML = '<span style="color:#d97757">Network error: ' + e.message + '</span>';
