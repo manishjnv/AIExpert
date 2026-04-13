@@ -358,6 +358,63 @@ async def approve_topic(
     return {"ok": True, "status": "approved"}
 
 
+@router.post("/api/claude-prompt")
+async def claude_prompt(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+):
+    """Render a ready-to-paste prompt for Claude Max chat.
+
+    Embeds the full generation schema + structure rules + level calibration
+    + action-verb / measurability thresholds (the same rules the heuristic
+    scorer enforces, so Claude's output should hit 95+ first-shot).
+    """
+    _check_origin(request)
+    from pathlib import Path as _Path
+    import re as _re
+
+    body = await request.json()
+    topic = (body.get("topic") or "").strip()
+    duration = int(body.get("duration_months") or 6)
+    level = (body.get("level") or "intermediate").strip().lower()
+
+    if not topic:
+        raise HTTPException(status_code=400, detail="topic required")
+    if duration not in (3, 6, 9, 12):
+        raise HTTPException(status_code=400, detail="duration_months must be 3, 6, 9, or 12")
+    if level not in ("beginner", "intermediate", "advanced"):
+        raise HTTPException(status_code=400, detail="level must be beginner, intermediate, or advanced")
+
+    duration_map = {3: "3mo", 6: "6mo", 9: "9mo", 12: "12mo"}
+    duration_str = duration_map[duration]
+    total_weeks = duration * 4
+    key = _re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_") + f"_{duration_str}_{level}"
+
+    prompt_path = _Path(__file__).parent.parent / "prompts" / "generate_curriculum.txt"
+    template = prompt_path.read_text(encoding="utf-8")
+    rendered = template.format(
+        topic=topic,
+        duration_months=duration,
+        total_weeks=total_weeks,
+        level=level,
+        level_title=level.capitalize(),
+        key=key,
+    )
+
+    # Claude-chat-specific preamble — makes the request unambiguous and
+    # encourages Claude to return raw JSON (not fenced markdown).
+    preamble = (
+        "You are generating a curriculum template for the AI Learning Roadmap platform. "
+        "Return ONLY the JSON object — no code fences, no preamble, no commentary. "
+        "The JSON will be validated against a Pydantic schema; any prose wrapper will break the upload.\n\n"
+    )
+    return {
+        "prompt": preamble + rendered,
+        "key": key,
+        "expected_weeks": total_weeks,
+    }
+
+
 @router.get("/api/sample-template")
 async def sample_template(_user: User = Depends(get_current_admin)):
     """Download a minimal valid sample template for manual upload reference."""
@@ -1047,8 +1104,35 @@ async def pipeline_topics_page(
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
   <div>{filter_html}</div>
   <div style="display:flex;gap:8px;align-items:center">
-    <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Download sample JSON</a>
+    <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Sample JSON</a>
+    <button class="btn" onclick="document.getElementById('promptModal').style.display='flex'" title="Generate a prompt to paste into Claude.ai chat">Claude prompt</button>
     <button class="btn primary" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload Template JSON</button>
+  </div>
+</div>
+
+<!-- Claude prompt generator modal -->
+<div id="promptModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#1d242e;border-radius:8px;padding:24px;max-width:780px;width:90%;max-height:85vh;overflow-y:auto;color:#d0cbc2">
+    <button onclick="document.getElementById('promptModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
+    <h2 style="margin-top:0;color:#e8a849">Generate Claude prompt</h2>
+    <p style="color:#8a92a0;font-size:13px;line-height:1.6">
+      Paste the generated prompt into <a href="https://claude.ai" target="_blank" style="color:#e8a849">Claude.ai</a> chat. Claude returns a full curriculum JSON. Copy that response, click <em>Upload Template JSON</em>, paste → publish.
+    </p>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">
+      <div><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Topic</label>
+        <input id="ptTopic" placeholder="e.g. Retrieval-Augmented Generation" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"></div>
+      <div><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Duration</label>
+        <select id="ptDuration" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="9">9 months</option><option value="12">12 months</option></select></div>
+      <div><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#8a92a0;display:block;margin-bottom:4px">Level</label>
+        <select id="ptLevel" style="width:100%;padding:8px;background:#0f1419;border:1px solid #2a323d;color:#f5f1e8;border-radius:3px"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select></div>
+      <button class="btn primary" onclick="generateClaudePrompt()">Generate</button>
+    </div>
+    <div id="promptMeta" style="font-size:12px;color:#8a92a0;min-height:18px"></div>
+    <textarea id="promptOutput" readonly placeholder="Prompt will appear here. Copy, paste into Claude.ai chat." style="width:100%;min-height:300px;padding:10px;background:#0f1419;border:1px solid #2a323d;color:#e8e2d3;border-radius:3px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;margin-top:8px"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn" onclick="copyPromptToClipboard()">Copy prompt</button>
+      <button class="btn" onclick="document.getElementById('promptModal').style.display='none'">Close</button>
+    </div>
   </div>
 </div>
 
@@ -1097,6 +1181,46 @@ async function deleteTopic(id) {{
   }});
   if (resp.ok) window.location.reload();
   else alert('Failed');
+}}
+
+async function generateClaudePrompt() {{
+  const topic = document.getElementById('ptTopic').value.trim();
+  const duration = parseInt(document.getElementById('ptDuration').value, 10);
+  const level = document.getElementById('ptLevel').value;
+  const meta = document.getElementById('promptMeta');
+  const out = document.getElementById('promptOutput');
+  if (!topic) {{ meta.innerHTML = '<span style="color:#d97757">Enter a topic first</span>'; return; }}
+  meta.textContent = 'Generating…';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/claude-prompt', {{
+      method: 'POST', credentials: 'same-origin',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{topic, duration_months: duration, level}}),
+    }});
+    const d = await resp.json();
+    if (resp.ok) {{
+      out.value = d.prompt;
+      meta.innerHTML = '<span style="color:#6db585">✓ Ready</span> — key: <code>' + d.key + '</code> · expected weeks: ' + d.expected_weeks;
+    }} else {{
+      meta.innerHTML = '<span style="color:#d97757">' + (d.detail || resp.statusText) + '</span>';
+    }}
+  }} catch(e) {{
+    meta.innerHTML = '<span style="color:#d97757">' + e.message + '</span>';
+  }}
+}}
+
+async function copyPromptToClipboard() {{
+  const out = document.getElementById('promptOutput');
+  const meta = document.getElementById('promptMeta');
+  if (!out.value) {{ meta.innerHTML = '<span style="color:#d97757">Nothing to copy</span>'; return; }}
+  try {{
+    await navigator.clipboard.writeText(out.value);
+    meta.innerHTML = '<span style="color:#6db585">✓ Copied to clipboard — paste into Claude.ai chat</span>';
+  }} catch {{
+    out.select();
+    document.execCommand('copy');
+    meta.innerHTML = '<span style="color:#6db585">✓ Copied (fallback)</span>';
+  }}
 }}
 
 async function uploadTemplate() {{
