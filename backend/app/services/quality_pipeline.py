@@ -163,16 +163,48 @@ async def run_quality_pipeline(
         result["skipped"].append("refine: no specific weeks identified")
         return result
 
-    # Pick refinement model based on severity.
-    # Heavy refactors → Gemini Pro (deep reasoning, still ~1.5× cheaper than Claude Sonnet).
-    # Minor patches → Gemini Flash (free-tier, fast).
+    # Pick refinement model based on WHAT is failing, not just HOW MANY.
+    # - Pattern-fixable failures (action verbs, measurability, vague verbs, resource
+    #   counts) are mechanical — Gemini Flash handles them cheaply and reliably.
+    # - Reasoning-heavy failures (Bloom's progression, prerequisites, industry
+    #   alignment, difficulty calibration) need deeper thinking — Gemini Pro.
+    # This routes ~50% of would-be-Pro calls down to Flash (saves ~$0.02/call).
+    REASONING_DIMS = {
+        "blooms_progression",
+        "difficulty_calibration",
+        "prerequisites_clarity",
+        "industry_alignment",
+        "freshness",
+        "real_world_readiness",
+    }
+    PATTERN_DIMS = {
+        "assessment_quality",   # action verbs, measurability
+        "completeness",
+        "project_density",
+        "theory_practice_ratio",
+        "deliverable_quality",
+        "resource_diversity",
+    }
+    reasoning_failing = [d for d in failing_dims if d in REASONING_DIMS]
+    pattern_failing = [d for d in failing_dims if d in PATTERN_DIMS]
+
+    # Pro if: 2+ reasoning-heavy dims fail, OR severity total is very high (4+)
     severity = len(failing_dims) + (1 if heuristic_fixes else 0)
-    if severity >= PRO_THRESHOLD:
+    use_pro = len(reasoning_failing) >= 2 or severity >= 4
+
+    if use_pro:
         refine_model = "gemini-pro"
-        logger.info("Quality pipeline: using Gemini Pro for %d failing dimensions", severity)
+        logger.info(
+            "Quality pipeline: Gemini Pro — reasoning=%s pattern=%s heuristic=%s",
+            reasoning_failing, pattern_failing, bool(heuristic_fixes),
+        )
     else:
         refine_model = "gemini"
-        logger.info("Quality pipeline: using Gemini Flash for %d failing dimensions (minor)", severity)
+        logger.info(
+            "Quality pipeline: Gemini Flash — %d dim(s) failing, all pattern-fixable "
+            "(reasoning=%s pattern=%s heuristic=%s)",
+            severity, reasoning_failing, pattern_failing, bool(heuristic_fixes),
+        )
 
     refined_plan = await _run_refinement(plan, critical_fixes, fix_week_nums, refine_model, db)
 
