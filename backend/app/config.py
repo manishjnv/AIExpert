@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "noreply@example.com"
-    smtp_from_name: str = "AI Roadmap"
+    smtp_from_name: str = "AutomateEdge"
     smtp_use_tls: bool = False  # True for port 465 (SSL), False for port 587 (STARTTLS)
 
     # ----- AI Providers -----

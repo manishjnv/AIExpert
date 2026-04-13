@@ -44,7 +44,7 @@ async def contact(body: ContactBody, request: Request):
         msg = EmailMessage()
         msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_from}>"
         msg["To"] = settings.maintainer_email
-        msg["Subject"] = f"[AI Roadmap] Contact from {body.name}"
+        msg["Subject"] = f"[AutomateEdge] Contact from {body.name}"
         msg["Reply-To"] = body.email
         msg.set_content(
             f"Name: {body.name}\n"
