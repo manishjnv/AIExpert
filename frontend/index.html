@@ -1713,11 +1713,120 @@ function syncTick(weekN, idx, done) {
       });
       if (resp.ok || resp.status === 204) {
         setSyncBadge("synced", "Synced");
+        // Newly-completed check may have crossed a certificate threshold.
+        if (done) maybeShowCertificateModal();
       } else {
         setSyncBadge("error", "Sync failed");
       }
     } catch { setSyncBadge("error", "Sync failed"); }
   }, 800);
+}
+
+// ---- Certificate completion modal ----
+// Gated to one-shot per (user, credential_id) via localStorage so the modal
+// doesn't re-fire on every subsequent check after a cert is issued.
+
+async function maybeShowCertificateModal() {
+  try {
+    const resp = await fetch('/api/certificates', { credentials: 'same-origin' });
+    if (!resp.ok) return;
+    const certs = await resp.json();
+    if (!certs.length) return;
+    // Newest = first (server orders DESC by issued_at)
+    const cert = certs[0];
+    const seenKey = 'cert_modal_seen_' + cert.credential_id + '_' + cert.tier;
+    if (localStorage.getItem(seenKey)) return;
+    localStorage.setItem(seenKey, '1');
+    showCertificateModal(cert);
+  } catch {}
+}
+
+function showCertificateModal(cert) {
+  const tierCopy = cert.tier === 'honors'
+    ? { headline: 'With Honors!', blurb: 'You hit 100% completion, ≥80% repos shipped, and an AI eval ≥ 8/10 on a capstone project.' }
+    : cert.tier === 'distinction'
+    ? { headline: 'With Distinction!', blurb: 'You finished every milestone and shipped the repos to back it up.' }
+    : { headline: 'Course Complete!', blurb: 'You finished your plan, capstone and all. Time to make it visible.' };
+
+  const verifyUrl = location.origin + '/verify/' + encodeURIComponent(cert.credential_id);
+  const shareUrl = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(verifyUrl);
+
+  // Overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'certModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,20,25,0.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:certFade 0.3s ease';
+
+  overlay.innerHTML = '' +
+    '<style>' +
+      '@keyframes certFade{from{opacity:0}to{opacity:1}}' +
+      '@keyframes certPop{0%{transform:scale(0.8);opacity:0}100%{transform:scale(1);opacity:1}}' +
+      '@keyframes confettiFall{0%{transform:translateY(-40px) rotate(0);opacity:1}100%{transform:translateY(480px) rotate(540deg);opacity:0}}' +
+      '.cert-modal{background:#fffaf1;color:#1f1610;max-width:540px;width:100%;border-radius:10px;padding:32px 36px 30px;font-family:Georgia,serif;position:relative;animation:certPop 0.35s ease;box-shadow:0 30px 80px rgba(0,0,0,0.4)}' +
+      '.cert-modal h2{font-size:30px;margin:0 0 6px;color:#78350f;font-weight:400;text-align:center}' +
+      '.cert-modal .eyebrow{font-family:system-ui,sans-serif;font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#b45309;text-align:center;margin-bottom:14px}' +
+      '.cert-modal p{font-size:14px;line-height:1.55;color:#44403c;text-align:center;margin:6px 0 20px;font-family:system-ui,sans-serif}' +
+      '.cert-modal .credbox{background:white;border:1px solid #e7e5e4;border-radius:6px;padding:14px 16px;margin-bottom:20px;font-family:system-ui,sans-serif}' +
+      '.cert-modal .credbox .label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b45309;margin-bottom:4px}' +
+      '.cert-modal .credbox .cid{font-family:ui-monospace,monospace;font-size:14px;color:#1f1610}' +
+      '.cert-modal .btns{display:flex;flex-direction:column;gap:8px;font-family:system-ui,sans-serif}' +
+      '.cert-modal .btn-primary,.cert-modal .btn-secondary{padding:12px 18px;border-radius:5px;text-decoration:none;text-align:center;font-weight:600;font-size:13px;cursor:pointer;border:none}' +
+      '.cert-modal .btn-primary{background:#b45309;color:white}' +
+      '.cert-modal .btn-primary:hover{background:#92400e}' +
+      '.cert-modal .btn-secondary{background:transparent;color:#78350f;border:1px solid #d6d3d1}' +
+      '.cert-modal .btn-secondary:hover{background:#f5f5f4}' +
+      '.cert-modal .close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:22px;color:#78716c;cursor:pointer;line-height:1}' +
+      '.confetti{position:absolute;width:8px;height:14px;top:-20px;pointer-events:none;animation:confettiFall 2.4s ease-out forwards}' +
+    '</style>' +
+    '<div class="cert-modal" role="dialog" aria-modal="true" aria-labelledby="certModalHeadline">' +
+      '<button class="close" onclick="closeCertModal()" aria-label="Close">×</button>' +
+      '<div id="confettiWrap" aria-hidden="true"></div>' +
+      '<div class="eyebrow">Certificate Issued</div>' +
+      '<h2 id="certModalHeadline">' + escapeCert(tierCopy.headline) + '</h2>' +
+      '<p>' + escapeCert(tierCopy.blurb) + ' Your certificate is live and verifiable.</p>' +
+      '<div class="credbox">' +
+        '<div class="label">Credential ID</div>' +
+        '<div class="cid">' + escapeCert(cert.credential_id) + '</div>' +
+      '</div>' +
+      '<div class="btns">' +
+        '<a class="btn-primary" href="/api/certificates/' + encodeURIComponent(cert.credential_id) + '/pdf" target="_blank">Download Certificate (PDF)</a>' +
+        '<button class="btn-primary" onclick="shareCertLinkedIn(\'' + cert.credential_id + '\')" style="background:#0a66c2">Share on LinkedIn</button>' +
+        '<a class="btn-secondary" href="/account">View in My Certificates</a>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  // Confetti
+  const confettiWrap = overlay.querySelector('#confettiWrap');
+  const colors = ['#e8a849','#b45309','#10b981','#0a66c2','#fbbf24'];
+  for (let i = 0; i < 40; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = (5 + Math.random() * 90) + '%';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDelay = (Math.random() * 0.6) + 's';
+    c.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+    confettiWrap.appendChild(c);
+  }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCertModal(); });
+}
+
+function closeCertModal() {
+  const el = document.getElementById('certModalOverlay');
+  if (el) el.remove();
+}
+
+function shareCertLinkedIn(credentialId) {
+  const verifyUrl = location.origin + '/verify/' + encodeURIComponent(credentialId);
+  fetch('/api/certificates/' + encodeURIComponent(credentialId) + '/share-linkedin', {
+    method: 'POST', credentials: 'same-origin',
+  }).catch(() => {});
+  const url = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(verifyUrl);
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function escapeCert(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
 window.addEventListener("scroll", () => {
