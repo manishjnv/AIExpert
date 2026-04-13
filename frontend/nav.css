@@ -48,8 +48,8 @@
 }
 .topnav-links {
   display: flex;
-  gap: 2px;
-  align-items: center;
+  gap: 4px;              /* was 2px — too cramped */
+  align-items: stretch;  /* make every link the same height so the active underline aligns */
   flex-wrap: nowrap;
   flex-shrink: 0;
 }
@@ -63,10 +63,15 @@
   text-transform: uppercase;
   color: #e8e2d3;
   text-decoration: none;
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-radius: 2px;
   transition: all 0.2s;
+  /* Transparent 2px border on every link so the active variant doesn't
+     shift a pixel down when its amber underline appears. */
   border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 .topnav-links a:hover {
   color: #e8a849;
@@ -82,7 +87,7 @@
   border-radius: 3px;
   font-weight: 600;
   border-bottom: none;
-  padding: 8px 18px;
+  padding: 10px 20px;
 }
 .topnav-links a.signin-link:hover {
   background: #c98e2f;
