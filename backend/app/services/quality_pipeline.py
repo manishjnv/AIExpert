@@ -230,16 +230,86 @@ async def run_quality_pipeline(
     result["final_score"] = final_score
     result["stages_run"].append("validate")
 
-    if final_score < heuristic_score:
+    # Semantic guardrail — reject refines that either did nothing or hallucinated.
+    # Only runs if the plan actually changed (avoids a wasted embedding call).
+    if "refine" in result["stages_run"] and result["plan"] is not plan:
+        try:
+            sim = await _semantic_similarity(plan, result["plan"], db)
+            if sim is not None:
+                result["similarity"] = round(sim, 4)
+                if sim > 0.98:
+                    result["plan"] = plan
+                    result["final_score"] = heuristic_score
+                    result["skipped"].append(
+                        f"validate: refinement ~identical (sim={sim:.3f}), reverted"
+                    )
+                    logger.warning(
+                        "Quality pipeline: refine produced near-identical plan (sim=%.3f), reverting",
+                        sim,
+                    )
+                elif sim < 0.50:
+                    result["plan"] = plan
+                    result["final_score"] = heuristic_score
+                    result["skipped"].append(
+                        f"validate: refinement too divergent (sim={sim:.3f}), possible hallucination, reverted"
+                    )
+                    logger.warning(
+                        "Quality pipeline: refine diverged too much (sim=%.3f), possible hallucination, reverting",
+                        sim,
+                    )
+        except Exception as e:
+            # Embedding guardrail is best-effort; never block the pipeline on it.
+            logger.warning("Quality pipeline: semantic guardrail failed: %s", e)
+
+    if result["final_score"] < heuristic_score:
         # Refinement made it worse — revert
         result["plan"] = plan
         result["final_score"] = heuristic_score
         result["skipped"].append(f"validate: refinement regressed ({final_score} < {heuristic_score}), reverted")
         logger.warning("Quality pipeline: refinement regressed (%d < %d), reverting", final_score, heuristic_score)
     else:
-        logger.info("Quality pipeline: improved %d → %d (+%d)", heuristic_score, final_score, final_score - heuristic_score)
+        logger.info("Quality pipeline: improved %d → %d (+%d)", heuristic_score, result["final_score"], result["final_score"] - heuristic_score)
 
     return result
+
+
+def _plan_fingerprint_text(plan: dict) -> str:
+    """Flatten a plan into a short semantic fingerprint for embedding.
+
+    Concat of all focus areas + checklist items, separated. Stable ordering.
+    Truncated to the OpenAI embedding token-ish limit.
+    """
+    parts: list[str] = []
+    for m in plan.get("months", []) or []:
+        for w in m.get("weeks", []) or []:
+            parts.extend([s for s in (w.get("focus") or []) if isinstance(s, str)])
+            parts.extend([s for s in (w.get("checks") or []) if isinstance(s, str)])
+    text = " | ".join(parts)
+    # text-embedding-3-small allows 8191 tokens; ~4 chars per token means
+    # ~32k chars is safe. Our fingerprint is usually well under that.
+    return text[:28000]
+
+
+async def _semantic_similarity(plan_a: dict, plan_b: dict, db) -> float | None:
+    """Cosine similarity between two plans' focus+checks fingerprints.
+
+    Returns None if OpenAI embeddings are unavailable.
+    """
+    try:
+        from app.ai.openai_embeddings import embed, cosine_similarity
+    except Exception:
+        return None
+
+    text_a = _plan_fingerprint_text(plan_a)
+    text_b = _plan_fingerprint_text(plan_b)
+    if not text_a or not text_b:
+        return None
+
+    vecs = await embed([text_a, text_b], db=db, task="embedding",
+                       subtask="quality_guardrail")
+    if len(vecs) != 2:
+        return None
+    return cosine_similarity(vecs[0], vecs[1])
 
 
 def _quick_heuristic_score(plan: dict) -> int:
