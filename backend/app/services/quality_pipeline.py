@@ -37,7 +37,7 @@ REFINE_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "refine_curricul
 # Thresholds
 SKIP_REVIEW_THRESHOLD = 92      # Heuristic score above which we skip AI review
 SKIP_REFINE_THRESHOLD = 8       # All dimensions >= this → skip refinement
-CLAUDE_THRESHOLD = 3            # Use Claude only if >= this many dimensions fail
+PRO_THRESHOLD = 3               # Use Gemini Pro only if >= this many dimensions fail (else Flash)
 REVIEW_CACHE_TTL = 86400 * 30   # 30 days
 
 
@@ -163,13 +163,16 @@ async def run_quality_pipeline(
         result["skipped"].append("refine: no specific weeks identified")
         return result
 
-    # Pick refinement model based on severity
-    if len(failing_dims) >= CLAUDE_THRESHOLD:
-        refine_model = "claude"
-        logger.info("Quality pipeline: using Claude for %d failing dimensions", len(failing_dims))
+    # Pick refinement model based on severity.
+    # Heavy refactors → Gemini Pro (deep reasoning, still ~1.5× cheaper than Claude Sonnet).
+    # Minor patches → Gemini Flash (free-tier, fast).
+    severity = len(failing_dims) + (1 if heuristic_fixes else 0)
+    if severity >= PRO_THRESHOLD:
+        refine_model = "gemini-pro"
+        logger.info("Quality pipeline: using Gemini Pro for %d failing dimensions", severity)
     else:
         refine_model = "gemini"
-        logger.info("Quality pipeline: using Gemini for %d failing dimensions (minor)", len(failing_dims))
+        logger.info("Quality pipeline: using Gemini Flash for %d failing dimensions (minor)", severity)
 
     refined_plan = await _run_refinement(plan, critical_fixes, fix_week_nums, refine_model, db)
 
@@ -490,12 +493,22 @@ async def _run_refinement(
 
     try:
         if model_name == "claude":
+            # Retained for when Anthropic credits are available; no longer default.
             from app.ai.anthropic import complete
             fixed_weeks = await complete(
                 user_content, json_response=True,
                 system_prompt=system_rules,
                 db=db, task="quality_refine",
                 subtask=plan.get("title", "")[:50] or None,
+            )
+        elif model_name == "gemini-pro":
+            from app.ai.gemini import complete
+            from app.config import get_settings as _get_settings
+            fixed_weeks = await complete(
+                user_content, json_response=True,
+                task="quality_refine",
+                system_instruction=system_rules,
+                model=_get_settings().gemini_pro_model,
             )
         elif model_name == "gemini":
             from app.ai.gemini import complete
@@ -512,11 +525,20 @@ async def _run_refinement(
         if isinstance(fixed_weeks, str):
             fixed_weeks = json.loads(fixed_weeks)
 
-        # Log usage
+        # Log usage — map logical model_name to (provider, model_id) correctly.
         if db is not None:
             from app.ai.health import log_usage
+            from app.config import get_settings as _s
+            if model_name == "gemini-pro":
+                prov, mdl = "gemini", _s().gemini_pro_model
+            elif model_name == "gemini":
+                prov, mdl = "gemini", _s().gemini_model
+            elif model_name == "claude":
+                prov, mdl = "anthropic", _s().anthropic_model
+            else:
+                prov, mdl = model_name, model_name
             weeks_str = ",".join(str(n) for n in fix_week_nums)
-            await log_usage(db, model_name, model_name, "quality_refine", "ok",
+            await log_usage(db, prov, mdl, "quality_refine", "ok",
                            subtask=f"weeks:{weeks_str}")
 
         # Merge fixed weeks back into the plan
@@ -539,7 +561,16 @@ async def _run_refinement(
         logger.error("Refinement failed (%s): %s", model_name, e)
         if db is not None:
             from app.ai.health import log_usage
-            await log_usage(db, model_name, model_name, "quality_refine", "error",
+            from app.config import get_settings as _s
+            if model_name == "gemini-pro":
+                prov, mdl = "gemini", _s().gemini_pro_model
+            elif model_name == "gemini":
+                prov, mdl = "gemini", _s().gemini_model
+            elif model_name == "claude":
+                prov, mdl = "anthropic", _s().anthropic_model
+            else:
+                prov, mdl = model_name, model_name
+            await log_usage(db, prov, mdl, "quality_refine", "error",
                            error_message=str(e))
         return None
 

@@ -65,6 +65,7 @@ async def complete(
     task: str = "default",
     system_instruction: str | None = None,
     json_schema: dict | None = None,
+    model: str | None = None,
 ) -> dict | str:
     """Call Gemini with cost optimizations.
 
@@ -74,6 +75,8 @@ async def complete(
         task: Task name for right-sizing tokens/timeout (chat, generation, discovery, etc.)
         system_instruction: Reusable system prompt (cached by Gemini for cost savings).
         json_schema: If provided, use structured output mode (guarantees valid JSON schema).
+        model: Override the default model (e.g. pass settings.gemini_pro_model for
+            deeper reasoning on hard tasks). Defaults to settings.gemini_model.
 
     Returns:
         Parsed JSON dict or raw text string.
@@ -82,7 +85,8 @@ async def complete(
     if not settings.gemini_api_key:
         raise GeminiError("GEMINI_API_KEY not configured")
 
-    url = GEMINI_URL.format(model=settings.gemini_model)
+    model_id = model or settings.gemini_model
+    url = GEMINI_URL.format(model=model_id)
     max_tokens = TOKEN_LIMITS.get(task, TOKEN_LIMITS["default"])
     timeout = TIMEOUTS.get(task, TIMEOUTS["default"])
 

@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # ----- AI Providers -----
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
+    # Pro model reserved for deep refinement and hard reasoning tasks. ~15× more
+    # expensive than flash per output token, but still ~1.5× cheaper than Claude
+    # Sonnet and much smarter than flash on multi-constraint rewrites.
+    gemini_pro_model: str = "gemini-2.5-pro"
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
     cerebras_api_key: str = ""
