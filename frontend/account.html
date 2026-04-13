@@ -9,7 +9,10 @@
 :root {
   --bg: #0f1419; --bg-2: #161c24; --bg-3: #1d242e;
   --paper: #f5f1e8; --paper-dim: #e8e2d3;
-  --ink-soft: #4a5260; --line: #2a323d; --line-soft: #3a4452;
+  /* --ink-soft is used for all secondary text (emails, timestamps, meta lines,
+     section labels). Bumped from #4a5260 (≈2.4:1 on --bg, fails WCAG AA) to
+     #94a3b8 (≈7:1, AA-large-text comfortable for the small caps/mono labels). */
+  --ink-soft: #94a3b8; --ink-mute: #5a6473; --line: #2a323d; --line-soft: #3a4452;
   --accent: #e8a849; --accent-soft: #c98e2f;
   --success: #6db585; --danger: #d97757; --info: #6fa8d6;
   --serif: 'Fraunces', Georgia, serif;

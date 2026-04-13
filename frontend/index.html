@@ -21,7 +21,11 @@
     --paper: #f5f1e8;
     --paper-dim: #e8e2d3;
     --ink: #0a0e13;
-    --ink-soft: #4a5260;
+    /* --ink-soft drives every secondary label, meta line, and small-caps
+       UI element across the page. Bumped from #4a5260 (≈2.4:1 contrast on
+       --bg, fails WCAG AA) to #94a3b8 (≈7:1, comfortably readable). */
+    --ink-soft: #94a3b8;
+    --ink-mute: #5a6473;
     --line: #2a323d;
     --line-soft: #3a4452;
     --accent: #e8a849;
