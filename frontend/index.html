@@ -1926,17 +1926,22 @@ async function loadActivePlan() {
     const doneChecksLoaded = Object.values(state).filter(Boolean).length;
     const pctLoaded = totalChecksLoaded ? Math.round((doneChecksLoaded / totalChecksLoaded) * 100) : 0;
 
-    // Show plan badge
+    // Nav plan badge shows only the course topic (text before ' — '), not
+    // the full 'Topic — Level N-Month Roadmap' label, so it doesn't collide
+    // visually with the hero h1 which uses the same topic.
     const badge = document.getElementById("planBadge");
-    const label = plan.title || PLAN_LABELS[plan.template_key] || plan.template_key;
+    const fullLabel = plan.title || PLAN_LABELS[plan.template_key] || plan.template_key;
+    const shortLabel = fullLabel.split(/\s+[—\-–]\s+/)[0].trim();
     if (badge) {
-      badge.textContent = label;
-      badge.title = label;
+      badge.textContent = shortLabel;
+      badge.title = fullLabel;   // full label on hover for disambiguation
     }
 
-    // Update eyebrow with personalized text and real progress
+    // Eyebrow: welcome + progress. Plan title is already in the hero h1 and
+    // the nav badge — repeating it here made the page say the same thing
+    // three times.
     const firstName = (currentUser?.name || "").split(" ")[0] || "there";
-    document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · ${label} · ${pctLoaded}% complete`;
+    document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · ${pctLoaded}% complete`;
 
     // Header stats (compute first so hero subtitle can use them)
     const totalWeeks = plan.total_weeks || DATA.reduce((s, m) => s + m.weeks.length, 0);
