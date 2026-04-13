@@ -24,12 +24,37 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
+}
+.topnav-brand-stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.2;
+  overflow: hidden;
+}
+.topnav-brand-stack #planBadge {
+  display: block;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a92a0;
+  margin-top: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .topnav-links {
   display: flex;
   gap: 2px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.topnav-links > * {
+  flex-shrink: 0;
 }
 .topnav-links a {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -104,6 +129,7 @@
 @media (max-width: 768px) {
   .topnav { padding: 10px 16px; flex-wrap: wrap; }
   .topnav-brand { font-size: 14px; }
+  .topnav-links { flex-wrap: wrap; }
   .topnav-links a { font-size: 10px; padding: 6px 10px; }
   .subnav { padding: 6px 16px; }
   .subnav a { font-size: 10px; padding: 5px 10px; }
