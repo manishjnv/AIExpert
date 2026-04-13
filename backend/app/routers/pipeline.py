@@ -358,7 +358,7 @@ async def approve_topic(
     return {"ok": True, "status": "approved"}
 
 
-@router.get("/api/topics/sample-template")
+@router.get("/api/sample-template")
 async def sample_template(_user: User = Depends(get_current_admin)):
     """Download a minimal valid sample template for manual upload reference."""
     from fastapi.responses import JSONResponse
@@ -1047,7 +1047,7 @@ async def pipeline_topics_page(
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
   <div>{filter_html}</div>
   <div style="display:flex;gap:8px;align-items:center">
-    <a href="/admin/pipeline/api/topics/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Download sample JSON</a>
+    <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Download sample JSON</a>
     <button class="btn primary" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload Template JSON</button>
   </div>
 </div>
@@ -1060,7 +1060,7 @@ async def pipeline_topics_page(
     <p style="color:#8a92a0;font-size:13px;line-height:1.6">
       Upload a fully-formed curriculum template (same schema as AI-generated templates). The file is validated, saved, and a Topic row is created with status <code>generated</code>. You can publish it immediately from the <a href="/admin/templates" style="color:#e8a849">Templates</a> tab if it scores ≥ 90 on the quality check.
       <br><br>
-      <a href="/admin/pipeline/api/topics/sample-template" download="sample-template.json" style="color:#e8a849">Download sample JSON</a> to see the required shape.
+      <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="color:#e8a849">Download sample JSON</a> to see the required shape.
     </p>
     <input type="file" id="uploadFile" accept="application/json,.json" style="margin:12px 0;color:#d0cbc2">
     <div>
