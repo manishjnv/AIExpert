@@ -18,6 +18,7 @@ from app.curriculum.loader import load_template, list_templates
 from app.db import get_db
 from app.models.plan import Progress, RepoLink, UserPlan
 from app.models.user import User
+from app.services.affiliate import rewrite_plan
 
 router = APIRouter()
 
@@ -97,13 +98,18 @@ def _plan_to_dict(plan: UserPlan, template, progress_rows: list[Progress]) -> di
     }
 
 
+def _learner_response(resp: dict) -> dict:
+    """Finalise a plan response for a learner: apply Coursera affiliate rewrite."""
+    return rewrite_plan(resp)
+
+
 # ---- Endpoints ----
 
 @router.get("/plan/default")
 async def plan_default():
     """Return the default plan template for anonymous browsing."""
     tpl = load_template("generalist_6mo_intermediate")
-    return tpl.model_dump()
+    return _learner_response(tpl.model_dump())
 
 
 @router.post("/plans")
@@ -151,7 +157,7 @@ async def enroll(
                 select(Progress).where(Progress.user_plan_id == active.id)
             )
         ).scalars().all()
-        return _plan_to_dict(active, tpl, list(progress_rows))
+        return _learner_response(_plan_to_dict(active, tpl, list(progress_rows)))
 
     if active:
         active.status = "archived"
@@ -186,7 +192,7 @@ async def enroll(
             )
         ).scalars().all()
         await db.flush()
-        return _plan_to_dict(plan, tpl, list(progress_rows))
+        return _learner_response(_plan_to_dict(plan, tpl, list(progress_rows)))
 
     # First-time enrollment in this template — create fresh.
     plan = UserPlan(
@@ -199,7 +205,7 @@ async def enroll(
     db.add(plan)
     await db.flush()
 
-    return _plan_to_dict(plan, tpl, [])
+    return _learner_response(_plan_to_dict(plan, tpl, []))
 
 
 @router.get("/plans/active")
@@ -238,7 +244,7 @@ async def get_active_plan(
     resp["linked_repos_count"] = int(linked_repos)
     resp["top_resources"] = [r.model_dump() for r in (tpl.top_resources or [])]
     resp["certifications"] = [c.model_dump() for c in (tpl.certifications or [])]
-    return resp
+    return _learner_response(resp)
 
 
 @router.get("/plan-versions")
@@ -406,4 +412,4 @@ async def migrate_progress(
     ).scalars().all()
 
     tpl = load_template(plan.template_key)
-    return _plan_to_dict(plan, tpl, list(all_progress))
+    return _learner_response(_plan_to_dict(plan, tpl, list(all_progress)))

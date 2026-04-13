@@ -104,6 +104,15 @@ class Settings(BaseSettings):
     # this explicitly lets us rotate cert signatures without rotating JWTs.
     cert_hmac_secret: str = ""
 
+    # ----- Affiliate -----
+    # Coursera affiliate program ID (Impact.com partner). Empty = no rewrite.
+    # Sign up at: https://www.coursera.org/about/affiliates
+    # When set, coursera.org/{learn,specializations}/* URLs served to
+    # authenticated learners get an ?irclickid=... tracking param appended.
+    # Never applied on public_profile / share / verify pages (recruiters ≠
+    # affiliate context).
+    coursera_affiliate_id: str = ""
+
     # ----- Maintainer -----
     maintainer_email: str = "you@example.com"
 
