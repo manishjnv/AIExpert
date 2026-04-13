@@ -401,7 +401,6 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         if e["linkedin"]:
             li_href = e["linkedin"] if e["linkedin"].startswith("http") else "https://" + e["linkedin"]
             li_link = f'<a href="{esc(li_href)}" target="_blank" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#0a66c2"><svg width="14" height="14" viewBox="0 0 16 16" fill="#fff"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>'
-        bar_color = "#6db585" if e["pct"] >= 75 else "#e8a849" if e["pct"] >= 25 else "#4a5260"
         streak_display = f'🔥 {e["streak"]}w' if e["streak"] > 0 else "—"
         repos_display = (
             f'<span style="font-weight:600">{e["lifetime_repos"]}</span>'
@@ -451,24 +450,14 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
 
         rows += f"""<tr>
             <td class="rank" style="font-size:22px;text-align:center;vertical-align:top;padding-top:16px">{medal}</td>
-            <td style="min-width:260px">
+            <td style="min-width:280px">
               <a href="/profile/{e['id']}" style="font-weight:600;font-size:15px">{e['name']}</a>
               {pct_badge}
-              <div style="font-size:12px;color:#8a92a0;margin-top:2px">Joined {e['joined']} · {e['lifetime_done']} tasks</div>
+              <div style="font-size:12px;color:#8a92a0;margin-top:2px">Joined {e['joined']} · {e['plan']} · {e['lifetime_done']} tasks</div>
               {badges_html}
             </td>
             <td style="vertical-align:top;padding-top:14px">{tier_chip}</td>
             <td style="vertical-align:top;padding-top:12px">{xp_cell}</td>
-            <td style="vertical-align:top;padding-top:16px"><span style="font-size:12px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
-            <td style="vertical-align:top;padding-top:14px">
-              <div style="display:flex;align-items:center;gap:8px;min-width:160px">
-                <div style="flex:1">
-                  <div class="progress-bar" style="width:100%;height:8px"><div style="width:{e['pct']}%;background:{bar_color}"></div></div>
-                </div>
-                <span style="font-size:12px;color:#8a92a0;min-width:56px">{e['done']}/{e['total']}</span>
-              </div>
-              <div style="font-size:11px;color:#e8a849;font-weight:600;margin-top:4px">{e['pct']}%</div>
-            </td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px">{streak_display}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="GitHub repos linked lifetime">{repos_display}</td>
             <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="Course completion certificates earned">{certs_display}</td>
@@ -476,7 +465,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         </tr>"""
 
     if not rows:
-        rows = '<tr><td colspan="10" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
+        rows = '<tr><td colspan="8" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
 
     # Summary stats
     total_learners = len(entries)
@@ -540,8 +529,6 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
   <th>Learner</th>
   <th>Tier</th>
   <th>XP</th>
-  <th>Plan</th>
-  <th>Current Progress</th>
   <th style="text-align:center">Streak</th>
   <th style="text-align:center">Repos</th>
   <th style="text-align:center">Certs</th>
