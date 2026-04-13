@@ -62,6 +62,33 @@ def _module_titles(template_key: str) -> list[str]:
         return []
 
 
+def _topic_keywords(template_key: str, limit: int = 14) -> list[str]:
+    """Top deduped focus-area keywords across all weeks. Order preserved
+    by first appearance so the timeline (foundations → advanced) shows
+    through. Used for the 'Topics & skills' line on the PDF."""
+    try:
+        from app.curriculum.loader import load_template
+        tpl = load_template(template_key)
+    except Exception:
+        return []
+
+    seen: dict[str, str] = {}  # lowercase → original casing
+    for m in tpl.months:
+        for w in m.weeks:
+            for f in (w.focus or []):
+                if not isinstance(f, str):
+                    continue
+                t = f.strip()
+                if not t or len(t) > 40:
+                    continue
+                key = t.lower()
+                if key not in seen:
+                    seen[key] = t
+                if len(seen) >= limit:
+                    return list(seen.values())
+    return list(seen.values())
+
+
 def render_certificate_pdf(cert: Certificate) -> bytes:
     """Render a certificate to PDF bytes.
 
@@ -79,6 +106,7 @@ def render_certificate_pdf(cert: Certificate) -> bytes:
 
     ctx = {
         "modules": _module_titles(cert.template_key),
+        "topics": _topic_keywords(cert.template_key, limit=14),
         "credential_id": cert.credential_id,
         "course_title": cert.course_title,
         "display_name": cert.display_name,

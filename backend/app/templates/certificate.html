@@ -95,16 +95,21 @@
     }
     .modules {
       text-align: center;
-      margin-top: 6mm;
-      padding: 0 26mm;
+      margin-top: 5mm;
+      padding: 0 22mm;
       font-family: "DejaVu Sans", sans-serif;
-      font-size: 8.5pt;
       color: #57534e;
       line-height: 1.4;
+      font-size: 8.5pt;
     }
-    .modules .modules-label {
+    .modules-label {
       color: #92400e; font-weight: 700;
       letter-spacing: 0.5pt; text-transform: uppercase;
+      font-size: 7.5pt;
+    }
+    .verify-deep {
+      margin-top: 2mm; font-size: 7.5pt; color: #92400e;
+      font-style: italic;
     }
     .sig {
       text-align: center;
@@ -188,7 +193,8 @@
 
     {% if modules %}
     <div class="modules">
-      <span class="modules-label">Modules covered:</span> {{ modules | join(' · ') }}
+      <span class="modules-label">Modules:</span> {{ modules | join(' · ') }}
+      <div class="verify-deep">Full topic breakdown at <strong>{{ verify_domain }}/verify/{{ credential_id }}</strong></div>
     </div>
     {% endif %}
 

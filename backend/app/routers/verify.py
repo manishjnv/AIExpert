@@ -235,15 +235,69 @@ def _not_found_html(credential_id: str) -> str:
 </div></body></html>"""
 
 
-def _module_titles(template_key: str) -> list[str]:
-    """Pull the month titles from the plan template — these are the
-    curated module names ('Foundations', 'Classical ML', etc.)."""
+def _module_breakdown(template_key: str) -> list[dict]:
+    """For each month, return its title + a deduped, ordered list of
+    week-level focus-area topics. Drives the per-module section on the
+    public verify page."""
     try:
         from app.curriculum.loader import load_template
         tpl = load_template(template_key)
-        return [m.title for m in tpl.months if m.title]
     except Exception:
         return []
+    out = []
+    for m in tpl.months:
+        seen: dict[str, str] = {}
+        for w in m.weeks:
+            for f in (w.focus or []):
+                if not isinstance(f, str):
+                    continue
+                t = f.strip()
+                if not t or len(t) > 60:
+                    continue
+                key = t.lower()
+                if key not in seen:
+                    seen[key] = t
+        out.append({
+            "title": m.title or f"Month {m.month}",
+            "tagline": m.tagline or "",
+            "topics": list(seen.values()),
+        })
+    return out
+
+
+def _render_modules_html(modules: list[dict]) -> str:
+    """Per-module section: month title + tagline + topic chips."""
+    chip_css = (
+        "display:inline-block;background:#fef3c7;border:1px solid #fde68a;"
+        "color:#78350f;padding:3px 9px;margin:3px 4px 0 0;border-radius:3px;"
+        "font-size:11px;font-family:system-ui,sans-serif;line-height:1.5"
+    )
+    items = []
+    for i, m in enumerate(modules, 1):
+        chips = "".join(
+            f'<span style="{chip_css}">{_esc(t)}</span>' for t in m["topics"]
+        )
+        tagline = (
+            f'<div style="font-size:12px;color:#78716c;margin-top:2px;'
+            f'font-family:system-ui,sans-serif;font-style:italic">{_esc(m["tagline"])}</div>'
+            if m["tagline"] else ''
+        )
+        items.append(
+            f'<div style="margin-bottom:14px">'
+            f'<div style="font-family:system-ui,sans-serif;font-size:13px;'
+            f'font-weight:600;color:var(--ink)">'
+            f'<span style="color:var(--amber);margin-right:6px">{i:02d}</span>'
+            f'{_esc(m["title"])}</div>'
+            f'{tagline}'
+            f'<div style="margin-top:6px">{chips}</div>'
+            f'</div>'
+        )
+    return (
+        '<div style="margin-top:24px;padding-top:18px;border-top:1px dashed #e7e5e4">'
+        '<div style="font-family:system-ui,sans-serif;font-size:11px;letter-spacing:2px;'
+        'text-transform:uppercase;color:var(--amber);margin-bottom:14px">Modules Completed</div>'
+        + "".join(items) + '</div>'
+    )
 
 
 def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
@@ -251,7 +305,7 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
     base = settings.public_base_url.rstrip("/")
     verify_url = f"{base}/verify/{cert.credential_id}"
     og_image_url = f"{base}/verify/{cert.credential_id}/og.svg"
-    modules = _module_titles(cert.template_key)
+    modules = _module_breakdown(cert.template_key)
 
     issued_iso = cert.issued_at.strftime("%B %d, %Y") if cert.issued_at else ""
     tier_label = _TIER_LABEL.get(cert.tier, "Certificate")
@@ -351,7 +405,7 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
         <dt>Milestones</dt><dd>{_esc(cert.checks_done)} / {_esc(cert.checks_total)} completed</dd>
         {f'<dt>Projects shipped</dt><dd>{_esc(cert.repos_linked)} GitHub {"repository" if cert.repos_linked == 1 else "repositories"}</dd>' if cert.repos_linked > 0 else ''}
       </dl>
-      {('<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #e7e5e4"><div style="font-family:system-ui,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);margin-bottom:10px">Modules Completed</div><ol style="margin:0;padding-left:22px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.7;color:#44403c">' + ''.join(f'<li>{_esc(m)}</li>' for m in modules) + '</ol></div>') if modules else ''}
+      {_render_modules_html(modules) if modules else ''}
     </div>
 
     <div class="cta" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
