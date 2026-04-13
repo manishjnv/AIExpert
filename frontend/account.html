@@ -488,6 +488,12 @@ async function confirmSwitchPlan() {
       body: JSON.stringify({template_key: selectedSwitchKey})
     });
     if (resp.ok) {
+      // Clear any localStorage progress from the old plan so the new plan
+      // starts clean. Without this, a stale localStorage blob could leak
+      // checks into the new plan via /api/progress/migrate on next home load.
+      try {
+        localStorage.removeItem('ai-generalist-tracker-v3');
+      } catch {}
       showToast('Plan switched');
       loadProfile();  // reload data
     } else {

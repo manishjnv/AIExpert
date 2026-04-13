@@ -268,10 +268,15 @@ async def migrate_progress(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Merge localStorage progress blob into the user's active plan.
+    """First-time migration of localStorage progress into the user's active plan.
 
-    Keys are like "w1_0", "w1_1", etc. Values are booleans.
-    Merge rule: server wins on conflicts (if server says done, keep it).
+    Intended for the anon → authenticated handshake. Keys are like "w1_0".
+    Values are booleans.
+
+    HARD GUARDRAIL: if the active plan already has ANY Progress rows, this
+    endpoint is a no-op. Without this, switching plans (which clears server
+    progress for the new plan but leaves localStorage intact) would leak the
+    previous plan's checks into the new plan on the next page load.
     """
     plan = (
         await db.execute(
@@ -293,6 +298,11 @@ async def migrate_progress(
             select(Progress).where(Progress.user_plan_id == plan.id)
         )
     ).scalars().all()
+
+    # Guardrail: if this plan already has any progress, refuse to merge
+    # localStorage state. Prevents cross-plan leakage after plan switches.
+    if existing_rows:
+        return Response(status_code=204)
 
     existing_map: dict[tuple[int, int], Progress] = {}
     for p in existing_rows:
