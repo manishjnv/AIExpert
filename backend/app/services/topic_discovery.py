@@ -352,17 +352,40 @@ async def _triage_topic(
         justification=safe_justification,
     )
 
-    try:
-        from app.ai.groq import complete as groq_complete
-        raw = await groq_complete(prompt, json_response=True)
-        await track_tokens(db, TRIAGE_TOKENS_ESTIMATE)
+    # Cascading free-tier fallback: Groq -> Cerebras -> Mistral. Each classifier
+    # call is cheap and short; try the next free provider if the previous one
+    # rate-limits or errors. Only fall through (pass) if all three fail.
+    providers = [
+        ("groq",     "app.ai.groq"),
+        ("cerebras", "app.ai.cerebras"),
+        ("mistral",  "app.ai.mistral"),
+    ]
 
-        if isinstance(raw, str):
-            raw = json.loads(raw)
+    last_err: Exception | None = None
+    for provider_name, module_path in providers:
+        try:
+            mod = __import__(module_path, fromlist=["complete"])
+            raw = await mod.complete(prompt, json_response=True)
+        except Exception as e:
+            last_err = e
+            logger.info("Triage via %s failed for %s: %s — trying next",
+                        provider_name, topic.topic_name, str(e)[:120])
+            continue
 
-        result = TriageResponseSchema(**raw)
-        cache_set("triage", cache_params, raw, ttl=86400 * 7)
-        return result
-    except Exception as e:
-        logger.warning("Triage failed for %s: %s (passing through)", topic.topic_name, e)
-        return None  # fail open
+        try:
+            await track_tokens(db, TRIAGE_TOKENS_ESTIMATE)
+            if isinstance(raw, str):
+                raw = json.loads(raw)
+            result = TriageResponseSchema(**raw)
+            cache_set("triage", cache_params, raw, ttl=86400 * 7)
+            logger.info("Triage via %s for %s", provider_name, topic.topic_name)
+            return result
+        except Exception as e:
+            last_err = e
+            logger.info("Triage parse via %s failed for %s: %s — trying next",
+                        provider_name, topic.topic_name, str(e)[:120])
+            continue
+
+    logger.warning("Triage failed across all free providers for %s: %s (passing through)",
+                   topic.topic_name, last_err)
+    return None  # fail open
