@@ -1740,28 +1740,30 @@ async function loadActivePlan() {
 
     // Show plan badge
     const badge = document.getElementById("planBadge");
-    const label = PLAN_LABELS[plan.template_key] || plan.template_key;
+    const label = plan.title || PLAN_LABELS[plan.template_key] || plan.template_key;
     if (badge) badge.textContent = " · " + label;
 
     // Update eyebrow with personalized text and real progress
     const firstName = (currentUser?.name || "").split(" ")[0] || "there";
     document.getElementById("eyebrowText").textContent = `Welcome, ${firstName} · ${label} · ${pctLoaded}% complete`;
 
-    // Update hero title based on plan duration
-    const DURATION_TITLES = {
-      "generalist_3mo_intermediate": { title: "Three Months.", sub: "twelve weeks" },
-      "generalist_6mo_intermediate": { title: "Six Months.", sub: "twenty-four weeks" },
-      "generalist_12mo_beginner": { title: "Twelve Months.", sub: "forty-eight weeks" },
-    };
-    const dt = DURATION_TITLES[plan.template_key] || { title: "Your Plan.", sub: totalWeeks + " weeks" };
-    document.getElementById("heroTitle").innerHTML = `${dt.title} <em>One Generalist.</em>`;
-    document.getElementById("heroSubtitle").textContent = `From Python fundamentals to deployed AI applications. ${dt.sub.charAt(0).toUpperCase() + dt.sub.slice(1)} of building, shipping, and learning to think like an engineer — not watch tutorials.`;
-
-    // Update header stats
-    const totalWeeks = DATA.reduce((s, m) => s + m.weeks.length, 0);
-    const totalHours = DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
+    // Header stats (compute first so hero subtitle can use them)
+    const totalWeeks = plan.total_weeks || DATA.reduce((s, m) => s + m.weeks.length, 0);
+    const totalHours = plan.total_hours || DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
     document.getElementById("metaDuration").textContent = totalWeeks + " weeks";
     document.getElementById("metaHours").innerHTML = "~" + totalHours + " <em>hrs</em>";
+
+    // Hero title — derive from the plan itself, never hardcode a curriculum-specific phrase.
+    // Format: "{N} Months. {Topic}." where Topic = title before " — " dash, fallback Plan title.
+    const DURATION_TITLES_TOP = {3: "Three Months.", 6: "Six Months.", 9: "Nine Months.", 12: "Twelve Months."};
+    const topTitle = DURATION_TITLES_TOP[plan.duration_months] || (totalWeeks + " Weeks.");
+    const titleHead = (plan.title || "").split(/\s+[—\-–]\s+/)[0].trim() || "Your Plan";
+    document.getElementById("heroTitle").innerHTML = `${topTitle} <em>${titleHead}.</em>`;
+    // Subtitle — use the plan's goal if available; fall back to a generic builder message.
+    const subtitleText = plan.goal
+      ? plan.goal
+      : `${totalWeeks} weeks of building, shipping, and learning by doing.`;
+    document.getElementById("heroSubtitle").textContent = subtitleText;
 
     render();
     DATA.forEach(m => m.weeks.forEach(w => renderRepoSection(w.n)));

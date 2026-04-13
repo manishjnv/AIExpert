@@ -85,6 +85,14 @@ def _plan_to_dict(plan: UserPlan, template, progress_rows: list[Progress]) -> di
         "plan_version": plan.plan_version,
         "status": plan.status,
         "enrolled_at": plan.enrolled_at.isoformat() if plan.enrolled_at else None,
+        # Template metadata — frontend needs these to render the hero section
+        # accurately instead of falling back to hardcoded generalist copy.
+        "title": template.title,
+        "goal": template.goal,
+        "level": template.level,
+        "duration_months": template.duration_months,
+        "total_weeks": template.total_weeks,
+        "total_hours": template.total_hours,
         "months": months,
     }
 
