@@ -183,7 +183,27 @@
   .month-tagline { font-family: var(--serif); font-style: italic; color: var(--paper-dim); opacity: 0.65; font-size: 16px; margin: 16px 0 32px; max-width: 750px; }
 
   /* WEEK CARD */
-  .week { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: 28px 32px; margin-bottom: 16px; position: relative; transition: border-color 0.3s, transform 0.2s; }
+  .week { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: 0; margin-bottom: 16px; position: relative; transition: border-color 0.3s, transform 0.2s; overflow: hidden; }
+  .week-details > summary { list-style: none; cursor: pointer; padding: 22px 32px; user-select: none; }
+  .week-details > summary::-webkit-details-marker { display: none; }
+  .week-details > summary .week-header { margin-bottom: 0; }
+  .week-details[open] > summary { padding-bottom: 4px; }
+  .week-details[open] > summary .wk-toggle { transform: rotate(180deg); }
+  .wk-toggle { margin-left: auto; color: var(--ink-soft); font-size: 14px; transition: transform 0.2s; }
+  .wk-pill { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 12px; flex-shrink: 0; }
+  .wk-pill-done { background: rgba(109,181,133,0.18); color: #6db585; border: 1px solid rgba(109,181,133,0.35); }
+  .wk-pill-active { background: rgba(232,168,73,0.15); color: var(--accent); border: 1px solid rgba(232,168,73,0.35); }
+  .wk-pill-idle { background: rgba(148,163,184,0.1); color: var(--ink-soft); border: 1px solid var(--line-soft); }
+  .week-body { padding: 6px 32px 28px; }
+  .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .res-col h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 24px; }
+  @media (max-width: 720px) {
+    .res-grid { grid-template-columns: 1fr; }
+    .check-grid { grid-template-columns: 1fr; }
+    .week-details > summary { padding: 16px 16px; }
+    .week-body { padding: 6px 16px 18px; }
+  }
   .week:hover { border-color: var(--line-soft); }
   .week.complete { border-color: var(--success); border-left-width: 3px; }
   .week.complete::before { content: '✓'; position: absolute; top: 24px; right: 28px; color: var(--success); font-size: 20px; font-weight: 600; }
@@ -857,40 +877,76 @@ function render() {
       wEl.className = "week" + (isComplete ? " complete" : "") + (w.isBuffer ? " buffer" : "");
       wEl.style.animationDelay = `${wi * 0.05}s`;
       const newBadge = w.isNew ? '<span class="new">UPDATED</span>' : '';
+      // Video vs reference split — left column = video courses (YouTube,
+      // Coursera, fast.ai, DeepLearning.AI), right column = docs / practice.
+      const isVid = r => /youtube\.com|youtu\.be|vimeo\.com|coursera\.org\/(learn|specializations)|fast\.ai|deeplearning\.ai\/(courses|short-courses|programs)|udacity\.com|khanacademy\.org/.test((r.url || '').toLowerCase());
+      const renderRes = r => `<a class="res-item" href="${r.url}" target="_blank" rel="noopener noreferrer">
+        <span class="res-arrow">→</span>
+        <span class="res-name">${r.name}</span>
+        ${r.hrs ? `<span class="res-hrs">${r.hrs} hrs</span>` : ''}
+      </a>`;
+      let resourcesHTML = '';
+      if (w.resources && w.resources.length) {
+        const vids = w.resources.filter(isVid);
+        const refs = w.resources.filter(r => !isVid(r));
+        if (vids.length && refs.length) {
+          resourcesHTML = `<div class="resources"><div class="res-grid">
+            <div class="res-col"><h4>▶ Video Courses</h4><div class="res-list">${vids.map(renderRes).join("")}</div></div>
+            <div class="res-col"><h4>📄 Docs &amp; Practice</h4><div class="res-list">${refs.map(renderRes).join("")}</div></div>
+          </div></div>`;
+        } else {
+          resourcesHTML = `<div class="resources">
+            <h4>Top Resources</h4>
+            <div class="res-list">${w.resources.map(renderRes).join("")}</div>
+          </div>`;
+        }
+      }
+
+      // Collapse logic: completed weeks default collapsed (save scroll),
+      // in-progress and future weeks default open so current focus is visible.
+      const collapsedByDefault = isComplete && wTotal > 0;
+      const pctW = wTotal ? Math.round((wDone / wTotal) * 100) : 0;
+      const statusPill = isComplete && wTotal > 0
+        ? '<span class="wk-pill wk-pill-done">✓ Complete</span>'
+        : wDone > 0
+          ? `<span class="wk-pill wk-pill-active">${wDone}/${wTotal} · ${pctW}%</span>`
+          : '<span class="wk-pill wk-pill-idle">Not started</span>';
+
       wEl.innerHTML = `
-        <div class="week-header">
-          <span class="week-num">Week ${w.n}${w.isBuffer ? ' · BUFFER' : ''}</span>
-          <div class="week-title">${w.t.replace(/★/g, '<span style="color:var(--accent);font-size:14px;vertical-align:super;margin-left:4px">★</span>')}${newBadge}</div>
-          <span class="week-hours">⏱ <strong>${w.hours || 16}</strong> hrs</span>
-        </div>
-        <div class="week-grid">
-          <div class="week-section"><h4>Focus</h4><ul>${w.focus.map(f=>`<li>${f}</li>`).join("")}</ul></div>
-          <div class="week-section"><h4>Deliverables</h4><ul>${w.deliv.map(d=>`<li>${d}</li>`).join("")}</ul></div>
-        </div>
-        ${w.resources ? `<div class="resources">
-          <h4>Top Resources</h4>
-          <div class="res-list">
-            ${w.resources.map(r => `<a class="res-item" href="${r.url}" target="_blank" rel="noopener noreferrer">
-              <span class="res-arrow">→</span>
-              <span class="res-name">${r.name}</span>
-              ${r.hrs ? `<span class="res-hrs">${r.hrs} hrs</span>` : ''}
-            </a>`).join("")}
+        <details class="week-details"${collapsedByDefault ? '' : ' open'}>
+        <summary class="week-summary">
+          <div class="week-header">
+            <span class="week-num">Week ${w.n}${w.isBuffer ? ' · BUFFER' : ''}</span>
+            <div class="week-title">${w.t.replace(/★/g, '<span style="color:var(--accent);font-size:14px;vertical-align:super;margin-left:4px">★</span>')}${newBadge}</div>
+            ${statusPill}
+            <span class="week-hours">⏱ <strong>${w.hours || 16}</strong> hrs</span>
+            <span class="wk-toggle" aria-hidden="true">▾</span>
           </div>
-        </div>` : ''}
-        <div class="checklist">
-          <h4>Checklist · ${wDone}/${wTotal}</h4>
-          ${w.checks.map((c,i) => {
-            const done = state[key(w.n,i)];
-            return `<div class="check-item${done?' done':''}" data-week="${w.n}" data-idx="${i}">
-              <div class="check-box"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8L7 12L13 4" stroke="#0f1419" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-              <div class="check-text">${c}</div>
-            </div>`;
-          }).join("")}
+        </summary>
+        <div class="week-body">
+          <div class="week-grid">
+            <div class="week-section"><h4>Focus</h4><ul>${w.focus.map(f=>`<li>${f}</li>`).join("")}</ul></div>
+            <div class="week-section"><h4>Deliverables</h4><ul>${w.deliv.map(d=>`<li>${d}</li>`).join("")}</ul></div>
+          </div>
+          ${resourcesHTML}
+          <div class="checklist">
+            <h4>Checklist · ${wDone}/${wTotal}</h4>
+            <div class="check-grid">
+            ${w.checks.map((c,i) => {
+              const done = state[key(w.n,i)];
+              return `<div class="check-item${done?' done':''}" data-week="${w.n}" data-idx="${i}">
+                <div class="check-box"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8L7 12L13 4" stroke="#0f1419" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="check-text">${c}</div>
+              </div>`;
+            }).join("")}
+            </div>
+          </div>
+          ${currentUser ? `<div class="repo-link-section" data-week="${w.n}">
+            <h4>GitHub Repo</h4>
+            <div class="repo-link-content" id="repo-w${w.n}"></div>
+          </div>` : ''}
         </div>
-        ${currentUser ? `<div class="repo-link-section" data-week="${w.n}">
-          <h4>GitHub Repo</h4>
-          <div class="repo-link-content" id="repo-w${w.n}"></div>
-        </div>` : ''}
+        </details>
       `;
       monthEl.appendChild(wEl);
     });
