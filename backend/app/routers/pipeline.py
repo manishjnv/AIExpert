@@ -358,6 +358,149 @@ async def approve_topic(
     return {"ok": True, "status": "approved"}
 
 
+@router.get("/api/topics/sample-template")
+async def sample_template(_user: User = Depends(get_current_admin)):
+    """Download a minimal valid sample template for manual upload reference."""
+    from fastapi.responses import JSONResponse
+    sample = {
+        "key": "sample_topic_3mo_intermediate",
+        "version": "1.0",
+        "title": "Sample Topic — Intermediate 3-Month Roadmap",
+        "level": "intermediate",
+        "goal": "Ship a production-ready project demonstrating <capability> across real-world data.",
+        "duration_months": 3,
+        "months": [
+            {
+                "month": 1,
+                "label": "Foundations",
+                "title": "Core concepts and tooling",
+                "tagline": "Get grounded in the fundamentals and set up the dev environment.",
+                "checkpoint": "Learner can explain <core concept> and has a working environment.",
+                "weeks": [
+                    {
+                        "n": 1,
+                        "t": "Environment setup",
+                        "hours": 16,
+                        "focus": ["Topic A", "Topic B", "Topic C", "Topic D"],
+                        "deliv": ["Notebook demonstrating basics", "GitHub repo initialised"],
+                        "resources": [
+                            {"name": "Primary course or tutorial", "url": "https://real-url.com", "hrs": 6},
+                            {"name": "Official documentation", "url": "https://real-docs.com", "hrs": 4},
+                            {"name": "Hands-on practice", "url": "https://github.com/example", "hrs": 6},
+                        ],
+                        "checks": [
+                            "Implement a Python module with 3 tested functions",
+                            "Configure local dev environment and verify with a test run",
+                            "Build a notebook documenting <topic> fundamentals",
+                            "Write unit tests with >80% coverage",
+                            "Submit GitHub repo with README, .gitignore, and license",
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    return JSONResponse(
+        content=sample,
+        headers={"Content-Disposition": "attachment; filename=sample-template.json"},
+    )
+
+
+@router.post("/api/topics/upload-template")
+async def upload_manual_template(
+    request: Request,
+    user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually upload a full curriculum template JSON.
+
+    Validates structure against PlanTemplate (same schema as AI-generated
+    templates), saves to data/templates/, and creates a DiscoveredTopic
+    row so the template shows up on the Topics tab with status=generated
+    and source flagged as manual upload.
+
+    Key collision handling: body.overwrite=true allows replacing an
+    existing template; otherwise rejects with 409.
+    """
+    _check_origin(request)
+    from app.curriculum.loader import PlanTemplate, load_template
+    from app.services.curriculum_generator import save_curriculum_draft
+    import re as _re
+
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
+
+    overwrite = bool(body.pop("overwrite", False))
+    # Accept either {"template": {...}} or the template dict at the top level
+    plan_data = body.get("template") if isinstance(body.get("template"), dict) else body
+
+    # Structural validation via Pydantic
+    try:
+        tpl = PlanTemplate(**plan_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Template validation failed: {e}")
+
+    key = tpl.key
+
+    # Collision check
+    from pathlib import Path
+    template_path = Path(__file__).parent.parent / "curriculum" / "templates" / f"{key}.json"
+    if template_path.exists() and not overwrite:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Template '{key}' already exists. Re-submit with overwrite=true to replace.",
+        )
+
+    # Save template JSON
+    await save_curriculum_draft(plan_data)
+
+    # Create/update a DiscoveredTopic row so it appears on the Topics tab
+    topic_name = plan_data.get("title") or key
+    normalized = _re.sub(r"[^a-z0-9]+", "-", topic_name.lower()).strip("-")[:120]
+    existing_topic = (await db.execute(
+        select(DiscoveredTopic).where(DiscoveredTopic.normalized_name == normalized)
+    )).scalar_one_or_none()
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if existing_topic:
+        existing_topic.status = "generated"
+        existing_topic.templates_generated = (existing_topic.templates_generated or 0) + (0 if overwrite else 1)
+        existing_topic.reviewer_id = user.id
+        existing_topic.reviewed_at = now
+        topic_id = existing_topic.id
+    else:
+        new_topic = DiscoveredTopic(
+            topic_name=topic_name,
+            normalized_name=normalized,
+            category=(plan_data.get("level") or "manual")[:60],
+            subcategory=f"{tpl.duration_months}mo",
+            justification=f"Manually uploaded by admin on {now.strftime('%Y-%m-%d %H:%M UTC')}",
+            evidence_sources=json.dumps(["manual_upload"]),
+            confidence_score=100,
+            status="generated",
+            discovery_run=f"manual-{now.strftime('%Y%m%dT%H%M%S')}",
+            ai_model_used="manual_upload",
+            reviewer_id=user.id,
+            reviewed_at=now,
+            templates_generated=1,
+        )
+        db.add(new_topic)
+        await db.flush()
+        topic_id = new_topic.id
+
+    return {
+        "ok": True,
+        "key": key,
+        "title": tpl.title,
+        "topic_id": topic_id,
+        "overwritten": existing_topic is not None and overwrite,
+        "weeks": tpl.total_weeks,
+        "hours": tpl.total_hours,
+    }
+
+
 @router.post("/api/topics/{topic_id}/reject")
 async def reject_topic(
     topic_id: int,
@@ -901,7 +1044,35 @@ async def pipeline_topics_page(
   </ol>
   <div style="color:#8a92a0;font-size:12px">Status flow: <span class="badge pending" style="padding:1px 6px;border-radius:3px;background:#2a2520;color:#e8a849">pending</span> → <span class="badge approved" style="padding:1px 6px;border-radius:3px;background:#1d3525;color:#6db585">approved</span> → <span style="color:#d0cbc2">generating</span> → <span style="color:#d0cbc2">generated</span>. Enable <em>auto-approve</em> in Pipeline Settings to skip step 4 for trusted runs.</div>
 </div>
-<div style="margin-bottom:16px">{filter_html}</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+  <div>{filter_html}</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="/admin/pipeline/api/topics/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Download sample JSON</a>
+    <button class="btn primary" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload Template JSON</button>
+  </div>
+</div>
+
+<!-- Upload modal -->
+<div id="uploadModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center">
+  <div style="background:#1d242e;border-radius:8px;padding:24px;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;color:#d0cbc2">
+    <button onclick="document.getElementById('uploadModal').style.display='none'" style="float:right;cursor:pointer;font-size:20px;color:#8a92a0;background:none;border:none">&times;</button>
+    <h2 style="margin-top:0;color:#e8a849">Upload Template JSON</h2>
+    <p style="color:#8a92a0;font-size:13px;line-height:1.6">
+      Upload a fully-formed curriculum template (same schema as AI-generated templates). The file is validated, saved, and a Topic row is created with status <code>generated</code>. You can publish it immediately from the <a href="/admin/templates" style="color:#e8a849">Templates</a> tab if it scores ≥ 90 on the quality check.
+      <br><br>
+      <a href="/admin/pipeline/api/topics/sample-template" download="sample-template.json" style="color:#e8a849">Download sample JSON</a> to see the required shape.
+    </p>
+    <input type="file" id="uploadFile" accept="application/json,.json" style="margin:12px 0;color:#d0cbc2">
+    <div>
+      <label style="font-size:13px;color:#d0cbc2"><input type="checkbox" id="uploadOverwrite"> Overwrite if template with this key already exists</label>
+    </div>
+    <div id="uploadStatus" style="margin:12px 0;font-size:13px;min-height:20px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn" onclick="document.getElementById('uploadModal').style.display='none'">Cancel</button>
+      <button class="btn success" onclick="uploadTemplate()">Upload</button>
+    </div>
+  </div>
+</div>
 
 <table>
 <tr><th>ID</th><th>Topic</th><th>Justification</th><th>Confidence</th><th>Quality</th><th>Status</th><th>Templates</th><th>Discovered</th><th>Actions</th></tr>
@@ -926,6 +1097,51 @@ async function deleteTopic(id) {{
   }});
   if (resp.ok) window.location.reload();
   else alert('Failed');
+}}
+
+async function uploadTemplate() {{
+  const fileInput = document.getElementById('uploadFile');
+  const overwrite = document.getElementById('uploadOverwrite').checked;
+  const status = document.getElementById('uploadStatus');
+  if (!fileInput.files || !fileInput.files[0]) {{
+    status.innerHTML = '<span style="color:#d97757">Pick a JSON file first</span>';
+    return;
+  }}
+  const file = fileInput.files[0];
+  status.textContent = 'Reading file…';
+  let text;
+  try {{
+    text = await file.text();
+  }} catch(e) {{
+    status.innerHTML = '<span style="color:#d97757">Failed to read file: ' + e.message + '</span>';
+    return;
+  }}
+  let parsed;
+  try {{
+    parsed = JSON.parse(text);
+  }} catch(e) {{
+    status.innerHTML = '<span style="color:#d97757">Invalid JSON: ' + e.message + '</span>';
+    return;
+  }}
+  parsed.overwrite = overwrite;
+  status.textContent = 'Uploading…';
+  try {{
+    const resp = await fetch('/admin/pipeline/api/topics/upload-template', {{
+      method: 'POST', credentials: 'same-origin',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(parsed),
+    }});
+    const data = await resp.json().catch(() => ({{}}));
+    if (resp.ok) {{
+      status.innerHTML = '<span style="color:#6db585">✓ ' + data.title + ' uploaded ('
+        + data.weeks + ' weeks, ' + data.hours + 'h). Reloading…</span>';
+      setTimeout(() => window.location.reload(), 1500);
+    }} else {{
+      status.innerHTML = '<span style="color:#d97757">✗ ' + (data.detail || resp.statusText) + '</span>';
+    }}
+  }} catch(e) {{
+    status.innerHTML = '<span style="color:#d97757">Network error: ' + e.message + '</span>';
+  }}
 }}
 
 async function viewTopic(id) {{
