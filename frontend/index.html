@@ -1926,15 +1926,14 @@ async function loadActivePlan() {
     const doneChecksLoaded = Object.values(state).filter(Boolean).length;
     const pctLoaded = totalChecksLoaded ? Math.round((doneChecksLoaded / totalChecksLoaded) * 100) : 0;
 
-    // Nav plan badge shows only the course topic (text before ' — '), not
-    // the full 'Topic — Level N-Month Roadmap' label, so it doesn't collide
-    // visually with the hero h1 which uses the same topic.
+    // Nav plan badge is hidden by default (see nav.css) — the hero h1 owns
+    // the plan title. We still populate textContent for the title tooltip
+    // in case a future page opts back in.
     const badge = document.getElementById("planBadge");
     const fullLabel = plan.title || PLAN_LABELS[plan.template_key] || plan.template_key;
-    const shortLabel = fullLabel.split(/\s+[—\-–]\s+/)[0].trim();
     if (badge) {
-      badge.textContent = shortLabel;
-      badge.title = fullLabel;   // full label on hover for disambiguation
+      badge.textContent = "";
+      badge.title = fullLabel;
     }
 
     // Eyebrow: welcome + progress. Plan title is already in the hero h1 and

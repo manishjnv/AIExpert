@@ -15,7 +15,6 @@
 }
 .topnav-brand {
   font-family: 'Fraunces', Georgia, serif;
-  font-size: 16px;
   color: #e8a849;
   font-weight: 400;
   margin-right: auto;
@@ -23,24 +22,51 @@
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 2px;
   min-width: 0;
 }
 .topnav-brand-stack {
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
-  line-height: 1.2;
+  line-height: 1.15;
   overflow: hidden;
 }
+/* Primary wordmark — AutomateEdge in Fraunces, logo inline left. */
+.topnav-brand .brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.topnav-brand .brand-name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: #e8a849;
+  letter-spacing: 0.005em;
+}
+/* Product tag — AI Learning Roadmap sits under the brand in small mono caps. */
+.topnav-brand .brand-tag {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-top: 1px;
+  margin-left: 32px;    /* align with brand-name text, past the 24px logo + gap */
+}
+/* Plan badge intentionally hidden by default — the hero on each page owns
+   'what are you studying'. If a page re-enables it, it renders as a third
+   muted line below the product tag. */
 .topnav-brand-stack #planBadge {
-  display: block;
+  display: none;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #8a92a0;
+  color: #64748b;
   margin-top: 2px;
+  margin-left: 32px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

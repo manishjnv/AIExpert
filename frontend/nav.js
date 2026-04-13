@@ -64,8 +64,9 @@
   nav.id = 'shared-nav';
   nav.innerHTML = `
     <nav class="topnav">
-      <a href="/" class="topnav-brand topnav-brand-stack">
-        <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap">${LOGO} AI Learning Roadmap</span>
+      <a href="/" class="topnav-brand topnav-brand-stack" aria-label="AutomateEdge · AI Learning Roadmap">
+        <span class="brand-row">${LOGO}<span class="brand-name">AutomateEdge</span></span>
+        <span class="brand-tag">AI Learning Roadmap</span>
         <span id="planBadge"></span>
       </a>
       <span id="connectionBadges" style="display:none;flex-shrink:0">
