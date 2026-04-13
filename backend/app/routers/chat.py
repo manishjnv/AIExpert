@@ -53,8 +53,30 @@ def _check_rate_limit(user_id: int) -> None:
     _rate_tracker[user_id].append(now)
 
 
-def _build_system_prompt(week_num: int, template_key: str = "generalist_6mo_intermediate") -> str:
-    """Build the system prompt with week context."""
+def _learner_profile_block(user: Optional[User]) -> str:
+    """Render a LEARNER PROFILE section for the system prompt when the
+    user has set goal/level on /account. Returns an empty string for
+    anonymous visitors or users who haven't filled either field."""
+    if user is None:
+        return ""
+    goal = (user.learning_goal or "").strip()
+    level = (user.experience_level or "").strip()
+    if not goal and not level:
+        return ""
+    lines = ["LEARNER PROFILE (use to tailor depth + examples — never restate):"]
+    if level:
+        lines.append(f"- Experience level: {level}")
+    if goal:
+        lines.append(f"- Stated career goal: {goal}")
+    return "\n".join(lines)
+
+
+def _build_system_prompt(
+    week_num: int,
+    template_key: str = "generalist_6mo_intermediate",
+    user: Optional[User] = None,
+) -> str:
+    """Build the system prompt with week context + (optional) learner profile."""
     try:
         tpl = load_template(template_key)
         week = tpl.week_by_number(week_num)
@@ -74,6 +96,7 @@ def _build_system_prompt(week_num: int, template_key: str = "generalist_6mo_inte
         focus_areas="\n".join(f"- {f}" for f in week.focus),
         deliverables="\n".join(f"- {d}" for d in week.deliv),
         resources=resources_text,
+        learner_profile_block=_learner_profile_block(user),
     )
 
 
@@ -89,17 +112,18 @@ async def chat(
     import app.db as db_module
 
     rate_key = None
+    current_user: Optional[User] = None
     token = request.cookies.get("auth_token")
     if token and db_module.async_session_factory:
         async with db_module.async_session_factory() as db:
-            user = await verify_token(token, db)
-            if user:
-                rate_key = user.id
+            current_user = await verify_token(token, db)
+            if current_user:
+                rate_key = current_user.id
     if rate_key is None:
         rate_key = f"ip:{request.client.host if request.client else 'unknown'}"
     _check_rate_limit(rate_key)
 
-    system_prompt = _build_system_prompt(body.week_num)
+    system_prompt = _build_system_prompt(body.week_num, user=current_user)
 
     # Build message list
     messages: list[dict] = [{"role": "user", "content": system_prompt}]
