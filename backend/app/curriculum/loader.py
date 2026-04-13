@@ -35,6 +35,15 @@ class Resource(BaseModel):
     hrs: int
 
 
+class Certification(BaseModel):
+    """Industry certification a learner can pursue after completing the course."""
+    name: str
+    provider: str                   # e.g. "DeepLearning.AI", "Google Cloud", "AWS"
+    url: str                        # certification info page
+    cost_usd: int | None = None     # 0 for free, None if unknown
+    prep_hours: int | None = None   # estimated additional prep hours on top of this course
+
+
 class Week(BaseModel):
     n: int
     t: str
@@ -62,6 +71,10 @@ class PlanTemplate(BaseModel):
     goal: str
     duration_months: int
     months: list[Month]
+    # Optional course-level metadata (newer templates). Backward-compatible:
+    # existing templates that don't carry these just get None.
+    top_resources: list[Resource] | None = None      # 3 foundational anchors for the whole course
+    certifications: list[Certification] | None = None # industry certs learner can pursue on completion
 
     @property
     def total_weeks(self) -> int:

@@ -1,0 +1,180 @@
+ROLE
+====
+You are a senior AI/ML curriculum architect with experience at Stanford CS229/231n, fast.ai, DeepLearning.AI, and deeplearning.ai. You design job-ready study plans that outperform Coursera/Udacity equivalents.
+
+TASK
+====
+Generate ONE complete curriculum template for the AI Learning Roadmap platform. The output will be validated against a strict Pydantic schema and uploaded directly to a live platform — any prose wrapper, code fence, or deviation from the schema will break the upload.
+
+INPUTS (fill these in before pasting)
+=====================================
+- Topic: <e.g. Retrieval-Augmented Generation>
+- Duration: <3 | 6 | 9 | 12> months
+- Level: <beginner | intermediate | advanced>
+
+OUTPUT FORMAT (ABSOLUTE)
+========================
+Return ONE raw JSON object. Nothing else.
+- NO code fences (no ```json, no ```).
+- NO preamble ("Here is your template…").
+- NO trailing commentary.
+- First character MUST be `{`. Last character MUST be `}`.
+- Use UTF-8. Use straight quotes. Use em-dash `—` inside title strings only.
+
+SCHEMA (this is the exact shape the platform validates)
+========================================================
+{
+  "key": "<lowercase_snake_case_topic>_<duration>mo_<level>",
+  "version": "1.0",
+  "title": "<Topic> — <Level-Cap> <Duration>-Month Roadmap",
+  "level": "beginner|intermediate|advanced",
+  "goal": "<one sentence, 15–30 words, describing the concrete production capability at course end>",
+  "duration_months": <int 3|6|9|12>,
+  "top_resources": [
+    { "name": "<best-in-class anchor resource>", "url": "https://real-url", "hrs": <int> },
+    { "name": "<second anchor>",                  "url": "https://real-url", "hrs": <int> },
+    { "name": "<third anchor>",                   "url": "https://real-url", "hrs": <int> }
+  ],
+  "certifications": [
+    { "name": "<cert name>", "provider": "<org>", "url": "https://real-url", "cost_usd": <int or null>, "prep_hours": <int or null> }
+  ],
+  "months": [
+    {
+      "month": 1,
+      "label": "<phase name e.g. Foundations>",
+      "title": "<month title>",
+      "tagline": "<one motivating sentence>",
+      "checkpoint": "<what the learner can do by end of month>",
+      "weeks": [
+        {
+          "n": 1,
+          "t": "<week title>",
+          "hours": <int, per LEVEL LOAD below>,
+          "focus": ["<subtopic 1>", "<subtopic 2>", "<subtopic 3>", "<subtopic 4>"],
+          "deliv": ["<concrete artifact 1>", "<concrete artifact 2>"],
+          "resources": [
+            { "name": "<course/tutorial>",       "url": "https://real-url", "hrs": <int> },
+            { "name": "<docs/paper>",            "url": "https://real-url", "hrs": <int> },
+            { "name": "<hands-on practice>",     "url": "https://real-url", "hrs": <int> }
+          ],
+          "checks": ["<action-verb verifiable check>", "..."]
+        }
+      ]
+    }
+  ]
+}
+
+TOP_RESOURCES (course-level anchors — MANDATORY, exactly 3)
+===========================================================
+These are the 3 resources a learner could use to teach themselves the whole topic if they had nothing else. They should be:
+- Canonical (e.g. 3Blue1Brown's "Neural Networks", CS231n, Hugging Face NLP Course, the original paper)
+- Free or have a significant free tier
+- Currently maintained (check that the 2026 URL resolves)
+- Complementary: one visual/intuitive, one rigorous/mathematical, one hands-on/code
+
+Do NOT just list generic sites ("Coursera", "YouTube"). Pick specific, named resources.
+
+CERTIFICATIONS (industry-recognised, 1–3 items)
+================================================
+List industry certifications the learner can realistically pursue AFTER completing this course. Examples:
+- DeepLearning.AI: "Deep Learning Specialization", "Generative AI with LLMs"
+- Google Cloud: "Professional Machine Learning Engineer"
+- AWS: "Machine Learning – Specialty"
+- Hugging Face: "Community Certification"
+- Databricks: "ML Associate / Professional"
+- NVIDIA: "Deep Learning Institute — Fundamentals / specific track"
+
+Each cert MUST have a real URL and (when known) cost + prep hours. If the topic has no established certification (niche research area), return an empty array `[]` for `certifications`.
+
+LEVEL LOAD (absolute — the platform rejects mismatched loads)
+==============================================================
+Calibrate the weekly hour budget and item counts to the chosen level. DO NOT make a beginner plan have the same weekly intensity as an advanced plan.
+
+| Level        | Hours/week | focus items/week | deliverables/week | resources/week | checklist items/week |
+|--------------|-----------:|-----------------:|------------------:|---------------:|---------------------:|
+| beginner     | 10–12      | 3                | 2                 | 3              | 3–4                  |
+| intermediate | 14–16      | 4                | 2–3               | 3              | 5                    |
+| advanced     | 18–22      | 5                | 3                 | 4              | 6                    |
+
+TOTAL COURSE TIME
+=================
+- `duration_months × 4 weeks × hours/week` must equal (within ±5%) the sum of all weekly `hours` fields.
+- Example: 3-month intermediate = 3 × 4 × 15h ≈ 180h total. Sum of week `hours` should be 170–190h.
+- State the total in the `goal` sentence if it helps motivate, e.g. *"Ship a production-ready RAG system in ~180 hours…"*.
+
+SUBTOPIC TIME (the `hours` field per week)
+==========================================
+`hours` is the learner's weekly commitment for that week. Stay within the LEVEL LOAD range. Heavier weeks (capstone) may be +2h over the ceiling. First week of foundations may be −2h.
+
+STRUCTURE RULES (hard constraints)
+===================================
+1. Exactly `duration_months` months, exactly 4 weeks each. Week numbers sequential 1..N.
+2. Final month MUST be capstone + job-readiness (portfolio polish, mock interviews, PR-review-worthy project, resume line items).
+3. BLOOM'S PROGRESSION by month position:
+   - First 25% of months: Remember/Understand (define, identify, explain fundamentals)
+   - Middle 50%: Apply/Analyze (implement, debug, benchmark, compare approaches)
+   - Final 25%: Evaluate/Create (design systems, deploy, justify tradeoffs, ship end-to-end)
+
+CHECKLIST QUALITY (this determines the auto-score — meet every rule)
+=====================================================================
+Every checklist item (`checks[]`) MUST:
+1. Start with an ACTION VERB from this list: Implement, Build, Train, Deploy, Fine-tune, Write, Benchmark, Debug, Compare, Design, Submit, Test, Evaluate, Document, Optimize, Configure, Create, Architect, Develop, Ship, Measure, Profile, Refactor.
+2. NEVER start with: Understand, Learn, Know, Study, Explore, Review, Read about, Familiarize, Get familiar, Look into, See, Gain understanding.
+3. Be independently verifiable in a pull request, notebook output, or terminal log.
+4. At least 15% of ALL checklist items across the entire course must include a measurable numeric threshold: `>90% accuracy`, `F1 > 0.7`, `BLEU > 25`, `p99 < 200ms`, `>80% coverage`, `100 req/s`, `<2GB model`, `<5% error rate`, `12 issues closed`.
+5. The final month MUST have at least 30% of its checks starting with Create-level verbs (Build, Design, Deploy, Train, Fine-tune, Develop, Architect, Ship).
+6. No vague artifacts ("a model", "an app") — name concrete things ("a ResNet-50 classifier on CIFAR-10", "a Streamlit dashboard on HuggingFace Spaces").
+
+RESOURCE QUALITY (every url MUST be real, free-accessible, and current)
+=======================================================================
+Per-week resources: 1 course/tutorial, 1 docs/paper, 1 hands-on. Pull from (not exhaustive):
+- Courses: coursera.org, fast.ai, deeplearning.ai, d2l.ai, cs231n.stanford.edu, cs224n.stanford.edu, karpathy.ai, 3blue1brown.com
+- Docs/papers: pytorch.org, tensorflow.org, huggingface.co/docs, scikit-learn.org, arxiv.org, paperswithcode.com, nvidia.com/deep-learning-institute
+- Hands-on: kaggle.com, github.com (real repos), colab.research.google.com, huggingface.co/spaces
+
+URL requirements:
+- Full `https://` prefix.
+- Specific page, not homepage (e.g. `https://pytorch.org/tutorials/intermediate/ddp_tutorial.html`, not `https://pytorch.org`).
+- Must resolve as of 2026.
+- No placeholder `example.com`.
+
+DELIVERABLE QUALITY
+===================
+- Each `deliv[]` item is a portfolio-shareable artifact: notebook, trained model, API endpoint, report, deployed demo.
+- At least 3 deliverables across the course should link to the learner's GitHub or a HuggingFace Space.
+- Deliverables compound across months (each month's deliverables build on the previous).
+
+COMPLETENESS — topics the course MUST cover
+===========================================
+- Core theory and fundamentals for <Topic>.
+- Modern implementation with current-version frameworks (PyTorch, HuggingFace, relevant libraries).
+- Model/system evaluation, testing, debugging (not just training).
+- Deployment/serving (at minimum: Gradio demo, HuggingFace Space, Flask/FastAPI endpoint).
+- Responsible AI considerations (bias, fairness, interpretability, data privacy) — at least one dedicated week.
+- Data quality, preprocessing, feature engineering, or (for LLM topics) prompt engineering + eval.
+
+PROHIBITED PATTERNS (auto-reject triggers)
+===========================================
+- Passive-voice checks: "Should understand X" → rewrite "Explain X with a diagram".
+- Fake URLs or `arxiv.org/abs/XXXX` placeholders.
+- Duplicate resources across weeks (each URL should appear at most twice in the whole course).
+- More than one "theory-only" week in a row without hands-on practice.
+- Empty `focus`, `deliv`, `resources`, or `checks` arrays.
+- Hours outside LEVEL LOAD range (e.g. beginner week with 20 hours).
+
+SELF-CHECK BEFORE RETURNING (run mentally, then return)
+========================================================
+1. ☐ Output is pure JSON, starts with `{`, ends with `}`.
+2. ☐ `key` matches pattern `<topic_snake>_<duration>mo_<level>`.
+3. ☐ `top_resources` has exactly 3 items with real URLs.
+4. ☐ `certifications` has at least 1 item (or `[]` if genuinely none exist).
+5. ☐ `months` count equals `duration_months`. Each month has exactly 4 weeks.
+6. ☐ Every week's `hours` falls inside LEVEL LOAD range.
+7. ☐ Sum of weekly hours within ±5% of `duration_months × 4 × midpoint(LEVEL LOAD)`.
+8. ☐ ZERO checks start with banned verbs (Understand/Learn/Study/Explore/Review/Familiarize).
+9. ☐ ≥ 15% of all checks have a numeric threshold.
+10. ☐ Final month has ≥ 30% Create-level verbs in checks.
+11. ☐ No duplicate URLs.
+12. ☐ Final month is capstone + job-prep.
+
+Return the JSON now.

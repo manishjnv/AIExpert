@@ -415,6 +415,27 @@ async def claude_prompt(
     }
 
 
+@router.get("/api/claude-opus-prompt-template")
+async def claude_opus_prompt_template(_user: User = Depends(get_current_admin)):
+    """Download the master prompt template for manual curriculum generation in Claude.ai chat.
+
+    Admin fills in Topic/Duration/Level at the top, pastes the rest into Claude Opus,
+    and Claude returns a JSON template that passes our schema + quality gates.
+    """
+    from pathlib import Path as _Path
+    from fastapi.responses import PlainTextResponse
+
+    prompt_path = _Path(__file__).parent.parent / "prompts" / "claude_opus_manual.txt"
+    text = prompt_path.read_text(encoding="utf-8")
+    return PlainTextResponse(
+        content=text,
+        headers={
+            "Content-Disposition": "attachment; filename=claude-opus-curriculum-prompt.txt",
+            "Content-Type": "text/plain; charset=utf-8",
+        },
+    )
+
+
 @router.get("/api/sample-template")
 async def sample_template(_user: User = Depends(get_current_admin)):
     """Download a minimal valid sample template for manual upload reference."""
@@ -424,8 +445,16 @@ async def sample_template(_user: User = Depends(get_current_admin)):
         "version": "1.0",
         "title": "Sample Topic — Intermediate 3-Month Roadmap",
         "level": "intermediate",
-        "goal": "Ship a production-ready project demonstrating <capability> across real-world data.",
+        "goal": "Ship a production-ready project demonstrating <capability> across real-world data in ~180 hours.",
         "duration_months": 3,
+        "top_resources": [
+            {"name": "Primary textbook / course (visual-intuitive)", "url": "https://real-anchor-1.com", "hrs": 20},
+            {"name": "Rigorous reference (math/theory)",             "url": "https://real-anchor-2.com", "hrs": 15},
+            {"name": "Hands-on codebase (practice)",                 "url": "https://github.com/example/anchor-3", "hrs": 25},
+        ],
+        "certifications": [
+            {"name": "Relevant industry cert", "provider": "DeepLearning.AI", "url": "https://www.deeplearning.ai/courses/...", "cost_usd": 49, "prep_hours": 20},
+        ],
         "months": [
             {
                 "month": 1,
@@ -1131,7 +1160,8 @@ async def pipeline_topics_page(
   <div>{filter_html}</div>
   <div style="display:flex;gap:8px;align-items:center">
     <a href="/admin/pipeline/api/sample-template" download="sample-template.json" style="font-size:12px;color:#8a92a0;text-decoration:underline">Sample JSON</a>
-    <button class="btn" onclick="document.getElementById('promptModal').style.display='flex'" title="Generate a prompt to paste into Claude.ai chat">Claude prompt</button>
+    <a href="/admin/pipeline/api/claude-opus-prompt-template" download="claude-opus-curriculum-prompt.txt" style="font-size:12px;color:#8a92a0;text-decoration:underline" title="Master prompt for Claude Opus 4.6 — paste into Claude.ai chat, fill in topic/duration/level at top">Opus prompt (.txt)</a>
+    <button class="btn" onclick="document.getElementById('promptModal').style.display='flex'" title="Generate a topic-specific prompt (rendered with your inputs) to paste into Claude.ai chat">Quick prompt</button>
     <button class="btn primary" onclick="document.getElementById('uploadModal').style.display='flex'">+ Upload Template JSON</button>
   </div>
 </div>
