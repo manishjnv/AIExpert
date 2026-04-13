@@ -1,14 +1,37 @@
 # AI Integration
 
-Free AI APIs powering the chat assistant, repo evaluation, and quarterly curriculum sync. Goal: zero ongoing cost, ever.
+AI APIs powering the chat assistant, repo evaluation, curriculum pipeline, and topic discovery. Goal: minimise paid spend while maintaining quality ≥ 90 on generated curricula.
 
-## Provider strategy
+> **See also:** [AI_QUALITY_PIPELINE.md](AI_QUALITY_PIPELINE.md) — stage-by-stage contract of the curriculum quality pipeline (prefix → score → review → refine → validate) with provider dispatch rules, model routing, and cost-saving measures.
+
+## Provider strategy (current)
 
 | Purpose | Primary | Fallback | Why |
 |---|---|---|---|
-| Chat assistant | Google Gemini 1.5 Flash | Groq Llama 3.3 70B | Gemini free tier is generous; Groq is the fastest free alternative |
-| Repo evaluation | Google Gemini 1.5 Flash | Groq Llama 3.3 70B | Gemini's 1M-token context lets us send a whole repo in one shot |
-| Quarterly curriculum sync | Google Gemini 1.5 Pro | Gemini 1.5 Flash | Run once per quarter; worth using the higher-quality model |
+| **Topic discovery** | Gemini 2.5 Flash | provider chain | Structured output, schema-enforced |
+| **Topic triage** | Groq Llama 3.3 70B | Cerebras → Mistral → pass | Free classification, cascading fallback on rate limit |
+| **Topic dedup embedding** | OpenAI `text-embedding-3-small` | — | $0.02/1M; gemini has no competitive embedding model |
+| **Curriculum generation** | Gemini 2.5 Flash + JSON schema | provider chain | Guaranteed schema, cached system prompt |
+| **Quality review** | Gemini 2.5 Flash | Groq | Cross-model review, cached 30 days |
+| **Refine — pattern fixes** | Gemini 2.5 Flash | — | Mechanical rewrites (action verbs, measurability) |
+| **Refine — reasoning-heavy** | Gemini 2.5 Pro | Gemini Flash | Deep rewrites (Bloom's, prerequisites). ~1.5× cheaper than Claude Sonnet |
+| **Quality guardrail** | OpenAI embeddings | skip on error | Semantic similarity post-refine |
+| **Chat assistant** | Gemini 2.5 Flash | Groq | Generous free tier, fast fallback |
+| **Repo evaluation** | Gemini 2.5 Flash | Groq | Large context for whole-repo eval |
+| **Quarterly sync (legacy)** | Gemini | — | Replaced by auto-pipeline |
+
+### Why not Claude
+
+Anthropic Tier 1 requires **$40 cumulative spend** for reliable API access. At test-scale volumes this is wasted capital — Gemini 2.5 Pro provides equivalent reasoning on multi-constraint rewrites at 60% of the cost. Claude wiring retained in code for when usage justifies Tier 2.
+
+### Why OpenAI only for embeddings
+
+`text-embedding-3-small` at $0.02 per 1M tokens has no peer. Gemini/Groq/Mistral offer nothing competitive for semantic similarity. Used for:
+
+1. Topic discovery dedup (reject candidates > 0.88 cosine sim to existing topics).
+2. Post-refine semantic guardrail (reject refines with sim > 0.98 — wasted call — or sim < 0.50 — hallucination).
+
+Never in generation/refine/chat critical path.
 
 ## Free-tier limits (as of v1)
 

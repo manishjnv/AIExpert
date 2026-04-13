@@ -232,6 +232,17 @@ This is subtle and worth writing down so we get it right:
 
 Do not delete localStorage data until the merge returns success.
 
+## AI Quality Pipeline
+
+The full curriculum lifecycle (discovery → triage → dedup → generation → quality → publish → refresh) and every cost/quality optimisation in effect are documented in a dedicated file: see [AI_QUALITY_PIPELINE.md](AI_QUALITY_PIPELINE.md).
+
+TL;DR:
+
+- **Pipeline**: Stage 0 Prefix (local auto-fix) → Stage 1 Score (heuristic) → Stage 2 Review (Gemini, cached 30d) → Stage 3 Refine (Gemini Pro for reasoning-heavy, Flash for pattern fixes) → Stage 4 Validate (heuristic + OpenAI-embedding semantic guardrail).
+- **Providers**: Gemini for generation/review/refine, OpenAI for embeddings only, Groq/Cerebras/Mistral for triage cascading fallback, Claude path retained but dormant (Tier 1 gating).
+- **Cost ceiling**: ~$0.046 for heavy-refine templates; ~$0.003 for happy-path generations; ~10–15% of refines caught by the semantic guardrail.
+- **Observability**: `/admin/pipeline/ai-usage` has Cost-per-Template attribution, per-provider and per-task aggregates, 30-day reconciliation, and Recent Calls.
+
 ## External Integrations
 
 Complete list of every external service the platform integrates with, how it's configured, and what it's used for.
