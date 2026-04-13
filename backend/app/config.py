@@ -58,7 +58,9 @@ class Settings(BaseSettings):
 
     # ----- AI Providers -----
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    # Default flash model — 2.5 has materially stronger reasoning than 1.5 at
+    # the same price. Used for discovery, generation, review, light refine.
+    gemini_model: str = "gemini-2.5-flash"
     # Pro model reserved for deep refinement and hard reasoning tasks. ~15× more
     # expensive than flash per output token, but still ~1.5× cheaper than Claude
     # Sonnet and much smarter than flash on multi-constraint rewrites.
