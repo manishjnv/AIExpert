@@ -1,40 +1,75 @@
-# AI Roadmap Platform
+# AutomateEdge — AI Learning Roadmap
 
-A self-hosted web platform that generates personalized AI study plans (3 months to 1 year), tracks progress, auto-refreshes the curriculum every quarter from trending sources, and uses free AI APIs to evaluate learners' GitHub practice work.
+**A free, self-paced platform that gives anyone a personalised,
+AI-curated 3-to-12-month study plan to learn modern AI from scratch.**
+Track your progress, link your GitHub repos as you build, get AI
+evaluations of your practice work, and graduate with an HMAC-signed,
+publicly-verifiable credential.
 
-**Status:** Planning complete, scaffolding in place, implementation in progress.
+Live: **[automateedge.cloud](https://automateedge.cloud)** ·
+Blog: **[Building AutomateEdge Solo](https://automateedge.cloud/blog/01)**
+
+## Screenshots
+
+<!-- Drop PNGs into docs/screenshots/ with these filenames -->
+| Hero + plan                        | Certificate                                       | Leaderboard                                       |
+| ---------------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| ![Hero](docs/screenshots/hero.png) | ![Certificate](docs/screenshots/certificate.png) | ![Leaderboard](docs/screenshots/leaderboard.png) |
+
+## Why it exists
+
+Static roadmaps drift within a quarter. Paid cohort programs
+gate-keep on price and schedule. AutomateEdge sits between them:
+AI-generated curricula that refresh every quarter, human-reviewed
+before publish, free for every learner.
 
 ## What it does
 
-- **Personalized plans.** Pick your goal, duration (3, 6, or 12 months), and prior experience. The platform generates a week-by-week plan.
-- **Progress tracking.** Check off tasks. Per-week, per-month, and overall progress bars. Progress syncs across devices once signed in.
-- **Two sign-in modes.** Google SSO for one-click login, or email OTP for users who prefer not to use Google.
-- **GitHub practice linking.** Each week's deliverable can be linked to a GitHub repo. The platform verifies the repo exists and counts commits.
-- **AI evaluation.** Submit a repo for AI review — the platform fetches the README and top files, sends them to a free AI API (Gemini), and returns a score plus an assessment summary.
-- **Top resources per topic.** Every week ships with 3 hand-curated resources (YouTube, Coursera, docs, blog posts) with direct links and time estimates.
-- **Auto-refreshing curriculum.** A quarterly cron job pulls trending topics from top universities (Stanford, CMU, MIT), practitioner newsletters, and arXiv-sanity, then generates an update proposal the maintainer reviews and applies.
-- **Old vs new topic comparison.** Every curriculum version is tracked. Users can see what changed when they resume the plan.
-- **Shareable milestones.** One-click LinkedIn share for capstone completion.
-- **AI chat assistant.** Ask questions about any topic or resource — answered by the free Gemini API.
+- **Personalised plans.** Pick goal, duration (3, 6, 9, 12 months),
+  level. 6 resources per week, split 3 video + 3 non-video.
+- **Progress tracking.** Week-by-week + month-by-month + overall
+  bars. Collapsible cards, two-column resource grid.
+- **Auth.** Google OAuth or email OTP. JWT cookies, httpOnly.
+- **GitHub linking + AI evaluation.** Link practice repos per week;
+  ask AI to grade the README + top files. Secrets stripped before
+  anything leaves the server.
+- **Quality-gated AI curriculum pipeline.** Generate → review →
+  refine → validate → 15-dimension score. Only human-approved
+  templates go live; `last_reviewed_by` + `last_reviewed_on` are
+  stamped on every publish.
+- **HMAC-signed certificates.** Credential ID carries a truncated
+  HMAC over user + course + issue date; `/verify/<id>` re-derives
+  and checks. WeasyPrint-rendered PDF with a QR code to the verify
+  page and an OpenGraph image for LinkedIn.
+- **Gamified leaderboard.** XP formula (tasks + distinct repos +
+  streak weeks + cert bonus), 7 tiers Apprentice → AI Guru,
+  achievement pills, last-active recency color-coding.
+- **AI chat.** Per-week Q&A, calibrated to the learner's stated
+  experience and goal.
+- **Seven AI providers on a fallback chain.** Gemini Flash 2.5 →
+  Groq → Cerebras → Mistral → DeepSeek → Sambanova → Anthropic
+  with a circuit breaker + per-provider daily $ cap.
+
+For the full story — choices, trade-offs, what'd I do differently —
+read the blog post: **[Building AutomateEdge Solo](https://automateedge.cloud/blog/01)**.
 
 ## Tech stack
 
-- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 (async), SQLite
-- **Auth:** Google OAuth2, email OTP, JWT cookies
-- **Frontend:** Vanilla JS (progressive enhancement over a single HTML file)
-- **AI:** Google Gemini API (free tier)
-- **Deployment:** Docker Compose on a VPS behind an existing reverse proxy
+- **Backend:** Python 3.12 · FastAPI · SQLAlchemy 2.0 (async) · SQLite
+- **Auth:** Google OAuth2 · email OTP · JWT cookies
+- **Frontend:** Vanilla JS, no framework, progressive enhancement
+- **AI:** 7 providers via a single fallback router (`app/ai/provider.py`)
+- **PDF:** WeasyPrint 63.1 · pydyf 0.11 · qrcode
+- **Deployment:** Docker Compose on a VPS behind Caddy
 
-See `docs/ARCHITECTURE.md` for the full picture.
-
-## Quick start (development)
+## Quick start
 
 ```bash
 # 1. Clone and configure
-git clone <repo-url> ai-roadmap-platform
-cd ai-roadmap-platform
+git clone https://github.com/manishjnv/AIExpert.git
+cd AIExpert
 cp .env.example .env
-# Edit .env and fill in the required secrets (see SECURITY.md)
+# Edit .env — at minimum: JWT_SECRET, GEMINI_API_KEY, SMTP_*
 
 # 2. Bring up the stack
 docker compose up -d
@@ -45,25 +80,48 @@ docker compose exec backend alembic upgrade head
 # 4. Visit http://localhost:8080
 ```
 
+Run tests:
+
+```bash
+docker compose exec backend pytest -q
+```
+
+CI runs the full suite on every push to master and every PR
+(see `.github/workflows/ci.yml`).
+
+## Contributing
+
+Issues and PRs welcome. Before opening one:
+
+1. Check `docs/TASKS.md` — if the feature is already scoped there,
+   link it. Otherwise open an issue first so we can agree on shape.
+2. Read `CLAUDE.md` section 5 — the non-negotiable rules
+   (no secrets in code, SQLAlchemy-only, async throughout, etc.)
+3. Add a test. The green baseline is 127 passing; CI gates PRs on that.
+4. Keep PRs small and reviewable. One feature slice per PR.
+
 ## Documentation
 
 | File | Purpose |
 |---|---|
-| `CLAUDE.md` | Primary context file for Claude Code (read this first if working with an AI coding assistant) |
-| `docs/PRD.md` | Product requirements — what each feature does and how it behaves |
-| `docs/ARCHITECTURE.md` | Technical architecture and stack rationale |
+| `CLAUDE.md` | Primary context for Claude Code — read first |
+| `docs/PRD.md` | Product requirements |
+| `docs/ARCHITECTURE.md` | Technical architecture + stack rationale |
 | `docs/DATA_MODEL.md` | Database schema |
-| `docs/API_SPEC.md` | REST API specification |
-| `docs/TASKS.md` | Phased build plan with acceptance criteria |
-| `docs/SECURITY.md` | Security requirements and threat model |
-| `docs/AI_INTEGRATION.md` | Free AI API setup and prompt templates |
+| `docs/API_SPEC.md` | REST endpoints |
+| `docs/TASKS.md` | Phased build plan |
+| `docs/SECURITY.md` | Security rules + threat model |
+| `docs/AI_INTEGRATION.md` | AI provider setup + prompts |
 | `docs/DEPLOYMENT.md` | VPS deployment workflow |
-| `docs/HANDOFF.md` | Living session state, updated after every dev session |
+| `docs/HANDOFF.md` | Living session state |
+| `docs/blog/` | Blog posts (source markdown) |
 
 ## License
 
 MIT — build on it, fork it, share it.
 
-## A note on AI-assisted development
+---
 
-This project is structured to be built with [Claude Code](https://claude.com/claude-code) or a similar AI coding assistant. The `CLAUDE.md` file and the docs in `/docs/` are written specifically so an AI assistant can read them at the start of a session, understand the state of the project, and pick up where the last session left off. If you're building this manually, the same docs work fine for humans.
+**Built solo by [@manishjnv](https://github.com/manishjnv)
+with Claude Code.** Feedback: open the footer → Contact on
+[automateedge.cloud](https://automateedge.cloud), or file an issue.
