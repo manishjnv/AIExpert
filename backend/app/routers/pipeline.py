@@ -466,6 +466,109 @@ async def sample_template(_user: User = Depends(get_current_admin)):
     )
 
 
+def _lenient_cleanup(data):
+    """Best-effort normalisation of a Claude-generated template before strict
+    schema validation. Fixes common LLM output quirks without changing semantics.
+
+    Handles:
+    - Markdown chars (**, `, ~~, ```json, extra quotes) leaking into string values
+    - Numeric fields arriving as strings ("16" → 16)
+    - Missing https:// on URLs
+    - Stray whitespace / newlines in titles/goals
+    - Wrong-case level ("Intermediate" → "intermediate")
+    - Empty certifications array omitted vs null
+    - Common Claude-isms like "…" (ellipsis) in URLs
+
+    Returns (cleaned_dict, list_of_notes).
+    """
+    import re as _re
+    notes: list[str] = []
+    if not isinstance(data, dict):
+        return data, notes
+
+    NUMERIC_KEYS = {"duration_months", "n", "month", "hours", "hrs", "cost_usd", "prep_hours"}
+    MARKDOWN_RE = _re.compile(r"\*\*|__|~~|`+")
+
+    def _clean_str(s, key=""):
+        if not isinstance(s, str):
+            return s
+        original = s
+        # Strip markdown emphasis chars
+        s = MARKDOWN_RE.sub("", s)
+        # Strip code fences if they somehow appear in a value
+        s = s.replace("```json", "").replace("```", "")
+        # Collapse excess whitespace (but preserve single spaces)
+        s = _re.sub(r"[\r\n\t]+", " ", s)
+        s = _re.sub(r" +", " ", s).strip()
+        # URL fixups
+        if key == "url" and s and not s.lower().startswith(("http://", "https://")):
+            if s.startswith("//"):
+                s = "https:" + s
+            elif _re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", s):
+                s = "https://" + s
+        if s != original:
+            notes.append(f"cleaned string at '{key}'")
+        return s
+
+    def _coerce_num(v, key=""):
+        if isinstance(v, (int, float)) or v is None:
+            return v
+        if isinstance(v, str):
+            stripped = v.strip().replace(",", "")
+            try:
+                if "." in stripped:
+                    val = int(float(stripped))
+                else:
+                    val = int(stripped)
+                notes.append(f"coerced {key}: '{v}' → {val}")
+                return val
+            except (ValueError, TypeError):
+                return v
+        return v
+
+    def _walk(node, parent_key=""):
+        if isinstance(node, dict):
+            out = {}
+            for k, v in node.items():
+                if k in NUMERIC_KEYS:
+                    v = _coerce_num(v, k)
+                elif isinstance(v, str):
+                    v = _clean_str(v, k)
+                elif isinstance(v, (list, dict)):
+                    v = _walk(v, k)
+                out[k] = v
+            return out
+        if isinstance(node, list):
+            return [_walk(item, parent_key) for item in node]
+        if isinstance(node, str):
+            return _clean_str(node, parent_key)
+        return node
+
+    cleaned = _walk(data)
+
+    # Level normalisation
+    if isinstance(cleaned.get("level"), str):
+        lv = cleaned["level"].strip().lower()
+        if lv in ("beginner", "intermediate", "advanced") and lv != cleaned["level"]:
+            notes.append(f"normalised level to lowercase '{lv}'")
+            cleaned["level"] = lv
+
+    # Ensure optional fields that might be null arrive as [] (Pydantic
+    # allows None, but downstream code is happier with [])
+    for opt_list in ("top_resources", "certifications"):
+        if cleaned.get(opt_list) is None:
+            cleaned[opt_list] = []
+
+    # Strip any leading/trailing junk from key (slugify leftovers)
+    if isinstance(cleaned.get("key"), str):
+        clean_key = _re.sub(r"[^a-z0-9_]+", "_", cleaned["key"].lower()).strip("_")
+        if clean_key != cleaned["key"]:
+            notes.append(f"normalised key: '{cleaned['key']}' → '{clean_key}'")
+            cleaned["key"] = clean_key
+
+    return cleaned, notes
+
+
 @router.post("/api/topics/upload-template")
 async def upload_manual_template(
     request: Request,
@@ -496,6 +599,11 @@ async def upload_manual_template(
     auto_publish = bool(body.pop("auto_publish", False))
     # Accept either {"template": {...}} or the template dict at the top level
     plan_data = body.get("template") if isinstance(body.get("template"), dict) else body
+
+    # Lenient cleanup — fix common issues in Claude/LLM output before strict
+    # Pydantic validation. Handles markdown stragglers, type coercions,
+    # URL protocol, etc.
+    plan_data, cleanup_notes = _lenient_cleanup(plan_data)
 
     # Structural validation via Pydantic
     try:
@@ -551,17 +659,31 @@ async def upload_manual_template(
         await db.flush()
         topic_id = new_topic.id
 
-    # Auto-score + optional auto-publish
+    # Run the full quality pipeline (prefix → score → review → refine → validate).
+    # The pipeline can improve weak templates, and auto-publish only fires on
+    # the final score. Uploaded templates from Claude usually land near-perfect,
+    # so refine rarely triggers; but if it does, the refined version is saved.
     quality_score = None
     published = False
     publish_reason = None
+    pipeline_stages: list[str] = []
     try:
-        from app.services.quality_scorer import score_template
-        result = await score_template(tpl, db)
-        quality_score = int(result.get("composite_score", 0))
-        # Persist the score on the template metadata
-        from app.curriculum.loader import update_quality_score, publish_template, PUBLISH_THRESHOLD
+        from app.services.quality_pipeline import run_quality_pipeline
+        from app.curriculum.loader import (
+            update_quality_score, publish_template, PUBLISH_THRESHOLD,
+        )
+        qr = await run_quality_pipeline(plan_data, generator_model="manual_upload", db=db)
+        quality_score = int(qr.get("final_score", 0))
+        pipeline_stages = qr.get("stages_run", [])
+
+        # If the pipeline improved the plan, persist the improved version
+        improved_plan = qr.get("plan") or plan_data
+        if improved_plan is not plan_data:
+            await save_curriculum_draft(improved_plan)
+            plan_data = improved_plan
+
         update_quality_score(key, quality_score)
+
         if auto_publish:
             if quality_score >= PUBLISH_THRESHOLD:
                 if publish_template(key, quality_score):
@@ -571,7 +693,8 @@ async def upload_manual_template(
             else:
                 publish_reason = f"score {quality_score} < {PUBLISH_THRESHOLD} threshold"
     except Exception as e:
-        publish_reason = f"scoring failed: {type(e).__name__}"
+        logger.exception("Quality pipeline on manual upload failed")
+        publish_reason = f"pipeline failed: {type(e).__name__}"
 
     return {
         "ok": True,
@@ -584,6 +707,8 @@ async def upload_manual_template(
         "quality_score": quality_score,
         "published": published,
         "publish_reason": publish_reason,
+        "cleanup_notes": cleanup_notes,
+        "pipeline_stages": pipeline_stages,
     }
 
 
@@ -1393,11 +1518,19 @@ async function uploadTemplate() {{
     const data = await resp.json().catch(() => ({{}}));
     if (resp.ok) {{
       let msg = '✓ ' + data.title + ' uploaded (' + data.weeks + ' weeks, ' + data.hours + 'h)';
-      if (typeof data.quality_score !== 'undefined') msg += ' · score ' + data.quality_score;
+      if (typeof data.quality_score !== 'undefined' && data.quality_score !== null) msg += ' · score ' + data.quality_score;
       if (data.published) msg += ' · <strong>published</strong>';
       else if (data.publish_reason) msg += ' · not published (' + data.publish_reason + ')';
+      if (Array.isArray(data.pipeline_stages) && data.pipeline_stages.length) {{
+        msg += '<div style="color:#8a92a0;font-size:11px;margin-top:4px">stages: ' + data.pipeline_stages.join(' → ') + '</div>';
+      }}
+      if (Array.isArray(data.cleanup_notes) && data.cleanup_notes.length) {{
+        const shown = data.cleanup_notes.slice(0, 3).join('; ');
+        const more = data.cleanup_notes.length > 3 ? ` (+${{data.cleanup_notes.length - 3}} more)` : '';
+        msg += '<div style="color:#8a92a0;font-size:11px;margin-top:2px">auto-cleaned: ' + shown + more + '</div>';
+      }}
       status.innerHTML = '<span style="color:#6db585">' + msg + '. Reloading…</span>';
-      setTimeout(() => window.location.reload(), 1800);
+      setTimeout(() => window.location.reload(), 2500);
     }} else {{
       status.innerHTML = '<span style="color:#d97757">✗ ' + (data.detail || resp.statusText) + '</span>';
     }}
