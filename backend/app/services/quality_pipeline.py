@@ -42,8 +42,36 @@ REVIEW_CACHE_TTL = 86400 * 30   # 30 days
 
 
 def _plan_hash(plan: dict) -> str:
-    """Deterministic hash of plan content for cache keying."""
-    raw = json.dumps(plan, sort_keys=True)
+    """Structural fingerprint of a plan for cache keying.
+
+    Uses the content that matters for quality review (title, level, weeks,
+    focus, deliv, check texts, resource URLs) — ignoring whitespace, key
+    order, and non-content metadata. Trivial edits hit the cache instead of
+    paying for a fresh review.
+    """
+    def _norm_str(s):
+        return " ".join(s.split()).strip().lower() if isinstance(s, str) else ""
+
+    fingerprint = {
+        "title": _norm_str(plan.get("title", "")),
+        "level": _norm_str(plan.get("level", "")),
+        "duration_months": plan.get("duration_months"),
+        "weeks": [],
+    }
+    for m in plan.get("months", []) or []:
+        for w in m.get("weeks", []) or []:
+            fingerprint["weeks"].append({
+                "n": w.get("n"),
+                "hours": w.get("hours"),
+                "focus": sorted(_norm_str(x) for x in (w.get("focus") or [])),
+                "deliv": sorted(_norm_str(x) for x in (w.get("deliv") or [])),
+                "checks": sorted(_norm_str(x) for x in (w.get("checks") or [])),
+                "resource_urls": sorted(
+                    _norm_str((r or {}).get("url", ""))
+                    for r in (w.get("resources") or []) if isinstance(r, dict)
+                ),
+            })
+    raw = json.dumps(fingerprint, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
