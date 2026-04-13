@@ -89,7 +89,11 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
 /* Toggle */
 .toggle-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
 .toggle-row + .toggle-row { border-top: 1px solid var(--line); }
-.toggle-row label { font-family: var(--sans); font-size: 14px; color: var(--paper); cursor: pointer; flex: 1; letter-spacing: 0.01em; }
+/* Match brand: serif for the human-readable label (same family as
+   profile-name and plan-title) so the toggle row visually belongs with
+   the other content cards. Was --sans which read like a stray system
+   font once contrast was fixed. */
+.toggle-row label { font-family: var(--serif); font-size: 15px; color: var(--paper); cursor: pointer; flex: 1; font-weight: 400; letter-spacing: 0; }
 .toggle-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
 /* Toast */
