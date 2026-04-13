@@ -2,6 +2,72 @@
 
 > This file is rewritten at the end of every session. Read after CLAUDE.md.
 
+## Current state as of 2026-04-13 (session 9)
+
+**Last worked on:** Survival-mode shipping from the session-8 post-mortem.
+**Branch:** master (HEAD: 731e0bc)
+**Live site:** https://automateedge.cloud
+**Alembic head:** b3f5a9e21c04 (no new migrations this session)
+
+### Session 9 — what shipped (2026-04-13)
+
+**T1 (aef7a17) — Auto-publish disabled site-wide**
+- `loader.publish_template(key, score, admin_name)` now requires admin_name; raises ValueError otherwise. No auto-publish path anywhere.
+- Manual-upload endpoint: `auto_publish=true` still accepted for back-compat but template stays draft with `publish_reason="auto-publish disabled — admin must review and publish manually"`.
+- `set_template_status()` stamps `last_reviewed_on` (UTC YYYY-MM-DD) + `last_reviewed_by` (admin name/email) into `_meta.json` on publish. New helper `get_review_stamp(key)`.
+- `publish_template_endpoint` reads `user.name or user.email` and passes through.
+- Templates admin page shows "reviewed YYYY-MM-DD by <name>" under the status badge; grandfathered generalist_* show "grandfathered".
+- 6 tests in `backend/tests/test_publish_gate.py`.
+
+**T2 (5de7fd0) — Coursera affiliate URL rewriter**
+- New `COURSERA_AFFILIATE_ID` setting (default empty = no rewrite).
+- `backend/app/services/affiliate.py`:
+  - `rewrite_url(url, affiliate_id=None)` — urlparse-safe, preserves existing query string, idempotent (skips URLs that already have `irclickid`), only rewrites coursera.org/{learn,specializations}/<non-empty-slug>.
+  - `rewrite_plan(plan)` — deep-copies, rewrites week resources + top_resources + certifications.
+- Click ID format: `<affiliate_id>-<16 hex chars>` (unique per render).
+- Wired into `plans.py` via `_learner_response()` helper on `/plan/default`, POST `/plans` (all 3 branches), GET `/plans/active`, progress tick response.
+- NOT applied on public_profile / share / verify routers.
+- 12 unit tests in `backend/tests/test_affiliate.py`.
+- `.env.example` entry added with pointer to coursera.org/about/affiliates.
+
+**T4 (61c847b) — 7 test fixes to a green baseline**
+- `test_ai`: old targets `app.ai.provider.gemini_complete/groq_complete` never existed (provider.py uses dynamic `__import__`). Now patches `app.ai.gemini.complete` + `app.ai.groq.complete`. Also unblocks API-key gate and circuit breaker.
+- `test_plans::test_re_enroll_archives_old_plan`: switch 6mo-intermediate → 12mo-beginner. Same-template re-enroll is documented no-op.
+- `test_plans::test_migrate_server_wins`: migrate endpoint returns 204 (guardrail) when progress exists. Test asserts 204 + empty body + `/plans/active` state preserved.
+- `test_e2e_smoke::test_full_user_journey`: migrate step asserts 204 + verifies w1_0 stays True, w1_1 stays False via `/plans/active`.
+- `test_certificates_e2e`: `_weasyprint_available()` helper skips the PDF-render assertion block on hosts without cairo/pango (Windows dev).
+- Full suite: **127 passed, 1 skipped, 0 failed**.
+
+**T4 (6d975fc) — CI workflow**
+- `.github/workflows/ci.yml`: push to master + PR to master. Python 3.12, Ubuntu, pip cache keyed on `backend/requirements.txt`. Installs `libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info fonts-dejavu` so the PDF-render test runs for real. In-memory SQLite, 16+ char JWT secret, empty affiliate ID. Concurrency group cancels superseded runs on the same ref.
+
+**T5 (731e0bc) — Blog + footer + README**
+- `docs/blog/01-building-automateedge-solo.md` — ~1500-word honest post-mortem: why AutomateEdge exists, stack rationale, quality pipeline, HMAC-signed certs, leaderboard XP + 7 tiers, what I'd do differently (auto-publish regret, more integration tests, Gemini Pro for refine sooner), what's next.
+- `backend/app/routers/blog.py` — `/blog/01` + `/blog/01/` routes, full OG + Twitter meta, Fraunces serif body, amber h2s, uses existing nav.js + nav.css shell. Registered in `main.py` under no prefix. No new runtime deps (rule #9) — HTML is hand-polished from the markdown source.
+- `frontend/nav.js` footer: Blog link inserted between Leaderboard and Verify Credential.
+- README rewritten: real pitch, screenshot table with placeholder paths (`docs/screenshots/hero.png`, `certificate.png`, `leaderboard.png` — PNGs TBD), feature list tied to shipped systems, blog + live-site links, contribution instructions referencing the 127-test green baseline.
+
+### Deploy checklist for the user (session 9)
+
+5 commits to pull, **no migrations**:
+
+```bash
+ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose build backend && docker compose up -d --force-recreate backend"
+```
+
+After deploy:
+- Set `COURSERA_AFFILIATE_ID=<real_id>` in `/srv/roadmap/.env` when you have one, then `docker compose up -d --force-recreate backend` (env_file only re-reads on container creation).
+- Drop hero/certificate/leaderboard PNGs into `docs/screenshots/` for README rendering on GitHub.
+
+### Next session priorities
+
+1. Admin revoke UI for certs (still pending from session 7).
+2. Tier-2 leaderboard: timeframe tabs, recent-activity stream, rank-change arrows.
+3. Second blog post — cadence matters.
+4. Verify first auto-generated template post-session-9 lands as draft (not published) and carries `summary` + 6/3/3 resource split.
+
+---
+
 ## Current state as of 2026-04-13 (session 8)
 
 **Last worked on:** Site-wide gamification + branding + UX polish on top of the now-shipped certificate system.
