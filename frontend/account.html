@@ -240,9 +240,12 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
         </div>
 
         <!-- My Certificates -->
-        <div class="section" id="certsSection" style="display:none">
+        <div class="section" id="certsSection">
           <div class="section-title">My Certificates</div>
           <div id="certsList" style="display:flex;flex-direction:column;gap:12px;margin-top:8px"></div>
+          <div id="certsEmpty" style="display:none;padding:18px;border:1px dashed var(--line);border-radius:6px;text-align:center;color:var(--ink-soft);font-size:13px;line-height:1.5">
+            No certificates yet. Finish a plan — <strong style="color:var(--paper)">≥90% of milestones with the capstone month at 100%</strong> — and a credential will appear here automatically.
+          </div>
         </div>
 
         <!-- Course History -->
@@ -369,15 +372,27 @@ const TIER_LABEL = {
 };
 
 async function loadCertificates() {
+  const listEl = document.getElementById('certsList');
+  const emptyEl = document.getElementById('certsEmpty');
   try {
     const resp = await fetch('/api/certificates', { credentials: 'same-origin' });
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
     const certs = await resp.json();
-    if (!certs.length) return;
-    document.getElementById('certsSection').style.display = 'block';
-    const listEl = document.getElementById('certsList');
+    if (!certs.length) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
     listEl.innerHTML = certs.map(renderCertRow).join('');
-  } catch {}
+  } catch {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+  }
 }
 
 function renderCertRow(c) {
