@@ -735,14 +735,14 @@ async def upload_manual_template(
 
         update_quality_score(key, quality_score)
 
+        # Auto-publish is disabled by policy (session 9). Every generated template
+        # lands as a draft; an admin must manually click Publish on the Templates
+        # admin page, which stamps last_reviewed_by / last_reviewed_on.
+        published = False
         if auto_publish:
-            if quality_score >= PUBLISH_THRESHOLD:
-                if publish_template(key, quality_score):
-                    published = True
-                else:
-                    publish_reason = f"publish_template declined (score={quality_score})"
-            else:
-                publish_reason = f"score {quality_score} < {PUBLISH_THRESHOLD} threshold"
+            publish_reason = "auto-publish disabled — admin must review and publish manually"
+        else:
+            publish_reason = f"draft (score={quality_score}); review on /admin/templates to publish"
     except Exception as e:
         logger.exception("Quality pipeline on manual upload failed")
         publish_reason = f"pipeline failed: {type(e).__name__}"
@@ -818,10 +818,13 @@ async def get_template_quality(
 async def publish_template_endpoint(
     template_key: str,
     request: Request,
-    _user: User = Depends(get_current_admin),
+    user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Publish a template if it meets the quality threshold (>= 90)."""
+    """Publish a template if it meets the quality threshold (>= 90).
+
+    Stamps last_reviewed_by (admin name/email) + last_reviewed_on into _meta.json.
+    """
     _check_origin(request)
     from app.services.quality_scorer import score_template
     from app.curriculum.loader import load_template, publish_template, PUBLISH_THRESHOLD
@@ -833,8 +836,9 @@ async def publish_template_endpoint(
     result = await score_template(tpl, db)
     score = result["composite_score"]
 
-    if publish_template(template_key, score):
-        return {"ok": True, "status": "published", "score": score}
+    admin_name = getattr(user, "name", None) or getattr(user, "email", None) or f"admin#{user.id}"
+    if publish_template(template_key, score, admin_name=admin_name):
+        return {"ok": True, "status": "published", "score": score, "reviewed_by": admin_name}
     else:
         raise HTTPException(
             status_code=400,

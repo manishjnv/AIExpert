@@ -773,7 +773,7 @@ async def admin_templates_page(
     db: AsyncSession = Depends(get_db),
 ):
     """Admin templates management page."""
-    from app.curriculum.loader import list_templates, load_template, get_template_status
+    from app.curriculum.loader import list_templates, load_template, get_template_status, get_review_stamp
     from app.models.plan import UserPlan
 
     # Get subscriber counts per template (active enrollments only)
@@ -803,6 +803,16 @@ async def admin_templates_page(
             else:
                 status_badge = '<span style="background:#2a2520;color:#e8a849;padding:2px 8px;border-radius:10px;font-size:11px">Draft</span>'
 
+            stamp = get_review_stamp(key)
+            if stamp.get("last_reviewed_on") and stamp.get("last_reviewed_by"):
+                status_badge += (
+                    f'<div style="font-size:10px;color:#8a92a0;margin-top:3px;white-space:nowrap">'
+                    f'reviewed {esc(stamp["last_reviewed_on"])}<br>by {esc(stamp["last_reviewed_by"])}'
+                    f'</div>'
+                )
+            elif is_default:
+                status_badge += '<div style="font-size:10px;color:#8a92a0;margin-top:3px">grandfathered</div>'
+
             score_color = "#6db585" if q_score >= 90 else "#e8a849" if q_score >= 70 else "#d97757" if q_score > 0 else "#8a92a0"
             if q_score == 0:
                 score_display = '<span style="color:#8a92a0" title="Not yet scored — click Check quality">—</span>'
@@ -824,7 +834,7 @@ async def admin_templates_page(
                 if q_score >= 90:
                     actions.append(f'<button class="btn success" onclick="publishTemplate(&quot;{key}&quot;)" title="Make this template available to users">Publish</button>')
                 elif q_score == 0:
-                    actions.append(f'<button class="btn primary" onclick="checkQuality(&quot;{key}&quot;)" title="Score quality; auto-publishes if score >= 90">Check quality</button>')
+                    actions.append(f'<button class="btn primary" onclick="checkQuality(&quot;{key}&quot;)" title="Score this draft against the 15-dim rubric. Does NOT publish — admin must click Publish manually.">Check quality</button>')
                 else:
                     actions.append(f'<button class="btn" onclick="refineOne(&quot;{key}&quot;)" title="Score {q_score} below 90. Run quality pipeline on this template only.">Refine</button>')
             if not is_default:

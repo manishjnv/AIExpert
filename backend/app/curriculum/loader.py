@@ -3,17 +3,20 @@ Plan template loader — reads JSON templates from disk and validates
 them against Pydantic schemas.
 
 Publishing model:
-- All templates are saved as drafts by default
-- Templates must score >= PUBLISH_THRESHOLD (90) to be publishable
-- Admin can publish/unpublish via API
-- User-facing endpoints only see published templates
-- _meta.json in templates dir tracks status + scores
+- All templates are saved as drafts by default (NO auto-publish on score).
+- Templates must score >= PUBLISH_THRESHOLD (90) to be publishable.
+- An admin must manually call publish_template(..., admin_name=...) to promote a
+  draft. The admin's name + timestamp are stamped into _meta.json as
+  last_reviewed_by / last_reviewed_on.
+- User-facing endpoints only see published templates.
+- _meta.json in templates dir tracks status + scores + reviewer stamp.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -228,23 +231,44 @@ def get_template_status(key: str) -> dict:
     return meta.get(key, {"status": "draft", "quality_score": 0})
 
 
-def set_template_status(key: str, status: str, quality_score: int = 0) -> None:
-    """Set publish status for a template ('draft' or 'published')."""
+def set_template_status(
+    key: str,
+    status: str,
+    quality_score: int = 0,
+    reviewer_name: Optional[str] = None,
+) -> None:
+    """Set publish status for a template ('draft' or 'published').
+
+    When status=='published' and reviewer_name is given, stamp
+    last_reviewed_on (UTC ISO date) + last_reviewed_by onto the meta entry.
+    """
     meta = _load_meta()
-    meta[key] = {"status": status, "quality_score": quality_score}
+    entry = meta.get(key, {})
+    entry["status"] = status
+    entry["quality_score"] = quality_score
+    if status == "published" and reviewer_name:
+        entry["last_reviewed_on"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        entry["last_reviewed_by"] = reviewer_name
+    meta[key] = entry
     _save_meta(meta)
     load_template.cache_clear()
-    logger.info("Template %s → %s (score: %d)", key, status, quality_score)
+    logger.info("Template %s → %s (score: %d, reviewer: %s)",
+                key, status, quality_score, reviewer_name or "-")
 
 
-def publish_template(key: str, quality_score: int) -> bool:
+def publish_template(key: str, quality_score: int, admin_name: str) -> bool:
     """Publish a template if it meets the quality threshold.
+
+    REQUIRES admin_name — there is no auto-publish path. Callers who cannot
+    supply a real admin identity must leave the template as a draft.
 
     Returns True if published, False if score too low.
     """
+    if not admin_name:
+        raise ValueError("publish_template requires admin_name; auto-publish is disabled")
     if quality_score < PUBLISH_THRESHOLD:
         return False
-    set_template_status(key, "published", quality_score)
+    set_template_status(key, "published", quality_score, reviewer_name=admin_name)
     return True
 
 
@@ -277,3 +301,13 @@ def update_quality_score(key: str, score: int) -> None:
     entry["quality_score"] = score
     meta[key] = entry
     _save_meta(meta)
+
+
+def get_review_stamp(key: str) -> dict:
+    """Return {'last_reviewed_on': str|None, 'last_reviewed_by': str|None}."""
+    meta = _load_meta()
+    entry = meta.get(key, {})
+    return {
+        "last_reviewed_on": entry.get("last_reviewed_on"),
+        "last_reviewed_by": entry.get("last_reviewed_by"),
+    }
