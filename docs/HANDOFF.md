@@ -58,6 +58,9 @@
 - Top-nav link alignment tightened (gap 2→4px, padding 10×16, explicit inline-flex line-height so the active underline doesn't shift rows 1px down)
 - Scroll-to-top button (bottom-left) rebuilt: amber fill, 48×48, gold halo ring, 2.4s pulse animation, hover-lift — impossible to miss
 
+**Pre-session-9 backup**
+`/srv/roadmap/data/app.db.backup-2026-04-13` on the VPS — byte-for-byte copy of prod `app.db` (324 KB) taken at the end of session 8. Restore with `cp` if session-9 test fixes corrupt the schema. Delete once session 9 is green.
+
 **Commits this session (2026-04-13, session 8)**
 PDF/verify fixes: `8810b4e`, `c76c84f`, `bc5672a`, `b2fa50a`, `2bf9b0b`, `f1ee2bb`, `8cc6d92`, `bb563f3`, `28e82e0`, `871ef0a`, `31c097f`  ·  Leaderboard gamification: `f935d49`, `42c1564`, `80cc6da`, `0782701`, `6d6afe1`, `4c59f7a`, `2e6dd21`  ·  Branding + footer: `32bcc8c`, `2a7ca8e`, `327002e`, `6932329`, `eb24b7c`, `51e544b`, `6ea6b62`, `6f677ea`  ·  UX: `45573d4`, `529a201`, `946d653`, `27f9c15`, `58d9a4e`  ·  This-turn: email identity (pending commit).
 
