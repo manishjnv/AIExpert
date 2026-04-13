@@ -230,7 +230,8 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
       </dl>
     </div>
 
-    <div class="cta">
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a href="https://www.linkedin.com/sharing/share-offsite/?url={verify_url}" target="_blank" rel="noopener" style="background:#0a66c2">Share on LinkedIn</a>
       <a href="{base}">Start your own AI roadmap</a>
     </div>
 
