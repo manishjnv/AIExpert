@@ -81,8 +81,10 @@ async def test_re_enroll_archives_old_plan():
         resp1 = await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
         plan1_id = resp1.json()["id"]
 
-        # Re-enroll
-        resp2 = await c.post("/api/plans", json={"goal": "generalist", "duration": "6mo", "level": "intermediate"}, cookies={"auth_token": token})
+        # Switch to a different template — this archives plan1 and activates plan2.
+        # (Enrolling into the SAME template is a no-op by design: it returns the
+        # current active plan with existing progress instead of duplicating it.)
+        resp2 = await c.post("/api/plans", json={"goal": "generalist", "duration": "12mo", "level": "beginner"}, cookies={"auth_token": token})
         plan2_id = resp2.json()["id"]
         assert plan2_id != plan1_id
 
@@ -177,7 +179,14 @@ async def test_migrate_progress():
 
 @pytest.mark.asyncio
 async def test_migrate_server_wins():
-    """Server-side done=True is not overwritten by client done=False."""
+    """Server-side done=True is not overwritten when migrate runs later.
+
+    The /progress/migrate endpoint carries a hard guardrail: if the active
+    plan already has any Progress rows, it no-ops (returns 204). This
+    prevents cross-plan leakage from stale localStorage after plan
+    switches. The test verifies that the server tick survives an attempted
+    clearing migration.
+    """
     await _setup()
     app = _get_app()
     _, token = await _create_user_and_token()
@@ -188,10 +197,17 @@ async def test_migrate_server_wins():
         # Set a tick server-side
         await c.patch("/api/progress", json={"week_num": 1, "check_idx": 0, "done": True}, cookies={"auth_token": token})
 
-        # Migrate with that key as False — server should win
+        # Attempt to migrate with that key as False — the endpoint should
+        # no-op (existing progress guardrail) and return 204.
         blob = {"w1_0": False}
         resp = await c.post("/api/progress/migrate", json={"progress": blob}, cookies={"auth_token": token})
-        w1 = resp.json()["months"][0]["weeks"][0]
-        assert w1["checks"][0]["done"] is True  # server wins
+        assert resp.status_code == 204
+        assert resp.content == b""
+
+        # Server state must still show the tick as done.
+        resp2 = await c.get("/api/plans/active", cookies={"auth_token": token})
+        assert resp2.status_code == 200
+        w1 = resp2.json()["months"][0]["weeks"][0]
+        assert w1["checks"][0]["done"] is True
 
     await close_db()

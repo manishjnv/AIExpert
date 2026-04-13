@@ -80,14 +80,19 @@ async def test_full_user_journey():
         resp = await c.get("/api/plans/active", cookies=cookies)
         assert resp.json()["months"][0]["weeks"][0]["checks"][0]["done"] is True
 
-        # 8. POST /api/progress/migrate — migrate localStorage blob
+        # 8. POST /api/progress/migrate — migrate localStorage blob.
+        # Guardrail: if the plan already has progress (step 6 ticked w1_0),
+        # the migrate endpoint no-ops and returns 204 to prevent stale
+        # localStorage from leaking across plan switches.
         resp = await c.post("/api/progress/migrate", json={
             "progress": {"w1_1": True, "w2_0": True}
         }, cookies=cookies)
-        assert resp.status_code == 200
-        # Server-side tick (w1_0) should still be true
+        assert resp.status_code == 204
+
+        # Server-side tick (w1_0) is untouched; the migrate blob is discarded.
+        resp = await c.get("/api/plans/active", cookies=cookies)
         assert resp.json()["months"][0]["weeks"][0]["checks"][0]["done"] is True
-        assert resp.json()["months"][0]["weeks"][0]["checks"][1]["done"] is True
+        assert resp.json()["months"][0]["weeks"][0]["checks"][1]["done"] is False
 
         # 9. POST /api/repos/link — link a repo (mocked GitHub)
         mock_repo = {

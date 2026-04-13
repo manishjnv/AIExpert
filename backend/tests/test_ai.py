@@ -94,10 +94,27 @@ class TestSanitizeFileList:
 
 # ---- 7.4: Provider tests ----
 
+def _patch_provider_keys(monkeypatch):
+    """Force non-empty API keys so the provider chain doesn't skip providers.
+
+    provider.complete() checks `settings.<name>_api_key` and skips any provider
+    with an empty key. Tests mock the underlying HTTP call but still need the
+    key gate to pass.
+    """
+    from app.config import get_settings
+    s = get_settings()
+    monkeypatch.setattr(s, "gemini_api_key", "test-gemini-key", raising=False)
+    monkeypatch.setattr(s, "groq_api_key", "test-groq-key", raising=False)
+    # Ensure circuit breaker treats both as available
+    from app.ai import health
+    monkeypatch.setattr(health, "is_available", lambda _name: True)
+
+
 @pytest.mark.asyncio
-async def test_provider_gemini_success():
+async def test_provider_gemini_success(monkeypatch):
     """Provider returns Gemini result on success."""
-    with patch("app.ai.provider.gemini_complete", new_callable=AsyncMock) as mock_gemini:
+    _patch_provider_keys(monkeypatch)
+    with patch("app.ai.gemini.complete", new_callable=AsyncMock) as mock_gemini:
         mock_gemini.return_value = {"score": 85}
         from app.ai.provider import complete
         result, model = await complete("test prompt")
@@ -106,12 +123,13 @@ async def test_provider_gemini_success():
 
 
 @pytest.mark.asyncio
-async def test_provider_falls_back_to_groq():
+async def test_provider_falls_back_to_groq(monkeypatch):
     """Provider falls back to Groq when Gemini fails."""
+    _patch_provider_keys(monkeypatch)
     from app.ai.gemini import GeminiError
 
-    with patch("app.ai.provider.gemini_complete", new_callable=AsyncMock) as mock_gemini, \
-         patch("app.ai.provider.groq_complete", new_callable=AsyncMock) as mock_groq:
+    with patch("app.ai.gemini.complete", new_callable=AsyncMock) as mock_gemini, \
+         patch("app.ai.groq.complete", new_callable=AsyncMock) as mock_groq:
         mock_gemini.side_effect = GeminiError("Gemini down")
         mock_groq.return_value = {"score": 70}
         from app.ai.provider import complete
@@ -121,14 +139,21 @@ async def test_provider_falls_back_to_groq():
 
 
 @pytest.mark.asyncio
-async def test_provider_all_fail():
+async def test_provider_all_fail(monkeypatch):
     """Provider raises AIProviderError when all providers fail."""
+    _patch_provider_keys(monkeypatch)
+    # Blank out every other provider key so the chain stops at gemini+groq
+    from app.config import get_settings
+    s = get_settings()
+    for k in ("cerebras_api_key", "mistral_api_key", "deepseek_api_key", "sambanova_api_key"):
+        monkeypatch.setattr(s, k, "", raising=False)
+
     from app.ai.gemini import GeminiError
     from app.ai.groq import GroqError
     from app.ai.provider import AIProviderError
 
-    with patch("app.ai.provider.gemini_complete", new_callable=AsyncMock) as mock_gemini, \
-         patch("app.ai.provider.groq_complete", new_callable=AsyncMock) as mock_groq:
+    with patch("app.ai.gemini.complete", new_callable=AsyncMock) as mock_gemini, \
+         patch("app.ai.groq.complete", new_callable=AsyncMock) as mock_groq:
         mock_gemini.side_effect = GeminiError("down")
         mock_groq.side_effect = GroqError("also down")
         from app.ai.provider import complete
