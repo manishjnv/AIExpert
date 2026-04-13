@@ -36,27 +36,29 @@
     .brand-right { font-weight: 400; }
     .eyebrow {
       text-align: center;
-      margin-top: 18mm;
+      margin-top: 14mm;
       font-family: "DejaVu Sans", sans-serif;
       font-size: 10pt; letter-spacing: 5pt; text-transform: uppercase;
       color: #92400e;
     }
     .title {
       text-align: center;
-      font-size: 44pt; font-weight: 400;
-      margin: 4mm 0 0 0;
+      font-size: 36pt; font-weight: 400;
+      margin: 3mm 0 0 0;
       color: #78350f; /* amber-900 */
       letter-spacing: 0.5pt;
+      line-height: 1.15;
+      padding: 0 12mm;
     }
     .awarded {
       text-align: center;
-      margin-top: 14mm;
-      font-size: 13pt; color: #57534e;
+      margin-top: 10mm;
+      font-size: 12pt; color: #57534e;
     }
     .name {
       text-align: center;
-      margin-top: 3mm;
-      font-size: 36pt; font-style: italic;
+      margin-top: 2mm;
+      font-size: 30pt; font-style: italic;
       color: #1f1610;
       border-bottom: 0.3mm solid #d97706;
       display: inline-block;
@@ -65,29 +67,30 @@
     .name-wrapper { text-align: center; }
     .body {
       text-align: center;
-      margin-top: 8mm;
-      font-size: 13pt; line-height: 1.55;
+      margin-top: 7mm;
+      font-size: 12pt; line-height: 1.5;
       color: #44403c;
-      padding: 0 10mm;
+      padding: 0 18mm;
     }
     .body strong { color: #1f1610; font-weight: 600; }
     .stats {
-      display: flex; justify-content: center; gap: 14mm;
-      margin-top: 10mm;
+      display: flex; justify-content: center; gap: 18mm;
+      margin-top: 7mm;
       font-family: "DejaVu Sans", sans-serif;
       font-size: 9pt; color: #78350f;
       text-transform: uppercase; letter-spacing: 1.5pt;
     }
     .stats .stat { text-align: center; }
     .stats .stat .val {
-      display: block; font-size: 16pt;
+      display: block; font-size: 15pt;
       font-family: "DejaVu Serif", Georgia, serif;
       font-weight: 700; color: #1f1610;
       letter-spacing: 0;
+      margin-bottom: 1mm;
     }
     .footer {
       position: absolute;
-      bottom: 14mm; left: 22mm; right: 22mm;
+      bottom: 12mm; left: 22mm; right: 22mm;
       display: flex; align-items: flex-end; justify-content: space-between;
     }
     .sig {
@@ -102,9 +105,10 @@
       border-bottom: 0.3mm solid #78350f;
       padding-bottom: 1mm; margin-bottom: 1mm;
     }
-    .cred-block { text-align: center; }
+    .cred-block { text-align: center; flex: 0 0 auto; }
     .cred-block img {
-      width: 30mm; height: 30mm;
+      width: 26mm; height: 26mm;
+      display: block; margin: 0 auto;
     }
     .cred-id {
       font-family: "DejaVu Sans Mono", monospace;
@@ -154,16 +158,18 @@
 
     <div class="body">
       has successfully completed the <strong>{{ duration_months }}-month {{ level }}</strong>
-      AI learning program, shipping <strong>{{ repos_linked }} GitHub
+      AI learning program{% if repos_linked > 0 %}, shipping <strong>{{ repos_linked }} GitHub
       {{ 'repository' if repos_linked == 1 else 'repositories' }}</strong>
-      and finishing <strong>{{ checks_done }} / {{ checks_total }}</strong> curriculum milestones
+      and finishing{% else %}, finishing{% endif %} <strong>{{ checks_done }} / {{ checks_total }}</strong> curriculum milestones
       across an estimated <strong>{{ total_hours }} hours</strong> of work.
     </div>
 
     <div class="stats">
       <div class="stat"><span class="val">{{ total_hours }}</span>Hours</div>
       <div class="stat"><span class="val">{{ checks_done }}/{{ checks_total }}</span>Milestones</div>
+      {% if repos_linked > 0 %}
       <div class="stat"><span class="val">{{ repos_linked }}</span>Projects</div>
+      {% endif %}
       <div class="stat"><span class="val">{{ issued_at_short }}</span>Issued</div>
     </div>
 
