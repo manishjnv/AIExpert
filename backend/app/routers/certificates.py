@@ -93,7 +93,11 @@ async def download_certificate_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Prevent stale-cache regressions when the template changes.
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
     )
 
 

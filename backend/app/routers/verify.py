@@ -152,13 +152,16 @@ def _index_html(error: str = "") -> str:
     )
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+
 @router.get("/verify", response_class=HTMLResponse)
 @router.get("/verify/", response_class=HTMLResponse)
 async def verify_index():
     """Paste-an-ID lookup form. Recruiters who don't have the full URL
     (e.g. they only have the printed credential ID from a PDF) can land
     here and look it up."""
-    return HTMLResponse(_index_html())
+    return HTMLResponse(_index_html(), headers=_NO_CACHE)
 
 
 @router.get("/verify/lookup", response_class=HTMLResponse)
