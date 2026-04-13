@@ -165,10 +165,13 @@ async def verify_index():
 async def verify_lookup(request: Request):
     """Form target — normalize the ID and either redirect to the cert
     page or re-render the form with an inline error."""
-    raw = (request.query_params.get("id") or "").strip().upper()
+    raw = (request.query_params.get("id") or "").strip()
     # Allow users to paste the full URL — extract the trailing segment.
-    if "/verify/" in raw.lower():
-        raw = raw.split("/verify/", 1)[1].split("/", 1)[0].split("?", 1)[0]
+    lower = raw.lower()
+    if "/verify/" in lower:
+        idx = lower.index("/verify/") + len("/verify/")
+        raw = raw[idx:].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    raw = raw.upper()
     import re
     if not re.fullmatch(r"AER-\d{4}-\d{2}-[A-Z0-9]{6}", raw):
         return HTMLResponse(
