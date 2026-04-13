@@ -72,6 +72,39 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
 .container a { color: #6fa8d6; text-decoration: none; }
 .container a:hover { color: #e8a849; }
+
+/* ----- Gamification ----- */
+.tier-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid; font-weight: 600; font-size: 13px; font-family: 'IBM Plex Sans', sans-serif; letter-spacing: 0.02em; white-space: nowrap; }
+.tier-chip .tier-icon { font-size: 22px; line-height: 1; }
+.tier-chip .tier-name { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; }
+
+.xp-cell { min-width: 150px; }
+.xp-num { font-family: 'Fraunces', Georgia, serif; font-size: 20px; color: #f5f1e8; font-weight: 400; line-height: 1; }
+.xp-num .xp-unit { font-size: 11px; color: #8a92a0; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.1em; margin-left: 4px; }
+.xp-next { font-size: 10px; color: #8a92a0; font-family: 'IBM Plex Mono', monospace; margin-top: 6px; letter-spacing: 0.03em; }
+.xp-bar { height: 4px; background: #2a323d; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.xp-bar > div { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+.pct-badge { display: inline-block; font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: #e8a849; background: rgba(232,168,73,0.12); border: 1px solid rgba(232,168,73,0.3); padding: 2px 8px; border-radius: 10px; letter-spacing: 0.05em; margin-top: 4px; }
+
+.badges-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.badge-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(232,168,73,0.1); border: 1px solid rgba(232,168,73,0.25); color: #e8d5a8; white-space: nowrap; }
+.badge-pill .be { font-size: 13px; line-height: 1; }
+
+/* ----- Help / Legend ----- */
+details.help { background: #161c24; border: 1px solid #2a323d; border-radius: 8px; padding: 16px 20px; margin: 20px 0 24px; }
+details.help[open] { background: #1a2029; }
+details.help summary { cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #e8a849; list-style: none; display: flex; align-items: center; gap: 10px; }
+details.help summary::-webkit-details-marker { display: none; }
+details.help summary::before { content: '?'; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(232,168,73,0.15); color: #e8a849; font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; }
+details.help[open] summary::before { content: '×'; }
+.help-body { margin-top: 14px; font-size: 13px; color: #c4c7cc; line-height: 1.6; }
+.help-body h4 { margin: 18px 0 8px; font-family: 'Fraunces', serif; color: #e8a849; font-size: 15px; font-weight: 500; }
+.help-body h4:first-child { margin-top: 0; }
+.help-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+.help-tile { padding: 10px 12px; background: #0f1419; border: 1px solid #2a323d; border-radius: 6px; font-size: 12px; }
+.help-tile .big { font-size: 18px; margin-right: 6px; vertical-align: middle; }
+.help-tile .thr { color: #8a92a0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; margin-top: 4px; }
 /* nav styles in /nav.css */
 @media (max-width: 768px) { .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
 """
@@ -112,13 +145,17 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
             )
         )).scalar() or 0
 
-    # Lifetime non-revoked certificates
-    lifetime_certs = (await db.execute(
-        select(func.count()).select_from(Certificate).where(
+    # Lifetime non-revoked certificates (need tier-level detail for XP scoring)
+    cert_rows = (await db.execute(
+        select(Certificate.tier).where(
             Certificate.user_id == user.id,
             Certificate.revoked_at.is_(None),
         )
-    )).scalar() or 0
+    )).all()
+    cert_tiers = [r[0] for r in cert_rows]
+    lifetime_certs = len(cert_tiers)
+    honors_count = sum(1 for t in cert_tiers if t == "honors")
+    distinction_count = sum(1 for t in cert_tiers if t == "distinction")
 
     # Active plan stats for current progress
     active_done = 0
@@ -149,7 +186,99 @@ async def _get_user_progress(user: User, db: AsyncSession) -> dict:
         "plans_count": len(all_plans),
         "lifetime_repos": lifetime_repos,
         "lifetime_certs": lifetime_certs,
+        "cert_tiers": cert_tiers,
+        "honors_count": honors_count,
+        "distinction_count": distinction_count,
     }
+
+
+# ---------------- Gamification: XP + Tiers + Badges ----------------
+#
+# Every activity is weighted against a published rubric so learners can
+# predict their gains. Only simple, stable signals — no click-tracking
+# or vanity metrics.
+
+XP_PER_TASK = 10
+XP_PER_REPO = 50
+XP_CERT_COMPLETION = 500
+XP_CERT_DISTINCTION = 750
+XP_CERT_HONORS = 1000
+XP_STREAK_PER_WEEK = 20       # flat bonus per active week
+
+# Tiers listed in ascending order — first entry with xp >= threshold wins.
+TIERS = [
+    {"min_xp":     0, "name": "Apprentice",  "icon": "🥚", "color": "#94a3b8", "bg": "rgba(148,163,184,0.12)", "border": "rgba(148,163,184,0.5)"},
+    {"min_xp":   100, "name": "Learner",     "icon": "📘", "color": "#60a5fa", "bg": "rgba(96,165,250,0.12)",  "border": "rgba(96,165,250,0.5)"},
+    {"min_xp":   500, "name": "Practitioner","icon": "🛠️", "color": "#2dd4bf", "bg": "rgba(45,212,191,0.12)",  "border": "rgba(45,212,191,0.5)"},
+    {"min_xp":  1500, "name": "Builder",     "icon": "🚀", "color": "#818cf8", "bg": "rgba(129,140,248,0.14)", "border": "rgba(129,140,248,0.55)"},
+    {"min_xp":  4000, "name": "Engineer",    "icon": "💎", "color": "#c084fc", "bg": "rgba(192,132,252,0.14)", "border": "rgba(192,132,252,0.55)"},
+    {"min_xp": 10000, "name": "Architect",   "icon": "👑", "color": "#f59e0b", "bg": "rgba(245,158,11,0.14)",  "border": "rgba(245,158,11,0.55)"},
+    {"min_xp": 25000, "name": "AI Guru",     "icon": "🧙", "color": "#ec4899", "bg": "rgba(236,72,153,0.14)",  "border": "rgba(236,72,153,0.55)"},
+]
+
+
+def _compute_xp(stats: dict, streak: int) -> int:
+    tasks = stats.get("lifetime_done", 0)
+    repos = stats.get("lifetime_repos", 0)
+    certs = stats.get("cert_tiers", [])
+    xp = tasks * XP_PER_TASK + repos * XP_PER_REPO + streak * XP_STREAK_PER_WEEK
+    for t in certs:
+        if t == "honors":
+            xp += XP_CERT_HONORS
+        elif t == "distinction":
+            xp += XP_CERT_DISTINCTION
+        else:
+            xp += XP_CERT_COMPLETION
+    return xp
+
+
+def _tier_for_xp(xp: int) -> dict:
+    chosen = TIERS[0]
+    for t in TIERS:
+        if xp >= t["min_xp"]:
+            chosen = t
+        else:
+            break
+    return chosen
+
+
+def _next_tier(xp: int) -> dict | None:
+    for t in TIERS:
+        if t["min_xp"] > xp:
+            return t
+    return None
+
+
+# Achievement badges — shown as pills next to the name. Keep the set
+# small so there's always headroom to earn another.
+def _compute_badges(stats: dict, streak: int) -> list[dict]:
+    tasks = stats.get("lifetime_done", 0)
+    repos = stats.get("lifetime_repos", 0)
+    certs = stats.get("lifetime_certs", 0)
+    honors = stats.get("honors_count", 0)
+
+    out: list[dict] = []
+    if tasks >= 1:
+        out.append({"icon": "🎯", "label": "First Task",     "hint": "Completed your first checklist item"})
+    if tasks >= 50:
+        out.append({"icon": "📚", "label": "50 Tasks",       "hint": "Completed 50 lifetime checklist items"})
+    if tasks >= 250:
+        out.append({"icon": "📖", "label": "250 Tasks",      "hint": "Completed 250 lifetime checklist items"})
+    if certs >= 1:
+        out.append({"icon": "🎓", "label": "First Cert",     "hint": "Earned your first course completion certificate"})
+    if certs >= 3:
+        out.append({"icon": "💎", "label": "Triple Crown",   "hint": "Earned 3 or more certificates"})
+    if honors >= 1:
+        out.append({"icon": "🏆", "label": "Honors",         "hint": "Earned at least one Honors-tier certificate"})
+    if repos >= 5:
+        out.append({"icon": "🚀", "label": "5 Repos",        "hint": "Linked 5 or more GitHub repos"})
+    if repos >= 15:
+        out.append({"icon": "⭐", "label": "15 Repos",       "hint": "Linked 15 or more GitHub repos"})
+    if streak >= 4:
+        out.append({"icon": "🔥", "label": f"{streak}w Streak", "hint": f"Active {streak} consecutive weeks"})
+    if streak >= 10:
+        out.append({"icon": "🔥🔥","label": "Hot Streak",     "hint": "10+ week streak — relentless"})
+    return out
 
 
 PLAN_LABELS = {
@@ -206,6 +335,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     total_streak_all = 0
     total_repos_all = 0
     total_certs_all = 0
+    total_xp_all = 0
     for user in users:
         stats = await _get_user_progress(user, db)
         lifetime = stats.get("lifetime_done", stats["done"])
@@ -215,6 +345,20 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
         joined = fmt_ist(user.created_at, FMT_MONTH_YEAR)
         streak = await _get_streak(user.id, stats["plan"].id, db) if stats["plan"] else 0
         total_streak_all = max(total_streak_all, streak)
+
+        xp = _compute_xp(stats, streak)
+        total_xp_all += xp
+        tier = _tier_for_xp(xp)
+        nxt = _next_tier(xp)
+        if nxt:
+            prog_span = max(1, nxt["min_xp"] - tier["min_xp"])
+            progress_pct = round(((xp - tier["min_xp"]) / prog_span) * 100)
+            xp_to_next = nxt["min_xp"] - xp
+        else:
+            progress_pct = 100
+            xp_to_next = 0
+        badges = _compute_badges(stats, streak)
+
         entries.append({
             "id": user.id,
             "name": esc((user.name or "Learner")),
@@ -226,14 +370,26 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             "plans_count": stats.get("plans_count", 1),
             "lifetime_repos": stats.get("lifetime_repos", 0),
             "lifetime_certs": stats.get("lifetime_certs", 0),
+            "honors_count": stats.get("honors_count", 0),
             "github": user.github_username,
             "linkedin": user.linkedin_url,
             "joined": joined,
             "streak": streak,
+            "xp": xp,
+            "tier": tier,
+            "next_tier": nxt,
+            "tier_progress_pct": progress_pct,
+            "xp_to_next": xp_to_next,
+            "badges": badges,
         })
 
-    # Sort by completion % descending, then by lifetime tasks
-    entries.sort(key=lambda e: (e["pct"], e["lifetime_done"]), reverse=True)
+    # Sort by XP desc (real number derived from DB-backed counts), tie-break by pct + lifetime tasks
+    entries.sort(key=lambda e: (e["xp"], e["pct"], e["lifetime_done"]), reverse=True)
+
+    # Percentile rank (top X%) computed post-sort from the real ranking
+    n = len(entries)
+    for i, e in enumerate(entries):
+        e["percentile"] = round((i / n) * 100) if n else 0  # 0 = top, 100 = bottom
 
     medals = ["🥇", "🥈", "🥉"]
 
@@ -255,30 +411,72 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
             f'<span style="color:#e8a849;font-weight:600">🎓 {e["lifetime_certs"]}</span>'
             if e["lifetime_certs"] > 0 else '<span style="color:#5a6473">—</span>'
         )
+
+        # Tier chip — big icon, colored border, real XP-derived tier
+        tier = e["tier"]
+        tier_chip = (
+            f'<span class="tier-chip" style="background:{tier["bg"]};border-color:{tier["border"]};color:{tier["color"]}">'
+            f'<span class="tier-icon">{tier["icon"]}</span>'
+            f'<span class="tier-name">{tier["name"]}</span>'
+            f'</span>'
+        )
+
+        # XP cell with progress bar to next tier
+        if e["next_tier"]:
+            xp_next = f'<div class="xp-next">{e["xp_to_next"]:,} XP → {e["next_tier"]["icon"]} {e["next_tier"]["name"]}</div>'
+        else:
+            xp_next = '<div class="xp-next" style="color:#e8a849">🏅 Max tier reached</div>'
+        xp_cell = (
+            f'<div class="xp-cell">'
+            f'<div class="xp-num">{e["xp"]:,}<span class="xp-unit">XP</span></div>'
+            f'<div class="xp-bar"><div style="width:{e["tier_progress_pct"]}%;background:{tier["color"]}"></div></div>'
+            f'{xp_next}'
+            f'</div>'
+        )
+
+        # Badges row — real, derived from DB counts
+        badges_html = ""
+        if e["badges"]:
+            badges_html = '<div class="badges-row">' + "".join(
+                f'<span class="badge-pill" title="{esc(b["hint"])}"><span class="be">{b["icon"]}</span>{esc(b["label"])}</span>'
+                for b in e["badges"]
+            ) + '</div>'
+
+        # Top % badge — only for genuine top tier (real percentile)
+        pct_badge = ""
+        if n >= 3 and e["percentile"] <= 10:
+            pct_badge = f'<span class="pct-badge">TOP {max(1, e["percentile"])}%</span>'
+        elif n >= 3 and e["percentile"] <= 25:
+            pct_badge = f'<span class="pct-badge" style="color:#94a3b8;background:rgba(148,163,184,0.1);border-color:rgba(148,163,184,0.3)">TOP {e["percentile"]}%</span>'
+
         rows += f"""<tr>
-            <td class="rank" style="font-size:20px;text-align:center">{medal}</td>
-            <td>
-              <a href="/profile/{e['id']}" style="font-weight:600;font-size:14px">{e['name']}</a>
-              <div style="font-size:12px;color:#8a92a0">Joined {e['joined']} · {e['lifetime_done']} lifetime tasks</div>
+            <td class="rank" style="font-size:22px;text-align:center;vertical-align:top;padding-top:16px">{medal}</td>
+            <td style="min-width:260px">
+              <a href="/profile/{e['id']}" style="font-weight:600;font-size:15px">{e['name']}</a>
+              {pct_badge}
+              <div style="font-size:12px;color:#8a92a0;margin-top:2px">Joined {e['joined']} · {e['lifetime_done']} tasks</div>
+              {badges_html}
             </td>
-            <td><span style="font-size:12px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
-            <td>
-              <div style="display:flex;align-items:center;gap:8px">
+            <td style="vertical-align:top;padding-top:14px">{tier_chip}</td>
+            <td style="vertical-align:top;padding-top:12px">{xp_cell}</td>
+            <td style="vertical-align:top;padding-top:16px"><span style="font-size:12px;background:#1d242e;padding:4px 10px;border-radius:12px">{e['plan']}</span></td>
+            <td style="vertical-align:top;padding-top:14px">
+              <div style="display:flex;align-items:center;gap:8px;min-width:160px">
                 <div style="flex:1">
                   <div class="progress-bar" style="width:100%;height:8px"><div style="width:{e['pct']}%;background:{bar_color}"></div></div>
                 </div>
-                <span style="font-size:12px;color:#8a92a0;min-width:50px">{e['done']}/{e['total']}</span>
+                <span style="font-size:12px;color:#8a92a0;min-width:56px">{e['done']}/{e['total']}</span>
               </div>
+              <div style="font-size:11px;color:#e8a849;font-weight:600;margin-top:4px">{e['pct']}%</div>
             </td>
-            <td style="color:#e8a849;font-weight:bold;font-size:20px;text-align:center">{e['pct']}%</td>
-            <td style="text-align:center;font-size:13px">{streak_display}</td>
-            <td style="text-align:center;font-size:13px" title="GitHub repos linked lifetime">{repos_display}</td>
-            <td style="text-align:center;font-size:13px" title="Course completion certificates earned">{certs_display}</td>
-            <td style="text-align:center">{gh_link}{li_link}</td>
+            <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px">{streak_display}</td>
+            <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="GitHub repos linked lifetime">{repos_display}</td>
+            <td style="text-align:center;font-size:13px;vertical-align:top;padding-top:16px" title="Course completion certificates earned">{certs_display}</td>
+            <td style="text-align:center;vertical-align:top;padding-top:14px">{gh_link}{li_link}</td>
         </tr>"""
 
     if not rows:
-        rows = '<tr><td colspan="9" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
+        rows = '<tr><td colspan="10" style="text-align:center;color:#8a92a0;padding:40px;font-size:14px">No public profiles yet.<br><span style="font-size:12px">Enable yours in Account Settings to appear here and motivate others!</span></td></tr>'
 
     # Summary stats
     total_learners = len(entries)
@@ -294,21 +492,56 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
 
 <div class="stat-row">
   <div class="stat"><div class="n">{total_learners}</div><div class="l">Learners</div></div>
+  <div class="stat"><div class="n">{total_xp_all:,}</div><div class="l">Total XP</div></div>
   <div class="stat"><div class="n">{total_tasks_all}</div><div class="l">Tasks Done</div></div>
-  <div class="stat"><div class="n">{avg_pct}%</div><div class="l">Avg Progress</div></div>
-  <div class="stat"><div class="n">🔥 {top_streak}w</div><div class="l">Top Streak</div></div>
   <div class="stat"><div class="n">{total_repos_all}</div><div class="l">Repos Shipped</div></div>
   <div class="stat"><div class="n">🎓 {total_certs_all}</div><div class="l">Certificates</div></div>
+  <div class="stat"><div class="n">🔥 {top_streak}w</div><div class="l">Top Streak</div></div>
   <div class="stat"><div class="n">{completers}</div><div class="l">Graduated</div></div>
 </div>
+
+<details class="help">
+  <summary>How ranking &amp; XP work</summary>
+  <div class="help-body">
+    <p style="margin-top:0">Your rank is sorted by <strong>XP</strong> — a single number computed from real activity in the database. Every signal below is a live count, nothing synthetic.</p>
+
+    <h4>How XP is earned</h4>
+    <div class="help-grid">
+      <div class="help-tile"><span class="big">✅</span> <strong>+{XP_PER_TASK} XP</strong> per checklist task you tick off<div class="thr">LIFETIME — NEVER RESETS</div></div>
+      <div class="help-tile"><span class="big">🔗</span> <strong>+{XP_PER_REPO} XP</strong> per GitHub repo linked to a week<div class="thr">ONE REPO PER WEEK</div></div>
+      <div class="help-tile"><span class="big">🎓</span> <strong>+{XP_CERT_COMPLETION} XP</strong> — Completion certificate<div class="thr">≥90% PLAN + CAPSTONE 100%</div></div>
+      <div class="help-tile"><span class="big">🥈</span> <strong>+{XP_CERT_DISTINCTION} XP</strong> — With Distinction<div class="thr">100% + ≥80% REPOS</div></div>
+      <div class="help-tile"><span class="big">🏆</span> <strong>+{XP_CERT_HONORS} XP</strong> — With Honors<div class="thr">DISTINCTION + AI EVAL ≥ 8/10</div></div>
+      <div class="help-tile"><span class="big">🔥</span> <strong>+{XP_STREAK_PER_WEEK} XP</strong> per active weekly streak<div class="thr">AT LEAST 1 TASK DONE THAT WEEK</div></div>
+    </div>
+
+    <h4>Tier ladder</h4>
+    <div class="help-grid">
+      {"".join(f'<div class="help-tile" style="border-color:{t["border"]}"><span class="big">{t["icon"]}</span><strong style="color:{t["color"]}">{t["name"]}</strong><div class="thr">{t["min_xp"]:,}+ XP</div></div>' for t in TIERS)}
+    </div>
+
+    <h4>Achievement badges</h4>
+    <p>Earned automatically when real thresholds are crossed:</p>
+    <div class="help-grid">
+      <div class="help-tile"><span class="big">🎯</span> First Task · 📚 50 · 📖 250 tasks</div>
+      <div class="help-tile"><span class="big">🎓</span> First Cert · 💎 Triple Crown · 🏆 Honors</div>
+      <div class="help-tile"><span class="big">🚀</span> 5 Repos · ⭐ 15 Repos</div>
+      <div class="help-tile"><span class="big">🔥</span> 4-week Streak · 🔥🔥 10-week Hot Streak</div>
+    </div>
+
+    <h4>Privacy</h4>
+    <p style="margin-bottom:0">You only appear here if you opt in under <a href="/account">Account Settings → Show my profile on the public leaderboard</a>. Name and counts are the only things shown — email is never exposed.</p>
+  </div>
+</details>
 
 <table>
 <tr>
   <th style="text-align:center">#</th>
   <th>Learner</th>
+  <th>Tier</th>
+  <th>XP</th>
   <th>Plan</th>
-  <th>Progress</th>
-  <th style="text-align:center">%</th>
+  <th>Current Progress</th>
   <th style="text-align:center">Streak</th>
   <th style="text-align:center">Repos</th>
   <th style="text-align:center">Certs</th>
