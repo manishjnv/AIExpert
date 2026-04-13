@@ -82,6 +82,15 @@ async def run_quality_pipeline(
         "skipped": [],
     }
 
+    # ---- Stage 0: Deterministic pre-fix (free, no LLM) ----
+    plan, prefix_fixes = _auto_fix(plan)
+    if prefix_fixes:
+        result["stages_run"].append("prefix")
+        result["models_used"]["prefix"] = "local"
+        result["plan"] = plan
+        logger.info("Quality pipeline: deterministic pre-fix applied — %s",
+                    ", ".join(f"{k}={v}" for k, v in prefix_fixes.items()))
+
     # ---- Stage 1: Heuristic Score ----
     heuristic_score = _quick_heuristic_score(plan)
     result["original_score"] = heuristic_score
@@ -314,6 +323,99 @@ def _quick_heuristic_score(plan: dict) -> int:
             score -= 5
 
     return max(0, min(100, score))
+
+
+def _auto_fix(plan: dict) -> tuple[dict, dict]:
+    """Deterministic pre-fix pass — mechanical cleanups that don't need an LLM.
+
+    Handles issues that degrade quality scores but are safe to fix programmatically:
+    - Dedup checklist items within a week (case-insensitive)
+    - Dedup resources by URL within a week
+    - Strip whitespace on all strings
+    - Normalize missing/zero hours to default 16
+    - Ensure week numbers are sequential 1..N
+
+    Returns (fixed_plan, summary_of_fixes).
+    """
+    import copy
+    p = copy.deepcopy(plan)
+    fixes = {
+        "checks_deduped": 0,
+        "resources_deduped": 0,
+        "hours_defaulted": 0,
+        "weeks_renumbered": 0,
+        "strings_trimmed": 0,
+    }
+
+    week_counter = 0
+    for m in p.get("months", []) or []:
+        for w in m.get("weeks", []) or []:
+            week_counter += 1
+
+            # Sequential week numbering
+            if w.get("n") != week_counter:
+                w["n"] = week_counter
+                fixes["weeks_renumbered"] += 1
+
+            # Normalize hours
+            hrs = w.get("hours")
+            if not isinstance(hrs, int) or hrs <= 0:
+                w["hours"] = 16
+                fixes["hours_defaulted"] += 1
+
+            # Trim strings in focus/deliv/checks
+            for field in ("focus", "deliv", "checks"):
+                items = w.get(field) or []
+                trimmed = []
+                for it in items:
+                    if isinstance(it, str):
+                        s = it.strip()
+                        if s != it:
+                            fixes["strings_trimmed"] += 1
+                        if s:
+                            trimmed.append(s)
+                w[field] = trimmed
+
+            # Dedup checks (case-insensitive)
+            checks = w.get("checks") or []
+            seen_lower = set()
+            deduped = []
+            for c in checks:
+                key = c.lower()
+                if key in seen_lower:
+                    fixes["checks_deduped"] += 1
+                    continue
+                seen_lower.add(key)
+                deduped.append(c)
+            w["checks"] = deduped
+
+            # Dedup resources by URL
+            resources = w.get("resources") or []
+            seen_urls = set()
+            deduped_res = []
+            for r in resources:
+                if not isinstance(r, dict):
+                    continue
+                url = (r.get("url") or "").strip().rstrip("/")
+                if not url:
+                    continue
+                if url in seen_urls:
+                    fixes["resources_deduped"] += 1
+                    continue
+                seen_urls.add(url)
+                r["url"] = url
+                # Trim name and hrs
+                if isinstance(r.get("name"), str):
+                    r["name"] = r["name"].strip()
+                hrs_r = r.get("hrs")
+                if not isinstance(hrs_r, int) or hrs_r <= 0:
+                    r["hrs"] = 4
+                deduped_res.append(r)
+            w["resources"] = deduped_res
+
+    # Only report counts that are non-zero
+    non_zero = {k: v for k, v in fixes.items() if v}
+    return p, non_zero
 
 
 def _heuristic_diagnostics(plan: dict) -> tuple[list[dict], list[int]]:
