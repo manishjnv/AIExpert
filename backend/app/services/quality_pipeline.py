@@ -54,6 +54,7 @@ def _plan_hash(plan: dict) -> str:
 
     fingerprint = {
         "title": _norm_str(plan.get("title", "")),
+        "goal": _norm_str(plan.get("goal", "")),
         "level": _norm_str(plan.get("level", "")),
         "duration_months": plan.get("duration_months"),
         "weeks": [],
@@ -318,11 +319,23 @@ def _plan_fingerprint_text(plan: dict) -> str:
     return text[:28000]
 
 
+# Soft circuit-breaker for the OpenAI embedding guardrail — if it fails 3 times
+# in a row, skip for 5 minutes instead of hammering. Reset on first success.
+_embedding_health = {"consecutive_failures": 0, "skip_until": 0.0}
+_EMBEDDING_FAIL_THRESHOLD = 3
+_EMBEDDING_COOLDOWN_SECS = 300
+
+
 async def _semantic_similarity(plan_a: dict, plan_b: dict, db) -> float | None:
     """Cosine similarity between two plans' focus+checks fingerprints.
 
-    Returns None if OpenAI embeddings are unavailable.
+    Returns None if OpenAI embeddings are unavailable or in cooldown.
     """
+    import time as _time
+    if _time.time() < _embedding_health["skip_until"]:
+        logger.debug("Semantic guardrail in cooldown, skipping")
+        return None
+
     try:
         from app.ai.openai_embeddings import embed, cosine_similarity
     except Exception:
@@ -333,8 +346,24 @@ async def _semantic_similarity(plan_a: dict, plan_b: dict, db) -> float | None:
     if not text_a or not text_b:
         return None
 
-    vecs = await embed([text_a, text_b], db=db, task="embedding",
-                       subtask="quality_guardrail")
+    try:
+        vecs = await embed([text_a, text_b], db=db, task="embedding",
+                           subtask="quality_guardrail")
+    except Exception as e:
+        _embedding_health["consecutive_failures"] += 1
+        if _embedding_health["consecutive_failures"] >= _EMBEDDING_FAIL_THRESHOLD:
+            _embedding_health["skip_until"] = _time.time() + _EMBEDDING_COOLDOWN_SECS
+            logger.warning(
+                "Semantic guardrail: %d consecutive failures, cooling down for %ds",
+                _embedding_health["consecutive_failures"], _EMBEDDING_COOLDOWN_SECS,
+            )
+        else:
+            logger.info("Semantic guardrail failed (%s)", type(e).__name__)
+        return None
+
+    _embedding_health["consecutive_failures"] = 0
+    _embedding_health["skip_until"] = 0.0
+
     if len(vecs) != 2:
         return None
     return cosine_similarity(vecs[0], vecs[1])
@@ -734,14 +763,31 @@ async def _run_refinement(
                 subtask=plan.get("title", "")[:50] or None,
             )
         elif model_name == "gemini-pro":
-            from app.ai.gemini import complete
+            from app.ai.gemini import complete, GeminiRateLimited, GeminiError
             from app.config import get_settings as _get_settings
-            fixed_weeks = await complete(
-                user_content, json_response=True,
-                task="quality_refine",
-                system_instruction=system_rules,
-                model=_get_settings().gemini_pro_model,
-            )
+            try:
+                fixed_weeks = await complete(
+                    user_content, json_response=True,
+                    task="quality_refine",
+                    system_instruction=system_rules,
+                    model=_get_settings().gemini_pro_model,
+                )
+            except (GeminiRateLimited, GeminiError) as e:
+                # Pro has ~2 RPM on free tier; on rate-limit or any transient
+                # error, fall back to Flash. Flash has 15 RPM and handles most
+                # patterns fine — losing some reasoning depth beats losing the
+                # whole refine call.
+                logger.warning(
+                    "Gemini Pro refine failed (%s) — falling back to Flash",
+                    type(e).__name__,
+                )
+                fixed_weeks = await complete(
+                    user_content, json_response=True,
+                    task="quality_refine",
+                    system_instruction=system_rules,
+                )
+                # Adjust model_name so usage logging reflects what actually ran.
+                model_name = "gemini"
         elif model_name == "gemini":
             from app.ai.gemini import complete
             fixed_weeks = await complete(

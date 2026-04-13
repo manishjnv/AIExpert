@@ -1644,16 +1644,20 @@ async def cost_per_template(
         except Exception:
             continue
 
-        # Topic portion = title before " — ", lowercased, no leading/trailing punctuation.
-        # The generator logs subtasks like "Topic Xmo level" (no em-dash), and refines
-        # log "Topic Xmo level" truncated at 50. Best match: lowercased topic-portion
-        # substring of the subtask.
+        # Multi-stage matching, most specific first:
+        #   1. Exact canonical form "topic Xmo level" (matches batch_generator subtask)
+        #   2. Topic prefix at START of subtask (anchored — rejects "AI" matching
+        #      "Advanced NLP" accidentally)
+        #   3. Full title substring (belt and braces)
+        import re as _re
         full_title = tpl.title.lower()
         topic_portion = (tpl.title.split("—")[0].split("-")[0]).strip().lower()
-        # Drop trailing punctuation and collapse whitespace
-        import re as _re
         topic_portion = _re.sub(r"[^a-z0-9 ]+", " ", topic_portion).strip()
         topic_portion = _re.sub(r"\s+", " ", topic_portion)
+
+        duration_tag = f"{tpl.duration_months}mo"
+        level_tag = (tpl.level or "").lower()
+        canonical = f"{topic_portion} {duration_tag} {level_tag}".strip()
 
         per_task: dict[str, dict] = {}
         total_cost = 0.0
@@ -1666,9 +1670,15 @@ async def cost_per_template(
                 continue
             sub_norm = _re.sub(r"[^a-z0-9 ]+", " ", sub)
             sub_norm = _re.sub(r"\s+", " ", sub_norm).strip()
-            # Match if topic portion appears in subtask (covers "Topic 3mo beginner"
-            # style subtasks) OR the full title contains the subtask / vice versa.
-            if topic_portion and topic_portion in sub_norm:
+
+            # Tier 1: canonical exact or prefix match — most precise
+            if canonical and (sub_norm == canonical or sub_norm.startswith(canonical)):
+                pass
+            # Tier 2: topic appears at the *start* of the subtask — anchored
+            elif topic_portion and sub_norm.startswith(topic_portion + " "):
+                pass
+            # Tier 3: broad substring (loose fallback, covers ad-hoc subtasks)
+            elif topic_portion and len(topic_portion) >= 10 and topic_portion in sub_norm:
                 pass
             elif sub in full_title or full_title in sub:
                 pass
