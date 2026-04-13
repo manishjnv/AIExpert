@@ -311,13 +311,59 @@ async def get_topic_detail(
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get full topic detail."""
+    """Get full topic detail — plus the associated templates (if any)."""
     result = await db.execute(
         select(DiscoveredTopic).where(DiscoveredTopic.id == topic_id)
     )
     t = result.scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=404, detail="Topic not found")
+
+    # Look up associated templates by slug match (same algo as the
+    # Topics Quality column uses).
+    from app.curriculum.loader import list_templates, load_template, get_template_status
+    import re as _re
+
+    def _candidates(raw):
+        if not raw:
+            return set()
+        head = _re.split(r"\s+[—\-–]\s+", raw, maxsplit=1)[0]
+        return {
+            _re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+            for s in (raw, head) if s
+        }
+
+    candidates = _candidates(t.topic_name) | _candidates(t.normalized_name)
+    associated = []
+    for key in list_templates():
+        m = _re.match(r"^(.+)_(\d+)mo_(beginner|intermediate|advanced)$", key)
+        if not m:
+            continue
+        key_topic, dur, lvl = m.group(1), int(m.group(2)), m.group(3)
+        if any(c and (key_topic == c or key_topic.startswith(c) or c.startswith(key_topic)) for c in candidates):
+            try:
+                tpl = load_template(key)
+                meta = get_template_status(key) or {}
+                associated.append({
+                    "key": key,
+                    "title": tpl.title,
+                    "level": tpl.level,
+                    "duration_months": tpl.duration_months,
+                    "total_weeks": tpl.total_weeks,
+                    "total_hours": tpl.total_hours,
+                    "total_focus_areas": tpl.total_focus_areas,
+                    "total_checks": tpl.total_checks,
+                    "certification_count": tpl.certification_count,
+                    "github_resource_count": tpl.github_resource_count,
+                    "top_resources_count": len(tpl.top_resources or []),
+                    "certifications_count": len(tpl.certifications or []),
+                    "goal": tpl.goal,
+                    "quality_score": int(meta.get("quality_score") or 0),
+                    "status": meta.get("status") or "draft",
+                })
+            except Exception:
+                continue
+
     return {
         "id": t.id,
         "topic_name": t.topic_name,
@@ -332,6 +378,7 @@ async def get_topic_detail(
         "templates_generated": t.templates_generated,
         "generation_error": t.generation_error,
         "created_at": t.created_at.isoformat() if t.created_at else None,
+        "associated_templates": associated,
     }
 
 
@@ -625,8 +672,11 @@ async def upload_manual_template(
     # Save template JSON
     await save_curriculum_draft(plan_data)
 
-    # Create/update a DiscoveredTopic row so it appears on the Topics tab
-    topic_name = plan_data.get("title") or key
+    # Create/update a DiscoveredTopic row so it appears on the Topics tab.
+    # Use the TOPIC PORTION (before any " — ..." suffix) as the topic_name so
+    # it slug-matches the template key pattern (key = <topic>_<duration>mo_<level>).
+    raw_title = plan_data.get("title") or key
+    topic_name = _re.split(r"\s+[—\-–]\s+", raw_title, maxsplit=1)[0].strip() or raw_title
     normalized = _re.sub(r"[^a-z0-9]+", "-", topic_name.lower()).strip("-")[:120]
     existing_topic = (await db.execute(
         select(DiscoveredTopic).where(DiscoveredTopic.normalized_name == normalized)
@@ -1248,15 +1298,33 @@ async def pipeline_topics_page(
 
     _all_keys = list_templates()
     def _avg_template_score_for(topic):
-        name_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.topic_name or "").lower()).strip("_")
-        norm_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.normalized_name or "").lower()).strip("_")
+        # Candidate slugs derived from the topic's identifiers. We match a
+        # template key iff the key's TOPIC PART (everything before the final
+        # "_<N>mo_<level>" suffix) equals the candidate — this is robust to
+        # topic_name carrying a "— Level X-Month Roadmap" tail.
+        candidates = set()
+        for raw in (topic.topic_name, topic.normalized_name):
+            if not raw:
+                continue
+            # Strip any "— Level X-Month Roadmap" style suffix
+            head = _re.split(r"\s+[—\-–]\s+", raw, maxsplit=1)[0]
+            for s in (raw, head):
+                candidates.add(_re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_"))
+
         scores = []
         for k in _all_keys:
-            if name_slug and k.startswith(name_slug) or (norm_slug and k.startswith(norm_slug)):
-                meta = get_template_status(k) or {}
-                s = int(meta.get("quality_score") or 0)
-                if s:
-                    scores.append(s)
+            # Extract the topic portion of the key (strip "_<N>mo_<level>")
+            m = _re.match(r"^(.+)_(\d+)mo_(beginner|intermediate|advanced)$", k)
+            key_topic = m.group(1) if m else k
+            for cand in candidates:
+                if not cand:
+                    continue
+                if key_topic == cand or key_topic.startswith(cand) or cand.startswith(key_topic):
+                    meta = get_template_status(k) or {}
+                    s = int(meta.get("quality_score") or 0)
+                    if s:
+                        scores.append(s)
+                    break
         return round(sum(scores) / len(scores)) if scores else None
 
     topic_scores = {}
@@ -1630,6 +1698,32 @@ async function viewTopic(id) {{
     const resp = await fetch('/admin/pipeline/api/topics/' + id, {{credentials: 'same-origin'}});
     const t = await resp.json();
     const sources = (t.evidence_sources || []).map(s => '<li>' + s + '</li>').join('');
+    const tplCards = (t.associated_templates || []).map(tp => {{
+      const scoreColor = tp.quality_score >= 90 ? '#6db585' : tp.quality_score >= 70 ? '#e8a849' : '#d97757';
+      const statusColor = tp.status === 'published' ? '#6db585' : '#e8a849';
+      return `
+        <div style="background:#0f1419;border:1px solid #2a323d;border-left:3px solid ${{scoreColor}};padding:12px 14px;border-radius:4px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+            <a href="/admin/templates/${{tp.key}}" style="color:#e8a849;font-weight:600;font-size:14px;text-decoration:none">${{tp.title}}</a>
+            <div style="font-size:11px">
+              <span style="color:${{statusColor}};text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;background:#1d242e;border-radius:3px">${{tp.status}}</span>
+              <span style="color:${{scoreColor}};font-weight:600;margin-left:6px">score ${{tp.quality_score || '—'}}</span>
+            </div>
+          </div>
+          <div style="color:#b0aaa0;font-size:12px;margin-bottom:6px;line-height:1.5">${{tp.goal || ''}}</div>
+          <div style="color:#8a92a0;font-size:11px;display:flex;gap:14px;flex-wrap:wrap">
+            <span>${{tp.level}} · ${{tp.duration_months}}mo</span>
+            <span>${{tp.total_weeks}} weeks · ${{tp.total_hours}}h</span>
+            <span>${{tp.total_focus_areas}} focus areas</span>
+            <span>${{tp.total_checks}} checks</span>
+            <span>${{tp.top_resources_count}} anchor resources</span>
+            <span>${{tp.certifications_count}} cert(s)</span>
+            <span>${{tp.github_resource_count}} GH repos</span>
+          </div>
+        </div>
+      `;
+    }}).join('');
+
     content.innerHTML = `
       <h2 style="color:#e8a849;margin:0 0 12px">${{t.topic_name}}</h2>
       <div style="margin-bottom:12px">
@@ -1640,12 +1734,13 @@ async function viewTopic(id) {{
       <div style="margin-bottom:12px"><strong style="color:#d0cbc2">Category:</strong> ${{t.category}}${{t.subcategory ? ' / ' + t.subcategory : ''}}</div>
       <div style="margin-bottom:16px"><strong style="color:#d0cbc2">Justification:</strong><p style="color:#b0aaa0;line-height:1.6">${{t.justification}}</p></div>
       ${{sources ? '<div style="margin-bottom:16px"><strong style="color:#d0cbc2">Evidence Sources:</strong><ul style="color:#b0aaa0;padding-left:20px;line-height:1.8">' + sources + '</ul></div>' : ''}}
+      ${{tplCards ? '<div style="margin:16px 0"><strong style="color:#d0cbc2;display:block;margin-bottom:8px">Associated templates (' + t.associated_templates.length + '):</strong>' + tplCards + '</div>' : ''}}
       <div style="color:#8a92a0;font-size:12px">Discovered: ${{t.created_at ? t.created_at.substring(0,10) : '—'}} · Templates generated: ${{t.templates_generated}}</div>
       ${{t.generation_error ? '<div style="color:#d97757;font-size:12px;margin-top:8px">Error: ' + t.generation_error.substring(0,200) + '</div>' : ''}}
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid #2a323d">
         ${{t.status === 'pending' ? '<button class="btn success" onclick="topicAction('+t.id+',\\'approve\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Approve</button> <button class="btn danger" onclick="topicAction('+t.id+',\\'reject\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Reject</button>' : ''}}
         ${{t.status === 'approved' ? '<span style="color:#6db585;font-weight:600">✓ Approved</span> — go to Pipeline page and click "Generate Curricula" to create templates' : ''}}
-        ${{t.status === 'generated' ? '<span style="color:#6db585;font-weight:600">✓ Generated</span> — ' + t.templates_generated + ' templates created. Review them in Templates page.' : ''}}
+        ${{t.status === 'generated' && (!t.associated_templates || !t.associated_templates.length) ? '<span style="color:#6db585;font-weight:600">✓ Generated</span> — ' + t.templates_generated + ' templates created. Review them in Templates page.' : ''}}
         ${{t.status === 'rejected' ? '<button class="btn success" onclick="topicAction('+t.id+',\\'approve\\');document.getElementById(\\'topicModal\\').style.display=\\'none\\'">Re-approve</button>' : ''}}
       </div>
     `;
