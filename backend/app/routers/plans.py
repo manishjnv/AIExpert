@@ -144,11 +144,51 @@ async def enroll(
         )
     ).scalar_one_or_none()
 
+    if active and active.template_key == template_key:
+        # Already on this template — no-op, just load with progress.
+        progress_rows = (
+            await db.execute(
+                select(Progress).where(Progress.user_plan_id == active.id)
+            )
+        ).scalars().all()
+        return _plan_to_dict(active, tpl, list(progress_rows))
+
     if active:
         active.status = "archived"
         active.archived_at = now
 
-    # Create new plan
+    # Re-enrollment: if this user previously enrolled in the same template,
+    # reactivate the most recent archived UserPlan instead of creating a new
+    # blank row. This preserves all their old Progress rows so they pick up
+    # exactly where they left off.
+    prior = (
+        await db.execute(
+            select(UserPlan)
+            .where(
+                UserPlan.user_id == user.id,
+                UserPlan.template_key == template_key,
+                UserPlan.status == "archived",
+            )
+            .order_by(UserPlan.archived_at.desc().nullslast(), UserPlan.enrolled_at.desc())
+        )
+    ).scalars().first()
+
+    if prior:
+        prior.status = "active"
+        prior.enrolled_at = now
+        prior.archived_at = None
+        # Sync plan_version in case the template was updated while archived
+        prior.plan_version = tpl.version
+        plan = prior
+        progress_rows = (
+            await db.execute(
+                select(Progress).where(Progress.user_plan_id == plan.id)
+            )
+        ).scalars().all()
+        await db.flush()
+        return _plan_to_dict(plan, tpl, list(progress_rows))
+
+    # First-time enrollment in this template — create fresh.
     plan = UserPlan(
         user_id=user.id,
         template_key=template_key,
