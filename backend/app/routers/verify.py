@@ -103,7 +103,7 @@ _INDEX_HTML = """<!DOCTYPE html>
   button{padding:11px 22px;border:none;border-radius:5px;background:var(--amber);color:white;font-family:system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer}
   button:hover{background:#92400e}
   .hint{font-family:system-ui,sans-serif;font-size:12px;color:#78716c;margin-top:10px}
-  .error{display:%(err_disp)s;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;padding:10px 14px;border-radius:5px;font-family:system-ui,sans-serif;font-size:13px;margin-bottom:18px}
+  .error{display:__ERR_DISP__;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;padding:10px 14px;border-radius:5px;font-family:system-ui,sans-serif;font-size:13px;margin-bottom:18px}
   .info{background:white;border:1px solid #e7e5e4;border-radius:8px;padding:20px 24px;font-family:system-ui,sans-serif;font-size:13px;line-height:1.6;color:#44403c}
   .info strong{color:var(--ink)}
   .info code{font-family:ui-monospace,monospace;background:#f5f5f4;padding:2px 6px;border-radius:3px;color:var(--amber)}
@@ -111,15 +111,15 @@ _INDEX_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <nav class="nav">
-  <a class="brand" href="%(base)s"><span class="brand-dot"></span> AutomateEdge</a>
-  <a class="home-link" href="%(base)s">← Back to roadmap</a>
+  <a class="brand" href="__BASE__"><span class="brand-dot"></span> AutomateEdge</a>
+  <a class="home-link" href="__BASE__">← Back to roadmap</a>
 </nav>
 <div class="wrap">
   <div class="eyebrow">Credential Verification</div>
   <h1>Verify a Certificate</h1>
   <p class="lede">Enter the credential ID printed on the certificate (or scanned from its QR code) to confirm it was issued by AutomateEdge and has not been revoked.</p>
 
-  <div class="error">%(err_msg)s</div>
+  <div class="error">__ERR_MSG__</div>
 
   <form method="get" action="/verify/lookup" autocomplete="off">
     <label for="cid">Credential ID</label>
@@ -144,11 +144,12 @@ _INDEX_HTML = """<!DOCTYPE html>
 
 def _index_html(error: str = "") -> str:
     base = get_settings().public_base_url.rstrip("/")
-    return _INDEX_HTML % {
-        "base": base,
-        "err_msg": _html.escape(error),
-        "err_disp": "block" if error else "none",
-    }
+    return (
+        _INDEX_HTML
+        .replace("__BASE__", base)
+        .replace("__ERR_MSG__", _html.escape(error))
+        .replace("__ERR_DISP__", "block" if error else "none")
+    )
 
 
 @router.get("/verify", response_class=HTMLResponse)
