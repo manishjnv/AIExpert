@@ -64,8 +64,11 @@
   nav.id = 'shared-nav';
   nav.innerHTML = `
     <nav class="topnav">
-      <div style="display:flex;align-items:center;margin-right:auto;gap:8px">
-        <a href="/" class="topnav-brand" style="text-decoration:none;margin-right:0">${LOGO} AI Learning Roadmap<span id="planBadge"></span></a>
+      <div style="display:flex;align-items:center;margin-right:auto;gap:8px;min-width:0;flex:1 1 auto">
+        <a href="/" class="topnav-brand topnav-brand-stack" style="text-decoration:none;margin-right:0;min-width:0;flex-wrap:wrap;line-height:1.2">
+          <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap">${LOGO} AI Learning Roadmap</span>
+          <span id="planBadge" style="display:block;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#8a92a0;margin-top:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        </a>
         <span id="connectionBadges" style="display:none">
           <span id="badgeGoogle" class="conn-badge" style="display:none">Google</span>
           <span id="badgeGithub" class="conn-badge" style="display:none">GitHub</span>

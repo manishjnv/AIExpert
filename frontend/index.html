@@ -311,9 +311,9 @@
   <div class="meta-bar">
     <div class="meta-item">Duration<strong id="metaDuration">24 weeks</strong></div>
     <div class="meta-item">Total hours<strong id="metaHours">~380 <em>hrs</em></strong></div>
-    <div class="meta-item">Weekly load<strong>15–18 <em>hrs</em></strong></div>
-    <div class="meta-item">Certifications<strong>2–3</strong></div>
-    <div class="meta-item">Repos shipped<strong>6+</strong></div>
+    <div class="meta-item">Weekly load<strong id="metaWeeklyLoad">15–18 <em>hrs</em></strong></div>
+    <div class="meta-item">Certifications<strong id="metaCerts">—</strong></div>
+    <div class="meta-item" title="GitHub-trackable deliverables the learner must produce. Format: linked / required.">Repos<strong id="metaRepos">0 / 0</strong></div>
     <div class="meta-item">Public posts<strong>1+</strong></div>
     <div class="meta-item">Kaggle subs<strong>2+</strong></div>
     <div class="meta-item" style="margin-left:auto"><button class="btn" onclick="exportPlanPDF()" style="font-size:10px;padding:8px 18px;border-color:var(--accent);color:var(--accent)">Export Learning Plan</button></div>
@@ -1058,6 +1058,8 @@ function exportPlanPDF() {
   <div class="stat"><div class="n">${totalWeeks}</div><div class="l">Weeks</div></div>
   <div class="stat"><div class="n">~${totalHours}</div><div class="l">Total Hours</div></div>
   <div class="stat"><div class="n">${doneChecks}/${totalChecks}</div><div class="l">Tasks Done</div></div>
+  <div class="stat"><div class="n">${(window.__planMeta?.linked_repos_count ?? 0)}/${(window.__planMeta?.repos_required ?? 0)}</div><div class="l">GitHub Repos</div></div>
+  <div class="stat"><div class="n">${(window.__planMeta?.certifications?.length ?? 0)}</div><div class="l">Certifications</div></div>
   <div class="stat"><div class="n" style="color:${pct>=75?'#2d7a4a':pct>=25?'#c98e2f':'#999'}">${pct}%</div><div class="l">Complete</div></div>
 </div>
 ${progBar}
@@ -1087,12 +1089,46 @@ ${progBar}
 </div>
 
 <!-- RESOURCES SUMMARY -->
-<div style="margin-bottom:16px;page-break-after:always">
+<div style="margin-bottom:14px">
   <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:4px">All Resources (${allResources.length})</div>
   <table style="font-size:10px;width:100%"><tr><th style="text-align:left;width:55%">Resource</th><th style="text-align:left">Source</th><th style="text-align:center">Hours</th></tr>
     ${allResources.map(r => { const domain = r.url ? new URL(r.url).hostname.replace('www.','') : '—'; return `<tr style="break-inside:avoid"><td style="padding:2px 4px"><a href="${r.url||'#'}" style="color:#1a6fb5;text-decoration:none">${r.name}</a></td><td style="padding:2px 4px;color:#999">${domain}</td><td style="padding:2px 4px;text-align:center">${r.hrs||'—'}</td></tr>`; }).join("")}
   </table>
 </div>
+
+<!-- GITHUB REPOS -->
+${(() => {
+  const pm = window.__planMeta || {};
+  const linked = pm.linked_repos_count ?? 0;
+  const required = pm.repos_required ?? 0;
+  if (!required) return '';
+  const barPct = required ? Math.min(100, Math.round((linked / required) * 100)) : 0;
+  return `<div style="margin-bottom:14px;page-break-inside:avoid">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:4px">GitHub Repositories · ${linked}/${required}</div>
+    <div style="background:#e8e8e8;border-radius:4px;height:6px;margin:4px 0 8px"><div style="background:#1a6fb5;height:6px;border-radius:4px;width:${barPct}%"></div></div>
+    <div style="font-size:11px;color:#555;line-height:1.5">
+      This course requires <strong>${required}</strong> GitHub-trackable deliverables (repositories, notebooks, deployed services, portfolio projects). Each completed deliverable linked to the learner's GitHub counts toward the total.
+      Learner has linked <strong>${linked}</strong> so far (${barPct}% of required).
+    </div>
+  </div>`;
+})()}
+
+<!-- CERTIFICATIONS -->
+${(() => {
+  const pm = window.__planMeta || {};
+  const certs = pm.certifications || [];
+  if (!certs.length) return '';
+  const rows = certs.map(c => {
+    const cost = (c.cost_usd === 0) ? 'Free' : (c.cost_usd != null ? `$${c.cost_usd}` : '—');
+    const prep = (c.prep_hours != null) ? `${c.prep_hours}h` : '—';
+    return `<tr style="break-inside:avoid"><td style="padding:3px 6px"><a href="${c.url || '#'}" style="color:#1a6fb5;text-decoration:none">${c.name}</a></td><td style="padding:3px 6px;color:#555">${c.provider || '—'}</td><td style="padding:3px 6px;text-align:center">${cost}</td><td style="padding:3px 6px;text-align:center">${prep}</td></tr>`;
+  }).join('');
+  return `<div style="margin-bottom:14px;page-break-after:always">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#c98e2f;margin-bottom:6px;border-bottom:1px solid #eee;padding-bottom:4px">Industry Certifications · 0/${certs.length}</div>
+    <div style="font-size:11px;color:#555;margin-bottom:6px;line-height:1.5">Recommended certifications the learner can pursue after completing this course. Not required to finish the roadmap, but recognised by employers.</div>
+    <table style="font-size:11px;width:100%"><tr><th style="text-align:left;width:48%">Certification</th><th style="text-align:left">Provider</th><th style="text-align:center">Cost</th><th style="text-align:center">Prep Hours</th></tr>${rows}</table>
+  </div>`;
+})()}
 
 <!-- MONTHS -->
 ${monthsHtml}
@@ -1741,7 +1777,10 @@ async function loadActivePlan() {
     // Show plan badge
     const badge = document.getElementById("planBadge");
     const label = plan.title || PLAN_LABELS[plan.template_key] || plan.template_key;
-    if (badge) badge.textContent = " · " + label;
+    if (badge) {
+      badge.textContent = label;
+      badge.title = label;
+    }
 
     // Update eyebrow with personalized text and real progress
     const firstName = (currentUser?.name || "").split(" ")[0] || "there";
@@ -1752,6 +1791,29 @@ async function loadActivePlan() {
     const totalHours = plan.total_hours || DATA.reduce((s, m) => s + m.weeks.reduce((ws, w) => ws + (w.hours || 16), 0), 0);
     document.getElementById("metaDuration").textContent = totalWeeks + " weeks";
     document.getElementById("metaHours").innerHTML = "~" + totalHours + " <em>hrs</em>";
+    // Weekly load band derived from level
+    const LEVEL_LOAD = { beginner: "10–12 <em>hrs</em>", intermediate: "14–16 <em>hrs</em>", advanced: "18–22 <em>hrs</em>" };
+    document.getElementById("metaWeeklyLoad").innerHTML = LEVEL_LOAD[plan.level] || "~" + Math.round(totalHours/Math.max(totalWeeks,1)) + " <em>hrs</em>";
+    // Certifications count from template
+    const certCount = Array.isArray(plan.certifications) ? plan.certifications.length : 0;
+    document.getElementById("metaCerts").textContent = certCount || "—";
+    // Repos: linked / required (X/Y). Plumbed via /api/plans/active.
+    const reposLinked = plan.linked_repos_count || 0;
+    const reposRequired = plan.repos_required || 0;
+    const reposEl = document.getElementById("metaRepos");
+    reposEl.textContent = `${reposLinked} / ${reposRequired || "—"}`;
+    // Stash for PDF export
+    window.__planMeta = {
+      level: plan.level,
+      duration_months: plan.duration_months,
+      totalWeeks, totalHours,
+      repos_required: reposRequired,
+      linked_repos_count: reposLinked,
+      certifications: plan.certifications || [],
+      top_resources: plan.top_resources || [],
+      title: plan.title,
+      goal: plan.goal,
+    };
 
     // Hero title — derive from the plan itself, never hardcode a curriculum-specific phrase.
     // Format: "{N} Months. {Topic}." where Topic = title before " — " dash, fallback Plan title.

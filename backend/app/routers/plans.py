@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import get_current_user
 from app.curriculum.loader import load_template, list_templates
 from app.db import get_db
-from app.models.plan import Progress, UserPlan
+from app.models.plan import Progress, RepoLink, UserPlan
 from app.models.user import User
 
 router = APIRouter()
@@ -228,7 +228,17 @@ async def get_active_plan(
         )
     ).scalars().all()
 
-    return _plan_to_dict(plan, tpl, list(progress_rows))
+    # Count repos the learner has linked for this plan
+    linked_repos = await db.scalar(
+        select(func.count()).select_from(RepoLink).where(RepoLink.user_plan_id == plan.id)
+    ) or 0
+
+    resp = _plan_to_dict(plan, tpl, list(progress_rows))
+    resp["repos_required"] = tpl.repos_required
+    resp["linked_repos_count"] = int(linked_repos)
+    resp["top_resources"] = [r.model_dump() for r in (tpl.top_resources or [])]
+    resp["certifications"] = [c.model_dump() for c in (tpl.certifications or [])]
+    return resp
 
 
 @router.get("/plan-versions")
