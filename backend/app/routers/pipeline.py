@@ -1613,6 +1613,80 @@ async def ai_usage_analytics(
     }
 
 
+@router.get("/api/ai-usage/cost-per-template")
+async def cost_per_template(
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Attribute AI spend to each template — generation + review + refine + refresh.
+
+    Attribution heuristic: match `ai_usage_log.subtask` substring against each
+    template's title. Works because generation logs subtask=title and refine
+    logs subtask=title[:50]. Not perfect (rows without a template-identifying
+    subtask are excluded), but gives a solid cost-per-template ranking.
+    """
+    from app.curriculum.loader import list_templates, load_template
+    from app.ai.pricing import get_price
+
+    # Fetch all OK rows with a non-empty subtask in one query
+    rows = (await db.execute(
+        select(
+            AIUsageLog.provider, AIUsageLog.model, AIUsageLog.task,
+            AIUsageLog.subtask, AIUsageLog.tokens_estimated,
+        ).where(AIUsageLog.status == "ok", AIUsageLog.subtask != "")
+    )).all()
+
+    # Build template summary list
+    out = []
+    for key in list_templates():
+        try:
+            tpl = load_template(key)
+        except Exception:
+            continue
+
+        title = tpl.title.lower()
+        title_short = title[:50]
+        per_task: dict[str, dict] = {}
+        total_cost = 0.0
+        total_calls = 0
+        total_tokens = 0
+
+        for r in rows:
+            sub = (r.subtask or "").lower()
+            if not sub:
+                continue
+            # Match either the full title or the 50-char prefix used by refine
+            if sub != title and title_short not in sub and sub not in title:
+                continue
+            in_p, _ = get_price(r.provider, r.model)
+            tok = int(r.tokens_estimated or 0)
+            cost = (tok / 1_000_000.0) * in_p
+            bucket = per_task.setdefault(r.task, {"calls": 0, "tokens": 0, "cost_usd": 0.0})
+            bucket["calls"] += 1
+            bucket["tokens"] += tok
+            bucket["cost_usd"] += cost
+            total_cost += cost
+            total_calls += 1
+            total_tokens += tok
+
+        out.append({
+            "key": key,
+            "title": tpl.title,
+            "level": tpl.level,
+            "duration_months": tpl.duration_months,
+            "total_cost_usd": round(total_cost, 6),
+            "total_calls": total_calls,
+            "total_tokens": total_tokens,
+            "by_task": {k: {
+                "calls": v["calls"],
+                "tokens": v["tokens"],
+                "cost_usd": round(v["cost_usd"], 6),
+            } for k, v in per_task.items()},
+        })
+    out.sort(key=lambda x: -x["total_cost_usd"])
+    return {"templates": out}
+
+
 @router.post("/api/ai-usage/set-balance")
 async def set_provider_balance(
     request: Request,
@@ -1894,6 +1968,12 @@ Drift column = our local estimate vs provider-reported spend. Gemini not availab
 </div>
 <div id="sync-status" style="font-size:13px;margin-bottom:8px;min-height:20px"></div>
 <div id="reconciliation"><em style="color:#8a92a0">Loading...</em></div>
+
+<h2 style="margin-top:28px">Cost per Template</h2>
+<div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
+  AI spend attributed to each template via <code>subtask</code> substring matching. Useful for spotting templates that cost more than they should (e.g. repeated refinements that never lift past the publish threshold).
+</div>
+<div id="cost-per-template"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2 style="margin-top:28px">Recent Calls (last 50)</h2>
 <div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
@@ -2537,8 +2617,40 @@ async function loadAnalytics() {{
   }}
 }}
 
+async function loadCostPerTemplate() {{
+  try {{
+    const resp = await fetch('/admin/pipeline/api/ai-usage/cost-per-template', {{credentials:'same-origin'}});
+    const d = await resp.json();
+    const container = document.getElementById('cost-per-template');
+    if (!d.templates || d.templates.length === 0) {{
+      container.innerHTML = '<p style="color:#8a92a0">No spend attributed to templates yet.</p>';
+      return;
+    }}
+    let html = '<div style="overflow-x:auto;border:1px solid #2a323d;border-radius:4px"><table style="min-width:900px;margin:0">'
+      + '<tr><th>Template</th><th>Level · Duration</th><th>Calls</th><th>Tokens</th><th>Cost (USD)</th><th>Per Task</th></tr>';
+    for (const t of d.templates) {{
+      const perTask = Object.entries(t.by_task || {{}})
+        .map(([task, v]) => `${{task}}: ${{fmtCost(v.cost_usd)}} (${{v.calls}})`)
+        .join('<br>') || '<span style="color:#5a6472">—</span>';
+      html += '<tr>'
+        + '<td style="font-size:13px"><a href="/admin/templates/' + encodeURIComponent(t.key) + '" style="color:#e8a849">' + t.title + '</a></td>'
+        + '<td style="font-size:12px;color:#8a92a0">' + t.level + ' · ' + t.duration_months + 'mo</td>'
+        + '<td style="font-size:12px">' + t.total_calls + '</td>'
+        + '<td style="font-size:12px">' + t.total_tokens.toLocaleString() + '</td>'
+        + '<td style="font-size:12px;font-weight:600">' + fmtCost(t.total_cost_usd) + '</td>'
+        + '<td style="font-size:11px;color:#8a92a0">' + perTask + '</td>'
+        + '</tr>';
+    }}
+    html += '</table></div>';
+    container.innerHTML = html;
+  }} catch(e) {{
+    document.getElementById('cost-per-template').innerHTML = '<p style="color:#d97757">Failed: ' + e.message + '</p>';
+  }}
+}}
+
 loadUsageData();
 loadAnalytics();
+loadCostPerTemplate();
 loadReconciliation();
 loadAlerts();
 </script>
