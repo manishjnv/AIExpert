@@ -811,14 +811,62 @@ async def delete_topic(
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a discovered topic."""
+    """Delete a discovered topic AND any associated template files.
+
+    Templates are matched by key prefix: if the topic's normalized_name
+    (as used by the generator) is a prefix of any template key, that
+    template file is removed (with metadata entry), so re-uploading
+    won't hit a 409 duplicate.
+    """
     _check_origin(request)
+    from pathlib import Path as _Path
+    from app.curriculum.loader import (
+        list_templates, load_template, unpublish_template, TEMPLATES_DIR,
+    )
+    import re as _re
+
     topic = await db.get(DiscoveredTopic, topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
+
+    # Build a key-prefix candidate from the topic name (same algo generators use)
+    name_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.topic_name or "").lower()).strip("_")
+    normalized_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.normalized_name or "").lower()).strip("_")
+    # Grandfathered generalist templates are protected
+    protected = {"generalist_3mo_intermediate", "generalist_6mo_intermediate", "generalist_12mo_beginner"}
+
+    deleted_templates: list[str] = []
+    for key in list_templates():
+        if key in protected:
+            continue
+        if name_slug and key.startswith(name_slug):
+            pass
+        elif normalized_slug and key.startswith(normalized_slug):
+            pass
+        else:
+            continue
+        try:
+            path = TEMPLATES_DIR / f"{key}.json"
+            if path.exists():
+                path.unlink()
+            # Clear publish metadata so it doesn't linger
+            try:
+                unpublish_template(key)
+            except Exception:
+                pass
+            deleted_templates.append(key)
+        except Exception as e:
+            logger.warning("Failed to delete template file %s: %s", key, e)
+
+    # Clear the load_template cache so stale entries don't linger
+    try:
+        load_template.cache_clear()
+    except Exception:
+        pass
+
     await db.delete(topic)
     await db.flush()
-    return {"ok": True}
+    return {"ok": True, "deleted_templates": deleted_templates}
 
 
 # ---- HTML Pages ----
@@ -1188,9 +1236,37 @@ async def pipeline_topics_page(
     total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = (await db.execute(query.offset((page - 1) * 50).limit(50))).scalars().all()
 
-    # Compute quality scores for each topic
+    # Compute quality scores for each topic.
+    # For topics that already generated templates (status=generated), the
+    # template's quality score (0-100, 15-dim curriculum scorer) is far more
+    # meaningful than the topic-evidence score (7-dim, driven by justification
+    # length and source count — which is always low for manual uploads).
+    # Prefer template score when available.
     from app.services.quality_scorer import score_topic
-    topic_scores = {score_topic(t)["id"]: score_topic(t) for t in rows}
+    from app.curriculum.loader import list_templates, get_template_status
+    import re as _re
+
+    _all_keys = list_templates()
+    def _avg_template_score_for(topic):
+        name_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.topic_name or "").lower()).strip("_")
+        norm_slug = _re.sub(r"[^a-z0-9]+", "_", (topic.normalized_name or "").lower()).strip("_")
+        scores = []
+        for k in _all_keys:
+            if name_slug and k.startswith(name_slug) or (norm_slug and k.startswith(norm_slug)):
+                meta = get_template_status(k) or {}
+                s = int(meta.get("quality_score") or 0)
+                if s:
+                    scores.append(s)
+        return round(sum(scores) / len(scores)) if scores else None
+
+    topic_scores = {}
+    for t in rows:
+        base = score_topic(t)
+        tpl_score = _avg_template_score_for(t) if t.status in ("generated", "generating") else None
+        if tpl_score is not None:
+            base["composite_score"] = tpl_score
+            base["issues"] = [f"Average of {len([k for k in _all_keys if k.startswith(_re.sub(r'[^a-z0-9]+', '_', (t.topic_name or '').lower()).strip('_'))])} template(s) · curriculum scorer (15 dims)"] + list(base.get("issues", []))
+        topic_scores[t.id] = base
 
     # Status filter links
     statuses = ["", "pending", "approved", "generating", "generated", "rejected"]
