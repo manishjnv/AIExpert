@@ -19,7 +19,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.db import async_session_factory
+import app.db as _db
 from app.models import Job, JobCompany, JobSource
 from app.services.jobs_sources import RawJob
 from app.services.jobs_sources.greenhouse import GREENHOUSE_BOARDS, fetch_all as gh_fetch_all
@@ -62,7 +62,7 @@ async def ensure_source_rows() -> None:
         ("greenhouse", "Greenhouse", GREENHOUSE_BOARDS),
         ("lever", "Lever", LEVER_BOARDS),
     ]
-    async with async_session_factory() as db:
+    async with _db.async_session_factory() as db:
         for kind, label_suffix, boards in registry:
             for board_slug, company_name in boards:
                 key = f"{kind}:{board_slug}"
@@ -189,7 +189,7 @@ async def run_daily_ingest() -> dict[str, int]:
 
     fetchers = [("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all), ("lever", LEVER_BOARDS, lv_fetch_all)]
 
-    async with async_session_factory() as db:
+    async with _db.async_session_factory() as db:
         for _kind, _boards, fetch in fetchers:
             async for source_key, raw in fetch():
                 stats["fetched"] += 1
