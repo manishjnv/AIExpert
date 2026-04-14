@@ -307,7 +307,8 @@ async def review_page(_admin: User = Depends(get_current_admin)) -> HTMLResponse
 _ADMIN_HTML = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Jobs Review — Admin</title>
-<link rel="stylesheet" href="/static/css/nav.css">
+<link rel="stylesheet" href="/nav.css">
+<script src="/nav.js"></script>
 <style>
   body{font-family:system-ui,sans-serif;max-width:1200px;margin:0 auto;padding:1rem;color:#1a1a1a}
   .banner{padding:.75rem 1rem;background:#fffbea;border:1px solid #f0c040;border-radius:6px;margin-bottom:1rem}
