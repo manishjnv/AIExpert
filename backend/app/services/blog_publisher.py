@@ -290,12 +290,22 @@ def _ensure_dirs() -> None:
 
 
 def save_draft(payload: dict, admin_name: str) -> Path:
+    """Write a draft JSON. If `_original_slug` is set and differs from
+    payload['slug'], the file under the old slug is deleted so a slug
+    rename results in exactly one file on disk."""
     _ensure_dirs()
     slug = payload["slug"]
+    original_slug = payload.pop("_original_slug", None)
     payload = {**payload, "_saved_by": admin_name,
                "_saved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat()}
     path = DRAFTS_DIR / f"{slug}.json"
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Handle a slug rename — drop the stale draft file, if any.
+    if original_slug and original_slug != slug:
+        stale = DRAFTS_DIR / f"{original_slug}.json"
+        if stale.exists():
+            stale.unlink()
+            logger.info("Blog draft renamed: %s → %s", original_slug, slug)
     logger.info("Blog draft saved: %s (by %s)", slug, admin_name)
     return path
 

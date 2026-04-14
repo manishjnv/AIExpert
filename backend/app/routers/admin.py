@@ -687,6 +687,7 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
                 f'title="Preview the rendered draft (opens in new tab)">{title} ↗</a>'
             )
             actions = (
+                f'<a class="btn" href="/admin/blog/{slug}/edit" title="Edit fields">Edit</a> '
                 f'<a class="btn" href="/admin/blog/{slug}/preview" target="_blank" title="Render + eyeball">Preview ↗</a> '
                 f'<button class="btn" onclick="validateDraft(\'{slug}\')" title="Re-run validator">Re-check</button> '
                 f'<button class="btn success" onclick="publishDraft(\'{slug}\')" title="Go live at /blog/{slug}">Publish</button> '
@@ -1053,6 +1054,302 @@ async def admin_blog_validate_draft(slug: str, _user: User = Depends(get_current
     if not d:
         raise HTTPException(status_code=404, detail=f"No draft '{slug}'")
     return validate_payload(d)
+
+
+@router.post("/api/blog/draft/update")
+async def admin_blog_update_draft(request: Request, user: User = Depends(get_current_admin)):
+    """Update an existing draft. Body must include every field (full replace).
+    Re-runs validator before saving. Errors block, warnings allowed."""
+    _check_origin(request)
+    from app.services.blog_publisher import validate_payload, save_draft, load_draft
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body must be JSON.")
+    slug = (body.get("slug") or "").strip()
+    if not slug:
+        raise HTTPException(status_code=400, detail="slug required")
+    if not load_draft(slug):
+        raise HTTPException(status_code=404, detail=f"No draft '{slug}'")
+    report = validate_payload(body)
+    if not report["ok"]:
+        raise HTTPException(status_code=400, detail={"errors": report["errors"], "warnings": report["warnings"]})
+    save_draft(body, admin_name=user.name or user.email)
+    return {"ok": True, "slug": slug, "warnings": report["warnings"], "stats": report["stats"]}
+
+
+@router.get("/blog/{slug}/edit", response_class=HTMLResponse)
+async def admin_blog_edit_page(slug: str, _user: User = Depends(get_current_admin)):
+    """Full-form editor for a draft. All fields editable. Save runs
+    the validator and updates the JSON on disk."""
+    from app.services.blog_publisher import load_draft
+    draft = load_draft(slug)
+    if not draft:
+        raise HTTPException(status_code=404, detail=f"No draft '{slug}'")
+
+    import json as _json
+
+    title = esc(draft.get("title", ""))
+    old_slug = esc(draft.get("slug", slug))
+    author = esc(draft.get("author", ""))
+    published = esc(draft.get("published", ""))
+    og = esc(draft.get("og_description", ""))
+    lede = esc(draft.get("lede", ""))
+    body_html = esc(draft.get("body_html", ""))
+    tags_csv = esc(", ".join(draft.get("tags", []) or []))
+    quotables = esc("\n".join(draft.get("quotable_lines", []) or []))
+    word_count = int(draft.get("word_count", 0) or 0)
+    ib = draft.get("image_brief", {}) or {}
+    hero_prompt = esc(ib.get("hero_prompt", ""))
+    hero_alt = esc(ib.get("hero_alt", ""))
+    hero_filename = esc(ib.get("hero_filename", ""))
+    angle_note = esc(draft.get("angle_note", "") or "")
+
+    # The full draft JSON inline so the JS has one source of truth for
+    # unchanged fields (avoids losing _saved_at, _saved_by, etc.).
+    full_json_b64 = _json.dumps(draft)
+
+    return HTMLResponse(_BLOG_EDIT_HTML
+        .replace("{{ADMIN_CSS}}", ADMIN_CSS)
+        .replace("{{ADMIN_NAV}}", ADMIN_NAV)
+        .replace("{{SLUG}}", esc(slug))
+        .replace("{{TITLE}}", title)
+        .replace("{{OLD_SLUG}}", old_slug)
+        .replace("{{AUTHOR}}", author)
+        .replace("{{PUBLISHED}}", published)
+        .replace("{{OG}}", og)
+        .replace("{{LEDE}}", lede)
+        .replace("{{BODY_HTML}}", body_html)
+        .replace("{{TAGS_CSV}}", tags_csv)
+        .replace("{{QUOTABLES}}", quotables)
+        .replace("{{WORD_COUNT}}", str(word_count))
+        .replace("{{HERO_PROMPT}}", hero_prompt)
+        .replace("{{HERO_ALT}}", hero_alt)
+        .replace("{{HERO_FILENAME}}", hero_filename)
+        .replace("{{ANGLE_NOTE}}", angle_note)
+        .replace("{{FULL_JSON_B64}}", full_json_b64.replace("</", "<\\/"))
+    )
+
+
+_BLOG_EDIT_HTML = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><title>Edit Draft — Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>{{ADMIN_CSS}}
+  .edit-layout { display:grid; grid-template-columns:1fr; gap:14px; max-width:1200px; margin:0 auto; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#94a3b8; }
+  .field label .hint { color:#64748b; font-size:10px; letter-spacing:0.05em; margin-left:8px; text-transform:none; }
+  .field input, .field textarea { padding:10px 12px; background:#0f1419; border:1px solid #2a323d; color:#f5f1e8; border-radius:4px; font-family:inherit; font-size:14px; }
+  .field textarea { font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:13px; line-height:1.55; resize:vertical; }
+  .field textarea.body-html { min-height:380px; }
+  .field textarea.med { min-height:80px; }
+  .field textarea.sm { min-height:50px; }
+  .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .row-3 { display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; }
+  @media (max-width:720px) { .row-2, .row-3 { grid-template-columns:1fr; } }
+  .card { background:#1d242e; border:1px solid #2a323d; border-radius:6px; padding:18px 20px; margin-bottom:14px; }
+  .card h2 { margin:0 0 12px; font-size:14px; color:#e8a849; font-family:'Fraunces',Georgia,serif; font-weight:500; }
+  .actions-sticky { position:sticky; bottom:0; background:rgba(15,20,25,0.95); backdrop-filter:blur(8px); padding:14px 0; border-top:1px solid #2a323d; display:flex; gap:10px; justify-content:space-between; align-items:center; flex-wrap:wrap; z-index:10; }
+  .val-result { padding:10px 14px; border-radius:4px; font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:12px; line-height:1.55; white-space:pre-wrap; }
+  .val-ok { background:rgba(109,181,133,0.1); border:1px solid rgba(109,181,133,0.35); color:#8fd0a5; }
+  .val-err { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.35); color:#fca5a5; }
+  .val-warn { background:rgba(232,168,73,0.08); border:1px solid rgba(232,168,73,0.3); color:#f5c06a; margin-top:6px; }
+  .btn { font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; padding:9px 16px; background:transparent; border:1px solid #3a4452; color:#e8e2d3; cursor:pointer; border-radius:3px; text-decoration:none; display:inline-block; }
+  .btn:hover { border-color:#e8a849; color:#e8a849; }
+  .btn.primary { background:#e8a849; color:#0f1419; border-color:#e8a849; }
+  .btn.primary:hover { background:#c98e2f; border-color:#c98e2f; color:#0f1419; }
+  .btn.success { border-color:#6db585; color:#6db585; }
+  .btn.danger { border-color:#d97757; color:#d97757; }
+</style>
+</head>
+<body>
+{{ADMIN_NAV}}
+<main class="page" style="max-width:100%;margin:0 auto;padding:28px clamp(20px,4vw,64px) 80px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+    <a href="/admin/blog" class="btn">← Back to blog admin</a>
+    <a href="/admin/blog/{{SLUG}}/preview" target="_blank" class="btn">Preview ↗</a>
+    <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:#94a3b8;letter-spacing:0.08em">editing draft · <code style="color:#e8a849">{{SLUG}}</code></div>
+  </div>
+  <h1 style="font-family:'Fraunces',Georgia,serif;color:#e8a849;font-weight:400;font-size:26px;margin:0 0 6px">Edit draft</h1>
+  <p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0 0 18px;max-width:780px">
+    Tune copy, tighten prose, fix tags, or swap the hero image brief.
+    <strong style="color:#f5c06a">Save</strong> re-runs the validator and writes back to
+    <code style="color:#e8a849">/data/blog/drafts/{{SLUG}}.json</code>. Publish from the main list when ready.
+  </p>
+
+  <div class="edit-layout">
+    <div class="card">
+      <h2>Identity</h2>
+      <div class="field">
+        <label>Title</label>
+        <input id="fTitle" value="{{TITLE}}" maxlength="150">
+      </div>
+      <div class="row-3" style="margin-top:10px">
+        <div class="field">
+          <label>Slug <span class="hint">changing breaks existing links</span></label>
+          <input id="fSlug" value="{{OLD_SLUG}}">
+        </div>
+        <div class="field"><label>Author</label><input id="fAuthor" value="{{AUTHOR}}"></div>
+        <div class="field"><label>Published (ISO)</label><input id="fPublished" value="{{PUBLISHED}}" placeholder="YYYY-MM-DD"></div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Tags <span class="hint">comma-separated, 3–5, first must be build-in-public</span></label>
+        <input id="fTags" value="{{TAGS_CSV}}">
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>OG description <span class="hint">≤ 200 chars, shown in link previews</span></label>
+        <textarea id="fOg" class="sm">{{OG}}</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Body</h2>
+      <div class="field">
+        <label>Lede <span class="hint">plain text, one sentence, under 30 words</span></label>
+        <textarea id="fLede" class="sm">{{LEDE}}</textarea>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Body HTML <span class="hint">opens with &lt;p class="lede"&gt;, ≥3 &lt;h2&gt; sections, ≤4 sentences per paragraph</span></label>
+        <textarea id="fBody" class="body-html">{{BODY_HTML}}</textarea>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Word count <span class="hint">we'll re-measure from body_html on save</span></label>
+        <input id="fWordCount" value="{{WORD_COUNT}}" type="number" min="0" style="max-width:160px">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Hero image brief</h2>
+      <div class="field">
+        <label>Hero prompt <span class="hint">40–90 words, photoreal + digital, dark palette</span></label>
+        <textarea id="fHeroPrompt" class="med">{{HERO_PROMPT}}</textarea>
+      </div>
+      <div class="row-2" style="margin-top:10px">
+        <div class="field"><label>Alt text <span class="hint">literal description</span></label><input id="fHeroAlt" value="{{HERO_ALT}}"></div>
+        <div class="field"><label>Filename</label><input id="fHeroFilename" value="{{HERO_FILENAME}}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quotable lines + editor notes</h2>
+      <div class="field">
+        <label>Quotable lines <span class="hint">one per line — 1 or 2 shareable sentences</span></label>
+        <textarea id="fQuotables" class="med">{{QUOTABLES}}</textarea>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Angle note <span class="hint">not published — editorial commentary for you</span></label>
+        <textarea id="fAngleNote" class="sm">{{ANGLE_NOTE}}</textarea>
+      </div>
+    </div>
+
+    <div id="validationResult"></div>
+
+    <div class="actions-sticky">
+      <a href="/admin/blog" class="btn danger">Discard changes</a>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="validateEdit()">Validate</button>
+        <button class="btn primary" onclick="saveEdit()">Save changes</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const ORIGINAL_JSON = {{FULL_JSON_B64}};
+const ORIGINAL_SLUG = ORIGINAL_JSON.slug;
+
+function buildPayload() {
+  // Preserve any fields we don't edit (like _saved_at). Overlay edited.
+  const p = Object.assign({}, ORIGINAL_JSON);
+  p.title = document.getElementById('fTitle').value.trim();
+  p.slug = document.getElementById('fSlug').value.trim();
+  p.author = document.getElementById('fAuthor').value.trim();
+  p.published = document.getElementById('fPublished').value.trim();
+  p.tags = document.getElementById('fTags').value.split(',').map(s => s.trim()).filter(Boolean);
+  p.og_description = document.getElementById('fOg').value.trim();
+  p.lede = document.getElementById('fLede').value.trim();
+  p.body_html = document.getElementById('fBody').value;
+  p.word_count = parseInt(document.getElementById('fWordCount').value, 10) || 0;
+  p.image_brief = Object.assign({}, p.image_brief || {}, {
+    hero_prompt: document.getElementById('fHeroPrompt').value.trim(),
+    hero_alt: document.getElementById('fHeroAlt').value.trim(),
+    hero_filename: document.getElementById('fHeroFilename').value.trim(),
+  });
+  p.quotable_lines = document.getElementById('fQuotables').value
+    .split('\\n').map(s => s.trim()).filter(Boolean);
+  p.angle_note = document.getElementById('fAngleNote').value.trim();
+  // Include the ORIGINAL slug so the backend can find the source draft
+  // even if we renamed the slug field.
+  p._original_slug = ORIGINAL_SLUG;
+  return p;
+}
+
+function renderReport(report) {
+  const el = document.getElementById('validationResult');
+  el.innerHTML = '';
+  if (report.errors && report.errors.length) {
+    const d = document.createElement('div');
+    d.className = 'val-result val-err';
+    d.textContent = '✗ ' + report.errors.length + ' blocking error(s):\\n\\n' + report.errors.map(e => '  • ' + e).join('\\n');
+    el.appendChild(d);
+  } else if (!(report.warnings && report.warnings.length)) {
+    const d = document.createElement('div');
+    d.className = 'val-result val-ok';
+    d.textContent = '✓ Clean — all checks pass.';
+    el.appendChild(d);
+  } else {
+    const d = document.createElement('div');
+    d.className = 'val-result val-ok';
+    d.textContent = '✓ No blocking errors.';
+    el.appendChild(d);
+  }
+  if (report.warnings && report.warnings.length) {
+    const w = document.createElement('div');
+    w.className = 'val-result val-warn';
+    w.textContent = '⚠ ' + report.warnings.length + ' warning(s):\\n\\n' + report.warnings.map(e => '  • ' + e).join('\\n');
+    el.appendChild(w);
+  }
+}
+
+async function validateEdit() {
+  const payload = buildPayload();
+  delete payload._original_slug;  // validator doesn't expect this
+  const resp = await fetch('/admin/api/blog/validate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin', body: JSON.stringify(payload),
+  });
+  const report = await resp.json();
+  renderReport(report);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+async function saveEdit() {
+  const payload = buildPayload();
+  const originalSlug = payload._original_slug;
+  delete payload._original_slug;
+
+  // If slug changed, save under new slug then clean up the old file.
+  const resp = await fetch('/admin/api/blog/draft/update', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(Object.assign({}, payload, { _original_slug: originalSlug })),
+  });
+  if (!resp.ok) {
+    const d = await resp.json().catch(() => ({}));
+    const errs = (d.detail && d.detail.errors) || [d.detail || 'Save failed.'];
+    const warns = (d.detail && d.detail.warnings) || [];
+    renderReport({ errors: errs, warnings: warns });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    return;
+  }
+  const data = await resp.json();
+  const el = document.getElementById('validationResult');
+  el.innerHTML = '<div class="val-result val-ok">✓ Draft saved — redirecting…</div>';
+  setTimeout(() => { window.location = '/admin/blog'; }, 700);
+}
+</script>
+</body></html>"""
 
 
 @router.get("/blog/{slug}/preview", response_class=HTMLResponse)
