@@ -218,6 +218,109 @@ _BLOG_CSS = """
   strong { color: #f5f1e8; }
   /* Navbar compat */
   body > nav { font-family: system-ui, -apple-system, sans-serif; }
+
+  /* ----- Post-level navigation ----- */
+  .post-breadcrumb {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #94a3b8; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .post-breadcrumb a {
+    color: #e8a849; text-decoration: none;
+    padding: 4px 10px; border: 1px solid rgba(232,168,73,0.3);
+    border-radius: 999px; transition: all 0.2s;
+  }
+  .post-breadcrumb a:hover {
+    background: rgba(232,168,73,0.1); border-color: #e8a849;
+  }
+  .post-breadcrumb .sep { opacity: 0.4; }
+  .post-breadcrumb .current {
+    color: #c0c4cc;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 60ch;
+  }
+  .post-nav-hr {
+    border-top-color: #2a323d; margin: 64px 0 36px;
+  }
+  .post-nav {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .nav-pair {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 640px) {
+    .nav-pair { grid-template-columns: 1fr; }
+  }
+  .nav-card {
+    display: block; text-decoration: none;
+    background: #1a2029; border: 1px solid #2a323d; border-radius: 8px;
+    padding: 18px 20px; color: inherit;
+    transition: all 0.2s ease;
+  }
+  .nav-card:hover {
+    border-color: #e8a849; transform: translateY(-2px);
+    background: #1d242e;
+  }
+  .nav-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+    color: #e8a849; margin-bottom: 6px;
+  }
+  .nav-date {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #94a3b8; margin-bottom: 6px;
+  }
+  .nav-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 17px; color: #f5f1e8; font-weight: 500;
+    line-height: 1.3; margin-bottom: 8px;
+  }
+  .nav-summary {
+    font-size: 13px; color: #c0c4cc; line-height: 1.5;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    max-height: 3em;
+  }
+  .nav-card-edge {
+    border-style: dashed; background: transparent; cursor: default;
+  }
+  .nav-card-edge:hover {
+    border-color: #2a323d; transform: none; background: transparent;
+  }
+  .nav-edge-msg {
+    font-size: 13px; color: #94a3b8; font-style: italic; margin-top: 4px;
+  }
+  .nav-more {
+    margin-top: 8px;
+  }
+  .nav-more-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+  }
+  .nav-more-header h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 18px; color: #e8a849; margin: 0; font-weight: 500;
+  }
+  .nav-all-link {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #e8a849; text-decoration: none;
+  }
+  .nav-all-link:hover { color: #f5c06a; }
+  .nav-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .post-nav-empty {
+    text-align: center; padding: 24px 0; color: #94a3b8;
+  }
+  .post-nav-empty p {
+    font-style: italic; margin: 0 0 14px; font-size: 14px;
+  }
 </style>
 """
 
@@ -227,6 +330,7 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
     base = settings.public_base_url.rstrip("/")
     url = f"{base}/blog/{slug}"
     og_image = f"{base}/assets/og-default.png"
+    post_nav_html = _render_post_nav(slug, base)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -261,12 +365,126 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
 </head>
 <body>
   <main>
+    <nav class="post-breadcrumb" aria-label="Breadcrumb">
+      <a href="/blog">← Blog</a>
+      <span class="sep">·</span>
+      <span class="current">{title}</span>
+    </nav>
     <div class="meta-line">Published {published} · Manish Kumar · Build in Public</div>
     {body_html}
+    {post_nav_html}
   </main>
   <script src="/nav.js" defer></script>
 </body>
 </html>"""
+
+
+def _render_post_nav(current_slug: str, base: str) -> str:
+    """Between-post navigation appended at the end of every blog post.
+
+    Design:
+      - <hr> separator
+      - Prev / Next cards side-by-side (chronological neighbours). Missing
+        sides show a muted 'You're at the edge' placeholder.
+      - 'More essays' grid showing up to 3 other posts, sorted newest-
+        first (excluding current + already-shown neighbours).
+      - 'All posts →' link to /blog when there's more than 4 other posts.
+
+    Single-post case: just a button to /blog so the reader has somewhere
+    to go. Empty-state handling.
+    """
+    import html as _html
+
+    posts = _list_visible_posts()  # newest-first
+    if not posts:
+        return ""
+
+    # Locate current post within the newest-first list.
+    cur_idx = next(
+        (i for i, p in enumerate(posts) if p.get("slug") == current_slug),
+        None,
+    )
+
+    # If the current post isn't in the list (e.g. preview of a draft),
+    # show a 'More essays' grid without prev/next framing.
+    if cur_idx is None:
+        newer = None
+        older = None
+        others = posts[:3]
+    else:
+        # Newer post in reading order = earlier index (list is newest-first).
+        newer = posts[cur_idx - 1] if cur_idx > 0 else None
+        older = posts[cur_idx + 1] if cur_idx + 1 < len(posts) else None
+        # Remaining posts for the 'More essays' strip.
+        others = [p for i, p in enumerate(posts) if i != cur_idx
+                  and (not newer or p.get("slug") != newer.get("slug"))
+                  and (not older or p.get("slug") != older.get("slug"))][:3]
+
+    def _card(post: dict, label: str | None = None) -> str:
+        slug = _html.escape(post.get("slug", ""))
+        title = _html.escape(post.get("title", ""))
+        summary = _html.escape(post.get("summary", ""))
+        pub = _html.escape(post.get("published", ""))
+        label_html = (
+            f'<div class="nav-label">{_html.escape(label)}</div>' if label else ""
+        )
+        return (
+            f'<a class="nav-card" href="{base}/blog/{slug}">'
+            f'{label_html}'
+            f'<div class="nav-date">{pub}</div>'
+            f'<div class="nav-title">{title}</div>'
+            f'<div class="nav-summary">{summary}</div>'
+            f'</a>'
+        )
+
+    def _edge(label: str, message: str) -> str:
+        return (
+            '<div class="nav-card nav-card-edge" aria-disabled="true">'
+            f'<div class="nav-label">{_html.escape(label)}</div>'
+            f'<div class="nav-edge-msg">{_html.escape(message)}</div>'
+            '</div>'
+        )
+
+    # --- Prev / Next row ---
+    pair_html = ""
+    if newer or older:
+        prev_html = _card(newer, "← Newer") if newer else _edge(
+            "← Newer", "You're reading the freshest post."
+        )
+        next_html = _card(older, "Older →") if older else _edge(
+            "Older →", "You've reached the first essay."
+        )
+        pair_html = f'<div class="nav-pair">{prev_html}{next_html}</div>'
+
+    # --- More essays grid ---
+    grid_html = ""
+    if others:
+        others_html = "".join(_card(p) for p in others)
+        all_link = (
+            '<a class="nav-all-link" href="/blog">See all posts →</a>'
+            if len(posts) > 4 else ""
+        )
+        grid_html = (
+            '<div class="nav-more">'
+            '<div class="nav-more-header">'
+            '<h3>More essays</h3>'
+            f'{all_link}'
+            '</div>'
+            f'<div class="nav-grid">{others_html}</div>'
+            '</div>'
+        )
+
+    # --- Nothing else? Single post — show CTA back to index ---
+    if not pair_html and not grid_html:
+        return (
+            '<hr class="post-nav-hr">'
+            '<div class="post-nav-empty">'
+            '<p>This is the only essay so far — more on the way.</p>'
+            '<a href="/blog" class="nav-all-link">Back to blog →</a>'
+            '</div>'
+        )
+
+    return f'<hr class="post-nav-hr"><section class="post-nav" aria-label="More from the blog">{pair_html}{grid_html}</section>'
 
 
 def _list_visible_posts() -> list[dict]:
