@@ -77,6 +77,7 @@
       <div class="topnav-links">
         <a href="/"${activeClass('/')}>Home</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
+        <a href="/blog"${path === '/blog' || path.startsWith('/blog/') ? ' class="active"' : ''}>Blog</a>
         <span id="navAuth" style="display:${authDisplay}">
           <a href="/account"${activeClass('/account')}>Account</a>
           <a href="/admin/" id="navAdminLink" style="display:${adminDisplay}"${activeClass('/admin')}>Admin</a>
