@@ -10,14 +10,17 @@ still staged with a minimal payload and flagged via admin_notes for review.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+import random
 import re
 import secrets
 from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 import app.db as _db
 from app.models import Job, JobCompany, JobSource
@@ -180,6 +183,35 @@ def _minimal_enrichment(raw: RawJob) -> dict[str, Any]:
     }
 
 
+async def _stage_with_retry(raw: RawJob, source_key: str, max_attempts: int = 4) -> str:
+    """Stage one row with retry+backoff on SQLite 'database is locked'.
+
+    SQLite WAL allows concurrent reads but only one writer at a time. The live
+    backend writing session cookies / progress can briefly hold the lock. A
+    short exponential backoff (0.2s, 0.4s, 0.8s) clears almost all real-world
+    cases without needing server-side locking.
+    """
+    for attempt in range(max_attempts):
+        try:
+            async with _db.async_session_factory() as db:
+                result = await _stage_one(raw, source_key, db)
+                await db.commit()
+                return result
+        except OperationalError as exc:
+            msg = str(exc).lower()
+            if "database is locked" not in msg and "database table is locked" not in msg:
+                raise
+            if attempt == max_attempts - 1:
+                logger.warning("db locked after %d attempts for %s/%s — giving up",
+                               max_attempts, source_key, raw.get("external_id"))
+                raise
+            delay = 0.2 * (2 ** attempt) + random.uniform(0, 0.1)
+            logger.info("db locked, retrying %s/%s in %.2fs (attempt %d/%d)",
+                        source_key, raw.get("external_id"), delay, attempt + 1, max_attempts)
+            await asyncio.sleep(delay)
+    return "errors"  # unreachable — raised above
+
+
 # ---------------------------------------------------------------- entry point
 
 async def run_daily_ingest() -> dict[str, int]:
@@ -199,9 +231,7 @@ async def run_daily_ingest() -> dict[str, int]:
         async for source_key, raw in fetch():
             stats["fetched"] += 1
             try:
-                async with _db.async_session_factory() as db:
-                    result = await _stage_one(raw, source_key, db)
-                    await db.commit()
+                result = await _stage_with_retry(raw, source_key)
                 key = "skipped" if result == "skipped_blocked" else result
                 stats[key] = stats.get(key, 0) + 1
             except Exception as exc:

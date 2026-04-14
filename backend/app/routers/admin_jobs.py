@@ -219,6 +219,45 @@ async def run_ingest_now(
     return {"ok": True, "stats": stats}
 
 
+@router.get("/api/stats")
+async def stats(
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-source stats for the admin banner: last 24h + cumulative."""
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+
+    srcs = (await db.execute(select(JobSource).order_by(JobSource.tier, JobSource.key))).scalars().all()
+
+    # Count recent staged rows per source (anything updated in last 24h counts as "touched").
+    recent_stmt = (
+        select(Job.source, Job.status, func.count(Job.id))
+        .where(Job.updated_at >= cutoff)
+        .group_by(Job.source, Job.status)
+    )
+    recent_rows = (await db.execute(recent_stmt)).all()
+    recent: dict[str, dict[str, int]] = {}
+    for src, status, n in recent_rows:
+        recent.setdefault(src, {})[status] = n
+
+    out = []
+    for s in srcs:
+        r = recent.get(s.key, {})
+        out.append({
+            "key": s.key, "label": s.label, "tier": s.tier,
+            "enabled": bool(s.enabled),
+            "last_run_at": s.last_run_at.isoformat() if s.last_run_at else None,
+            "recent_draft": r.get("draft", 0),
+            "recent_published": r.get("published", 0),
+            "recent_rejected": r.get("rejected", 0),
+            "total_published": s.total_published,
+            "total_rejected": s.total_rejected,
+            "error": s.last_run_error,
+        })
+    return {"sources": out}
+
+
 @router.get("/api/sources")
 async def list_sources(
     _admin: User = Depends(get_current_admin),
@@ -284,6 +323,11 @@ _ADMIN_HTML = """<!DOCTYPE html>
   .chip{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.75rem;background:#eee;margin-right:4px}
   .chip.verified{background:#dfd;color:#070}
   .tldr{color:#555;font-size:.85rem;max-width:420px}
+  .stats{margin:1rem 0;border:1px solid #e4e4e4;border-radius:6px;padding:.4rem .7rem;background:#fafafa;font-size:.8rem}
+  .stats summary{cursor:pointer;font-weight:600}
+  .stats table{margin-top:.4rem;font-size:.78rem}
+  .stats th,.stats td{padding:.25rem .5rem}
+  .stats .err{color:#c33;font-weight:600}
   details{margin:.3rem 0}
   details summary{cursor:pointer;color:#06c}
   pre{background:#f5f5f5;padding:.5rem;border-radius:4px;max-height:300px;overflow:auto;font-size:.75rem}
@@ -291,6 +335,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
 </head><body>
 <h1>Jobs Review Queue</h1>
 <div id="banner" class="banner">Loading…</div>
+<details class="stats" id="stats"><summary>Source stats (last 24h)</summary><div id="stats-body">Loading…</div></details>
 <div class="tabs">
   <button data-status="draft" class="active">Draft</button>
   <button data-status="published">Published</button>
@@ -313,6 +358,30 @@ async function load() {
   document.getElementById("banner").innerHTML =
     `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired`;
   renderList(data.items);
+  loadStats();
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch("/admin/jobs/api/stats", {credentials:"include"});
+    if (!r.ok) return;
+    const data = await r.json();
+    const rows = (data.sources || []).map(s => {
+      const tot = s.recent_draft + s.recent_published + s.recent_rejected;
+      const err = s.error ? `<span class="err">ERR</span>` : "";
+      const stale = !s.last_run_at || (Date.now() - new Date(s.last_run_at).getTime() > 36*3600*1000);
+      const staleTag = stale ? `<span class="err">stale</span>` : "";
+      return `<tr>
+        <td>${esc(s.label)}</td><td>T${s.tier}</td>
+        <td>${tot}</td><td>${s.recent_draft}</td><td>${s.recent_published}</td><td>${s.recent_rejected}</td>
+        <td>${s.last_run_at ? esc(s.last_run_at.slice(0,16).replace('T',' ')) : '—'} ${staleTag}</td>
+        <td>${err}</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("stats-body").innerHTML = rows
+      ? `<table><thead><tr><th>Source</th><th>Tier</th><th>24h</th><th>Draft</th><th>Pub</th><th>Rej</th><th>Last run (UTC)</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : "<p>No sources configured yet.</p>";
+  } catch(_) {}
 }
 
 function esc(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[c]))}
