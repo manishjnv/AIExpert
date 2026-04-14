@@ -87,9 +87,12 @@ async def list_jobs(
         from datetime import timedelta
         stmt = stmt.where(Job.posted_on >= date.today() - timedelta(days=posted_within_days))
     if q:
-        from sqlalchemy import func
+        from sqlalchemy import func, or_
         like = f"%{q.lower()}%"
-        stmt = stmt.where(func.lower(Job.title).like(like))
+        # Search title + company slug. Skill search happens post-query against
+        # the JSON payload below (SQLite can't cheaply index JSON arrays).
+        stmt = stmt.where(or_(func.lower(Job.title).like(like),
+                              func.lower(Job.company_slug).like(like)))
     stmt = stmt.order_by(Job.posted_on.desc(), Job.id.desc()).offset(offset).limit(limit)
 
     rows = (await db.execute(stmt)).scalars().all()
