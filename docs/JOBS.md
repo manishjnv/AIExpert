@@ -250,7 +250,8 @@ All other combos served via `/jobs?filter=…` with `<meta name="robots" content
 
 ### 7.6 Expiry handling
 
-- `posted_on + 45d` (or admin-set `valid_through`) → `status=expired`.
+- **Date-based:** `posted_on + 45d` (or admin-set `valid_through`) → `status=expired`.
+- **Early disappearance:** during daily ingest, any `published` job whose `external_id` is absent from the source feed increments `data._meta.missing_streak`. At `missing_streak >= 2` the job auto-flips to `status=expired` with `data._meta.expired_reason = "source_removed"`. Guard: a source that returned 0 rows is treated as an outage and skipped, preventing mass-expire on API blips. Lives in `backend/app/services/jobs_ingest.py::_auto_expire_missing`.
 - Expired jobs: `noindex` header + page renders "This job has closed" + related-jobs block. Kept resolvable 90d (preserves backlinks).
 - After 90d: return 410 Gone; removed from sitemap.
 

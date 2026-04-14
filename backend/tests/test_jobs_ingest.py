@@ -160,3 +160,124 @@ async def test_ensure_source_rows_idempotent():
         assert any(k.startswith("lever:") for k in keys)
         assert len(keys) == len(set(keys))  # no dupes
     await close_db()
+
+
+# ---------- auto-expire on source-feed disappearance (Phase 13.1) ----------
+
+async def _seed_published(source_key: str, external_id: str, *, missing_streak: int = 0) -> None:
+    """Seed one `published` job for the auto-expire tests."""
+    async with db_module.async_session_factory() as db:
+        db.add(Job(
+            source=source_key,
+            external_id=external_id,
+            source_url=f"https://example.com/{external_id}",
+            hash=f"h-{external_id}",
+            status="published",
+            posted_on=date(2026, 4, 1),
+            valid_through=date(2026, 5, 16),
+            slug=f"slug-{external_id}",
+            title="Senior ML Engineer",
+            company_slug="anthropic",
+            designation="ML Engineer",
+            country="US",
+            remote_policy="Hybrid",
+            verified=1,
+            data={"_meta": {"missing_streak": missing_streak}} if missing_streak else {},
+        ))
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_auto_expire_flips_after_two_misses():
+    """Missing one run bumps streak to 1 (still published); missing again flips to expired."""
+    await _setup()
+    src = "greenhouse:anthropic"
+    await _seed_published(src, "gh-present")
+    await _seed_published(src, "gh-missing")
+
+    # Run 1: feed contains only gh-present.
+    stats = {}
+    feed = [_raw(external_id="gh-present")]
+    await jobs_ingest._auto_expire_missing({src: feed}, stats)
+    assert stats.get("auto_expired", 0) == 0
+    async with db_module.async_session_factory() as db:
+        missing = (await db.execute(select(Job).where(Job.external_id == "gh-missing"))).scalar_one()
+        assert missing.status == "published"
+        assert missing.data["_meta"]["missing_streak"] == 1
+
+    # Run 2: feed still missing gh-missing → flips to expired.
+    stats = {}
+    await jobs_ingest._auto_expire_missing({src: feed}, stats)
+    assert stats["auto_expired"] == 1
+    async with db_module.async_session_factory() as db:
+        missing = (await db.execute(select(Job).where(Job.external_id == "gh-missing"))).scalar_one()
+        assert missing.status == "expired"
+        assert missing.data["_meta"]["expired_reason"] == "source_removed"
+        assert "expired_on" in missing.data["_meta"]
+        present = (await db.execute(select(Job).where(Job.external_id == "gh-present"))).scalar_one()
+        assert present.status == "published"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_auto_expire_resets_streak_on_reappearance():
+    """A job missing once then returning must reset its streak, not expire."""
+    await _setup()
+    src = "greenhouse:anthropic"
+    await _seed_published(src, "gh-flapper", missing_streak=1)
+
+    feed = [_raw(external_id="gh-flapper")]
+    stats = {}
+    await jobs_ingest._auto_expire_missing({src: feed}, stats)
+    assert stats.get("auto_expired", 0) == 0
+    async with db_module.async_session_factory() as db:
+        j = (await db.execute(select(Job).where(Job.external_id == "gh-flapper"))).scalar_one()
+        assert j.status == "published"
+        assert j.data["_meta"]["missing_streak"] == 0
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_auto_expire_skips_empty_source():
+    """Source outage (0 rows fetched) must not expire anyone from that source."""
+    await _setup()
+    src = "greenhouse:anthropic"
+    await _seed_published(src, "gh-safe", missing_streak=1)
+
+    stats = {}
+    await jobs_ingest._auto_expire_missing({src: []}, stats)
+    assert stats.get("auto_expired", 0) == 0
+    async with db_module.async_session_factory() as db:
+        j = (await db.execute(select(Job).where(Job.external_id == "gh-safe"))).scalar_one()
+        assert j.status == "published"
+        # streak untouched
+        assert j.data["_meta"]["missing_streak"] == 1
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_auto_expire_ignores_other_statuses():
+    """Draft/rejected/expired jobs must not be touched by the auto-expire pass."""
+    await _setup()
+    src = "greenhouse:anthropic"
+    async with db_module.async_session_factory() as db:
+        for ext_id, status in [("gh-draft", "draft"), ("gh-reject", "rejected"), ("gh-already", "expired")]:
+            db.add(Job(
+                source=src, external_id=ext_id,
+                source_url=f"https://example.com/{ext_id}",
+                hash=f"h-{ext_id}", status=status,
+                posted_on=date(2026, 4, 1), valid_through=date(2026, 5, 16),
+                slug=f"slug-{ext_id}", title="X", company_slug="anthropic",
+                designation="ML Engineer", country="US", remote_policy="Hybrid",
+                verified=1, data={},
+            ))
+        await db.commit()
+
+    stats = {}
+    await jobs_ingest._auto_expire_missing({src: [_raw(external_id="gh-unrelated")]}, stats)
+    assert stats.get("auto_expired", 0) == 0
+    async with db_module.async_session_factory() as db:
+        rows = {j.external_id: j.status for j in (await db.execute(select(Job))).scalars().all()}
+        assert rows == {"gh-draft": "draft", "gh-reject": "rejected", "gh-already": "expired"}
+    await close_db()
+    await close_db()

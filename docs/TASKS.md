@@ -330,6 +330,44 @@ When a task is completed, mark it with ✅ and add the commit SHA that shipped i
 
 ---
 
+## Phase 13 — Jobs early-expiry detection (target: <1 session)
+
+**Goal:** A job filled before `valid_through` stops being served as `published` without waiting for admin action. Closes the "ATS removes listing on day 10, we keep showing it till day 45" gap.
+
+**Context:** [docs/JOBS.md §7.6](JOBS.md#L252-L255) covers date-based expiry only. Greenhouse/Lever give no signal when a role is filled — the listing just disappears from the feed. We must infer closure from absence.
+
+### 13.1 Disappearance detection in ingest
+
+- [ ] In `backend/app/services/jobs_ingest.py`, after per-source fetch, compute `expected_ids = {published jobs from this source}` and `seen_ids = {external_ids in today's feed}`.
+- [ ] For each `id in expected_ids - seen_ids`: increment `_meta.missing_streak` (default 0) on the job row.
+- [ ] For each `id in expected_ids ∩ seen_ids`: reset `_meta.missing_streak = 0`.
+- [ ] When `missing_streak >= 2`: flip `status=expired`, stamp `_meta.expired_reason = "source_removed"`, stamp `_meta.expired_on = today`.
+- [ ] Skip if the source itself returned 0 jobs (treat as source outage, not mass-fill). Log warning instead.
+- **AC:** Unit test — seed 3 published jobs, feed returns 2 of them for 2 runs → the missing one flips to `expired` on the second run, not the first.
+
+### 13.2 Sitemap + SEO wiring
+
+- [ ] On flip to `expired`, drop from `sitemap-jobs.xml` on next regeneration (confirm via test).
+- [ ] Expired page already renders "This job has closed" + `X-Robots-Tag: noindex` per JOBS.md §7.6 — no change, just a test.
+- **AC:** Integration test — `GET /jobs/<slug>` on an expired job returns 200 + `X-Robots-Tag: noindex` + "closed" copy.
+
+### 13.3 Admin visibility
+
+- [ ] `/admin/jobs?tab=expired` already exists; add a sub-filter "Auto-expired (source removed)" driven by `_meta.expired_reason`.
+- [ ] 24h stats strip: add `auto-expired: N` counter alongside scraped/published/rejected.
+- **AC:** Admin sees at a glance how many jobs auto-expired yesterday per source; high rate from one source = investigate.
+
+### 13.4 Optional weekly apply-URL health check
+
+- [ ] Deferred unless §13.1 proves insufficient. Weekly HEAD-request on every `published` `apply_url`; 404/410 → flag in admin.
+- **AC:** N/A until built.
+
+**Rollout:** one PR, ~30–50 lines + tests. No migration (uses existing `_meta` JSON). Safe — only triggers on `published` jobs demonstrably missing for 2 consecutive days.
+
+**Update JOBS.md §7.6** when merged to document the new auto-expiry mechanism alongside the date-based one.
+
+---
+
 ## Task status log
 
 Claude Code: update this section as tasks complete.

@@ -43,6 +43,11 @@ PER_SOURCE_NEW_CAP = 30
 # 4 concurrent calls average 3-4s/call wall time and stay well under limits.
 ENRICH_CONCURRENCY = 4
 
+# Consecutive daily runs a published job may be absent from its source feed
+# before auto-expiring. 2 = one grace day absorbs transient ATS API blips.
+# See docs/JOBS.md §7.6 and docs/TASKS.md Phase 13.
+MISSING_STREAK_THRESHOLD = 2
+
 
 # ---------------------------------------------------------------- helpers
 
@@ -222,6 +227,53 @@ async def _stage_with_retry(raw: RawJob, source_key: str, max_attempts: int = 4)
     return "errors"  # unreachable — raised above
 
 
+# ---------------------------------------------------------------- auto-expire
+
+async def _auto_expire_missing(by_source: dict[str, list[RawJob]], stats: dict) -> None:
+    """Flip `published` jobs to `expired` when their ATS listing disappears.
+
+    Greenhouse/Lever give no explicit "role filled" signal — a closed posting
+    simply drops from the feed. We track `data._meta.missing_streak` per job
+    and flip once the streak hits MISSING_STREAK_THRESHOLD. One grace day
+    absorbs transient API blips without falsely expiring live roles.
+
+    Only runs against boards that returned ≥1 row this pass — a source that
+    yielded zero rows is treated as an outage, not a mass fill.
+    """
+    for source_key, rows in by_source.items():
+        if not rows:
+            logger.warning("source %s returned 0 rows — skipping auto-expire", source_key)
+            continue
+        seen_ids = {r["external_id"] for r in rows}
+        try:
+            async with _db.async_session_factory() as db:
+                stmt = select(Job).where(Job.source == source_key, Job.status == "published")
+                published = (await db.execute(stmt)).scalars().all()
+                for job in published:
+                    data = dict(job.data or {})
+                    meta = dict(data.get("_meta") or {})
+                    if job.external_id in seen_ids:
+                        if meta.get("missing_streak"):
+                            meta["missing_streak"] = 0
+                            data["_meta"] = meta
+                            job.data = data
+                        continue
+                    streak = int(meta.get("missing_streak", 0)) + 1
+                    meta["missing_streak"] = streak
+                    if streak >= MISSING_STREAK_THRESHOLD:
+                        job.status = "expired"
+                        meta["expired_reason"] = "source_removed"
+                        meta["expired_on"] = date.today().isoformat()
+                        stats["auto_expired"] = stats.get("auto_expired", 0) + 1
+                        logger.info("auto-expired %s/%s after %d missed runs",
+                                    source_key, job.external_id, streak)
+                    data["_meta"] = meta
+                    job.data = data
+                await db.commit()
+        except Exception as exc:
+            logger.exception("auto-expire failed for %s: %s", source_key, exc)
+
+
 # ---------------------------------------------------------------- entry point
 
 async def run_daily_ingest() -> dict[str, int]:
@@ -279,6 +331,12 @@ async def run_daily_ingest() -> dict[str, int]:
             except Exception as exc:
                 logger.exception("ingest error in %s: %s", source_key, exc)
                 stats["errors"] += 1
+
+    # Auto-expire pass: published jobs whose external_id vanished from the
+    # source feed for N consecutive runs. Guards against mass-expire on a
+    # transient source outage by only inspecting boards that returned ≥1 row.
+    stats["auto_expired"] = 0
+    await _auto_expire_missing(by_source, stats)
 
     # Stamp JobSource.last_run_* in a short final transaction.
     try:
