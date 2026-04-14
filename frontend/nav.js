@@ -101,6 +101,7 @@
         <a href="/admin/pipeline/proposals"${activeClass('/admin/pipeline/proposals')}>Proposals</a>
         <a href="/admin/pipeline/settings"${activeClass('/admin/pipeline/settings')}>Settings</a>
         <a href="/admin/pipeline/ai-usage"${activeClass('/admin/pipeline/ai-usage')}>AI Usage</a>
+        <a href="/admin/blog"${activeClass('/admin/blog')}>Blog</a>
       </nav>
     `;
   }

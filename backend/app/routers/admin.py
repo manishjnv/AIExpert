@@ -406,6 +406,214 @@ td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; color
 ADMIN_NAV = '<link rel="stylesheet" href="/nav.css"><script src="/nav.js"></script>'
 
 
+# ---------------- Blog prompt generator ----------------
+#
+# Mirrors the Claude-Opus-manual workflow used for curriculum templates:
+# admin supplies a title (and optional thesis), backend renders the
+# full editorial prompt with placeholders substituted, admin copies
+# into Claude.ai Max and pastes the returned markdown into docs/blog/
+# + backend/app/routers/blog.py. No AI call on our dime, no DB state,
+# no auto-publish — learner-first content gating is preserved.
+
+
+def _next_blog_slug() -> str:
+    """Read docs/blog/ for existing NN-*.md files and return NN+1 zero-padded."""
+    from pathlib import Path as _Path
+    import re as _re
+    blog_dir = _Path(__file__).parent.parent.parent.parent / "docs" / "blog"
+    max_n = 0
+    if blog_dir.exists():
+        for f in blog_dir.glob("*.md"):
+            m = _re.match(r"(\d+)-", f.stem)
+            if m:
+                try:
+                    max_n = max(max_n, int(m.group(1)))
+                except ValueError:
+                    pass
+    return f"{max_n + 1:02d}"
+
+
+def _slugify_title(title: str) -> str:
+    import re as _re
+    s = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return s[:60]
+
+
+@router.post("/api/render-blog-prompt")
+async def render_blog_prompt(
+    request: Request,
+    user: User = Depends(get_current_admin),
+):
+    """Render the Claude Opus blog prompt with the admin's title + angle
+    substituted. Returns the prompt text + derived slug so the admin
+    can copy straight into Claude.ai."""
+    _check_origin(request)
+    from pathlib import Path as _Path
+    from datetime import date as _date
+
+    body = await request.json()
+    title = (body.get("title") or "").strip()
+    angle = (body.get("angle") or "").strip()
+
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+    if len(title) > 150:
+        raise HTTPException(status_code=400, detail="title too long (max 150 chars)")
+
+    prefix = _next_blog_slug()
+    slug_body = _slugify_title(title)
+    slug = f"{prefix}-{slug_body}" if slug_body else prefix
+
+    prompt_path = _Path(__file__).parent.parent / "prompts" / "claude_blog_manual.txt"
+    template = prompt_path.read_text(encoding="utf-8")
+    rendered = (
+        template
+        .replace("{{TITLE}}", title)
+        .replace("{{ANGLE}}", angle or "(none — use your judgement, but stay on-topic)")
+        .replace("{{SLUG}}", slug)
+        .replace("{{PUBLISHED_DATE}}", _date.today().isoformat())
+        .replace("{{AUTHOR}}", user.name or "AutomateEdge team")
+    )
+    return {"prompt": rendered, "slug": slug, "title": title}
+
+
+@router.get("/blog", response_class=HTMLResponse)
+async def admin_blog_page(_user: User = Depends(get_current_admin)):
+    """Admin-only page: generate a ready-to-paste Claude blog prompt
+    from a title + optional angle. Matches the manual template workflow."""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><title>Blog Prompt Generator — Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>{ADMIN_CSS}
+  .form-grid {{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; margin-bottom:12px; }}
+  .form-grid label {{ font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#8a92a0; display:block; margin-bottom:4px; }}
+  .form-grid input, .form-grid textarea {{ width:100%; padding:9px 11px; background:#0f1419; border:1px solid #2a323d; color:#f5f1e8; border-radius:3px; font-family:inherit; font-size:14px; }}
+  .form-grid textarea {{ grid-column:1 / -1; min-height:70px; resize:vertical; }}
+  details.how-to {{ background:#0f1419; border:1px solid #2a323d; border-radius:4px; padding:10px 14px; margin-bottom:16px; font-size:13px; line-height:1.6; }}
+  details.how-to summary {{ cursor:pointer; color:#e8a849; font-weight:600; user-select:none; }}
+  details.how-to ol {{ margin:10px 0 4px 18px; padding:0; color:#d0cbc2; }}
+  #blogPromptOutput {{ width:100%; min-height:360px; padding:10px; background:#0f1419; border:1px solid #2a323d; color:#e8e2d3; border-radius:3px; font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:12px; line-height:1.5; resize:vertical; margin-top:8px; }}
+  .row-actions {{ display:flex; gap:8px; justify-content:space-between; margin-top:12px; flex-wrap:wrap; }}
+  .meta-line {{ font-size:12px; color:#8a92a0; min-height:18px; margin-top:6px; }}
+</style>
+{ADMIN_NAV}
+</head><body>
+<main class="page">
+  <header style="margin-bottom:18px">
+    <h1>Blog Prompt Generator</h1>
+    <p style="color:#8a92a0;font-size:14px;line-height:1.6">
+      Supply a title. Generate the Claude Opus prompt that embeds our full
+      style guide. Paste into Claude.ai (Max plan, free). Claude returns a
+      complete blog post as Markdown. Copy the Markdown, commit to
+      <code>docs/blog/&lt;slug&gt;.md</code>, and hand-convert to HTML in
+      <code>backend/app/routers/blog.py</code> (dual-source rule from
+      <code>docs/blog/STYLE.md</code>).
+    </p>
+  </header>
+
+  <details class="how-to">
+    <summary>End-to-end steps (click to expand)</summary>
+    <ol>
+      <li>Enter a plain <strong>Title</strong>. Optionally add a thesis <strong>Angle</strong> (one sentence on what you want to emphasise).</li>
+      <li>Click <strong>Generate prompt</strong>. The full Opus prompt appears in the box below. Meta line confirms the slug (auto-numbered, e.g. <code>02-something</code>).</li>
+      <li>Click <strong>Copy prompt</strong>. Your clipboard is loaded.</li>
+      <li>Click <strong>Open Claude.ai ↗</strong>, start a fresh chat, pick <strong>Claude Opus 4.6</strong>, paste, send.</li>
+      <li>Wait ~45–90s. Claude returns raw Markdown starting with <code>---</code>.</li>
+      <li>Copy Claude's full response. Save as <code>docs/blog/&lt;slug&gt;.md</code>.</li>
+      <li>Hand-convert the Markdown body to an HTML block inside <code>backend/app/routers/blog.py</code> (keep in sync with the .md).</li>
+      <li>Generate the hero image using the brief at the bottom of the post. Drop in <code>docs/blog/assets/&lt;slug&gt;-hero.png</code>.</li>
+      <li>Commit both files + image, push, deploy.</li>
+    </ol>
+    <div style="margin-top:8px;color:#8a92a0;font-size:12px">
+      <strong>Cost:</strong> zero — Claude Max chat is unmetered; no backend AI call. <strong>Content gating:</strong> human-in-the-loop by design; no auto-publish path exists for blogs.
+    </div>
+  </details>
+
+  <div class="form-grid">
+    <div>
+      <label>Title</label>
+      <input id="bpTitle" placeholder="e.g. Why AutomateEdge stopped auto-publishing curricula" maxlength="150">
+    </div>
+    <button class="btn primary" onclick="generateBlogPrompt()">Generate prompt</button>
+    <div style="grid-column:1 / -1">
+      <label>Angle / thesis <span style="color:#64748b;text-transform:none;letter-spacing:0">(optional — one or two sentences on the message)</span></label>
+      <textarea id="bpAngle" placeholder="e.g. Policy beats tools. Every AI pipeline needs a human button, even if the button does nothing but exist."></textarea>
+    </div>
+  </div>
+
+  <div id="bpMeta" class="meta-line"></div>
+  <textarea id="blogPromptOutput" readonly placeholder="Prompt will appear here after you click Generate."></textarea>
+
+  <div class="row-actions">
+    <button class="btn danger" onclick="clearBlogPrompt()">Clear</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn success" onclick="copyBlogPromptToClipboard()">Copy prompt</button>
+      <a href="https://claude.ai" target="_blank" rel="noopener" class="btn" style="text-decoration:none">Open Claude.ai ↗</a>
+    </div>
+  </div>
+</main>
+
+<script>
+async function generateBlogPrompt() {{
+  const title = document.getElementById('bpTitle').value.trim();
+  const angle = document.getElementById('bpAngle').value.trim();
+  if (!title) {{
+    document.getElementById('bpMeta').textContent = 'Title is required.';
+    document.getElementById('bpMeta').style.color = '#d97757';
+    return;
+  }}
+  document.getElementById('bpMeta').style.color = '#8a92a0';
+  document.getElementById('bpMeta').textContent = 'Rendering prompt…';
+  try {{
+    const resp = await fetch('/admin/api/render-blog-prompt', {{
+      method: 'POST',
+      headers: {{ 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{ title, angle }}),
+      credentials: 'same-origin',
+    }});
+    if (!resp.ok) {{
+      const d = await resp.json().catch(() => ({{}}));
+      document.getElementById('bpMeta').style.color = '#d97757';
+      document.getElementById('bpMeta').textContent = d.detail || 'Render failed.';
+      return;
+    }}
+    const data = await resp.json();
+    document.getElementById('blogPromptOutput').value = data.prompt;
+    document.getElementById('bpMeta').style.color = '#6db585';
+    document.getElementById('bpMeta').textContent =
+      `✓ Slug: ${{data.slug}}  ·  ${{data.prompt.length.toLocaleString()}} chars. Copy and paste into Claude.ai.`;
+  }} catch (e) {{
+    document.getElementById('bpMeta').style.color = '#d97757';
+    document.getElementById('bpMeta').textContent = 'Network error.';
+  }}
+}}
+
+function copyBlogPromptToClipboard() {{
+  const text = document.getElementById('blogPromptOutput').value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(
+    () => {{
+      const el = document.getElementById('bpMeta');
+      const prev = el.textContent;
+      el.style.color = '#6db585';
+      el.textContent = '✓ Copied to clipboard.';
+      setTimeout(() => {{ el.textContent = prev; }}, 2500);
+    }},
+    () => {{ document.getElementById('bpMeta').textContent = 'Copy failed — select and Ctrl+C manually.'; }}
+  );
+}}
+
+function clearBlogPrompt() {{
+  document.getElementById('bpTitle').value = '';
+  document.getElementById('bpAngle').value = '';
+  document.getElementById('blogPromptOutput').value = '';
+  document.getElementById('bpMeta').textContent = '';
+}}
+</script>
+</body></html>""")
+
+
 @router.get("/", response_class=HTMLResponse)
 async def admin_dashboard_page(
     _user: User = Depends(get_current_admin),
