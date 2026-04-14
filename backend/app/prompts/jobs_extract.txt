@@ -1,0 +1,59 @@
+You are extracting structured data from a job description for an AI/ML job board.
+
+RETURN STRICT JSON matching the schema below. No prose, no markdown, no comments.
+All enum fields MUST be one of the listed values — never invent new ones.
+If a field is truly unknown, use null (or "Unknown" where specified).
+
+---
+
+INPUT
+Company: {{company}}
+Title: {{title_raw}}
+Location (raw): {{location_raw}}
+Job description (HTML stripped of boilerplate):
+---
+{{jd_text}}
+---
+
+Roadmap module inventory (valid slugs for `roadmap_modules_matched`):
+{{module_slugs}}
+
+---
+
+OUTPUT SCHEMA (return exactly these keys):
+
+{
+  "designation": one of ["ML Engineer","Research Scientist","Applied Scientist","Data Scientist","Data Engineer","MLOps Engineer","AI Product Manager","AI Engineer","Prompt Engineer","Research Engineer","Computer Vision Engineer","NLP Engineer","AI Solutions Architect","AI Developer Advocate","Other"],
+  "seniority": one of ["Intern","Junior","Mid","Senior","Staff","Principal","Lead","Manager","Director"],
+  "topic": array (1-3 items) from ["LLM","CV","NLP","RL","MLOps","Data Eng","Research","Applied ML","GenAI","Robotics","Safety","Agents","RAG","Fine-tuning","Evals"],
+  "location": {
+    "country": ISO-2 country code (e.g. "US","IN","GB") or null,
+    "country_name": full country name or null,
+    "city": city name or null,
+    "remote_policy": one of ["Remote","Hybrid","Onsite"],
+    "regions_allowed": array of ISO-2 codes for remote-eligible countries; [] if onsite
+  },
+  "employment": {
+    "job_type": one of ["Full-time","Part-time","Contract","Internship"],
+    "shift": one of ["Day","Night","Flexible","Unknown"],
+    "experience_years": { "min": integer or null, "max": integer or null },
+    "salary": {
+      "min": integer or null,
+      "max": integer or null,
+      "currency": ISO-4217 code or null,
+      "disclosed": true only if explicit numbers are in the JD; never infer
+    }
+  },
+  "tldr": string, 2 sentences max, REWRITTEN IN YOUR OWN WORDS (do NOT copy from JD — duplicate-content SEO penalty),
+  "must_have_skills": array of 3-8 concise skill tags (e.g. "PyTorch","Distributed training"),
+  "nice_to_have_skills": array of 0-5 tags,
+  "roadmap_modules_matched": array of slugs chosen ONLY from the module inventory above; [] if none fit,
+  "description_html": the input JD HTML, cleaned (strip emails, phone numbers, tracking pixels, iframes, scripts)
+}
+
+RULES
+- Never hallucinate salary numbers — if JD does not disclose, set disclosed=false and min/max to null.
+- Never include PII (emails, phone numbers) in description_html.
+- `tldr` must be substantively different wording from the JD — paraphrasing is NOT enough; rewrite.
+- For `roadmap_modules_matched`, be strict: only include a slug if the JD requirements clearly overlap with that module's content.
+- Return ONLY the JSON object. No prefix, no suffix, no code fences.
