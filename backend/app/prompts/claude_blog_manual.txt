@@ -80,12 +80,98 @@ HTML BODY rules:
 - Start the body with the lede wrapped in `<p class="lede">…</p>`.
 - Use `<h2>` for all section headings (no `<h1>` — the title is
   rendered by the page template from the JSON `title` field).
+- Use `<h3>` for sub-sections inside a long H2 block (optional).
 - Paragraphs are short — ≤ 4 sentences each.
 - Wrap quotable lines in `<strong>` or `<em>` so they visually
   punch out.
 - Close with `<hr><p class="meta"><strong>Live site:</strong> …</p>`
   — copy the verbatim closing CTA in section 7 below.
 - Escape any inner `"` as `\"` so the JSON stays valid.
+
+RICH FORMATTING — use these to make the post scannable and alive
+================================================================
+A wall of plain paragraphs reads as effort; a well-marked-up post
+reads as thought. Use the tags below deliberately. None of them are
+mandatory in every post, but a 1200-word piece with zero
+emphasis / zero links / zero lists is probably too flat.
+
+1. **Links — in-body, purposeful, not decorative.**
+   - Internal links to other AutomateEdge posts when you reference
+     earlier thinking: `<a href="/blog/01-building-automateedge-solo">…</a>`.
+     Use this when a claim in the current post builds on one already
+     published — internal linking keeps readers on-site + signals
+     depth.
+   - External links to high-credibility sources when making a
+     non-obvious claim: university research, major news outlets,
+     published books, long-running practitioner blogs, foundational
+     specs. Use the canonical URL; no tracking params, no
+     affiliate tags.
+   - Anchor text is the claim, not "click here" or "this link".
+     Bad:  *"Read more <a href=\"...\">here</a>."*
+     Good: *"One study found <a href=\"...\">free AI courses have
+     a 94% dropout rate</a> — the question is what causes it."*
+   - Two or three external links per post is plenty. Don't bait;
+     link when it earns the reader's trust.
+
+2. **Emphasis — `<strong>` for claims, `<em>` for voice.**
+   - `<strong>` for sentences you want the skim-reader to catch —
+     the thesis line of a section, a surprising statistic, a hard
+     rule.
+   - `<em>` for tone (quietly ironic phrases, titles of things,
+     foreign terms). Not for 'just because it looks nice'.
+   - No more than one `<strong>` per paragraph. More than that and
+     nothing is emphasised.
+
+3. **Code-style spans and blocks.**
+   - Inline `<code>…</code>` for concrete terms, commands, field
+     names *the reader would recognise as a technical identifier*
+     — e.g. `<code>arXiv</code>`, `<code>.csv</code>`,
+     `<code>GPU-month</code>`.
+   - **DO NOT use `<code>` to surface internal platform details.**
+     You'll fail the branding scan: no API field names, internal
+     file paths, env vars, HMAC, JWT, SHA256, etc. Only the
+     universally-recognisable terms a learner would meet elsewhere.
+   - `<pre><code>…</code></pre>` block only if the post is about a
+     concrete recipe a reader should follow step-by-step. A single
+     block per post max. Keep it under ~12 lines.
+
+4. **Scannable lists.**
+   - Use `<ul>` / `<ol>` for any enumeration of 3+ items. Converting
+     a run-on sentence into a list is the highest-leverage readability
+     move in editing.
+   - Lead each item with the key phrase, not a filler verb — compare
+     *"Shortening paragraphs makes a post feel faster"* with
+     *"Paragraphs: keep them short — the post feels faster."*
+     The second reads well in skim mode.
+
+5. **Pull-out / blockquote — ONE maximum, not mandatory.**
+   - `<blockquote>…</blockquote>` for a line the reader will
+     screenshot. Place it at a natural section break, not mid-
+     paragraph. Typically the most quotable line from
+     `quotable_lines[]`.
+   - Overuse kills the effect. Zero or one per post.
+
+6. **Figures and inline images.**
+   - If the post has an inline image *beyond* the hero (rare,
+     post must be ≥ 1200 words), wrap it in
+     `<figure><img src=\"…\" alt=\"…\" loading=\"lazy\"><figcaption>…</figcaption></figure>`.
+     Caption is one sentence, dry-observational, not decorative.
+   - The hero image is NOT embedded in body_html — the page
+     template handles it from `image_brief`. Only add inline images
+     when they carry their own weight.
+
+7. **Rhetorical shape.**
+   - One well-placed question the reader is already thinking
+     (*"So why would anyone ship it that way?"*) pulls them into
+     the next section. Maximum one or two per post.
+   - A one-sentence paragraph after a dense run creates a mental
+     pause. Use rarely — once per post, if at all.
+
+8. **Natural CTAs.**
+   - Close sections (not the post) with a soft invitation when it
+     fits: *"If you've built something similar, write back —
+     contact in the footer."* Never hard-sell. Never more than one
+     non-closing CTA in the whole post.
 
 WRITING FOR IMPACT — the stuff that makes posts hit
 ====================================================
@@ -311,6 +397,22 @@ Engagement
         one sentence.
  18. ☐ One dry observational line per 4–6 paragraphs, none are memes
         or insider-tech jokes.
+
+Rich formatting
+ 19. ☐ At least one `<strong>` per H2 section, NOT more than one per
+        paragraph.
+ 20. ☐ One or more purposeful links — internal (`/blog/<slug>`) or
+        external (high-credibility source). Anchor text is the
+        claim, never "click here". Zero tracking params. Maximum
+        three external links total.
+ 21. ☐ At least one `<ul>` or `<ol>` somewhere in the post if the
+        post would otherwise be 8+ pure paragraphs in a row.
+ 22. ☐ If you use `<code>`, the content is a universally-recognised
+        term — NOT an internal platform identifier, field name,
+        file path, or env var. (These fail the branding scan.)
+ 23. ☐ Zero or one `<blockquote>` — not more. Not mid-paragraph.
+ 24. ☐ No `<h1>` in body_html (the page template owns it).
+ 25. ☐ No inline `<style>` or `<script>` blocks.
 
 =========================================================================
 FINAL REMINDER — FILE ARTIFACT, RAW JSON INSIDE
