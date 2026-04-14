@@ -78,6 +78,7 @@
         <a href="/"${activeClass('/')}>Home</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
         <a href="/blog"${path === '/blog' || path.startsWith('/blog/') ? ' class="active"' : ''}>Blog</a>
+        <a href="/jobs"${path === '/jobs' || path.startsWith('/jobs/') ? ' class="active"' : ''}>Jobs</a>
         <span id="navAuth" style="display:${authDisplay}">
           <a href="/account"${activeClass('/account')}>Account</a>
           <a href="/admin/" id="navAdminLink" style="display:${adminDisplay}"${activeClass('/admin')}>Admin</a>
@@ -166,6 +167,7 @@
           <a href="/#about" class="ftr-link" data-open-about>About</a>
           <a href="/leaderboard" class="ftr-link">Leaderboard</a>
           <a href="/blog" class="ftr-link">Blog</a>
+          <a href="/jobs" class="ftr-link">Jobs</a>
           <a href="/verify" class="ftr-link">Verify Credential</a>
           <a href="/#contact" class="ftr-link" data-open-contact>Contact</a>
         </nav>
