@@ -232,15 +232,30 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
 def _card_html(j: Job) -> str:
     d = j.data or {}
     loc = d.get("location") or {}
+    emp = d.get("employment") or {}
+    yrs = emp.get("experience_years") or {}
     loc_str = " · ".join(filter(None, [loc.get("city"), loc.get("country"), loc.get("remote_policy")]))
+    yrs_str = _yrs_label(yrs.get("min"), yrs.get("max"))
     verified_chip = '<span class="chip verified">✓ Verified</span>' if j.verified else ""
+    loc_chip = f'<span class="chip">📍 {esc(loc_str)}</span>' if loc_str else ""
+    yrs_chip = f'<span class="chip">{esc(yrs_str)}</span>' if yrs_str else ""
     tldr = esc((d.get("tldr") or "")[:200])
     return f"""<div class="card">
   <h3><a href="/jobs/{esc(j.slug)}">{esc(j.title)}</a></h3>
-  <div class="meta">{esc((d.get('company') or {}).get('name') or j.company_slug)} · {esc(loc_str or '—')} · {esc(j.posted_on.isoformat() if j.posted_on else '')}</div>
-  <div><span class="chip">{esc(j.designation)}</span> {verified_chip}</div>
+  <div class="meta">{esc((d.get('company') or {}).get('name') or j.company_slug)} · Posted {esc(j.posted_on.isoformat() if j.posted_on else '')}</div>
+  <div><span class="chip">{esc(j.designation)}</span> {loc_chip} {yrs_chip} {verified_chip}</div>
   <p>{tldr}</p>
 </div>"""
+
+
+def _yrs_label(mn, mx) -> str:
+    if isinstance(mn, int) and isinstance(mx, int):
+        return f"{mn}–{mx} yrs" if mn != mx else f"{mn} yrs"
+    if isinstance(mn, int):
+        return f"{mn}+ yrs"
+    if isinstance(mx, int):
+        return f"≤{mx} yrs"
+    return ""
 
 
 @router.get("/jobs/{slug}", response_class=HTMLResponse)
@@ -547,13 +562,24 @@ function renderChips(f) {
 function renderCard(j) {
   const co = j.company || {};
   const loc = j.location || {};
+  const emp = j.employment || {};
+  const yrs = emp.experience_years || {};
   const locStr = [loc.city, loc.country, loc.remote_policy].filter(Boolean).join(" · ");
+  const yrsStr = (() => {
+    const mn = yrs.min, mx = yrs.max;
+    if (Number.isInteger(mn) && Number.isInteger(mx)) return mn === mx ? `${mn} yrs` : `${mn}–${mx} yrs`;
+    if (Number.isInteger(mn)) return `${mn}+ yrs`;
+    if (Number.isInteger(mx)) return `≤${mx} yrs`;
+    return "";
+  })();
   const verified = j.verified ? '<span class="chip verified">✓ Verified</span>' : '';
+  const locChip = locStr ? `<span class="chip">📍 ${esc(locStr)}</span>` : '';
+  const yrsChip = yrsStr ? `<span class="chip">${esc(yrsStr)}</span>` : '';
   return `<div class="card" data-slug="${esc(j.slug)}">
     <div class="match-ring" id="match-${esc(j.slug)}" style="display:none"></div>
     <h3><a href="/jobs/${esc(j.slug)}">${esc(j.title)}</a></h3>
-    <div class="meta">${esc(co.name||j.company?.slug||'')} · ${esc(locStr||'—')} · ${esc(j.posted_on||'')}</div>
-    <div><span class="chip">${esc(j.designation||'')}</span> ${verified}</div>
+    <div class="meta">${esc(co.name||j.company?.slug||'')} · Posted ${esc(j.posted_on||'')}</div>
+    <div><span class="chip">${esc(j.designation||'')}</span> ${locChip} ${yrsChip} ${verified}</div>
     <p>${esc((j.tldr||'').slice(0,200))}</p>
   </div>`;
 }
