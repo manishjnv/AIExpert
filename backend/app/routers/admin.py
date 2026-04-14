@@ -564,30 +564,80 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
     from app.services.blog_publisher import list_drafts, list_published
     drafts = list_drafts()
     published = list_published()
-    drafts_html = "".join(
-        f'<tr><td><strong>{esc(d["title"])}</strong><div style="font-size:11px;color:#8a92a0;font-family:monospace">{esc(d["slug"])}</div></td>'
-        f'<td style="font-size:12px;color:#8a92a0">{esc(d.get("saved_by","—"))}<br>{esc(d.get("saved_at","")[:10])}</td>'
-        f'<td style="text-align:right;white-space:nowrap">'
-        f'<button class="btn" onclick="validateDraft(\'{esc(d["slug"])}\')">Re-check</button> '
-        f'<button class="btn success" onclick="publishDraft(\'{esc(d["slug"])}\')">Publish</button> '
-        f'<button class="btn danger" onclick="deleteDraft(\'{esc(d["slug"])}\')">Delete</button>'
-        f'</td></tr>'
-        for d in drafts
-    ) or '<tr><td colspan="3" style="text-align:center;color:#8a92a0;padding:18px">No drafts yet. Paste Claude\'s JSON below and click Save as draft.</td></tr>'
-    published_html = "".join(
-        f'<tr><td><a href="/blog/{esc(p["slug"])}" target="_blank" style="color:#e8a849">{esc(p["title"])}</a>'
-        f'<div style="font-size:11px;color:#8a92a0;font-family:monospace">{esc(p["slug"])}</div></td>'
-        f'<td style="font-size:12px;color:#8a92a0">reviewed {esc(p.get("last_reviewed_on","—"))} by {esc(p.get("last_reviewed_by","—"))}</td>'
-        f'<td style="text-align:right"><button class="btn" onclick="unpublish(\'{esc(p["slug"])}\')">Unpublish</button></td></tr>'
-        for p in published
-    ) or '<tr><td colspan="3" style="text-align:center;color:#8a92a0;padding:18px">Nothing published yet.</td></tr>'
+
+    # Unified list, newest slug first (slugs are NN-prefixed, so lexical
+    # reverse sort matches publication order). Each row knows its status
+    # and renders status-aware action buttons.
+    rows = []
+    for p in published:
+        rows.append({"type": "published", "data": p})
+    for d in drafts:
+        rows.append({"type": "draft", "data": d})
+    rows.sort(key=lambda r: r["data"].get("slug", ""), reverse=True)
+
+    def _row_html(r):
+        d = r["data"]
+        slug = esc(d.get("slug", ""))
+        title = esc(d.get("title", ""))
+        if r["type"] == "published":
+            status_pill = (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(109,181,133,0.18);color:#8fd0a5;border:1px solid rgba(109,181,133,0.4)">Published</span>'
+            )
+            meta = (
+                f'reviewed <strong>{esc(d.get("last_reviewed_on","—"))}</strong> by '
+                f'<strong>{esc(d.get("last_reviewed_by","—"))}</strong>'
+            )
+            title_link = f'<a href="/blog/{slug}" target="_blank" style="color:#e8a849">{title}</a>'
+            actions = (
+                f'<a class="btn" href="/blog/{slug}" target="_blank" title="View live">View ↗</a> '
+                f'<button class="btn" onclick="validateDraft(\'{slug}\')" title="Re-run validator">Re-check</button> '
+                f'<button class="btn danger" onclick="unpublish(\'{slug}\')" title="Move back to drafts (non-destructive)">Unpublish</button>'
+            )
+        else:
+            status_pill = (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(232,168,73,0.14);color:#f5c06a;border:1px solid rgba(232,168,73,0.4)">Draft</span>'
+            )
+            meta = f'saved by <strong>{esc(d.get("saved_by","—"))}</strong> on {esc(d.get("saved_at","")[:10])}'
+            title_link = f'<strong>{title}</strong>'
+            actions = (
+                f'<button class="btn" onclick="validateDraft(\'{slug}\')" title="Re-run validator">Re-check</button> '
+                f'<button class="btn success" onclick="publishDraft(\'{slug}\')" title="Go live at /blog/{slug}">Publish</button> '
+                f'<button class="btn danger" onclick="deleteDraft(\'{slug}\')" title="Hard delete">Delete</button>'
+            )
+        return (
+            f'<tr>'
+            f'<td>{title_link}<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-top:2px">{slug}</div></td>'
+            f'<td>{status_pill}</td>'
+            f'<td style="font-size:12px;color:#94a3b8">{meta}</td>'
+            f'<td style="text-align:right;white-space:nowrap">{actions}</td>'
+            f'</tr>'
+        )
+
+    if rows:
+        posts_html = "".join(_row_html(r) for r in rows)
+    else:
+        posts_html = (
+            '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:22px">'
+            "No posts yet. Generate a prompt above, paste Claude's JSON, save as draft, then publish."
+            '</td></tr>'
+        )
+
+    counts_line = (
+        f'<span style="margin-right:18px">📝 <strong>{len(drafts)}</strong> draft'
+        f'{"s" if len(drafts)!=1 else ""}</span>'
+        f'<span>✅ <strong>{len(published)}</strong> published</span>'
+    )
     # Build the page HTML without f-string brace hell — use .replace() on a
     # plain string for the data substitutions we actually need. This matches
     # what verify.py does and avoids f-string issues with CSS + JS braces.
     html = _BLOG_ADMIN_HTML.replace("{{ADMIN_CSS}}", ADMIN_CSS) \
                             .replace("{{ADMIN_NAV}}", ADMIN_NAV) \
-                            .replace("{{DRAFTS_ROWS}}", drafts_html) \
-                            .replace("{{PUBLISHED_ROWS}}", published_html)
+                            .replace("{{POSTS_ROWS}}", posts_html) \
+                            .replace("{{COUNTS_LINE}}", counts_line)
     return HTMLResponse(html)
 
 
@@ -702,20 +752,23 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
   </section>
 
   <section class="section-card">
-    <h2>3 · Drafts</h2>
-    <div class="note">Re-check against current rules before publishing — rule changes can invalidate an old draft.</div>
-    <table class="admin">
-      <tr><th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Post</th><th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Saved</th><th style="text-align:right;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Actions</th></tr>
-      {{DRAFTS_ROWS}}
-    </table>
-  </section>
-
-  <section class="section-card">
-    <h2>4 · Published</h2>
-    <div class="note">Live at <code>/blog/&lt;slug&gt;</code>. Unpublish moves back to drafts non-destructively.</div>
-    <table class="admin">
-      <tr><th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Post</th><th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Review</th><th style="text-align:right;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Actions</th></tr>
-      {{PUBLISHED_ROWS}}
+    <h2>3 · All blog posts</h2>
+    <div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>Single list of drafts + published. Actions change based on status. Unpublish is non-destructive — the post returns to drafts with its content intact.</div>
+      <div style="font-size:12px;color:#94a3b8;white-space:nowrap">{{COUNTS_LINE}}</div>
+    </div>
+    <table class="admin" style="margin-top:8px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Post</th>
+          <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Status</th>
+          <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Reviewer / Save</th>
+          <th style="text-align:right;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{POSTS_ROWS}}
+      </tbody>
     </table>
   </section>
 </main>
