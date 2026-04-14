@@ -573,12 +573,53 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
         rows.append({"type": "published", "data": p})
     for d in drafts:
         rows.append({"type": "draft", "data": d})
+
+    # Legacy hardcoded posts — baked into routers/blog.py as Python strings,
+    # not in the JSON pipeline. Surface them here so the admin sees the full
+    # state of /blog/*. No publish/unpublish via this UI (they're in code).
+    try:
+        from app.routers.blog import POST_01_TITLE, POST_01_PUBLISHED
+        rows.append({
+            "type": "legacy",
+            "data": {
+                "slug": "01",
+                "title": POST_01_TITLE,
+                "published": POST_01_PUBLISHED,
+            },
+        })
+    except Exception:
+        pass
+
     rows.sort(key=lambda r: r["data"].get("slug", ""), reverse=True)
 
     def _row_html(r):
         d = r["data"]
         slug = esc(d.get("slug", ""))
         title = esc(d.get("title", ""))
+        if r["type"] == "legacy":
+            status_pill = (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(109,181,133,0.18);color:#8fd0a5;border:1px solid rgba(109,181,133,0.4)">Published</span>'
+                '<span style="display:inline-block;margin-left:6px;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;'
+                'background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.35)" '
+                'title="Hardcoded in backend/app/routers/blog.py — predates the JSON pipeline">Legacy</span>'
+            )
+            meta = f'published on {esc(d.get("published", "—"))} · not editable via this UI (hand-coded)'
+            title_link = f'<a href="/blog/{slug}" target="_blank" style="color:#e8a849">{title}</a>'
+            actions = (
+                f'<a class="btn" href="/blog/{slug}" target="_blank" title="View live">View ↗</a> '
+                '<span class="btn" style="opacity:0.4;cursor:not-allowed" title="Legacy post lives in code, edit via source + deploy">Code-managed</span>'
+            )
+            return (
+                f'<tr>'
+                f'<td>{title_link}<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-top:2px">{slug}</div></td>'
+                f'<td>{status_pill}</td>'
+                f'<td style="font-size:12px;color:#94a3b8">{meta}</td>'
+                f'<td style="text-align:right;white-space:nowrap">{actions}</td>'
+                f'</tr>'
+            )
         if r["type"] == "published":
             status_pill = (
                 '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
