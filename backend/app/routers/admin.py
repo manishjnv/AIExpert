@@ -598,7 +598,6 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><title>Blog — Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/nav.css">
 <style>{{ADMIN_CSS}}
   .form-grid { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; margin-bottom:12px; }
   .form-grid label { font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; display:block; margin-bottom:4px; }
@@ -716,7 +715,6 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
   </section>
 </main>
 
-<script src="/nav.js" defer></script>
 <script>
 // --------------- Prompt generator ---------------
 async function generateBlogPrompt() {
