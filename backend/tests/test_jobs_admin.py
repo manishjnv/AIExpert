@@ -149,3 +149,53 @@ async def test_blocklist_company():
         assert co.blocklisted == 1
         assert co.blocklist_reason == "test"
     await close_db()
+
+
+@pytest.mark.asyncio
+async def test_queue_expired_reason_subfilter_and_24h_counter():
+    """Phase 13.3: expired_reason param splits auto-expired vs date-based;
+    auto_expired_24h counter surfaces source-removed flips for the banner chip."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:anthropic", kind="greenhouse", label="X",
+                         tier=1, enabled=1, bulk_approve=1))
+        db.add(JobCompany(slug="anthropic", name="Anthropic"))
+        # Auto-expired (source_removed) — counts toward 24h chip.
+        db.add(Job(
+            source="greenhouse:anthropic", external_id="auto-1", source_url="http://x",
+            hash="h1", status="expired", posted_on=date.today(),
+            valid_through=date.today() + timedelta(days=45),
+            slug="auto-1", title="T", company_slug="anthropic", designation="ML Engineer",
+            country="US", remote_policy="Hybrid", verified=1,
+            data={"_meta": {"expired_reason": "source_removed", "expired_on": "2026-04-15"}},
+        ))
+        # Date-based expiry — no _meta.expired_reason.
+        db.add(Job(
+            source="greenhouse:anthropic", external_id="date-1", source_url="http://x",
+            hash="h2", status="expired", posted_on=date.today() - timedelta(days=60),
+            valid_through=date.today() - timedelta(days=15),
+            slug="date-1", title="T", company_slug="anthropic", designation="ML Engineer",
+            country="US", remote_policy="Hybrid", verified=1, data={},
+        ))
+        await db.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        # Default expired view: both jobs, auto-counter = 1.
+        r = await c.get("/admin/jobs/api/queue?status=expired", cookies={"auth_token": token})
+        assert r.status_code == 200
+        d = r.json()
+        assert d["auto_expired_24h"] == 1
+        assert len(d["items"]) == 2
+
+        # Sub-filter: only auto-expired.
+        r = await c.get("/admin/jobs/api/queue?status=expired&expired_reason=source_removed",
+                        cookies={"auth_token": token})
+        assert [j["external_id"] for j in r.json()["items"]] == ["auto-1"]
+
+        # Sub-filter: only date-based.
+        r = await c.get("/admin/jobs/api/queue?status=expired&expired_reason=date_based",
+                        cookies={"auth_token": token})
+        assert [j["external_id"] for j in r.json()["items"]] == ["date-1"]
+    await close_db()

@@ -84,6 +84,7 @@ async def list_queue(
     country: str | None = None,
     remote: str | None = None,
     verified_only: bool = False,
+    expired_reason: str | None = None,
     q: str | None = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
@@ -107,6 +108,14 @@ async def list_queue(
         stmt = stmt.where(Job.remote_policy == remote)
     if verified_only:
         stmt = stmt.where(Job.verified == 1)
+    # Sub-filter on Expired tab: distinguish auto-expired (source_removed) from
+    # date-based (posted_on+45d) and admin-rejected-as-expired.
+    if expired_reason:
+        reason_expr = func.json_extract(Job.data, "$._meta.expired_reason")
+        if expired_reason == "source_removed":
+            stmt = stmt.where(reason_expr == "source_removed")
+        elif expired_reason == "date_based":
+            stmt = stmt.where(reason_expr.is_(None))
     if q:
         from sqlalchemy import or_
         like = f"%{q.lower()}%"
@@ -119,9 +128,21 @@ async def list_queue(
     counts_stmt = select(Job.status, func.count(Job.id)).group_by(Job.status)
     counts = {s: n for s, n in (await db.execute(counts_stmt)).all()}
 
+    # Auto-expired in last 24h — feeds the "auto-expired: N" chip on the stats strip.
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    auto_expired_24h = (await db.execute(
+        select(func.count(Job.id)).where(
+            Job.status == "expired",
+            Job.updated_at >= cutoff,
+            func.json_extract(Job.data, "$._meta.expired_reason") == "source_removed",
+        )
+    )).scalar() or 0
+
     return {
         "items": [_serialize(j) for j in rows],
         "counts": counts,
+        "auto_expired_24h": auto_expired_24h,
     }
 
 
@@ -405,6 +426,11 @@ _ADMIN_HTML = """<!DOCTYPE html>
   </select>
   <input id="qf-country" placeholder="Country (US, IN…)" maxlength="2" style="width:110px;text-transform:uppercase">
   <label><input id="qf-verified" type="checkbox"> Verified only</label>
+  <select id="qf-expired-reason" style="display:none">
+    <option value="">Any expiry reason</option>
+    <option value="source_removed">Auto-expired (source removed)</option>
+    <option value="date_based">Date-based (45d)</option>
+  </select>
   <button class="btn" id="qf-clear">Clear</button>
   <span class="pill-count" id="qf-count"></span>
 </div>
@@ -431,6 +457,8 @@ function qfilterParams() {
   if (rem) p.set("remote", rem);
   if (ctry) p.set("country", ctry);
   if (ver) p.set("verified_only", "true");
+  const expReason = document.getElementById("qf-expired-reason").value.trim();
+  if (expReason && currentStatus === "expired") p.set("expired_reason", expReason);
   return p.toString();
 }
 
@@ -439,8 +467,11 @@ async function load() {
   if (!r.ok) { document.getElementById("list").innerText = "Load failed: " + r.status; return; }
   const data = await r.json();
   const counts = data.counts || {};
+  const autoExp = data.auto_expired_24h || 0;
+  const autoChip = autoExp ? ` · <span style="color:#e8a849">auto-expired 24h: ${autoExp}</span>` : "";
   document.getElementById("banner").innerHTML =
-    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired`;
+    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}`;
+  document.getElementById("qf-expired-reason").style.display = (currentStatus === "expired") ? "" : "none";
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
   populateCompanyDropdown(data.items);
   renderList(data.items);
@@ -568,7 +599,7 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
 
 // Wire up the filter bar.
 (function initQFilters() {
-  const live = ["qf-designation","qf-remote","qf-company","qf-verified"];
+  const live = ["qf-designation","qf-remote","qf-company","qf-verified","qf-expired-reason"];
   live.forEach(id => document.getElementById(id).addEventListener("change", load));
   let tm = null;
   ["qf-q","qf-country"].forEach(id => {
@@ -578,7 +609,7 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
   });
   document.getElementById("qf-clear").addEventListener("click", () => {
     ["qf-q","qf-country"].forEach(id => document.getElementById(id).value = "");
-    ["qf-company","qf-designation","qf-remote"].forEach(id => document.getElementById(id).value = "");
+    ["qf-company","qf-designation","qf-remote","qf-expired-reason"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("qf-verified").checked = false;
     load();
   });
