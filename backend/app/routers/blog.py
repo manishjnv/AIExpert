@@ -269,6 +269,145 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
 </html>"""
 
 
+def _list_visible_posts() -> list[dict]:
+    """All posts a visitor can see — JSON-pipeline published + legacy
+    posts that aren't hidden. Sorted newest-first by published date."""
+    from app.services.blog_publisher import list_published as _list_pub, is_legacy_hidden
+
+    posts: list[dict] = []
+
+    for p in _list_pub():
+        posts.append({
+            "slug": p.get("slug", ""),
+            "title": p.get("title", ""),
+            "published": p.get("published", ""),
+            "summary": p.get("og_description") or p.get("title", ""),
+        })
+
+    if not is_legacy_hidden("01"):
+        posts.append({
+            "slug": "01",
+            "title": POST_01_TITLE,
+            "published": POST_01_PUBLISHED,
+            "summary": POST_01_DESCRIPTION,
+        })
+
+    posts.sort(key=lambda p: p.get("published", ""), reverse=True)
+    return posts
+
+
+@router.get("/blog", response_class=HTMLResponse)
+@router.get("/blog/", response_class=HTMLResponse)
+async def blog_index() -> HTMLResponse:
+    """Public blog index — lists every visible post. Empty-state card
+    if nothing is live yet."""
+    settings = get_settings()
+    base = settings.public_base_url.rstrip("/")
+    posts = _list_visible_posts()
+
+    if posts:
+        cards_html = "".join(_render_index_card(p, base) for p in posts)
+        inner = f'<div class="post-grid">{cards_html}</div>'
+    else:
+        inner = (
+            '<div class="empty-state">'
+            '<div class="empty-icon">📝</div>'
+            '<h2>No posts yet</h2>'
+            '<p>The AutomateEdge blog is still warming up. Check back soon — '
+            'the first essay is on its way.</p>'
+            f'<a class="back-home" href="{base}/">← Back to AutomateEdge</a>'
+            '</div>'
+        )
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog — AutomateEdge</title>
+  <meta name="description" content="Essays from AutomateEdge on building a free AI learning platform — lessons, principles, and post-mortems.">
+  <meta property="og:title" content="Blog — AutomateEdge">
+  <meta property="og:description" content="Essays on building a free AI learning platform.">
+  <meta property="og:url" content="{base}/blog">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AutomateEdge">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/nav.css">
+  <style>
+    :root {{ color-scheme: dark; }}
+    html, body {{ margin: 0; background: #0f1419; color: #e8e4d8;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.6; }}
+    main {{ max-width: 980px; margin: 0 auto; padding: 56px 24px 96px; }}
+    .page-eyebrow {{ font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: #e8a849; margin-bottom: 10px; }}
+    h1.page-title {{ font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(32px, 5vw, 48px); line-height: 1.1;
+      color: #f5f1e8; margin: 0 0 12px; font-weight: 500; }}
+    .page-lede {{ font-size: 17px; color: #c0c4cc; max-width: 640px;
+      margin: 0 0 44px; }}
+    .post-grid {{ display: flex; flex-direction: column; gap: 18px; }}
+    .post-card {{ display: block; text-decoration: none;
+      background: #1a2029; border: 1px solid #2a323d; border-radius: 8px;
+      padding: 24px 28px; transition: all 0.2s ease; color: inherit; }}
+    .post-card:hover {{ border-color: #e8a849; transform: translateY(-2px);
+      background: #1d242e; }}
+    .post-meta {{ font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #94a3b8; margin-bottom: 10px; }}
+    .post-card h2 {{ font-family: 'Fraunces', Georgia, serif;
+      font-size: 22px; line-height: 1.25; color: #f5f1e8;
+      margin: 0 0 10px; font-weight: 500; }}
+    .post-summary {{ font-size: 15px; color: #c0c4cc; margin: 0 0 14px; }}
+    .read-more {{ font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: #e8a849; }}
+    .empty-state {{ text-align: center; padding: 80px 28px;
+      background: #1a2029; border: 1px dashed #2a323d; border-radius: 10px; }}
+    .empty-state .empty-icon {{ font-size: 44px; margin-bottom: 16px; }}
+    .empty-state h2 {{ font-family: 'Fraunces', Georgia, serif;
+      color: #e8a849; font-size: 26px; font-weight: 400; margin: 0 0 10px; }}
+    .empty-state p {{ color: #94a3b8; max-width: 440px; margin: 0 auto 28px; font-size: 15px; }}
+    .back-home {{ display: inline-block; font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #e8a849; text-decoration: none; padding: 10px 20px;
+      border: 1px solid rgba(232,168,73,0.4); border-radius: 4px;
+      transition: all 0.2s; }}
+    .back-home:hover {{ background: rgba(232,168,73,0.1); border-color: #e8a849; }}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="page-eyebrow">AutomateEdge · Blog</div>
+    <h1 class="page-title">Essays on building a free AI learning platform</h1>
+    <p class="page-lede">Lessons, design principles, and honest
+      post-mortems from the solo-builder side of AutomateEdge.</p>
+    {inner}
+  </main>
+  <script src="/nav.js" defer></script>
+</body>
+</html>""")
+
+
+def _render_index_card(post: dict, base: str) -> str:
+    slug = post.get("slug", "")
+    title = post.get("title", "")
+    published = post.get("published", "")
+    summary = post.get("summary", "")
+    # Escape text content — HTML chars in titles/summaries shouldn't break the page
+    import html as _html
+    return (
+        f'<a class="post-card" href="{base}/blog/{_html.escape(slug)}">'
+        f'<div class="post-meta">{_html.escape(published)}</div>'
+        f'<h2>{_html.escape(title)}</h2>'
+        f'<p class="post-summary">{_html.escape(summary)}</p>'
+        f'<span class="read-more">Read the essay →</span>'
+        f'</a>'
+    )
+
+
 @router.get("/blog/01", response_class=HTMLResponse)
 @router.get("/blog/01/", response_class=HTMLResponse)
 async def post_01() -> HTMLResponse:

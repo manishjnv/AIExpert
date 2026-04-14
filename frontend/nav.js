@@ -163,7 +163,7 @@
         <nav class="ftr-links" aria-label="Footer navigation">
           <a href="/#about" class="ftr-link" data-open-about>About</a>
           <a href="/leaderboard" class="ftr-link">Leaderboard</a>
-          <a href="/blog/01" class="ftr-link">Blog</a>
+          <a href="/blog" class="ftr-link">Blog</a>
           <a href="/verify" class="ftr-link">Verify Credential</a>
           <a href="/#contact" class="ftr-link" data-open-contact>Contact</a>
         </nav>
