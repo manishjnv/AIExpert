@@ -21,18 +21,22 @@ logger = logging.getLogger("roadmap.jobs.greenhouse")
 API = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
 
 # Tier-1 verified AI/ML companies using Greenhouse ATS.
-# (board_slug, human_name). board_slug is the path segment in Greenhouse URLs.
+# (board_slug, human_name). Slugs verified against boards-api.greenhouse.io
+# 2026-04-14. Re-verify quarterly — companies rebrand or switch ATS providers.
+# Removed (404s as of 2026-04-14): huggingface, cohere, perplexityai, runwayml,
+#   character, anyscale, weightsandbiases — investigate before re-adding.
 GREENHOUSE_BOARDS: list[tuple[str, str]] = [
     ("anthropic", "Anthropic"),
     ("scaleai", "Scale AI"),
-    ("huggingface", "Hugging Face"),
-    ("cohere", "Cohere"),
     ("databricks", "Databricks"),
-    ("perplexityai", "Perplexity"),
-    ("runwayml", "Runway"),
-    ("character", "Character.AI"),
-    ("anyscale", "Anyscale"),
-    ("weightsandbiases", "Weights & Biases"),
+    ("xai", "xAI"),
+    ("deepmind", "Google DeepMind"),
+    ("cerebrassystems", "Cerebras"),
+    ("sambanovasystems", "SambaNova"),
+    ("togetherai", "Together AI"),
+    ("moveworks", "Moveworks"),
+    ("figure", "Figure"),
+    ("inflectionai", "Inflection AI"),
 ]
 
 

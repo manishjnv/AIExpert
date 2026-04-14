@@ -21,12 +21,11 @@ logger = logging.getLogger("roadmap.jobs.lever")
 API = "https://api.lever.co/v0/postings/{slug}?mode=json"
 
 # (board_slug, human_name). board_slug = path segment in jobs.lever.co/<slug>.
+# Verified against api.lever.co 2026-04-14. Re-verify quarterly.
+# Removed (404s as of 2026-04-14): elevenlabs, pika, luma-ai, contextual —
+#   investigate before re-adding (may have moved to Ashby/Greenhouse).
 LEVER_BOARDS: list[tuple[str, str]] = [
     ("mistral", "Mistral AI"),
-    ("elevenlabs", "ElevenLabs"),
-    ("pika", "Pika"),
-    ("luma-ai", "Luma AI"),
-    ("contextual", "Contextual AI"),
 ]
 
 

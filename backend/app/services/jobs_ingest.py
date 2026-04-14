@@ -33,6 +33,16 @@ logger = logging.getLogger("roadmap.jobs.ingest")
 # Default lifespan before a job auto-expires, per docs/JOBS.md §7.6.
 VALID_FOR_DAYS = 45
 
+# Max new jobs enriched per source per run. Anthropic + Databricks alone list
+# 1200+ roles combined; enriching all in one run (~7s/Gemini call) would take
+# hours. Capping means heavy boards take a few days to fully catch up, which
+# is fine — newest-first ordering surfaces recent posts fast.
+PER_SOURCE_NEW_CAP = 30
+
+# Bounded parallelism for enrichment. Gemini Flash free tier allows ~15 RPM;
+# 4 concurrent calls average 3-4s/call wall time and stay well under limits.
+ENRICH_CONCURRENCY = 4
+
 
 # ---------------------------------------------------------------- helpers
 
@@ -226,16 +236,48 @@ async def run_daily_ingest() -> dict[str, int]:
     stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0, "skipped": 0, "errors": 0}
 
     fetchers = [("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all), ("lever", LEVER_BOARDS, lv_fetch_all)]
+    sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
 
+    # Group fetched jobs per source so we can apply the cap to genuinely NEW
+    # rows only (unchanged/existing rows are cheap — no enrichment call).
+    by_source: dict[str, list[RawJob]] = {}
     for _kind, _boards, fetch in fetchers:
         async for source_key, raw in fetch():
             stats["fetched"] += 1
+            by_source.setdefault(source_key, []).append(raw)
+
+    async def _process(raw: RawJob, source_key: str, new_budget: list[int]) -> str | None:
+        # Skip enrichment entirely if this row already exists unchanged.
+        async with _db.async_session_factory() as db:
+            job_hash = compute_hash(raw)
+            existing = (await db.execute(
+                select(Job).where(Job.source == source_key, Job.external_id == raw["external_id"])
+            )).scalar_one_or_none()
+            if existing and existing.hash == job_hash:
+                return "unchanged"
+
+        # Genuinely new or changed — respect the per-source budget.
+        if new_budget[0] <= 0:
+            return "deferred"
+        new_budget[0] -= 1
+        async with sem:
+            return await _stage_with_retry(raw, source_key)
+
+    stats["deferred"] = 0
+    for source_key, rows in by_source.items():
+        budget = [PER_SOURCE_NEW_CAP]
+        # Process serially by source so cap logic stays deterministic, but
+        # enrichment itself is parallel via the semaphore inside _stage.
+        tasks = [asyncio.create_task(_process(r, source_key, budget)) for r in rows]
+        for t in asyncio.as_completed(tasks):
             try:
-                result = await _stage_with_retry(raw, source_key)
+                result = await t
+                if result is None:
+                    continue
                 key = "skipped" if result == "skipped_blocked" else result
                 stats[key] = stats.get(key, 0) + 1
             except Exception as exc:
-                logger.exception("ingest error for %s/%s: %s", source_key, raw.get("external_id"), exc)
+                logger.exception("ingest error in %s: %s", source_key, exc)
                 stats["errors"] += 1
 
     # Stamp JobSource.last_run_* in a short final transaction.
