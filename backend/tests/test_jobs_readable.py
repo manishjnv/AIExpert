@@ -33,8 +33,8 @@ def test_drops_about_us_and_company_sections():
     for filler in ("About Acme", "How we're different", "Equal Opportunity"):
         assert filler not in out
     # Bullets preserved.
-    assert "Build production ML pipelines on PyTorch" in out["What you'll do"]
-    assert "5+ years Python" in out["Requirements"]
+    assert any("Build production ML pipelines on PyTorch" in b for b in out["What you'll do"])
+    assert any("5+ years Python" in b for b in out["Requirements"])
 
 
 def test_canonicalizes_heading_variants():
@@ -109,6 +109,53 @@ def test_headingless_jd_extracts_signal_sentences():
     assert "mission is to create" not in kept
     assert "equal opportunity" not in kept
     assert "diverse team" not in kept
+
+
+def test_bullets_capped_at_scan_length():
+    """No bullet exceeds the hard max length."""
+    long_p = (
+        "You will build production RLHF pipelines on PyTorch at scale across thousands "
+        "of GPUs, collaborate with researchers across multiple time zones on alignment "
+        "evals, own distributed training infrastructure end-to-end, and mentor junior "
+        "engineers. Required: 5+ years of experience with Python and distributed systems "
+        "in high-throughput production environments serving millions of requests daily. "
+        "You will own evaluation harnesses for frontier LLM deployments. "
+        "You will design CUDA kernels for inference latency improvements."
+    )
+    out = simplify_jd(f"<p>{long_p}</p>")
+    assert out, "should produce bullets"
+    for items in out.values():
+        for b in items:
+            assert len(b) <= 141, f"bullet too long ({len(b)}): {b!r}"
+
+
+def test_strips_leading_filler_clauses():
+    """Preambles like 'As part of our commitment, ...' get stripped."""
+    html = (
+        "<p>As part of our commitment to responsible AI, you will design eval "
+        "harnesses for large language models. The successful candidate will own "
+        "distributed training infrastructure. In this role, you'll ship production "
+        "RLHF pipelines. Required: 5+ years PyTorch.</p>"
+    )
+    out = simplify_jd(html)
+    bullets = out.get("Key points", [])
+    joined = " | ".join(bullets).lower()
+    assert "as part of our commitment" not in joined
+    assert "successful candidate will" not in joined
+    assert "in this role" not in joined
+    # The payload words survived.
+    assert "eval" in joined or "rlhf" in joined or "distributed" in joined
+
+
+def test_bullet_count_capped_for_headingless():
+    """Headingless JDs never exceed MAX_BULLETS even with many signal sentences."""
+    sentences = [
+        f"You will own distributed training system number {i} at scale."
+        for i in range(20)
+    ]
+    html = "<p>" + " ".join(sentences) + "</p>"
+    out = simplify_jd(html)
+    assert len(out["Key points"]) <= 8
 
 
 def test_headingless_respects_min_bullets():

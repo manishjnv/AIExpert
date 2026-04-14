@@ -205,6 +205,69 @@ def _sentence_bullets(paragraph: str, max_items: int = 6) -> list[str]:
 
 _SIGNAL_RE = re.compile("|".join(f"({p})" for p in SIGNAL_PATTERNS), re.I)
 
+# Leading clauses stripped from sentence starts so bullets feel punchy.
+# Applied before filler/signal checks so the filter sees the real content.
+LEADING_STRIP = [
+    re.compile(r"^\s*(as part of [^,]{3,60},\s*)", re.I),
+    re.compile(r"^\s*(in this (role|position)[^,]{0,40},\s*)", re.I),
+    re.compile(r"^\s*(the (successful|ideal) candidate (will|should|must) )", re.I),
+    re.compile(r"^\s*(successful candidates (will|should|must) )", re.I),
+    re.compile(r"^\s*(you (will|'ll)( be expected to| be responsible for)? )", re.I),
+    re.compile(r"^\s*(we('re| are) looking for (someone who |a candidate who |people who )?)", re.I),
+    re.compile(r"^\s*(this (role|position) (will |requires ))", re.I),
+    re.compile(r"^\s*(responsibilities (include|will include):?\s*)", re.I),
+    re.compile(r"^\s*(you should have )", re.I),
+    re.compile(r"^\s*(candidates? (should|must) (have|be) )", re.I),
+]
+
+MAX_BULLET_LEN = 140   # hard cap per bullet — scan-friendly
+MAX_BULLETS = 8        # total bullets in a headingless JD
+
+
+def _strip_leading(sentence: str) -> str:
+    """Remove filler preambles like "As part of our commitment, you will ..."."""
+    out = sentence
+    for _ in range(3):  # up to 3 stacked preambles
+        changed = False
+        for pat in LEADING_STRIP:
+            new = pat.sub("", out, count=1)
+            if new != out:
+                out = new
+                changed = True
+        if not changed:
+            break
+    out = out.strip()
+    # Capitalize first letter since we may have cut "you will" off the front.
+    if out and out[0].islower():
+        out = out[0].upper() + out[1:]
+    return out
+
+
+def _shorten(sentence: str) -> str:
+    """Keep bullets under MAX_BULLET_LEN by cutting at natural break points.
+
+    Truncation priority: first cut at "; ", then " — ", then " and ",
+    then "," — else hard-truncate with an ellipsis. Preserves the lead
+    clause, which is where the signal almost always lives.
+    """
+    s = sentence.strip().rstrip(".")
+    if len(s) <= MAX_BULLET_LEN:
+        return s + "."
+    for sep in ("; ", " — ", " – "):
+        idx = s.find(sep)
+        if 40 <= idx <= MAX_BULLET_LEN:
+            return s[:idx].rstrip() + "."
+    # Try ", and " / ", or " before plain commas.
+    for sep in (", and ", ", or "):
+        idx = s.find(sep)
+        if 40 <= idx <= MAX_BULLET_LEN:
+            return s[:idx].rstrip() + "."
+    # Last comma within budget.
+    idx = s.rfind(",", 0, MAX_BULLET_LEN)
+    if idx >= 40:
+        return s[:idx].rstrip() + "."
+    return s[: MAX_BULLET_LEN - 1].rstrip() + "…"
+
 
 def _is_filler(sentence: str) -> bool:
     low = sentence.lower()
@@ -236,19 +299,21 @@ def _headingless_bullets(stream: list[tuple[str, str]]) -> list[str]:
         sentences.extend(p.strip() for p in parts if p.strip())
     kept: list[str] = []
     seen: set[str] = set()
-    for s in sentences:
-        if len(s) < 20 or len(s) > 260:
+    for raw in sentences:
+        s = _strip_leading(raw)
+        if len(s) < 20 or len(s) > 400:
             continue
         if _is_filler(s):
             continue
         if not _is_signal(s):
             continue
-        key = s.lower()[:80]
+        short = _shorten(s)
+        key = short.lower()[:60]
         if key in seen:
             continue
         seen.add(key)
-        kept.append(s.rstrip(".") + ".")
-        if len(kept) >= 12:
+        kept.append(short)
+        if len(kept) >= MAX_BULLETS:
             break
     return kept
 
@@ -288,9 +353,9 @@ def simplify_jd(html: str) -> dict[str, list[str]]:
             return
         for para in pending_para:
             for item in _sentence_bullets(para):
-                item = item.strip(" •*-–—")
+                item = _strip_leading(item.strip(" •*-–—"))
                 if item and len(item) > 3:
-                    sections.setdefault(current_name, []).append(item)
+                    sections.setdefault(current_name, []).append(_shorten(item))
         pending_para = []
 
     for kind, text in f.stream:
@@ -303,9 +368,9 @@ def simplify_jd(html: str) -> dict[str, list[str]]:
             if current_kind == "drop":
                 continue
             name = current_name or "Highlights"
-            clean = text.strip(" •*-–—")
+            clean = _strip_leading(text.strip(" •*-–—"))
             if clean and len(clean) > 3:
-                sections.setdefault(name, []).append(clean)
+                sections.setdefault(name, []).append(_shorten(clean))
         elif kind == "p":
             if current_kind == "drop":
                 continue
