@@ -183,34 +183,44 @@ def _minimal_enrichment(raw: RawJob) -> dict[str, Any]:
 # ---------------------------------------------------------------- entry point
 
 async def run_daily_ingest() -> dict[str, int]:
-    """Run the full daily ingest. Returns stats dict (for admin banner + logs)."""
+    """Run the full daily ingest. Returns stats dict (for admin banner + logs).
+
+    Uses a fresh session per job so: (a) SQLite WAL writes stay short and
+    don't collide with the live backend, (b) one failed row can't rollback
+    the whole batch. Per-source fetch remains inside one transaction is OK
+    because fetch is read-only HTTP.
+    """
     await ensure_source_rows()
     stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0, "skipped": 0, "errors": 0}
 
     fetchers = [("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all), ("lever", LEVER_BOARDS, lv_fetch_all)]
 
-    async with _db.async_session_factory() as db:
-        for _kind, _boards, fetch in fetchers:
-            async for source_key, raw in fetch():
-                stats["fetched"] += 1
-                try:
+    for _kind, _boards, fetch in fetchers:
+        async for source_key, raw in fetch():
+            stats["fetched"] += 1
+            try:
+                async with _db.async_session_factory() as db:
                     result = await _stage_one(raw, source_key, db)
-                    key = "skipped" if result == "skipped_blocked" else result
-                    stats[key] = stats.get(key, 0) + 1
-                except Exception as exc:
-                    logger.exception("ingest error for %s/%s: %s", source_key, raw.get("external_id"), exc)
-                    stats["errors"] += 1
-        await db.commit()
+                    await db.commit()
+                key = "skipped" if result == "skipped_blocked" else result
+                stats[key] = stats.get(key, 0) + 1
+            except Exception as exc:
+                logger.exception("ingest error for %s/%s: %s", source_key, raw.get("external_id"), exc)
+                stats["errors"] += 1
 
-        # Stamp JobSource.last_run_*.
-        now = datetime.utcnow()
-        for kind, boards, _ in fetchers:
-            for board_slug, _ in boards:
-                key = f"{kind}:{board_slug}"
-                src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
-                if src:
-                    src.last_run_at = now
-        await db.commit()
+    # Stamp JobSource.last_run_* in a short final transaction.
+    try:
+        async with _db.async_session_factory() as db:
+            now = datetime.utcnow()
+            for kind, boards, _ in fetchers:
+                for board_slug, _ in boards:
+                    key = f"{kind}:{board_slug}"
+                    src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
+                    if src:
+                        src.last_run_at = now
+            await db.commit()
+    except Exception as exc:
+        logger.warning("failed to stamp JobSource.last_run_at: %s", exc)
 
     logger.info("jobs ingest complete: %s", stats)
     return stats
