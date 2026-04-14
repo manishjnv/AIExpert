@@ -15,7 +15,7 @@ from datetime import date, datetime
 from html import escape as esc
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -160,9 +160,26 @@ _BASE_CSS = """
   .tldr{background:#1a2029;padding:14px 18px;border-left:3px solid #e8a849;margin:20px 0;border-radius:4px;color:#e8e4d8}
   .apply{display:inline-block;padding:10px 22px;background:#e8a849;color:#0f1419;border-radius:4px;text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;margin:10px 0;transition:background .2s}
   .apply:hover{background:#f0b968}
-  .jd{border-top:1px solid #2a323d;margin-top:28px;padding-top:20px;color:#d0cbc2}
-  .jd h2,.jd h3{font-family:'Fraunces',Georgia,serif;color:#f5f1e8;font-weight:500;margin-top:24px}
+  .jd{color:#d0cbc2;max-width:760px;font-size:15px;line-height:1.75}
+  .jd p{margin:0 0 1em}
+  .jd h1,.jd h2,.jd h3,.jd h4{font-family:'Fraunces',Georgia,serif;color:#f5f1e8;font-weight:500;margin:1.6em 0 .6em;line-height:1.3}
+  .jd h2{font-size:22px}.jd h3{font-size:18px}.jd h4{font-size:16px}
+  .jd ul,.jd ol{padding-left:22px;margin:0 0 1em}
+  .jd li{margin:.35em 0}
   .jd a{color:#e8a849}
+  .jd-wrap{border-top:1px solid #2a323d;margin-top:28px;padding-top:8px}
+  .jd-wrap>summary{cursor:pointer;list-style:none;padding:14px 0;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e8a849}
+  .jd-wrap>summary::-webkit-details-marker{display:none}
+  .jd-wrap>summary::before{content:"▸ ";display:inline-block;transition:transform .2s;margin-right:4px}
+  .jd-wrap[open]>summary::before{transform:rotate(90deg)}
+  .hl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:#2a323d;border:1px solid #2a323d;border-radius:6px;overflow:hidden;margin:22px 0}
+  .hl-cell{background:#141a21;padding:10px 14px}
+  .hl-k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:2px}
+  .hl-v{color:#e8e4d8;font-size:14px;font-weight:500}
+  .skills-block{margin:18px 0;display:flex;flex-direction:column;gap:10px}
+  .skills-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .skills-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8;padding-top:4px;min-width:110px}
+  .skills-row em{color:#94a3b8;font-style:normal;font-size:13px}
   .card{background:#1a2029;border:1px solid #2a323d;border-radius:8px;padding:18px 22px;margin:12px 0;transition:all .2s ease;position:relative}
   .card:hover{border-color:#e8a849;background:#1d242e}
   .card a{color:inherit;text-decoration:none}
@@ -302,10 +319,27 @@ def _yrs_label(mn, mx) -> str:
 
 @router.get("/jobs/{slug}", response_class=HTMLResponse)
 @router.get("/jobs/{slug}/", response_class=HTMLResponse)
-async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLResponse:
+async def job_detail(
+    slug: str,
+    preview: int = 0,
+    auth_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
     job = (await db.execute(select(Job).where(Job.slug == slug))).scalar_one_or_none()
-    if not job or job.status not in ("published", "expired"):
+    if not job:
         raise HTTPException(404, "Job not found")
+
+    # Admin preview bypass: draft/rejected jobs viewable with ?preview=1 when
+    # the caller has an admin session cookie. Published/expired stay public.
+    is_preview = False
+    if job.status not in ("published", "expired"):
+        if preview and auth_token:
+            from app.auth.jwt import verify_token
+            u = await verify_token(auth_token, db)
+            if u and u.is_admin:
+                is_preview = True
+        if not is_preview:
+            raise HTTPException(404, "Job not found")
 
     d = job.data or {}
     settings = get_settings()
@@ -369,10 +403,50 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
 
     expired_banner = ('<p style="background:#fee;padding:.6rem 1rem;border:1px solid #fbb">'
                       'This role has closed. Listed for reference only.</p>') if is_expired else ""
-    robots_tag = '<meta name="robots" content="noindex">' if is_expired else ""
+    preview_banner = (
+        '<p style="background:#2a1f08;border:1px solid rgba(232,168,73,.5);color:#e8a849;'
+        'padding:10px 16px;border-radius:4px;margin:0 0 18px;font-family:\'IBM Plex Mono\',monospace;'
+        'font-size:12px;letter-spacing:.08em">'
+        '⚠ ADMIN PREVIEW · status=' + esc(job.status) + ' · not visible to public</p>'
+    ) if is_preview else ""
+    robots_tag = '<meta name="robots" content="noindex">' if (is_expired or is_preview) else ""
 
     skills = d.get("must_have_skills") or []
+    nice_skills = d.get("nice_to_have_skills") or []
+    topics = d.get("topic") or []
     skills_html = " ".join(f'<span class="chip">{esc(s)}</span>' for s in skills)
+    nice_skills_html = " ".join(f'<span class="chip">{esc(s)}</span>' for s in nice_skills)
+    topics_html = " ".join(f'<span class="chip">{esc(t)}</span>' for t in topics)
+
+    # Highlights grid — above-the-fold, scannable summary so readers don't have
+    # to parse the raw JD for basics. Pulled from enriched fields.
+    yrs = emp.get("experience_years") or {}
+    yrs_label = _yrs_label(yrs.get("min"), yrs.get("max"))
+    salary_label = ""
+    if salary.get("disclosed") and salary.get("currency"):
+        mn, mx = salary.get("min"), salary.get("max")
+        cur = salary.get("currency")
+        if mn and mx:
+            salary_label = f"{cur} {mn:,}–{mx:,}"
+        elif mn:
+            salary_label = f"{cur} {mn:,}+"
+        elif mx:
+            salary_label = f"up to {cur} {mx:,}"
+    highlights = [
+        ("Role", job.designation),
+        ("Seniority", d.get("seniority") or ""),
+        ("Experience", yrs_label),
+        ("Workplace", loc.get("remote_policy") or ""),
+        ("Location", loc_str),
+        ("Type", emp.get("job_type") or ""),
+        ("Shift", emp.get("shift") or ""),
+        ("Salary", salary_label),
+    ]
+    highlights_html = "".join(
+        f'<div class="hl-cell"><div class="hl-k">{esc(k)}</div>'
+        f'<div class="hl-v">{esc(v) if v else "—"}</div></div>'
+        for k, v in highlights
+    )
 
     modules = d.get("roadmap_modules_matched") or []
     modules_html = (
@@ -408,13 +482,47 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
   <span class="chip">{esc(emp.get('job_type') or '')}</span>
   {verified_chip}
 </div>
+{preview_banner}
 {expired_banner}
 {f'<div class="tldr">{esc(d.get("tldr") or "")}</div>' if d.get("tldr") else ""}
 <p><a class="apply" href="{esc(apply_url)}" rel="nofollow sponsored" target="_blank">Apply on {esc(company.get('name') or 'company site')} →</a></p>
-<div><b>Key skills:</b> {skills_html or "—"}</div>
+
+<div class="hl-grid">{highlights_html}</div>
+
+<div class="skills-block">
+  <div class="skills-row"><span class="skills-label">Must-have skills</span><div>{skills_html or "<em>Not specified</em>"}</div></div>
+  {f'<div class="skills-row"><span class="skills-label">Nice to have</span><div>{nice_skills_html}</div></div>' if nice_skills else ""}
+  {f'<div class="skills-row"><span class="skills-label">Topics</span><div>{topics_html}</div></div>' if topics else ""}
+</div>
 {modules_html}
 <div id="match-box" style="display:none;background:#1a2029;border:1px solid #2a323d;padding:16px 20px;border-radius:8px;margin:20px 0"></div>
-<div class="jd">{d.get("description_html") or ""}</div>
+
+<details class="jd-wrap" open>
+  <summary>Full job description</summary>
+  <div class="jd" id="jd-body">{d.get("description_html") or ""}</div>
+</details>
+<script>
+// Break up wall-of-text JDs: if the rendered JD has fewer than 2 block-level
+// children, sentence-split the plain text into readable paragraphs client-side.
+(function enhanceJD(){{
+  const el = document.getElementById('jd-body'); if (!el) return;
+  const blocks = el.querySelectorAll('p, h1, h2, h3, h4, ul, ol, li, div');
+  if (blocks.length >= 3) return;
+  const text = el.innerText || el.textContent || '';
+  if (text.length < 400) return;
+  const chunks = text.split(/\\n{{2,}}|(?<=[.!?])\\s+(?=[A-Z])/).map(s => s.trim()).filter(s => s.length > 0);
+  if (chunks.length < 2) return;
+  // Group into paragraphs ~3-4 sentences each for readability.
+  const paras = [];
+  let buf = [];
+  for (const s of chunks) {{
+    buf.push(s);
+    if (buf.join(' ').length > 280) {{ paras.push(buf.join(' ')); buf = []; }}
+  }}
+  if (buf.length) paras.push(buf.join(' '));
+  el.innerHTML = paras.map(p => '<p>' + p.replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;') + '</p>').join('');
+}})();
+</script>
 <script>
 (async () => {{
   try {{

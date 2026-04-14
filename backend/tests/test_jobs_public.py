@@ -172,6 +172,57 @@ async def test_api_jobs_filter_by_city():
 
 
 @pytest.mark.asyncio
+async def test_draft_preview_requires_admin():
+    """Draft jobs are 404 to public + anon, but viewable with ?preview=1 + admin cookie."""
+    from app.auth.jwt import issue_token
+    from app.models.user import User
+    await _setup()
+    slug = await _seed(status="draft", slug="prev-x", external_id="pv1")
+
+    # Seed admin + non-admin users.
+    async with db_module.async_session_factory() as db:
+        admin = User(email="admin@t.com", provider="otp", is_admin=True, name="a")
+        reg = User(email="u@t.com", provider="otp", is_admin=False, name="u")
+        db.add_all([admin, reg])
+        await db.flush()
+        admin_token = await issue_token(admin, db)
+        user_token = await issue_token(reg, db)
+        await db.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        # Anonymous: 404.
+        assert (await c.get(f"/jobs/{slug}")).status_code == 404
+        # Anonymous with preview flag: still 404.
+        assert (await c.get(f"/jobs/{slug}?preview=1")).status_code == 404
+        # Non-admin with preview: still 404.
+        r = await c.get(f"/jobs/{slug}?preview=1", cookies={"auth_token": user_token})
+        assert r.status_code == 404
+        # Admin with preview: 200 + banner + noindex.
+        r = await c.get(f"/jobs/{slug}?preview=1", cookies={"auth_token": admin_token})
+        assert r.status_code == 200
+        assert "ADMIN PREVIEW" in r.text
+        assert 'name="robots" content="noindex"' in r.text
+        # Admin without preview flag: 404 (preview is explicit).
+        r = await c.get(f"/jobs/{slug}", cookies={"auth_token": admin_token})
+        assert r.status_code == 404
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_job_detail_shows_highlights_and_collapsible_jd():
+    """Published page renders the highlights grid + collapsible JD wrapper."""
+    await _setup()
+    slug = await _seed()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        body = (await c.get(f"/jobs/{slug}")).text
+        assert 'class="hl-grid"' in body
+        assert 'class="jd-wrap"' in body
+        # Salary highlight pulled from enrichment.
+        assert "USD" in body
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_api_jobs_locations_aggregates_counts():
     await _setup()
     await _seed(**_with_loc("sf-1", "l1", "US", "San Francisco"))

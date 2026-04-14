@@ -533,10 +533,13 @@ function renderList(items) {
       ? `<button class="btn primary" onclick="pub(${j.id})">Publish</button>
          <button class="btn danger" onclick="rej(${j.id})">Reject</button>`
       : `<span>${esc(j.status)}${j.reject_reason?" ("+esc(j.reject_reason)+")":""}</span>`;
+    const previewUrl = `/jobs/${encodeURIComponent(j.slug)}?preview=1`;
     return `<tr>
       <td><input type="checkbox" class="sel" value="${j.id}" ${j.status==='draft'?'':'disabled'}></td>
       <td>
-        <b>${esc(j.title)}</b> <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span><br>
+        <a href="${previewUrl}" target="_blank" rel="noopener" style="color:#e8a849;text-decoration:none"><b>${esc(j.title)}</b></a>
+        <a href="${previewUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;font-size:10px;padding:2px 8px">Preview ↗</a>
+        <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span><br>
         <span class="chip">${esc(j.designation)}</span>
         <span class="chip">${esc(locStr||'—')}</span>
         <span class="chip">${esc(emp.job_type||'—')}</span>
