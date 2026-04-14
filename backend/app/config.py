@@ -113,6 +113,11 @@ class Settings(BaseSettings):
     # affiliate context).
     coursera_affiliate_id: str = ""
 
+    # ----- IndexNow (search engine ping on publish) -----
+    # 32-char random hex. The file <key>.txt must be served at /<key>.txt with
+    # the key as content so Bing/Yandex can verify ownership. Empty = disabled.
+    indexnow_key: str = ""
+
     # ----- Maintainer -----
     maintainer_email: str = "you@example.com"
 

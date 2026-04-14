@@ -383,6 +383,31 @@ async def sitemap_jobs(db: AsyncSession = Depends(get_db)) -> Response:
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
+@router.get("/sitemap_index.xml")
+async def sitemap_index() -> Response:
+    """Minimal sitemap-index referencing the jobs sitemap. Submit this URL to GSC."""
+    settings = get_settings()
+    base = (settings.public_base_url or "").rstrip("/")
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>{esc(base)}/sitemap-jobs.xml</loc></sitemap>
+</sitemapindex>"""
+    return Response(content=xml, media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+@router.get("/{key}.txt")
+async def indexnow_key_verify(key: str) -> Response:
+    """IndexNow ownership verification file. Serves the key as plain text at
+    /<key>.txt only when it matches INDEXNOW_KEY in config. 404 otherwise so
+    this route doesn't shadow unrelated .txt paths."""
+    settings = get_settings()
+    configured = settings.indexnow_key
+    if not configured or key != configured:
+        raise HTTPException(404, "not found")
+    return Response(content=configured, media_type="text/plain")
+
+
 # ---- Match-% endpoint (logged-in only) --------------------------------------
 
 @router.get("/api/jobs/{slug}/match")

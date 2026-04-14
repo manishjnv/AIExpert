@@ -23,6 +23,7 @@ from app.db import async_session_factory
 from app.models import Job, JobCompany, JobSource
 from app.services.jobs_sources import RawJob
 from app.services.jobs_sources.greenhouse import GREENHOUSE_BOARDS, fetch_all as gh_fetch_all
+from app.services.jobs_sources.lever import LEVER_BOARDS, fetch_all as lv_fetch_all
 
 logger = logging.getLogger("roadmap.jobs.ingest")
 
@@ -57,21 +58,24 @@ def build_slug(title: str, company_slug: str) -> str:
 
 async def ensure_source_rows() -> None:
     """Upsert JobSource rows for every hardcoded source. Idempotent."""
+    registry: list[tuple[str, str, list[tuple[str, str]]]] = [
+        ("greenhouse", "Greenhouse", GREENHOUSE_BOARDS),
+        ("lever", "Lever", LEVER_BOARDS),
+    ]
     async with async_session_factory() as db:
-        for board_slug, company_name in GREENHOUSE_BOARDS:
-            key = f"greenhouse:{board_slug}"
-            existing = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
-            if existing:
-                continue
-            db.add(JobSource(
-                key=key, kind="greenhouse",
-                label=f"{company_name} (Greenhouse)",
-                tier=1, enabled=1, bulk_approve=1,
-            ))
-            # Also seed company row.
-            has_co = (await db.execute(select(JobCompany).where(JobCompany.slug == board_slug))).scalar_one_or_none()
-            if not has_co:
-                db.add(JobCompany(slug=board_slug, name=company_name, verified=1))
+        for kind, label_suffix, boards in registry:
+            for board_slug, company_name in boards:
+                key = f"{kind}:{board_slug}"
+                existing = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
+                if not existing:
+                    db.add(JobSource(
+                        key=key, kind=kind,
+                        label=f"{company_name} ({label_suffix})",
+                        tier=1, enabled=1, bulk_approve=1,
+                    ))
+                has_co = (await db.execute(select(JobCompany).where(JobCompany.slug == board_slug))).scalar_one_or_none()
+                if not has_co:
+                    db.add(JobCompany(slug=board_slug, name=company_name, verified=1))
         await db.commit()
 
 
@@ -183,25 +187,29 @@ async def run_daily_ingest() -> dict[str, int]:
     await ensure_source_rows()
     stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0, "skipped": 0, "errors": 0}
 
+    fetchers = [("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all), ("lever", LEVER_BOARDS, lv_fetch_all)]
+
     async with async_session_factory() as db:
-        async for source_key, raw in gh_fetch_all():
-            stats["fetched"] += 1
-            try:
-                result = await _stage_one(raw, source_key, db)
-                key = "skipped" if result == "skipped_blocked" else result
-                stats[key] = stats.get(key, 0) + 1
-            except Exception as exc:
-                logger.exception("ingest error for %s/%s: %s", source_key, raw.get("external_id"), exc)
-                stats["errors"] += 1
+        for _kind, _boards, fetch in fetchers:
+            async for source_key, raw in fetch():
+                stats["fetched"] += 1
+                try:
+                    result = await _stage_one(raw, source_key, db)
+                    key = "skipped" if result == "skipped_blocked" else result
+                    stats[key] = stats.get(key, 0) + 1
+                except Exception as exc:
+                    logger.exception("ingest error for %s/%s: %s", source_key, raw.get("external_id"), exc)
+                    stats["errors"] += 1
         await db.commit()
 
         # Stamp JobSource.last_run_*.
         now = datetime.utcnow()
-        for board_slug, _ in GREENHOUSE_BOARDS:
-            key = f"greenhouse:{board_slug}"
-            src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
-            if src:
-                src.last_run_at = now
+        for kind, boards, _ in fetchers:
+            for board_slug, _ in boards:
+                key = f"{kind}:{board_slug}"
+                src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
+                if src:
+                    src.last_run_at = now
         await db.commit()
 
     logger.info("jobs ingest complete: %s", stats)

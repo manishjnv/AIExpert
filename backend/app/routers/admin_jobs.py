@@ -22,14 +22,24 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_admin
+from app.config import get_settings
 from app.db import get_db
 from app.models import Job, JobCompany, JobSource
 from app.models.user import User
+from app.services.indexnow import ping_async
 
 router = APIRouter()
 
 VALID_REJECT_REASONS = {"fake", "expired", "off_topic", "duplicate", "low_quality"}
 VALID_STATUS_FILTER = {"draft", "published", "rejected", "expired", "all"}
+
+
+def _ping_indexnow(slugs: list[str]) -> None:
+    settings = get_settings()
+    base = (settings.public_base_url or "").rstrip("/")
+    if not base or not slugs:
+        return
+    ping_async([f"{base}/jobs/{s}" for s in slugs])
 
 
 def _check_origin(request: Request) -> None:
@@ -130,6 +140,7 @@ async def publish(
     if src:
         src.total_published = (src.total_published or 0) + 1
     await db.commit()
+    _ping_indexnow([job.slug])
     return {"ok": True, "status": job.status}
 
 
@@ -193,6 +204,7 @@ async def bulk_publish(
         if src:
             src.total_published = (src.total_published or 0) + 1
     await db.commit()
+    _ping_indexnow([r.slug for r in rows])
     return {"ok": True, "published": len(rows)}
 
 
