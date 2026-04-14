@@ -16,9 +16,15 @@ import sys
 
 async def _main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    # Script runs outside FastAPI lifecycle — bind the async engine explicitly.
+    from app.db import close_db, init_db
     from app.services.jobs_ingest import run_daily_ingest
-    stats = await run_daily_ingest()
-    print("jobs ingest stats:", stats)
+    await init_db()
+    try:
+        stats = await run_daily_ingest()
+        print("jobs ingest stats:", stats)
+    finally:
+        await close_db()
     return 0
 
 
