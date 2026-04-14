@@ -180,6 +180,13 @@ _BASE_CSS = """
   .skills-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
   .skills-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#94a3b8;padding-top:4px;min-width:110px}
   .skills-row em{color:#94a3b8;font-style:normal;font-size:13px}
+  .jd-simple{margin:22px 0 8px;max-width:760px}
+  .jd-simple .jd-sec{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:500;color:#f5f1e8;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid #2a323d}
+  .jd-simple .jd-sec:first-child{margin-top:0}
+  .jd-simple .jd-bullets{list-style:none;padding:0;margin:0}
+  .jd-simple .jd-bullets li{position:relative;padding:6px 0 6px 22px;color:#d0cbc2;font-size:14.5px;line-height:1.6;border-bottom:1px dashed #1f2731}
+  .jd-simple .jd-bullets li:last-child{border-bottom:none}
+  .jd-simple .jd-bullets li::before{content:"▸";position:absolute;left:2px;top:6px;color:#e8a849;font-size:12px}
   .card{background:#1a2029;border:1px solid #2a323d;border-radius:8px;padding:18px 22px;margin:12px 0;transition:all .2s ease;position:relative}
   .card:hover{border-color:#e8a849;background:#1d242e}
   .card a{color:inherit;text-decoration:none}
@@ -448,6 +455,15 @@ async def job_detail(
         for k, v in highlights
     )
 
+    # Simplified JD: drop filler sections (about us / culture / EEO / etc),
+    # convert wall-of-text paragraphs into bullets under canonical headings.
+    # When extraction yields nothing usable, fall back to the raw JD open.
+    from app.services.jobs_readable import render_simplified, simplify_jd
+    _sections = simplify_jd(d.get("description_html") or "")
+    _simplified_block = render_simplified(_sections)
+    _jd_open_attr = "" if _simplified_block else " open"
+    _jd_label = "Full job description" if _simplified_block else "Full job description"
+
     modules = d.get("roadmap_modules_matched") or []
     modules_html = (
         f'<p class="meta">Matches roadmap modules: {", ".join(esc(m) for m in modules)}. '
@@ -497,8 +513,9 @@ async def job_detail(
 {modules_html}
 <div id="match-box" style="display:none;background:#1a2029;border:1px solid #2a323d;padding:16px 20px;border-radius:8px;margin:20px 0"></div>
 
-<details class="jd-wrap" open>
-  <summary>Full job description</summary>
+{_simplified_block}
+<details class="jd-wrap"{_jd_open_attr}>
+  <summary>{_jd_label}</summary>
   <div class="jd" id="jd-body">{d.get("description_html") or ""}</div>
 </details>
 <script>
