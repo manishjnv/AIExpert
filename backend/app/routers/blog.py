@@ -498,7 +498,7 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
 def _render_post_sidebar(current_slug: str, current_title: str, current_url: str, base: str) -> str:
     """Right-rail sidebar on wide screens — uses the blank space beside
     the 720px article. Three blocks:
-      - More essays: up to 5 posts (excluding current) with date + title.
+      - More posts: up to 5 posts (excluding current) with date + title.
         Current post is highlighted when present in the public list.
       - Contents: auto-built client-side from the article's <h2> headings
         (the <ul> is populated by the inline script).
@@ -512,7 +512,7 @@ def _render_post_sidebar(current_slug: str, current_title: str, current_url: str
 
     posts = _list_visible_posts()
 
-    # More essays list
+    # More posts list
     list_items: list[str] = []
     if posts:
         for p in posts[:8]:  # show up to 8 in total, including current
@@ -532,7 +532,7 @@ def _render_post_sidebar(current_slug: str, current_title: str, current_url: str
     if list_items:
         essays_block = (
             '<div class="sb-block">'
-            '<h4>More essays</h4>'
+            '<h4>More posts</h4>'
             + "".join(list_items)
             + '</div>'
         )
@@ -570,7 +570,7 @@ def _render_post_nav(current_slug: str, base: str) -> str:
       - <hr> separator
       - Prev / Next cards side-by-side (chronological neighbours). Missing
         sides show a muted 'You're at the edge' placeholder.
-      - 'More essays' grid showing up to 3 other posts, sorted newest-
+      - 'More posts' grid showing up to 3 other posts, sorted newest-
         first (excluding current + already-shown neighbours).
       - 'All posts →' link to /blog when there's more than 4 other posts.
 
@@ -590,7 +590,7 @@ def _render_post_nav(current_slug: str, base: str) -> str:
     )
 
     # If the current post isn't in the list (e.g. preview of a draft),
-    # show a 'More essays' grid without prev/next framing.
+    # show a 'More posts' grid without prev/next framing.
     if cur_idx is None:
         newer = None
         older = None
@@ -599,7 +599,7 @@ def _render_post_nav(current_slug: str, base: str) -> str:
         # Newer post in reading order = earlier index (list is newest-first).
         newer = posts[cur_idx - 1] if cur_idx > 0 else None
         older = posts[cur_idx + 1] if cur_idx + 1 < len(posts) else None
-        # Remaining posts for the 'More essays' strip.
+        # Remaining posts for the 'More posts' strip.
         others = [p for i, p in enumerate(posts) if i != cur_idx
                   and (not newer or p.get("slug") != newer.get("slug"))
                   and (not older or p.get("slug") != older.get("slug"))][:3]
@@ -636,11 +636,11 @@ def _render_post_nav(current_slug: str, base: str) -> str:
             "← Newer", "You're reading the freshest post."
         )
         next_html = _card(older, "Older →") if older else _edge(
-            "Older →", "You've reached the first essay."
+            "Older →", "You've reached the first post."
         )
         pair_html = f'<div class="nav-pair">{prev_html}{next_html}</div>'
 
-    # --- More essays grid ---
+    # --- More posts grid ---
     grid_html = ""
     if others:
         others_html = "".join(_card(p) for p in others)
@@ -651,7 +651,7 @@ def _render_post_nav(current_slug: str, base: str) -> str:
         grid_html = (
             '<div class="nav-more">'
             '<div class="nav-more-header">'
-            '<h3>More essays</h3>'
+            '<h3>More posts</h3>'
             f'{all_link}'
             '</div>'
             f'<div class="nav-grid">{others_html}</div>'
@@ -663,7 +663,7 @@ def _render_post_nav(current_slug: str, base: str) -> str:
         return (
             '<hr class="post-nav-hr">'
             '<div class="post-nav-empty">'
-            '<p>This is the only essay so far — more on the way.</p>'
+            '<p>This is the only post so far — more on the way.</p>'
             '<a href="/blog" class="nav-all-link">Back to blog →</a>'
             '</div>'
         )
@@ -730,7 +730,7 @@ async def blog_index() -> HTMLResponse:
             '<div class="empty-icon">📝</div>'
             '<h2>No posts yet</h2>'
             '<p>The AutomateEdge blog is still warming up. Check back soon — '
-            'the first essay is on its way.</p>'
+            'the first post is on its way.</p>'
             f'<a class="back-home" href="{base}/">← Back to AutomateEdge</a>'
             '</div>'
         )
@@ -743,7 +743,7 @@ async def blog_index() -> HTMLResponse:
   <title>Blog — AutomateEdge</title>
   <meta name="description" content="Essays from AutomateEdge on building a free AI learning platform — lessons, principles, and post-mortems.">
   <meta property="og:title" content="Blog — AutomateEdge">
-  <meta property="og:description" content="Essays on building a free AI learning platform.">
+  <meta property="og:description" content="Posts on building a free AI learning platform.">
   <meta property="og:url" content="{base}/blog">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AutomateEdge">
@@ -797,7 +797,7 @@ async def blog_index() -> HTMLResponse:
 <body>
   <main>
     <div class="page-eyebrow">AutomateEdge · Blog</div>
-    <h1 class="page-title">Essays on building a free AI learning platform</h1>
+    <h1 class="page-title">Posts on building a free AI learning platform</h1>
     <p class="page-lede">Lessons, design principles, and honest
       post-mortems from the solo-builder side of AutomateEdge.</p>
     {inner}
@@ -819,7 +819,7 @@ def _render_index_card(post: dict, base: str) -> str:
         f'<div class="post-meta">{_html.escape(published)}</div>'
         f'<h2>{_html.escape(title)}</h2>'
         f'<p class="post-summary">{_html.escape(summary)}</p>'
-        f'<span class="read-more">Read the essay →</span>'
+        f'<span class="read-more">Read the post →</span>'
         f'</a>'
     )
 
