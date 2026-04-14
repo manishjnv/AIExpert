@@ -184,9 +184,89 @@ _BLOG_CSS = """
     font-family: Georgia, 'Times New Roman', serif;
     line-height: 1.7; font-size: 17px;
   }
+  /* Two-column layout on wide screens: 720px article + 260px sidebar.
+     Below 1100px the sidebar drops off and the bottom post-nav covers
+     discovery. Article stays at an editorial-optimal reading width
+     regardless of viewport — widening body copy hurts comprehension. */
   main {
-    max-width: 720px; margin: 0 auto;
+    max-width: 1080px; margin: 0 auto;
     padding: 48px 24px 96px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+  }
+  @media (min-width: 1100px) {
+    main {
+      max-width: 1120px;
+      grid-template-columns: minmax(0, 720px) 300px;
+      align-items: start;
+    }
+  }
+  .post-article { min-width: 0; }
+  .post-sidebar {
+    position: sticky; top: 80px;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 14px; color: #c0c4cc;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  @media (max-width: 1099px) { .post-sidebar { display: none; } }
+  .sb-block { margin-bottom: 32px; }
+  .sb-block h4 {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #94a3b8; margin: 0 0 14px; font-weight: 500;
+  }
+  .sb-post {
+    display: block; text-decoration: none; color: inherit;
+    padding: 10px 12px; margin-bottom: 8px; border-radius: 6px;
+    border: 1px solid transparent; transition: all 0.15s;
+  }
+  .sb-post:hover {
+    background: #1a2029; border-color: #2a323d;
+  }
+  .sb-post .sb-date {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.08em; color: #64748b;
+    margin-bottom: 3px;
+  }
+  .sb-post .sb-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 14px; color: #e8e4d8; line-height: 1.35; font-weight: 500;
+  }
+  .sb-post:hover .sb-title { color: #e8a849; }
+  .sb-post.current {
+    background: rgba(232,168,73,0.08);
+    border-color: rgba(232,168,73,0.25);
+  }
+  .sb-post.current .sb-title { color: #e8a849; font-style: italic; }
+  .sb-toc { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .sb-toc li { margin-bottom: 6px; line-height: 1.4; }
+  .sb-toc a {
+    color: #94a3b8; text-decoration: none;
+    padding-left: 10px; border-left: 2px solid #2a323d;
+    display: block; padding-top: 3px; padding-bottom: 3px;
+    transition: all 0.15s;
+  }
+  .sb-toc a:hover { color: #e8a849; border-left-color: #e8a849; }
+  .sb-toc a.active {
+    color: #e8a849; border-left-color: #e8a849;
+    background: rgba(232,168,73,0.05);
+  }
+  .sb-share {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .sb-share a {
+    flex: 1 1 auto; text-align: center;
+    padding: 8px 10px; border: 1px solid #2a323d; border-radius: 4px;
+    color: #c0c4cc; text-decoration: none; font-size: 11px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .sb-share a:hover {
+    color: #e8a849; border-color: #e8a849; background: rgba(232,168,73,0.05);
   }
   .meta-line {
     color: #94a3b8; font-family: ui-monospace, SFMono-Regular, monospace;
@@ -331,6 +411,7 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
     url = f"{base}/blog/{slug}"
     og_image = f"{base}/assets/og-default.png"
     post_nav_html = _render_post_nav(slug, base)
+    sidebar_html = _render_post_sidebar(slug, title, url, base)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -365,18 +446,121 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
 </head>
 <body>
   <main>
-    <nav class="post-breadcrumb" aria-label="Breadcrumb">
-      <a href="/blog">← Blog</a>
-      <span class="sep">·</span>
-      <span class="current">{title}</span>
-    </nav>
-    <div class="meta-line">Published {published} · Manish Kumar · Build in Public</div>
-    {body_html}
-    {post_nav_html}
+    <article class="post-article">
+      <nav class="post-breadcrumb" aria-label="Breadcrumb">
+        <a href="/blog">← Blog</a>
+        <span class="sep">·</span>
+        <span class="current">{title}</span>
+      </nav>
+      <div class="meta-line">Published {published} · Manish Kumar · Build in Public</div>
+      {body_html}
+      {post_nav_html}
+    </article>
+    <aside class="post-sidebar" aria-label="Sidebar">
+      {sidebar_html}
+    </aside>
   </main>
   <script src="/nav.js" defer></script>
+  <script>
+    // Auto-build Contents TOC from the article's H2s, and scroll-spy to
+    // highlight the active section in the sidebar.
+    (function() {{
+      var tocList = document.getElementById('sbToc');
+      if (!tocList) return;
+      var headings = document.querySelectorAll('.post-article h2');
+      if (!headings.length) {{ tocList.parentElement.style.display = 'none'; return; }}
+      headings.forEach(function(h, i) {{
+        if (!h.id) h.id = 'section-' + i;
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = h.textContent;
+        li.appendChild(a); tocList.appendChild(li);
+      }});
+      // Scroll spy — mark closest heading to top as .active
+      var tocLinks = tocList.querySelectorAll('a');
+      function onScroll() {{
+        var y = window.scrollY + 120;
+        var current = null;
+        headings.forEach(function(h) {{ if (h.offsetTop <= y) current = h.id; }});
+        tocLinks.forEach(function(a) {{
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        }});
+      }}
+      window.addEventListener('scroll', onScroll, {{ passive: true }});
+      onScroll();
+    }})();
+  </script>
 </body>
 </html>"""
+
+
+def _render_post_sidebar(current_slug: str, current_title: str, current_url: str, base: str) -> str:
+    """Right-rail sidebar on wide screens — uses the blank space beside
+    the 720px article. Three blocks:
+      - More essays: up to 5 posts (excluding current) with date + title.
+        Current post is highlighted when present in the public list.
+      - Contents: auto-built client-side from the article's <h2> headings
+        (the <ul> is populated by the inline script).
+      - Share: LinkedIn + Twitter/X prefilled links.
+
+    Mobile (<1100px): hidden via CSS; the bottom post-nav covers
+    discovery.
+    """
+    import html as _html
+    from urllib.parse import quote as _q
+
+    posts = _list_visible_posts()
+
+    # More essays list
+    list_items: list[str] = []
+    if posts:
+        for p in posts[:8]:  # show up to 8 in total, including current
+            slug = p.get("slug", "")
+            is_current = slug == current_slug
+            cls = "sb-post current" if is_current else "sb-post"
+            date = _html.escape(p.get("published", ""))
+            title = _html.escape(p.get("title", ""))
+            href = f"{base}/blog/{_html.escape(slug)}"
+            list_items.append(
+                f'<a class="{cls}" href="{href}">'
+                f'<div class="sb-date">{date}</div>'
+                f'<div class="sb-title">{title}</div>'
+                f'</a>'
+            )
+    essays_block = ""
+    if list_items:
+        essays_block = (
+            '<div class="sb-block">'
+            '<h4>More essays</h4>'
+            + "".join(list_items)
+            + '</div>'
+        )
+
+    # TOC block — actual list items populated by the inline script once
+    # the DOM is ready. Empty <ul> here.
+    toc_block = (
+        '<div class="sb-block">'
+        '<h4>Contents</h4>'
+        '<ul class="sb-toc" id="sbToc"></ul>'
+        '</div>'
+    )
+
+    # Share block — LinkedIn + X prefilled
+    share_text = f"Reading: {current_title}"
+    li_url = f"https://www.linkedin.com/sharing/share-offsite/?url={_q(current_url)}"
+    tw_url = f"https://twitter.com/intent/tweet?text={_q(share_text)}&url={_q(current_url)}"
+    share_block = (
+        '<div class="sb-block">'
+        '<h4>Share</h4>'
+        '<div class="sb-share">'
+        f'<a href="{_html.escape(li_url)}" target="_blank" rel="noopener">LinkedIn</a>'
+        f'<a href="{_html.escape(tw_url)}" target="_blank" rel="noopener">X / Twitter</a>'
+        '</div>'
+        '</div>'
+    )
+
+    return essays_block + toc_block + share_block
 
 
 def _render_post_nav(current_slug: str, base: str) -> str:
