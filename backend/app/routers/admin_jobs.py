@@ -306,35 +306,52 @@ async def review_page(_admin: User = Depends(get_current_admin)) -> HTMLResponse
 
 _ADMIN_HTML = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jobs Review — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/nav.css">
-<script src="/nav.js"></script>
 <style>
-  body{font-family:system-ui,sans-serif;max-width:1200px;margin:0 auto;padding:1rem;color:#1a1a1a}
-  .banner{padding:.75rem 1rem;background:#fffbea;border:1px solid #f0c040;border-radius:6px;margin-bottom:1rem}
-  .tabs{display:flex;gap:.5rem;margin:1rem 0}
-  .tabs button{padding:.4rem .8rem;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:4px}
-  .tabs button.active{background:#1a1a1a;color:#fff}
-  table{width:100%;border-collapse:collapse;font-size:.9rem}
-  th,td{padding:.5rem;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
-  th{background:#f7f7f7}
-  .btn{padding:.3rem .6rem;border:1px solid #888;background:#fff;cursor:pointer;border-radius:3px;font-size:.85rem}
-  .btn.primary{background:#0a7;color:#fff;border-color:#0a7}
-  .btn.danger{background:#c33;color:#fff;border-color:#c33}
-  .chip{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.75rem;background:#eee;margin-right:4px}
-  .chip.verified{background:#dfd;color:#070}
-  .tldr{color:#555;font-size:.85rem;max-width:420px}
-  .stats{margin:1rem 0;border:1px solid #e4e4e4;border-radius:6px;padding:.4rem .7rem;background:#fafafa;font-size:.8rem}
-  .stats summary{cursor:pointer;font-weight:600}
-  .stats table{margin-top:.4rem;font-size:.78rem}
-  .stats th,.stats td{padding:.25rem .5rem}
-  .stats .err{color:#c33;font-weight:600}
-  details{margin:.3rem 0}
-  details summary{cursor:pointer;color:#06c}
-  pre{background:#f5f5f5;padding:.5rem;border-radius:4px;max-height:300px;overflow:auto;font-size:.75rem}
+  :root{color-scheme:dark}
+  html,body{margin:0;background:#0f1419;color:#e8e4d8;font-family:'IBM Plex Sans',system-ui,sans-serif;line-height:1.6}
+  main{max-width:1280px;margin:0 auto;padding:32px 24px 80px}
+  .page-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#e8a849;margin-bottom:8px}
+  h1.page-title{font-family:'Fraunces',Georgia,serif;font-size:clamp(26px,3.5vw,36px);line-height:1.15;color:#f5f1e8;margin:0 0 14px;font-weight:500}
+  .banner{padding:12px 18px;background:#1a2029;border:1px solid rgba(232,168,73,.35);border-radius:6px;margin-bottom:16px;color:#e8e4d8;font-size:14px}
+  .banner b{color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-right:8px}
+  .tabs{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
+  .tabs button{padding:7px 14px;border:1px solid #2a323d;background:transparent;color:#c0c4cc;cursor:pointer;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  .tabs button:hover{border-color:#e8a849;color:#e8a849}
+  .tabs button.active{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:500}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:10px 12px;border-bottom:1px solid #2a323d;text-align:left;vertical-align:top}
+  th{background:#1a2029;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;font-weight:500}
+  td{color:#e8e4d8}
+  td b{color:#f5f1e8;font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:15px}
+  .btn{padding:6px 12px;border:1px solid #2a323d;background:transparent;color:#c0c4cc;cursor:pointer;border-radius:3px;font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em}
+  .btn:hover{border-color:#e8a849;color:#e8a849}
+  .btn.primary{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:500}
+  .btn.primary:hover{background:#f0b968;color:#0f1419}
+  .btn.danger{background:transparent;color:#d97757;border-color:#d97757}
+  .btn.danger:hover{background:rgba(217,119,87,.1)}
+  .chip{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#1a2029;color:#c0c4cc;border:1px solid #2a323d;margin-right:4px}
+  .chip.verified{background:rgba(232,168,73,.12);color:#e8a849;border-color:rgba(232,168,73,.4)}
+  .tldr{color:#94a3b8;font-size:13px;max-width:480px;margin-top:6px}
+  .stats{margin:16px 0;background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:10px 16px;font-size:12px}
+  .stats summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e8a849}
+  .stats table{margin-top:10px}
+  .stats .err{color:#d97757;font-weight:600;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em}
+  details{margin:6px 0}
+  details summary{cursor:pointer;color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em}
+  pre{background:#0f1419;border:1px solid #2a323d;color:#c0c4cc;padding:12px;border-radius:4px;max-height:320px;overflow:auto;font-size:11px;font-family:'IBM Plex Mono',monospace}
+  a{color:#e8a849}
+  input[type=checkbox]{accent-color:#e8a849}
 </style>
 </head><body>
-<h1>Jobs Review Queue</h1>
+<main>
+<div class="page-eyebrow">AutomateEdge · Admin</div>
+<h1 class="page-title">Jobs Review Queue</h1>
 <div id="banner" class="banner">Loading…</div>
 <details class="stats" id="stats"><summary>Source stats (last 24h)</summary><div id="stats-body">Loading…</div></details>
 <div class="tabs">
@@ -480,4 +497,6 @@ document.getElementById("run-ingest").onclick = async () => {
 
 load();
 </script>
+</main>
+<script src="/nav.js" defer></script>
 </body></html>"""

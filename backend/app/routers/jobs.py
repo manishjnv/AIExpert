@@ -102,22 +102,39 @@ async def list_jobs(
 
 # ---- SSR pages --------------------------------------------------------------
 
+_BRAND_HEAD = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/nav.css">
+"""
+
 _BASE_CSS = """
 <style>
-  body{font-family:system-ui,-apple-system,sans-serif;max-width:980px;margin:0 auto;padding:1rem;color:#1a1a1a;line-height:1.55}
-  h1{font-size:1.6rem;margin-bottom:.25rem}
-  .meta{color:#666;font-size:.9rem;margin-bottom:1rem}
-  .chip{display:inline-block;padding:2px 8px;border-radius:3px;font-size:.8rem;background:#eee;margin:2px 4px 2px 0}
-  .chip.verified{background:#e6f7ea;color:#0a7}
-  .tldr{background:#f7f9fc;padding:.8rem 1rem;border-left:3px solid #0a7;margin:1rem 0}
-  .apply{display:inline-block;padding:.6rem 1.2rem;background:#0a7;color:#fff;border-radius:4px;text-decoration:none;margin:.5rem 0}
-  .apply:hover{background:#086}
-  .jd{border-top:1px solid #eee;margin-top:1.5rem;padding-top:1rem}
-  .card{border:1px solid #e4e4e4;border-radius:6px;padding:.8rem 1rem;margin:.6rem 0;background:#fff}
-  .card a{color:#1a1a1a;text-decoration:none}
-  .card h3{margin:0 0 .3rem 0;font-size:1.05rem}
-  a{color:#06c}
-  .breadcrumb{font-size:.85rem;color:#888;margin-bottom:1rem}
+  :root{color-scheme:dark}
+  html,body{margin:0;background:#0f1419;color:#e8e4d8;font-family:'IBM Plex Sans',system-ui,sans-serif;line-height:1.6}
+  main{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  h1.page-title{font-family:'Fraunces',Georgia,serif;font-size:clamp(28px,4vw,42px);line-height:1.15;color:#f5f1e8;margin:0 0 10px;font-weight:500}
+  .page-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#e8a849;margin-bottom:8px}
+  .page-lede{font-size:15px;color:#c0c4cc;max-width:640px;margin:0 0 32px}
+  .meta{color:#94a3b8;font-size:13px}
+  .chip{display:inline-block;padding:2px 10px;border-radius:3px;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#1a2029;color:#c0c4cc;border:1px solid #2a323d;margin:2px 4px 2px 0}
+  .chip.verified{background:rgba(232,168,73,.12);color:#e8a849;border-color:rgba(232,168,73,.4)}
+  .tldr{background:#1a2029;padding:14px 18px;border-left:3px solid #e8a849;margin:20px 0;border-radius:4px;color:#e8e4d8}
+  .apply{display:inline-block;padding:10px 22px;background:#e8a849;color:#0f1419;border-radius:4px;text-decoration:none;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:500;margin:10px 0;transition:background .2s}
+  .apply:hover{background:#f0b968}
+  .jd{border-top:1px solid #2a323d;margin-top:28px;padding-top:20px;color:#d0cbc2}
+  .jd h2,.jd h3{font-family:'Fraunces',Georgia,serif;color:#f5f1e8;font-weight:500;margin-top:24px}
+  .jd a{color:#e8a849}
+  .card{background:#1a2029;border:1px solid #2a323d;border-radius:8px;padding:18px 22px;margin:12px 0;transition:all .2s ease;position:relative}
+  .card:hover{border-color:#e8a849;background:#1d242e}
+  .card a{color:inherit;text-decoration:none}
+  .card h3{margin:0 0 6px 0;font-size:17px;font-family:'Fraunces',Georgia,serif;font-weight:500;color:#f5f1e8;line-height:1.25}
+  .card p{color:#c0c4cc;font-size:14px;margin:8px 0 0}
+  a{color:#e8a849}
+  .breadcrumb{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px}
+  .breadcrumb a{color:#94a3b8;text-decoration:none}
+  .breadcrumb a:hover{color:#e8a849}
 </style>
 """
 
@@ -137,17 +154,21 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI &amp; ML Jobs — AutomateEdge</title>
 <meta name="description" content="Curated AI and ML job openings from verified companies. See your match %% against your AutomateEdge learning plan.">
 <link rel="canonical" href="{esc(base)}/jobs">
 <meta property="og:title" content="AI &amp; ML Jobs — AutomateEdge">
 <meta property="og:description" content="Curated AI and ML job openings from verified companies.">
 <meta property="og:type" content="website">
+{_BRAND_HEAD}
 {_BASE_CSS}
 {_HUB_CSS}
 </head><body>
-<h1>AI &amp; ML Jobs</h1>
-<p class="meta">Curated from verified company career pages. Updated daily.</p>
+<main>
+<div class="page-eyebrow">AutomateEdge · Jobs</div>
+<h1 class="page-title">AI &amp; ML Jobs</h1>
+<p class="page-lede">Curated openings from verified AI-native companies. Daily scrape, AI-summarised, matched against your learning plan.</p>
 
 <div class="layout">
   <aside class="filters">
@@ -202,6 +223,8 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
 </div>
 
 {_HUB_JS}
+</main>
+<script src="/nav.js" defer></script>
 </body></html>"""
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=600"})
 
@@ -302,6 +325,7 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title_tag}</title>
 <meta name="description" content="{desc_tag}">
 <link rel="canonical" href="{esc(canonical)}">
@@ -311,15 +335,17 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
 <meta property="og:type" content="article">
 <meta property="og:url" content="{esc(canonical)}">
 <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+{_BRAND_HEAD}
 {_BASE_CSS}
 </head><body>
+<main>
 <div class="breadcrumb"><a href="/jobs">AI &amp; ML Jobs</a> / {esc(job.title)}</div>
-<h1>{esc(job.title)}</h1>
-<div class="meta">
-  <b>{esc(company.get('name') or job.company_slug)}</b> · {esc(loc_str or '—')} ·
+<h1 class="page-title">{esc(job.title)}</h1>
+<div class="meta" style="margin-bottom:14px">
+  <strong style="color:#e8a849">{esc(company.get('name') or job.company_slug)}</strong> · {esc(loc_str or '—')} ·
   Posted {esc(job.posted_on.isoformat() if job.posted_on else '')}
 </div>
-<div>
+<div style="margin-bottom:18px">
   <span class="chip">{esc(job.designation)}</span>
   <span class="chip">{esc(d.get('seniority') or '')}</span>
   <span class="chip">{esc(emp.get('job_type') or '')}</span>
@@ -330,7 +356,7 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
 <p><a class="apply" href="{esc(apply_url)}" rel="nofollow sponsored" target="_blank">Apply on {esc(company.get('name') or 'company site')} →</a></p>
 <div><b>Key skills:</b> {skills_html or "—"}</div>
 {modules_html}
-<div id="match-box" style="display:none;background:#f7f9fc;border:1px solid #d0dce8;padding:.8rem 1rem;border-radius:6px;margin:1rem 0"></div>
+<div id="match-box" style="display:none;background:#1a2029;border:1px solid #2a323d;padding:16px 20px;border-radius:8px;margin:20px 0"></div>
 <div class="jd">{d.get("description_html") or ""}</div>
 <script>
 (async () => {{
@@ -339,21 +365,24 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
     if (!r.ok) return;
     const m = await r.json();
     const box = document.getElementById("match-box");
-    const tone = m.score >= 70 ? "#0a7" : m.score >= 40 ? "#d88600" : "#888";
+    const tone = m.score >= 70 ? "#6db585" : m.score >= 40 ? "#e8a849" : "#4a5560";
+    const textColor = m.score >= 40 ? "#0f1419" : "#c0c4cc";
     const missing = (m.missing_skills||[]);
     const gap = missing.length
-      ? `<p><b>Close the gap:</b> ${{missing.map(s => `<span class=\\"chip\\">${{s.replace(/[<>]/g,'')}}</span>`).join(" ")}}</p>`
-      : `<p>You match every listed must-have skill. 👏</p>`;
+      ? `<p style="margin:12px 0 0"><b style="color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase">Close the gap:</b><br>${{missing.map(s => `<span class=\\"chip\\">${{s.replace(/[<>]/g,'')}}</span>`).join(" ")}}</p>`
+      : `<p style="margin:12px 0 0;color:#6db585">You match every listed must-have skill. 👏</p>`;
     box.innerHTML = `
-      <div style="display:flex;align-items:center;gap:1rem">
-        <div style="background:${{tone}};color:#fff;padding:.4rem .8rem;border-radius:4px;font-weight:700;font-size:1.2rem">${{m.score}}% match</div>
-        <div>Based on your linked repos + experience level.</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="background:${{tone}};color:${{textColor}};padding:8px 16px;border-radius:4px;font-weight:600;font-size:18px;font-family:'IBM Plex Mono',monospace">${{m.score}}% match</div>
+        <div style="color:#c0c4cc;font-size:14px">Based on your linked repos + experience level.</div>
       </div>
       ${{gap}}`;
     box.style.display = "block";
   }} catch(_) {{}}
 }})();
 </script>
+</main>
+<script src="/nav.js" defer></script>
 </body></html>"""
     headers = {"Cache-Control": "public, max-age=300" if not is_expired else "public, max-age=86400"}
     return HTMLResponse(html, headers=headers)
@@ -426,26 +455,30 @@ async def job_match(
 
 _HUB_CSS = """
 <style>
-  .layout{display:grid;grid-template-columns:240px 1fr;gap:1.5rem;margin-top:1rem}
-  .filters details{border:1px solid #e4e4e4;border-radius:4px;padding:.4rem .7rem;margin-bottom:.5rem;background:#fafafa}
-  .filters summary{cursor:pointer;font-weight:600;font-size:.9rem}
-  .filters label{display:block;font-size:.85rem;padding:.2rem 0}
+  .layout{display:grid;grid-template-columns:240px 1fr;gap:24px;margin-top:8px}
+  .filters details{background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:10px 14px;margin-bottom:10px}
+  .filters summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e8a849;font-weight:500}
+  .filters label{display:block;font-size:13px;padding:4px 0;color:#c0c4cc;cursor:pointer}
   .filters input[type=text],.filters input:not([type]),.filters select{
-    width:100%;padding:.35rem;margin-top:.3rem;font-size:.85rem;
-    border:1px solid #ccc;border-radius:3px;box-sizing:border-box
+    width:100%;padding:7px 10px;margin-top:6px;font-size:13px;
+    background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:4px;box-sizing:border-box;
+    font-family:'IBM Plex Sans',sans-serif
   }
-  .apply-btn{width:100%;padding:.5rem;background:#0a7;color:#fff;border:0;border-radius:4px;cursor:pointer;margin-top:.5rem}
-  .clear-btn{width:100%;padding:.4rem;background:#fff;color:#555;border:1px solid #ccc;border-radius:4px;cursor:pointer;margin-top:.3rem;font-size:.85rem}
-  .chips-row{margin-bottom:.5rem}
-  .chips-row .filter-chip{background:#1a1a1a;color:#fff;padding:2px 8px;border-radius:3px;font-size:.75rem;margin-right:4px;cursor:pointer}
-  .chips-row .filter-chip::after{content:" ×";opacity:.7}
-  .card{position:relative}
-  .match-ring{position:absolute;top:.8rem;right:1rem;width:44px;height:44px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff}
-  .match-ring.high{background:#0a7}
-  .match-ring.mid{background:#d88600}
-  .match-ring.low{background:#888}
-  .empty{padding:2rem;text-align:center;color:#888}
+  .filters input:focus,.filters select:focus{outline:none;border-color:#e8a849}
+  .apply-btn{width:100%;padding:10px;background:#e8a849;color:#0f1419;border:0;border-radius:4px;cursor:pointer;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:500}
+  .apply-btn:hover{background:#f0b968}
+  .clear-btn{width:100%;padding:8px;background:transparent;color:#94a3b8;border:1px solid #2a323d;border-radius:4px;cursor:pointer;margin-top:6px;font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
+  .clear-btn:hover{color:#e8a849;border-color:#e8a849}
+  .chips-row{margin-bottom:12px}
+  .chips-row .filter-chip{background:#2a323d;color:#e8e4d8;padding:3px 10px;border-radius:3px;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-right:6px;cursor:pointer}
+  .chips-row .filter-chip::after{content:" ×";opacity:.7;color:#e8a849}
+  .chips-row .filter-chip:hover{background:#3a424d}
+  .match-ring{position:absolute;top:16px;right:18px;width:48px;height:48px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#0f1419;font-family:'IBM Plex Mono',monospace}
+  .match-ring.high{background:#6db585}
+  .match-ring.mid{background:#e8a849}
+  .match-ring.low{background:#4a5560;color:#c0c4cc}
+  .empty{padding:48px 24px;text-align:center;color:#94a3b8;background:#1a2029;border:1px dashed #2a323d;border-radius:8px}
   @media (max-width:720px){ .layout{grid-template-columns:1fr} }
 </style>
 """
