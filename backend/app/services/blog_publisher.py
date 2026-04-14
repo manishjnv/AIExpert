@@ -398,3 +398,56 @@ def unpublish(slug: str) -> bool:
     )
     path.unlink()
     return True
+
+
+# ---------------- legacy (hardcoded) post toggles ----------------
+#
+# Posts baked into routers/blog.py as Python strings (pre-JSON
+# pipeline) can't be unpublished by deleting a file. Instead we
+# maintain a tiny allow/deny file the legacy route consults at
+# request time. Hiding flips it to return 404. Non-destructive —
+# the source code is untouched.
+
+_LEGACY_STATE = BLOG_ROOT / "_legacy.json"
+
+
+def _load_legacy_state() -> dict:
+    if not _LEGACY_STATE.exists():
+        return {"hidden": []}
+    try:
+        data = json.loads(_LEGACY_STATE.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and isinstance(data.get("hidden"), list):
+            return data
+    except Exception:
+        pass
+    return {"hidden": []}
+
+
+def _save_legacy_state(state: dict) -> None:
+    _ensure_dirs()
+    _LEGACY_STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
+def is_legacy_hidden(slug: str) -> bool:
+    return slug in _load_legacy_state().get("hidden", [])
+
+
+def set_legacy_hidden(slug: str, hidden: bool, admin_name: str) -> dict:
+    state = _load_legacy_state()
+    hidden_list = list(state.get("hidden", []))
+    if hidden and slug not in hidden_list:
+        hidden_list.append(slug)
+    elif not hidden and slug in hidden_list:
+        hidden_list.remove(slug)
+    state["hidden"] = hidden_list
+    state.setdefault("audit", []).append({
+        "slug": slug,
+        "action": "hide" if hidden else "show",
+        "by": admin_name,
+        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    })
+    # Cap audit log to the last 100 events to keep the file small
+    state["audit"] = state["audit"][-100:]
+    _save_legacy_state(state)
+    logger.info("Legacy post %s: %s (by %s)", slug, "hidden" if hidden else "shown", admin_name)
+    return state

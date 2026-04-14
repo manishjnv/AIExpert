@@ -272,6 +272,12 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
 @router.get("/blog/01", response_class=HTMLResponse)
 @router.get("/blog/01/", response_class=HTMLResponse)
 async def post_01() -> HTMLResponse:
+    # Honour the legacy-hidden flag — admin can toggle from /admin/blog
+    # without touching the code below.
+    from app.services.blog_publisher import is_legacy_hidden
+    if is_legacy_hidden("01"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Blog post not found")
     html = _render_post(
         slug="01",
         title=POST_01_TITLE,
