@@ -280,3 +280,27 @@ async def post_01() -> HTMLResponse:
         published=POST_01_PUBLISHED,
     )
     return HTMLResponse(html)
+
+
+# Dynamic route — serves any post published via the admin UI (02+).
+# Reads the JSON from /data/blog/published/<slug>.json and renders
+# through the same _render_post template used by the hardcoded /blog/01.
+@router.get("/blog/{slug}", response_class=HTMLResponse)
+@router.get("/blog/{slug}/", response_class=HTMLResponse)
+async def post_dynamic(slug: str) -> HTMLResponse:
+    # Hardcoded routes win — /blog/01 is handled above.
+    if slug == "01":
+        return await post_01()
+    from app.services.blog_publisher import load_published
+    payload = load_published(slug)
+    if not payload:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    html = _render_post(
+        slug=payload.get("slug", slug),
+        title=payload.get("title", ""),
+        description=payload.get("og_description", ""),
+        body_html=payload.get("body_html", ""),
+        published=payload.get("published", ""),
+    )
+    return HTMLResponse(html)
