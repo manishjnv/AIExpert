@@ -116,7 +116,7 @@ _BASE_CSS = """
 <style>
   :root{color-scheme:dark}
   html,body{margin:0;background:#0f1419;color:#e8e4d8;font-family:'IBM Plex Sans',system-ui,sans-serif;line-height:1.6}
-  main{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  main{max-width:1440px;margin:0 auto;padding:40px 32px 80px}
   h1.page-title{font-family:'Fraunces',Georgia,serif;font-size:clamp(28px,4vw,42px);line-height:1.15;color:#f5f1e8;margin:0 0 10px;font-weight:500}
   .page-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#e8a849;margin-bottom:8px}
   .page-lede{font-size:15px;color:#c0c4cc;max-width:640px;margin:0 0 32px}
@@ -175,6 +175,10 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
 
 <div class="layout">
   <aside class="filters">
+    <div class="search-box">
+      <label for="f-q">Search</label>
+      <input id="f-q" type="search" placeholder="Title, company, or skill…" autocomplete="off">
+    </div>
     <details open><summary>Time</summary>
       <label><input type="radio" name="posted" value=""> Any time</label>
       <label><input type="radio" name="posted" value="1"> Last 24h</label>
@@ -211,9 +215,6 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
     </details>
     <details><summary>Company</summary>
       <input id="f-company" placeholder="Company slug (e.g. anthropic)">
-    </details>
-    <details><summary>Search</summary>
-      <input id="f-q" placeholder="Keyword in title">
     </details>
     <button id="apply" class="apply-btn">Apply filters</button>
     <button id="clear" class="clear-btn">Clear</button>
@@ -473,7 +474,12 @@ async def job_match(
 
 _HUB_CSS = """
 <style>
-  .layout{display:grid;grid-template-columns:240px 1fr;gap:24px;margin-top:8px}
+  .layout{display:grid;grid-template-columns:260px 1fr;gap:32px;margin-top:8px;align-items:start}
+  .filters{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:4px}
+  .search-box{background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:12px 14px;margin-bottom:12px}
+  .search-box label{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e8a849;font-weight:500;margin-bottom:8px}
+  .search-box input{width:100%;padding:9px 12px;font-size:14px;background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:4px;box-sizing:border-box;font-family:'IBM Plex Sans',sans-serif}
+  .search-box input:focus{outline:none;border-color:#e8a849}
   .filters details{background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:10px 14px;margin-bottom:10px}
   .filters summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e8a849;font-weight:500}
   .filters label{display:block;font-size:13px;padding:4px 0;color:#c0c4cc;cursor:pointer}
@@ -482,6 +488,10 @@ _HUB_CSS = """
     background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:4px;box-sizing:border-box;
     font-family:'IBM Plex Sans',sans-serif
   }
+  /* Scrollbar polish on sticky sidebar */
+  .filters::-webkit-scrollbar{width:6px}
+  .filters::-webkit-scrollbar-track{background:transparent}
+  .filters::-webkit-scrollbar-thumb{background:#2a323d;border-radius:3px}
   .filters input:focus,.filters select:focus{outline:none;border-color:#e8a849}
   .apply-btn{width:100%;padding:10px;background:#e8a849;color:#0f1419;border:0;border-radius:4px;cursor:pointer;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:500}
   .apply-btn:hover{background:#f0b968}
@@ -610,8 +620,14 @@ $('clear').onclick = () => {
   loadJobs();
 };
 // Enter-to-apply in text inputs.
-['f-country','f-company','f-q'].forEach(id => {
+['f-country','f-company'].forEach(id => {
   $(id).addEventListener('keydown', e => { if (e.key === 'Enter') loadJobs(); });
+});
+// Prominent search: live filter with a 250ms debounce after the user stops typing.
+let _searchTimer = null;
+$('f-q').addEventListener('input', () => {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(loadJobs, 250);
 });
 // Auto-apply on dropdown/radio change.
 ['f-designation','f-topic','f-remote'].forEach(id => $(id).addEventListener('change', loadJobs));
