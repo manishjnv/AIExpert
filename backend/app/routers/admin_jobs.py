@@ -79,6 +79,11 @@ def _serialize(job: Job) -> dict[str, Any]:
 async def list_queue(
     status: str = Query("draft"),
     source: str | None = None,
+    company: str | None = None,
+    designation: str | None = None,
+    country: str | None = None,
+    remote: str | None = None,
+    verified_only: bool = False,
     q: str | None = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
@@ -92,9 +97,21 @@ async def list_queue(
         stmt = stmt.where(Job.status == status)
     if source:
         stmt = stmt.where(Job.source == source)
+    if company:
+        stmt = stmt.where(Job.company_slug == company.lower())
+    if designation:
+        stmt = stmt.where(Job.designation == designation)
+    if country:
+        stmt = stmt.where(Job.country == country.upper())
+    if remote:
+        stmt = stmt.where(Job.remote_policy == remote)
+    if verified_only:
+        stmt = stmt.where(Job.verified == 1)
     if q:
+        from sqlalchemy import or_
         like = f"%{q.lower()}%"
-        stmt = stmt.where(func.lower(Job.title).like(like))
+        stmt = stmt.where(or_(func.lower(Job.title).like(like),
+                              func.lower(Job.company_slug).like(like)))
     stmt = stmt.order_by(Job.posted_on.desc(), Job.id.desc()).offset(offset).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
 
@@ -347,6 +364,11 @@ _ADMIN_HTML = """<!DOCTYPE html>
   pre{background:#0f1419;border:1px solid #2a323d;color:#c0c4cc;padding:12px;border-radius:4px;max-height:320px;overflow:auto;font-size:11px;font-family:'IBM Plex Mono',monospace}
   a{color:#e8a849}
   input[type=checkbox]{accent-color:#e8a849}
+  .qfilters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0;padding:12px 16px;background:#1a2029;border:1px solid #2a323d;border-radius:6px}
+  .qfilters input,.qfilters select{padding:6px 10px;font-size:12px;background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:3px;font-family:'IBM Plex Sans',sans-serif}
+  .qfilters input:focus,.qfilters select:focus{outline:none;border-color:#e8a849}
+  .qfilters label{font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;color:#94a3b8;text-transform:uppercase;display:flex;align-items:center;gap:6px;cursor:pointer}
+  .qfilters .pill-count{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#e8a849}
 </style>
 </head><body>
 <main>
@@ -362,21 +384,78 @@ _ADMIN_HTML = """<!DOCTYPE html>
   <button data-status="all">All</button>
   <button id="run-ingest" style="margin-left:auto" class="btn primary">Run ingest now</button>
 </div>
+
+<div class="qfilters">
+  <input id="qf-q" type="search" placeholder="Search title or company…" style="min-width:220px">
+  <select id="qf-company"><option value="">Any company</option></select>
+  <select id="qf-designation">
+    <option value="">Any designation</option>
+    <option>ML Engineer</option><option>Research Scientist</option>
+    <option>Applied Scientist</option><option>Data Scientist</option>
+    <option>Data Engineer</option><option>MLOps Engineer</option>
+    <option>AI Engineer</option><option>AI Product Manager</option>
+    <option>Research Engineer</option><option>Computer Vision Engineer</option>
+    <option>NLP Engineer</option><option>Prompt Engineer</option>
+    <option>AI Solutions Architect</option><option>AI Developer Advocate</option>
+    <option>Other</option>
+  </select>
+  <select id="qf-remote">
+    <option value="">Any workplace</option>
+    <option>Remote</option><option>Hybrid</option><option>Onsite</option>
+  </select>
+  <input id="qf-country" placeholder="Country (US, IN…)" maxlength="2" style="width:110px;text-transform:uppercase">
+  <label><input id="qf-verified" type="checkbox"> Verified only</label>
+  <button class="btn" id="qf-clear">Clear</button>
+  <span class="pill-count" id="qf-count"></span>
+</div>
+
 <div id="list">Loading…</div>
 
 <script>
 const REJECT_REASONS = ["fake","expired","off_topic","duplicate","low_quality"];
 let currentStatus = "draft";
 
+function qfilterParams() {
+  const p = new URLSearchParams();
+  p.set("status", currentStatus);
+  p.set("limit", "200");
+  const q = document.getElementById("qf-q").value.trim();
+  const co = document.getElementById("qf-company").value.trim();
+  const des = document.getElementById("qf-designation").value.trim();
+  const rem = document.getElementById("qf-remote").value.trim();
+  const ctry = document.getElementById("qf-country").value.trim().toUpperCase();
+  const ver = document.getElementById("qf-verified").checked;
+  if (q) p.set("q", q);
+  if (co) p.set("company", co);
+  if (des) p.set("designation", des);
+  if (rem) p.set("remote", rem);
+  if (ctry) p.set("country", ctry);
+  if (ver) p.set("verified_only", "true");
+  return p.toString();
+}
+
 async function load() {
-  const r = await fetch(`/admin/jobs/api/queue?status=${currentStatus}&limit=200`, {credentials:"include"});
+  const r = await fetch(`/admin/jobs/api/queue?${qfilterParams()}`, {credentials:"include"});
   if (!r.ok) { document.getElementById("list").innerText = "Load failed: " + r.status; return; }
   const data = await r.json();
   const counts = data.counts || {};
   document.getElementById("banner").innerHTML =
     `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired`;
+  document.getElementById("qf-count").textContent = `${data.items.length} shown`;
+  populateCompanyDropdown(data.items);
   renderList(data.items);
   loadStats();
+}
+
+function populateCompanyDropdown(items) {
+  const sel = document.getElementById("qf-company");
+  if (sel.options.length > 1) return;   // only seed once from the first load
+  const slugs = [...new Set(items.map(j => j.company_slug).filter(Boolean))].sort();
+  for (const s of slugs) {
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  }
 }
 
 async function loadStats() {
@@ -486,6 +565,24 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
     load();
   };
 });
+
+// Wire up the filter bar.
+(function initQFilters() {
+  const live = ["qf-designation","qf-remote","qf-company","qf-verified"];
+  live.forEach(id => document.getElementById(id).addEventListener("change", load));
+  let tm = null;
+  ["qf-q","qf-country"].forEach(id => {
+    document.getElementById(id).addEventListener("input", () => {
+      clearTimeout(tm); tm = setTimeout(load, 250);
+    });
+  });
+  document.getElementById("qf-clear").addEventListener("click", () => {
+    ["qf-q","qf-country"].forEach(id => document.getElementById(id).value = "");
+    ["qf-company","qf-designation","qf-remote"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("qf-verified").checked = false;
+    load();
+  });
+})();
 
 document.getElementById("run-ingest").onclick = async () => {
   if (!confirm("Run ingest now? May take ~30s.")) return;
