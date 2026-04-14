@@ -684,8 +684,13 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
 
   <section class="section-card">
     <h2>2 · Upload Claude's JSON</h2>
-    <div class="note">Paste Claude's full response — one raw JSON object starting with <code>{</code>. Validate first; fix any red errors before saving as draft.</div>
-    <textarea id="blogJsonInput" placeholder='{"title":"...","slug":"02-...","author":"...","published":"...","tags":[...],"og_description":"...","lede":"...","body_html":"...","word_count":1200,"image_brief":{...},"quotable_lines":[...]}'></textarea>
+    <div class="note">Paste Claude's full response — one raw JSON object starting with <code>{</code> — or upload a <code>.json</code> file exported from the chat. Validate first; fix any red errors before saving as draft.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <label for="blogJsonFile" class="btn" style="cursor:pointer;margin:0">📂 Upload JSON file</label>
+      <input id="blogJsonFile" type="file" accept="application/json,.json,.txt" style="display:none" onchange="handleJsonFile(event)">
+      <span id="bpFileName" style="font-size:12px;color:#94a3b8;font-family:'IBM Plex Mono',ui-monospace,monospace"></span>
+    </div>
+    <textarea id="blogJsonInput" placeholder='Paste Claude&apos;s JSON here, or click Upload JSON file above.&#10;&#10;{&#10;  "title": "...",&#10;  "slug": "02-...",&#10;  "author": "...",&#10;  "published": "...",&#10;  "tags": [...],&#10;  "og_description": "...",&#10;  "lede": "...",&#10;  "body_html": "...",&#10;  "word_count": 1200,&#10;  "image_brief": {...},&#10;  "quotable_lines": [...]&#10;}'></textarea>
     <div id="validationResult"></div>
     <div class="row-actions">
       <button class="btn danger" onclick="clearJsonInput()">Clear</button>
@@ -830,6 +835,33 @@ async function saveDraft() {
 function clearJsonInput() {
   document.getElementById('blogJsonInput').value = '';
   document.getElementById('validationResult').innerHTML = '';
+  document.getElementById('bpFileName').textContent = '';
+  document.getElementById('blogJsonFile').value = '';
+}
+
+function handleJsonFile(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  const fileNameEl = document.getElementById('bpFileName');
+  if (file.size > 2 * 1024 * 1024) {
+    fileNameEl.textContent = '✗ File too large (2 MB max).';
+    fileNameEl.style.color = '#fca5a5';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = (e.target.result || '').toString();
+    const stripped = text.replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim();
+    document.getElementById('blogJsonInput').value = stripped;
+    fileNameEl.textContent = '✓ Loaded: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB) — click Validate.';
+    fileNameEl.style.color = '#8fd0a5';
+    document.getElementById('validationResult').innerHTML = '';
+  };
+  reader.onerror = function() {
+    fileNameEl.textContent = '✗ Failed to read file.';
+    fileNameEl.style.color = '#fca5a5';
+  };
+  reader.readAsText(file);
 }
 
 // --------------- Draft actions ---------------
