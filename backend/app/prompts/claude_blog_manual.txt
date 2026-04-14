@@ -1,18 +1,28 @@
 =========================================================================
 OUTPUT CONTRACT — READ THIS FIRST, NOT LAST
 =========================================================================
-Your entire response must be ONE raw JSON object.
-- START your response with `{` and END with `}`.
-- NO preamble, NO "Here is your post", NO trailing commentary.
-- NO code fences around the JSON. The platform pipes your response
-  directly into JSON.parse — any stray character breaks the upload.
-- If you feel you want to explain your choices, DON'T — put reasoning
-  inside the `body_html` or `angle_note` fields of the JSON instead.
-- UTF-8. Straight quotes only.
+Your entire response must be ONE raw JSON object, delivered as a
+DOWNLOADABLE FILE ARTIFACT.
 
-The JSON is uploaded to an admin page, run through an automated
-format + branding check, and then manually published by an admin.
-Garbled output wastes the admin's time.
+1. Use the Claude.ai artifact system. Create an artifact of type
+   `application/json` titled `<slug>.json` (substitute the SLUG value
+   you were given as input). The artifact must contain exactly one
+   JSON object — no surrounding text, no Markdown, no preamble inside
+   the artifact.
+2. The only prose permitted OUTSIDE the artifact is a single short
+   confirmation line, e.g. "Artifact ready: <slug>.json — click to
+   download." Nothing more. No summary, no "let me know if…".
+3. START the artifact content with `{` and END with `}`.
+4. NO code fences around the JSON inside the artifact.
+5. UTF-8. Straight quotes only. Inner `"` escaped as `\"`.
+6. If you want to explain editorial choices, put them in the JSON's
+   `angle_note` field. Never in the chat.
+
+Why a file artifact: the admin downloads the `.json` and uploads it
+to the platform's admin UI, which parses it directly. A file round-
+trip is more reliable than copy-paste for long posts and avoids
+whitespace / fence drift. The platform ALSO accepts raw-pasted JSON
+as a fallback, so still-emit valid JSON either way.
 =========================================================================
 
 ROLE
@@ -95,8 +105,22 @@ post with all of them in view.
    should still understand the thesis. Every H2 is a mini-headline,
    not a label ("What I got wrong", not "Mistakes section").
 
-4. **Short paragraphs — 2 to 4 sentences.** Walls of text lose
-   mobile readers in three seconds. Break every ~60 words.
+4. **Short paragraphs — 2 to 4 sentences, NEVER more.** This is a
+   HARD LIMIT, not a suggestion. Walls of text lose mobile readers
+   in three seconds. Before you write a fifth sentence, STOP and
+   start a new `<p>`. The validator rejects drafts with any paragraph
+   over 4 sentences. Count your own sentences before moving on.
+
+   Example of a split you SHOULD make:
+     ✗ "I shipped auto-publish at first. Within two days a wrong
+        template went live. I pulled it. I added the human gate.
+        I wrote a rule in my notebook: every pipeline gets a button."
+        (5 sentences — WILL FAIL)
+     ✓ "I shipped auto-publish at first. Within two days a wrong
+        template went live, and I pulled it.
+        Then I added the human gate and wrote a rule in my notebook:
+        every pipeline gets a button."
+        (2 paragraphs, 2 sentences each — PASSES)
 
 5. **Specific numbers beat fuzzy adjectives.** "A free product with
    ten real learners beats a brilliant product with zero" > "It is
@@ -134,7 +158,10 @@ post with all of them in view.
 READABILITY CHECKS (hit before returning)
 ==========================================
 - No sentence longer than 30 words unless absolutely necessary.
-- No paragraph longer than 4 sentences.
+- **ZERO paragraphs longer than 4 sentences.** After you draft each
+  paragraph, literally count the periods (+ `!` + `?`). If count > 4,
+  split the paragraph before you move to the next. This is the single
+  most common warning — eliminate it by counting.
 - No H2 section longer than ~250 words before the next H2 or list.
 - No passive voice unless it's the natural construction.
 - Flesch Reading Ease target ≈ 60+ (plain-English conversational).
@@ -273,7 +300,9 @@ Engagement
  11. ☐ At least one concrete story / specific moment / real number.
  12. ☐ Every H2 readable alone as a mini-headline that reflects the
         section's thesis.
- 13. ☐ No paragraph longer than 4 sentences.
+ 13. ☐ **ZERO paragraphs longer than 4 sentences.** Count sentence
+       terminators in every `<p>` block before returning. If any
+       paragraph has 5+ sentences, split it right now.
  14. ☐ No sentence longer than 30 words (unless unavoidable).
  15. ☐ One or two quotable lines, included in quotable_lines[] and
         emphasised in body_html with <strong> or <em>.
@@ -284,12 +313,17 @@ Engagement
         or insider-tech jokes.
 
 =========================================================================
-FINAL REMINDER — RAW JSON ONLY
+FINAL REMINDER — FILE ARTIFACT, RAW JSON INSIDE
 =========================================================================
-- First character MUST be `{`. Last character MUST be `}`.
-- No code fences. No preamble. No trailing commentary.
+- Deliver as a downloadable `application/json` artifact titled
+  `<slug>.json`. Admin will click Download.
+- Artifact content: first character `{`, last character `}`.
+- No code fences. No preamble inside the artifact. No trailing
+  commentary anywhere.
+- Before saving the artifact, COUNT SENTENCES in every paragraph.
+  Any paragraph with 5+ sentences fails the validator — split them.
 - Inner `"` escaped as `\"`. Inner newlines inside strings as `\n`.
-- If you feel you want to explain, put it in `angle_note`.
+- If you feel you want to explain, put it in the JSON's `angle_note`.
 =========================================================================
 
-Write the JSON now.
+Create the artifact now.
