@@ -678,8 +678,16 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
                 'background:rgba(232,168,73,0.14);color:#f5c06a;border:1px solid rgba(232,168,73,0.4)">Draft</span>'
             )
             meta = f'saved by <strong>{esc(d.get("saved_by","—"))}</strong> on {esc(d.get("saved_at","")[:10])}'
-            title_link = f'<strong>{title}</strong>'
+            # Clickable title opens the rendered preview (admin-only route)
+            # so the admin sees exactly what a reader would see, with an
+            # amber "DRAFT PREVIEW" banner at the top.
+            title_link = (
+                f'<a href="/admin/blog/{slug}/preview" target="_blank" '
+                f'style="color:#f5c06a;text-decoration:none;font-weight:600" '
+                f'title="Preview the rendered draft (opens in new tab)">{title} ↗</a>'
+            )
             actions = (
+                f'<a class="btn" href="/admin/blog/{slug}/preview" target="_blank" title="Render + eyeball">Preview ↗</a> '
                 f'<button class="btn" onclick="validateDraft(\'{slug}\')" title="Re-run validator">Re-check</button> '
                 f'<button class="btn success" onclick="publishDraft(\'{slug}\')" title="Go live at /blog/{slug}">Publish</button> '
                 f'<button class="btn danger" onclick="deleteDraft(\'{slug}\')" title="Hard delete">Delete</button>'
@@ -1045,6 +1053,50 @@ async def admin_blog_validate_draft(slug: str, _user: User = Depends(get_current
     if not d:
         raise HTTPException(status_code=404, detail=f"No draft '{slug}'")
     return validate_payload(d)
+
+
+@router.get("/blog/{slug}/preview", response_class=HTMLResponse)
+async def admin_blog_preview(slug: str, _user: User = Depends(get_current_admin)):
+    """Render a draft (or published post) using the public /blog
+    template so the admin can eyeball it before clicking Publish.
+    A visible amber banner marks it as a preview so it can never be
+    confused with the live page."""
+    from app.services.blog_publisher import load_draft, load_published
+    from app.routers.blog import _render_post
+
+    is_draft = False
+    payload = load_published(slug)
+    if payload is None:
+        payload = load_draft(slug)
+        is_draft = True
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"No post '{slug}' — not in drafts or published.")
+
+    post_html = _render_post(
+        slug=payload.get("slug", slug),
+        title=payload.get("title", ""),
+        description=payload.get("og_description", ""),
+        body_html=payload.get("body_html", ""),
+        published=payload.get("published", ""),
+    )
+    # Inject a preview banner at the top of <body>. The _render_post
+    # output is a full HTML document, so we splice the banner in just
+    # after the opening <body> tag — same pattern as our other admin
+    # page-header injections.
+    badge_label = "DRAFT PREVIEW" if is_draft else "PUBLISHED (LIVE) — PREVIEW VIEW"
+    badge_bg = "#b45309" if is_draft else "#15803d"
+    banner = (
+        f'<div style="position:sticky;top:0;z-index:1000;background:{badge_bg};'
+        f'color:#fffaf1;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+        f'font-size:12px;letter-spacing:0.12em;text-transform:uppercase;'
+        f'padding:10px 18px;text-align:center;font-weight:600;'
+        f'border-bottom:2px solid rgba(0,0,0,0.3)">'
+        f'{badge_label} · slug: {esc(slug)} · '
+        f'<a href="/admin/blog" style="color:#fffaf1;text-decoration:underline">← Back to admin</a>'
+        f'</div>'
+    )
+    post_html = post_html.replace("<body>", "<body>\n" + banner, 1)
+    return HTMLResponse(post_html)
 
 
 @router.get("/", response_class=HTMLResponse)
