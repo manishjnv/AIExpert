@@ -82,6 +82,7 @@ async def list_queue(
     company: str | None = None,
     designation: str | None = None,
     country: str | None = None,
+    city: str | None = None,
     remote: str | None = None,
     verified_only: bool = False,
     expired_reason: str | None = None,
@@ -104,6 +105,10 @@ async def list_queue(
         stmt = stmt.where(Job.designation == designation)
     if country:
         stmt = stmt.where(Job.country == country.upper())
+    if city:
+        stmt = stmt.where(
+            func.lower(func.json_extract(Job.data, "$.location.city")) == city.strip().lower()
+        )
     if remote:
         stmt = stmt.where(Job.remote_policy == remote)
     if verified_only:
@@ -425,6 +430,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
     <option>Remote</option><option>Hybrid</option><option>Onsite</option>
   </select>
   <input id="qf-country" placeholder="Country (US, IN…)" maxlength="2" style="width:110px;text-transform:uppercase">
+  <input id="qf-city" placeholder="City" style="width:140px">
   <label><input id="qf-verified" type="checkbox"> Verified only</label>
   <select id="qf-expired-reason" style="display:none">
     <option value="">Any expiry reason</option>
@@ -450,12 +456,14 @@ function qfilterParams() {
   const des = document.getElementById("qf-designation").value.trim();
   const rem = document.getElementById("qf-remote").value.trim();
   const ctry = document.getElementById("qf-country").value.trim().toUpperCase();
+  const city = document.getElementById("qf-city").value.trim();
   const ver = document.getElementById("qf-verified").checked;
   if (q) p.set("q", q);
   if (co) p.set("company", co);
   if (des) p.set("designation", des);
   if (rem) p.set("remote", rem);
   if (ctry) p.set("country", ctry);
+  if (city) p.set("city", city);
   if (ver) p.set("verified_only", "true");
   const expReason = document.getElementById("qf-expired-reason").value.trim();
   if (expReason && currentStatus === "expired") p.set("expired_reason", expReason);
@@ -602,13 +610,13 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
   const live = ["qf-designation","qf-remote","qf-company","qf-verified","qf-expired-reason"];
   live.forEach(id => document.getElementById(id).addEventListener("change", load));
   let tm = null;
-  ["qf-q","qf-country"].forEach(id => {
+  ["qf-q","qf-country","qf-city"].forEach(id => {
     document.getElementById(id).addEventListener("input", () => {
       clearTimeout(tm); tm = setTimeout(load, 250);
     });
   });
   document.getElementById("qf-clear").addEventListener("click", () => {
-    ["qf-q","qf-country"].forEach(id => document.getElementById(id).value = "");
+    ["qf-q","qf-country","qf-city"].forEach(id => document.getElementById(id).value = "");
     ["qf-company","qf-designation","qf-remote","qf-expired-reason"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("qf-verified").checked = false;
     load();

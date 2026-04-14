@@ -65,6 +65,7 @@ def _public_view(job: Job) -> dict[str, Any]:
 async def list_jobs(
     designation: str | None = None,
     country: str | None = None,
+    city: str | None = None,
     remote: str | None = None,
     company: str | None = None,
     topic: str | None = None,
@@ -74,11 +75,17 @@ async def list_jobs(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ):
+    from sqlalchemy import func
     stmt = select(Job).where(Job.status == "published")
     if designation:
         stmt = stmt.where(Job.designation == designation)
     if country:
         stmt = stmt.where(Job.country == country.upper())
+    if city:
+        # City lives only in data.location.city — match case-insensitive.
+        stmt = stmt.where(
+            func.lower(func.json_extract(Job.data, "$.location.city")) == city.strip().lower()
+        )
     if remote:
         stmt = stmt.where(Job.remote_policy == remote)
     if company:
@@ -101,6 +108,33 @@ async def list_jobs(
     if topic:
         items = [it for it in items if topic in (it.get("topic") or [])]
     return JSONResponse(items, headers={"Cache-Control": "public, max-age=300"})
+
+
+@router.get("/api/jobs/locations")
+async def list_locations(db: AsyncSession = Depends(get_db)):
+    """Distinct countries + cities from published jobs, sorted by count.
+    Feeds the public + admin location filter dropdowns."""
+    from sqlalchemy import func
+    # Countries from the denormalized column.
+    country_rows = (await db.execute(
+        select(Job.country, func.count(Job.id))
+        .where(Job.status == "published", Job.country.is_not(None))
+        .group_by(Job.country).order_by(func.count(Job.id).desc())
+    )).all()
+    # Cities live in the JSON payload.
+    city_expr = func.json_extract(Job.data, "$.location.city")
+    city_rows = (await db.execute(
+        select(city_expr, Job.country, func.count(Job.id))
+        .where(Job.status == "published", city_expr.is_not(None), city_expr != "")
+        .group_by(city_expr, Job.country).order_by(func.count(Job.id).desc())
+    )).all()
+    return JSONResponse(
+        {
+            "countries": [{"code": c, "count": n} for c, n in country_rows],
+            "cities": [{"name": c, "country": co, "count": n} for c, co, n in city_rows],
+        },
+        headers={"Cache-Control": "public, max-age=600"},
+    )
 
 
 # ---- SSR pages --------------------------------------------------------------
@@ -211,7 +245,11 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
         <option value="">Any workplace</option>
         <option>Remote</option><option>Hybrid</option><option>Onsite</option>
       </select>
-      <input id="f-country" placeholder="Country (ISO-2, e.g. US, IN)" maxlength="2" style="text-transform:uppercase">
+      <select id="f-country">
+        <option value="">Any country</option>
+      </select>
+      <input id="f-city" list="city-options" placeholder="City (e.g. Bengaluru)" autocomplete="off">
+      <datalist id="city-options"></datalist>
     </details>
     <details><summary>Company</summary>
       <input id="f-company" placeholder="Company slug (e.g. anthropic)">
@@ -530,7 +568,7 @@ _HUB_CSS = """
 
 _HUB_JS = """
 <script>
-const FILTERS = ["designation","topic","remote","country","company","q"];
+const FILTERS = ["designation","topic","remote","country","city","company","q"];
 const $ = id => document.getElementById(id);
 
 function currentFilters() {
@@ -540,10 +578,32 @@ function currentFilters() {
     topic: $('f-topic').value.trim(),
     remote: $('f-remote').value.trim(),
     country: $('f-country').value.trim().toUpperCase(),
+    city: $('f-city').value.trim(),
     company: $('f-company').value.trim().toLowerCase(),
     q: $('f-q').value.trim(),
     posted_within_days: posted ? posted.value : ""
   };
+}
+
+async function loadLocations() {
+  try {
+    const r = await fetch("/api/jobs/locations");
+    if (!r.ok) return;
+    const d = await r.json();
+    const cSel = $('f-country');
+    for (const c of (d.countries || [])) {
+      const o = document.createElement('option');
+      o.value = c.code; o.textContent = `${c.code} (${c.count})`;
+      cSel.appendChild(o);
+    }
+    const dl = $('city-options');
+    for (const c of (d.cities || [])) {
+      const o = document.createElement('option');
+      o.value = c.name;
+      o.label = c.country ? `${c.name}, ${c.country} (${c.count})` : `${c.name} (${c.count})`;
+      dl.appendChild(o);
+    }
+  } catch(_) {}
 }
 
 function esc(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[c]))}
@@ -582,6 +642,7 @@ function renderChips(f) {
       else if (k === 'topic') $('f-topic').value = "";
       else if (k === 'remote') $('f-remote').value = "";
       else if (k === 'country') $('f-country').value = "";
+      else if (k === 'city') $('f-city').value = "";
       else if (k === 'company') $('f-company').value = "";
       else if (k === 'q') $('f-q').value = "";
       loadJobs();
@@ -637,8 +698,9 @@ $('clear').onclick = () => {
   loadJobs();
 };
 // Enter-to-apply in text inputs.
-['f-country','f-company'].forEach(id => {
+['f-city','f-company'].forEach(id => {
   $(id).addEventListener('keydown', e => { if (e.key === 'Enter') loadJobs(); });
+  $(id).addEventListener('change', loadJobs);
 });
 // Prominent search: live filter with a 250ms debounce after the user stops typing.
 let _searchTimer = null;
@@ -647,9 +709,10 @@ $('f-q').addEventListener('input', () => {
   _searchTimer = setTimeout(loadJobs, 250);
 });
 // Auto-apply on dropdown/radio change.
-['f-designation','f-topic','f-remote'].forEach(id => $(id).addEventListener('change', loadJobs));
+['f-designation','f-topic','f-remote','f-country'].forEach(id => $(id).addEventListener('change', loadJobs));
 document.querySelectorAll('input[name=posted]').forEach(x => x.addEventListener('change', loadJobs));
 
+loadLocations();
 loadJobs();
 </script>
 """

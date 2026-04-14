@@ -138,3 +138,53 @@ async def test_indexnow_key_verify_404_when_unconfigured():
         r = await c.get("/somerandomstring.txt")
         assert r.status_code == 404
     await close_db()
+
+
+def _with_loc(slug: str, ext: str, country: str, city: str) -> dict:
+    return dict(
+        slug=slug, external_id=ext, country=country,
+        data={
+            "tldr": "t", "designation": "ML Engineer",
+            "company": {"name": "Anthropic", "slug": "anthropic"},
+            "location": {"country": country, "city": city, "remote_policy": "Hybrid"},
+            "employment": {"job_type": "Full-time"},
+            "must_have_skills": [], "description_html": "<p>X</p>", "apply_url": "http://x",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_api_jobs_filter_by_city():
+    await _setup()
+    await _seed(**_with_loc("sf-1", "c1", "US", "San Francisco"))
+    await _seed(**_with_loc("blr-1", "c2", "IN", "Bengaluru"))
+    await _seed(**_with_loc("sf-2", "c3", "US", "San Francisco"))
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/api/jobs?city=Bengaluru")
+        assert [it["slug"] for it in r.json()] == ["blr-1"]
+        # Case-insensitive.
+        r2 = await c.get("/api/jobs?city=san francisco")
+        assert sorted(it["slug"] for it in r2.json()) == ["sf-1", "sf-2"]
+        # City + country combined.
+        r3 = await c.get("/api/jobs?country=US&city=San Francisco")
+        assert len(r3.json()) == 2
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_api_jobs_locations_aggregates_counts():
+    await _setup()
+    await _seed(**_with_loc("sf-1", "l1", "US", "San Francisco"))
+    await _seed(**_with_loc("sf-2", "l2", "US", "San Francisco"))
+    await _seed(**_with_loc("blr-1", "l3", "IN", "Bengaluru"))
+    # Draft must NOT leak into public locations.
+    await _seed(status="draft", **_with_loc("drft-x", "l4", "DE", "Berlin"))
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/api/jobs/locations")
+        assert r.status_code == 200
+        d = r.json()
+        country_map = {c["code"]: c["count"] for c in d["countries"]}
+        assert country_map == {"US": 2, "IN": 1}
+        city_map = {c["name"]: c["count"] for c in d["cities"]}
+        assert city_map == {"San Francisco": 2, "Bengaluru": 1}
+    await close_db()

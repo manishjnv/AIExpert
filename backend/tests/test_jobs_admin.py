@@ -199,3 +199,29 @@ async def test_queue_expired_reason_subfilter_and_24h_counter():
                         cookies={"auth_token": token})
         assert [j["external_id"] for j in r.json()["items"]] == ["date-1"]
     await close_db()
+
+
+@pytest.mark.asyncio
+async def test_admin_queue_filters_by_city():
+    """Admin city filter uses json_extract on data.location.city (case-insensitive)."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:anthropic", kind="greenhouse", label="X",
+                         tier=1, enabled=1, bulk_approve=1))
+        db.add(JobCompany(slug="anthropic", name="Anthropic"))
+        for ext, city in [("c1", "San Francisco"), ("c2", "Bengaluru")]:
+            db.add(Job(
+                source="greenhouse:anthropic", external_id=ext, source_url="http://x",
+                hash=ext, status="draft", posted_on=date.today(),
+                valid_through=date.today() + timedelta(days=45),
+                slug=ext, title="T", company_slug="anthropic", designation="ML Engineer",
+                country="US" if ext == "c1" else "IN", remote_policy="Hybrid", verified=1,
+                data={"location": {"city": city, "country": "US" if ext == "c1" else "IN"}},
+            ))
+        await db.commit()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/admin/jobs/api/queue?status=draft&city=bengaluru",
+                        cookies={"auth_token": token})
+        assert [j["external_id"] for j in r.json()["items"]] == ["c2"]
+    await close_db()
