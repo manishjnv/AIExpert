@@ -88,6 +88,35 @@ def test_render_simplified_escapes_and_wraps():
     assert "5+ years" in html
 
 
+def test_headingless_jd_extracts_signal_sentences():
+    """JDs with no headings get sentence-split, filler dropped, signals kept."""
+    html = """
+    <p>Anthropic's mission is to create reliable, interpretable, and steerable AI systems.
+       We are a diverse team with a culture of experimentation. Our mission is to ensure AI
+       safety is prioritized. You will build production RLHF pipelines on PyTorch at scale.
+       You will own distributed training infrastructure across thousands of GPUs.
+       You'll collaborate with researchers on alignment evals. We are an equal opportunity
+       employer and welcome applications regardless of background. Required: 5+ years of
+       experience with Python. Must have strong expertise in distributed systems.</p>
+    """
+    out = simplify_jd(html)
+    assert "Key points" in out
+    kept = " | ".join(out["Key points"]).lower()
+    # Signals kept.
+    assert "rlhf" in kept or "pytorch" in kept
+    assert "5+ years" in kept or "5+ year" in kept
+    # Filler dropped.
+    assert "mission is to create" not in kept
+    assert "equal opportunity" not in kept
+    assert "diverse team" not in kept
+
+
+def test_headingless_respects_min_bullets():
+    """A JD with no headings and <3 signal sentences falls back (empty dict)."""
+    html = "<p>We are a friendly team. Our mission is to win. Apply today.</p>"
+    assert simplify_jd(html) == {}
+
+
 def test_drops_filler_paragraphs_inside_kept_section_head():
     """A kept section's heading wins — but drop-sections dropped even between them."""
     html = """

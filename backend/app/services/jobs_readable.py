@@ -47,6 +47,43 @@ KEEP_PATTERNS = [
     "benefits", "what we offer", "what you'll get", "perks",
 ]
 
+# Sentence-level filler patterns used when the JD has no headings at all.
+# A sentence matching any of these is dropped. Patterns are lowercased
+# substrings — short enough to be precise but broad enough to catch
+# paraphrases. Do not add domain terms here (e.g. "research") — only
+# marketing/culture/logistics phrasing.
+FILLER_SENTENCE_PATTERNS = [
+    "our mission", "our team", "our company", "our culture", "our values",
+    "we are ", "we're a ", "we believe", "founded in", "headquartered",
+    "diverse team", "inclusive ", "equal opportunity", "regardless of",
+    "does not discriminate", "protected by law",
+    "apply now", "apply below", "join us", "come join", "come work",
+    "drop us a line", "reach out",
+    "visa sponsor", "sponsor visa", "relocation assistance",
+    "deadline to apply", "closing date", "interview process",
+    "generous ", "competitive compensation", "competitive salary",
+    "as part of our commitment",
+    "look forward to hearing", "excited to hear",
+]
+
+# Signals that a sentence carries candidate-relevant content. When the JD has
+# no section structure, we keep sentences matching these patterns (or short
+# sentences that contain a numeral like "5+ years"). Everything else drops.
+SIGNAL_PATTERNS = [
+    # Responsibility verbs at sentence start.
+    r"^\s*(you (will|'ll)|build|design|develop|own|lead|drive|ship|deploy|scale|"
+    r"implement|train|evaluate|optimi[sz]e|research|analyze|collaborate|mentor|"
+    r"architect|deliver|create|maintain|debug|investigate)",
+    # Requirement markers.
+    r"\b(required|must have|must-have|strong (experience|background)|proficien|"
+    r"familiar|expertise|fluen|\d+\+?\s*(years?|yrs))",
+    # Degrees / credentials.
+    r"\b(phd|ph\.d|m\.?s\.?|b\.?s\.?|master|bachelor|degree in)\b",
+    # Tool/tech keywords commonly gating AI roles.
+    r"\b(python|pytorch|tensorflow|jax|cuda|kubernetes|docker|spark|llm|rlhf|"
+    r"transformer|distributed training|gpu|tpu|mlops)\b",
+]
+
 # Headings to rewrite for consistency in the simplified view.
 HEADING_REWRITE = [
     (re.compile(r"responsibilit|what you.?ll do|what you do|the role|the opportunity",
@@ -166,6 +203,56 @@ def _sentence_bullets(paragraph: str, max_items: int = 6) -> list[str]:
     return parts[:max_items]
 
 
+_SIGNAL_RE = re.compile("|".join(f"({p})" for p in SIGNAL_PATTERNS), re.I)
+
+
+def _is_filler(sentence: str) -> bool:
+    low = sentence.lower()
+    return any(pat in low for pat in FILLER_SENTENCE_PATTERNS)
+
+
+def _is_signal(sentence: str) -> bool:
+    if _SIGNAL_RE.search(sentence):
+        return True
+    if len(sentence) < 120 and re.search(r"\d", sentence):
+        return True
+    return False
+
+
+def _headingless_bullets(stream: list[tuple[str, str]]) -> list[str]:
+    """Extract signal sentences from a JD with no section structure.
+
+    Sentence-split every paragraph + list item, drop filler, keep signal.
+    Caps at 12 bullets so we don't dump the whole JD back as a list.
+    """
+    sentences: list[str] = []
+    for kind, text in stream:
+        if kind not in ("p", "li"):
+            continue
+        if len(text) < 60:
+            sentences.append(text.strip())
+            continue
+        parts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
+        sentences.extend(p.strip() for p in parts if p.strip())
+    kept: list[str] = []
+    seen: set[str] = set()
+    for s in sentences:
+        if len(s) < 20 or len(s) > 260:
+            continue
+        if _is_filler(s):
+            continue
+        if not _is_signal(s):
+            continue
+        key = s.lower()[:80]
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(s.rstrip(".") + ".")
+        if len(kept) >= 12:
+            break
+    return kept
+
+
 def simplify_jd(html: str) -> dict[str, list[str]]:
     """Return {section_name: [bullet, ...]} of kept, de-fluffed content.
 
@@ -182,6 +269,12 @@ def simplify_jd(html: str) -> dict[str, list[str]]:
         f._flush()
     except Exception:
         return {}
+
+    # No headings at all → use signal-sentence extractor. This is the
+    # common case for ATSes that render the whole JD as one prose blob.
+    if not any(k == "h" for k, _ in f.stream):
+        bullets = _headingless_bullets(f.stream)
+        return {"Key points": bullets} if len(bullets) >= 3 else {}
 
     sections: dict[str, list[str]] = {}
     current_name: str | None = None
