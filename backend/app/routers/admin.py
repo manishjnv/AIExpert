@@ -1056,6 +1056,29 @@ async def admin_blog_validate_draft(slug: str, _user: User = Depends(get_current
     return validate_payload(d)
 
 
+@router.post("/api/blog/image")
+async def admin_blog_image_upload(request: Request, user: User = Depends(get_current_admin)):
+    """Upload a hero image for a blog post. Stores under
+    /data/blog/assets/<slug>-hero.<ext> and returns the public URL
+    the editor can drop into body_html / image_brief."""
+    _check_origin(request)
+    from app.services.blog_publisher import save_image
+
+    form = await request.form()
+    slug = (form.get("slug") or "").strip()
+    upload = form.get("image")
+    if upload is None or not hasattr(upload, "filename"):
+        raise HTTPException(status_code=400, detail="Image file is required (form field: image).")
+    if not slug:
+        raise HTTPException(status_code=400, detail="slug required")
+    data = await upload.read()
+    try:
+        result = save_image(slug, upload.filename, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "slug": slug, **result}
+
+
 @router.post("/api/blog/draft/update")
 async def admin_blog_update_draft(request: Request, user: User = Depends(get_current_admin)):
     """Update an existing draft. Body must include every field (full replace).
@@ -1136,7 +1159,7 @@ _BLOG_EDIT_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8"><title>Edit Draft — Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>{{ADMIN_CSS}}
-  .edit-layout { display:grid; grid-template-columns:1fr; gap:14px; max-width:1200px; margin:0 auto; }
+  .edit-layout { display:grid; grid-template-columns:1fr; gap:14px; max-width:100%; margin:0 auto; }
   .field { display:flex; flex-direction:column; gap:6px; }
   .field label { font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:#94a3b8; }
   .field label .hint { color:#64748b; font-size:10px; letter-spacing:0.05em; margin-left:8px; text-transform:none; }
@@ -1172,11 +1195,64 @@ _BLOG_EDIT_HTML = """<!DOCTYPE html>
     <div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:#94a3b8;letter-spacing:0.08em">editing draft · <code style="color:#e8a849">{{SLUG}}</code></div>
   </div>
   <h1 style="font-family:'Fraunces',Georgia,serif;color:#e8a849;font-weight:400;font-size:26px;margin:0 0 6px">Edit draft</h1>
-  <p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0 0 18px;max-width:780px">
-    Tune copy, tighten prose, fix tags, or swap the hero image brief.
+  <p style="color:#94a3b8;font-size:13px;line-height:1.55;margin:0 0 14px;max-width:880px">
+    Tune copy, tighten prose, fix tags, swap the hero image, or rewrite sections that didn't land.
     <strong style="color:#f5c06a">Save</strong> re-runs the validator and writes back to
     <code style="color:#e8a849">/data/blog/drafts/{{SLUG}}.json</code>. Publish from the main list when ready.
   </p>
+
+  <details class="how-to" style="background:#0f1419;border:1px solid #2a323d;border-radius:4px;padding:12px 16px;margin-bottom:18px;font-size:13px;line-height:1.65">
+    <summary style="cursor:pointer;color:#e8a849;font-weight:600;user-select:none">Editing guidelines (click to expand)</summary>
+    <div style="margin-top:12px;color:#d0cbc2">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <div>
+          <h4 style="color:#e8a849;font-family:'Fraunces',Georgia,serif;font-weight:500;margin:0 0 6px;font-size:14px">Voice &amp; tone</h4>
+          <ul style="margin:0;padding-left:20px;color:#c0c4cc">
+            <li>Simple English, active voice, short sentences (&lt; 30 words).</li>
+            <li>One dry observational line per 4–6 paragraphs. No memes.</li>
+            <li>"You" and "I" — never generic "we".</li>
+            <li>Specific numbers and real moments beat fuzzy claims.</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="color:#e8a849;font-family:'Fraunces',Georgia,serif;font-weight:500;margin:0 0 6px;font-size:14px">Structure</h4>
+          <ul style="margin:0;padding-left:20px;color:#c0c4cc">
+            <li>Body starts with <code>&lt;p class="lede"&gt;</code>.</li>
+            <li>At least 3 <code>&lt;h2&gt;</code> section headings.</li>
+            <li><strong style="color:#f5c06a">Zero paragraphs over 4 sentences</strong> — this is the warning that bites most drafts.</li>
+            <li>Target 800–1500 words, one clear takeaway.</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="color:#e8a849;font-family:'Fraunces',Georgia,serif;font-weight:500;margin:0 0 6px;font-size:14px">Banned content</h4>
+          <ul style="margin:0;padding-left:20px;color:#c0c4cc">
+            <li>No stack names (FastAPI, SQLite, nginx, etc.).</li>
+            <li>No AI provider names (Claude, Gemini, OpenAI, Groq…).</li>
+            <li>No repo URLs, session numbers, commit hashes, field names.</li>
+            <li>No exact credit balances or per-call costs.</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="color:#e8a849;font-family:'Fraunces',Georgia,serif;font-weight:500;margin:0 0 6px;font-size:14px">Image</h4>
+          <ul style="margin:0;padding-left:20px;color:#c0c4cc">
+            <li>One hero image, 16:9, realistic-digital (no cartoons, no flat vectors).</li>
+            <li>Dark-palette friendly — warm amber / slate accents.</li>
+            <li>No text baked into the image — captions go in alt text.</li>
+            <li>Upload PNG/JPG/WEBP ≤ 5 MB in the Hero image brief card below.</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="color:#e8a849;font-family:'Fraunces',Georgia,serif;font-weight:500;margin:0 0 6px;font-size:14px">Publish flow</h4>
+          <ul style="margin:0;padding-left:20px;color:#c0c4cc">
+            <li>Edit → Validate → Save draft → Preview ↗ → Publish.</li>
+            <li>Warnings are judgement calls; errors block publication.</li>
+            <li>Slug rename keeps one file on disk, but breaks any old links.</li>
+            <li>Full rules in <a href="https://github.com/manishjnv/AIExpert/blob/master/docs/blog/STYLE.md" target="_blank" style="color:#e8a849">STYLE.md</a> + <a href="https://github.com/manishjnv/AIExpert/blob/master/docs/blog/ADMIN_GUIDE.md" target="_blank" style="color:#e8a849">ADMIN_GUIDE.md</a>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </details>
 
   <div class="edit-layout">
     <div class="card">
@@ -1220,14 +1296,29 @@ _BLOG_EDIT_HTML = """<!DOCTYPE html>
     </div>
 
     <div class="card">
-      <h2>Hero image brief</h2>
-      <div class="field">
-        <label>Hero prompt <span class="hint">40–90 words, photoreal + digital, dark palette</span></label>
-        <textarea id="fHeroPrompt" class="med">{{HERO_PROMPT}}</textarea>
-      </div>
-      <div class="row-2" style="margin-top:10px">
-        <div class="field"><label>Alt text <span class="hint">literal description</span></label><input id="fHeroAlt" value="{{HERO_ALT}}"></div>
-        <div class="field"><label>Filename</label><input id="fHeroFilename" value="{{HERO_FILENAME}}"></div>
+      <h2>Hero image</h2>
+      <div style="display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:18px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div id="heroPreview" style="border:1px dashed #3a4452;border-radius:6px;background:#0f1419;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#64748b;font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;text-align:center;padding:8px">No image uploaded yet<br><span style="opacity:0.7">(16:9 preview appears here)</span></div>
+          <label for="blogHeroFile" class="btn" style="cursor:pointer;text-align:center">📤 Upload image</label>
+          <input id="blogHeroFile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" style="display:none" onchange="uploadHeroImage(event)">
+          <div id="heroUploadStatus" style="font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',ui-monospace,monospace;min-height:16px;line-height:1.4"></div>
+          <div style="font-size:10px;color:#64748b;line-height:1.5">PNG / JPG / WEBP · ≤ 5 MB · 16:9 recommended · goes to <code>/data/blog/assets/</code> on the VPS.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="field">
+            <label>Hero prompt <span class="hint">40–90 words, photoreal + digital, dark palette</span></label>
+            <textarea id="fHeroPrompt" class="med">{{HERO_PROMPT}}</textarea>
+          </div>
+          <div class="field">
+            <label>Alt text <span class="hint">literal description — screen readers + SEO fallback</span></label>
+            <input id="fHeroAlt" value="{{HERO_ALT}}">
+          </div>
+          <div class="field">
+            <label>Filename <span class="hint">auto-filled when you upload; stored at /blog/assets/&lt;filename&gt;</span></label>
+            <input id="fHeroFilename" value="{{HERO_FILENAME}}">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1258,6 +1349,56 @@ _BLOG_EDIT_HTML = """<!DOCTYPE html>
 <script>
 const ORIGINAL_JSON = {{FULL_JSON_B64}};
 const ORIGINAL_SLUG = ORIGINAL_JSON.slug;
+
+// --------------- Hero image upload + preview ---------------
+function _applyHeroPreview(url) {
+  const el = document.getElementById('heroPreview');
+  el.innerHTML = '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;display:block" alt="hero preview">';
+}
+// If the draft already has a filename, show the image.
+(function() {
+  const existing = (document.getElementById('fHeroFilename').value || '').trim();
+  if (existing) { _applyHeroPreview('/blog/assets/' + encodeURIComponent(existing)); }
+})();
+
+async function uploadHeroImage(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('heroUploadStatus');
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = '✗ File too large (5 MB max).'; statusEl.style.color = '#fca5a5';
+    return;
+  }
+  const slug = document.getElementById('fSlug').value.trim() || ORIGINAL_SLUG;
+  const fd = new FormData();
+  fd.append('image', file, file.name);
+  fd.append('slug', slug);
+  statusEl.style.color = '#94a3b8';
+  statusEl.textContent = 'Uploading ' + (file.size / 1024).toFixed(1) + ' KB…';
+  try {
+    const resp = await fetch('/admin/api/blog/image', {
+      method: 'POST', credentials: 'same-origin', body: fd,
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      statusEl.style.color = '#fca5a5';
+      statusEl.textContent = '✗ ' + (d.detail || 'Upload failed.');
+      return;
+    }
+    const data = await resp.json();
+    document.getElementById('fHeroFilename').value = data.filename;
+    if (!document.getElementById('fHeroAlt').value.trim()) {
+      // Leave alt blank for admin to fill; just nudge with a placeholder pattern
+    }
+    // Cache-bust so the preview updates even if the filename hasn't changed
+    _applyHeroPreview(data.url + '?t=' + Date.now());
+    statusEl.style.color = '#8fd0a5';
+    statusEl.textContent = '✓ Saved as ' + data.filename + ' (' + (data.size / 1024).toFixed(1) + ' KB).';
+  } catch (e) {
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '✗ Network error: ' + e.message;
+  }
+}
 
 function buildPayload() {
   // Preserve any fields we don't edit (like _saved_at). Overlay edited.

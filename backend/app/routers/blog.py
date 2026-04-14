@@ -514,6 +514,20 @@ def _list_visible_posts() -> list[dict]:
     return posts
 
 
+@router.get("/blog/assets/{filename}")
+async def blog_asset(filename: str):
+    """Serve an uploaded blog image from /data/blog/assets/.
+    Strict whitelist via blog_publisher.get_asset_path."""
+    from app.services.blog_publisher import get_asset_path
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+    path = get_asset_path(filename)
+    if not path:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    # Let FileResponse set the mime based on extension
+    return FileResponse(str(path), headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @router.get("/blog", response_class=HTMLResponse)
 @router.get("/blog/", response_class=HTMLResponse)
 async def blog_index() -> HTMLResponse:

@@ -30,6 +30,14 @@ logger = logging.getLogger("roadmap.blog_publisher")
 BLOG_ROOT = Path("/data/blog")
 DRAFTS_DIR = BLOG_ROOT / "drafts"
 PUBLISHED_DIR = BLOG_ROOT / "published"
+ASSETS_DIR = BLOG_ROOT / "assets"
+
+# Image upload limits
+MAX_IMAGE_BYTES = 5 * 1024 * 1024     # 5 MB
+ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+IMAGE_MIME_WHITELIST = {
+    "image/png", "image/jpeg", "image/webp",
+}
 
 REQUIRED_FIELDS = (
     "title", "slug", "author", "published", "tags",
@@ -287,6 +295,68 @@ def validate_payload(payload: dict) -> dict:
 def _ensure_dirs() -> None:
     DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
     PUBLISHED_DIR.mkdir(parents=True, exist_ok=True)
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------- image assets ----------------
+
+
+def save_image(slug: str, original_filename: str, data: bytes) -> dict:
+    """Save an uploaded blog image to /data/blog/assets/<slug>-<role>.<ext>.
+    Returns {filename, path, url, size}.
+    Raises ValueError on bad input."""
+    _ensure_dirs()
+    import re as _re
+
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError(f"Image too large ({len(data)} bytes; max {MAX_IMAGE_BYTES}).")
+    if len(data) < 64:
+        raise ValueError("Image suspiciously small — upload looks empty.")
+
+    # Normalise extension from the uploaded filename
+    ext = Path(original_filename).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTS:
+        raise ValueError(
+            f"Unsupported image format '{ext}'. Allowed: {sorted(ALLOWED_IMAGE_EXTS)}."
+        )
+
+    # Sanitise slug — only pass alnum + dash
+    safe_slug = _re.sub(r"[^a-z0-9-]+", "", (slug or "hero").lower())[:80] or "hero"
+    # Default to -hero suffix; admin can rename via the normal hero_filename
+    # field on save if they uploaded a non-hero image.
+    target_name = f"{safe_slug}-hero{ext}"
+    target_path = ASSETS_DIR / target_name
+    target_path.write_bytes(data)
+
+    logger.info("Blog image saved: %s (%d bytes)", target_name, len(data))
+    return {
+        "filename": target_name,
+        "path": str(target_path),
+        "url": f"/blog/assets/{target_name}",
+        "size": len(data),
+    }
+
+
+def get_asset_path(filename: str) -> Optional[Path]:
+    """Resolve a safe asset filename to its on-disk path. Returns None if
+    the name escapes the assets dir or doesn't exist."""
+    # Strict whitelist — no path separators, no null bytes, must end in
+    # an allowed extension.
+    if not filename or "/" in filename or "\\" in filename or "\x00" in filename:
+        return None
+    if Path(filename).suffix.lower() not in ALLOWED_IMAGE_EXTS:
+        return None
+    path = ASSETS_DIR / filename
+    try:
+        # Resolve + ensure it's still inside ASSETS_DIR (defence-in-depth)
+        resolved = path.resolve()
+        if ASSETS_DIR.resolve() not in resolved.parents and resolved != ASSETS_DIR.resolve():
+            return None
+    except Exception:
+        return None
+    if not path.exists() or not path.is_file():
+        return None
+    return path
 
 
 def save_draft(payload: dict, admin_name: str) -> Path:
