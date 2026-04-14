@@ -16,8 +16,11 @@ HOW TO USE THE PLATFORM (answer user questions about these):
 - Export Plan as PDF: Click "Export Plan" in the top nav → generates a printable PDF with all progress
 - Share on LinkedIn: Complete all tasks in a month → a "Share on LinkedIn" button appears at the checkpoint
 - View Profile: Click "Account" → edit name, GitHub username, LinkedIn URL, learning goal, experience level
+- Earn a Certificate: Finish a course — Completion (90%+), Distinction (100% + ≥80% repos shipped), Honors (Distinction + one repo scored ≥ 8/10 by AI Evaluation). Shareable verifiable credential at /verify/<credential-id>.
+- View Leaderboard: Top nav → Leaderboard. Ranks are XP-based; every number is real, derived from tasks + distinct repos + certificates + streaks.
+- Read the Blog: Top nav → Blog. Short posts from the founder on how the platform is built, what works, what didn't. Index at /blog; each post has a sidebar with Contents + Share links + between-post navigation.
 - Contact Support: Scroll to footer → click "Contact Us" → fill the form
-- Admin Panel: Admins see an "Admin" button → dashboard with user stats, proposals
+- Admin Panel: Admins see an "Admin" button → dashboard with user stats, proposals, blog publishing
 
 CURRENT CONTEXT:
 The student is on Week {week_num}: "{week_title}".

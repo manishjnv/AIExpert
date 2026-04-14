@@ -83,24 +83,29 @@ The public blog is learner- and recruiter-facing. It is **not** a changelog.
 
 If the sentence only makes sense to someone who has seen the codebase, cut it or rewrite it for a learner.
 
-## 4. Frontmatter contract
+## 4. JSON schema contract
 
-Every post starts with this block, in this order:
+Posts are authored as JSON (not Markdown). The full schema lives in
+[SYSTEM.md](./SYSTEM.md#json-schema-the-wire-format). Fields Claude
+Opus emits for every post, in this order:
 
-```yaml
----
-title: <Plain title — no stack names>
-slug: <NN-kebab-case-title>
-author: Manish Kumar
-published: YYYY-MM-DD
-tags: [build-in-public, <topic>, <topic>]
-og_description: <1–2 sentences, ~160 chars, matches the post's lede. No stack, no providers.>
----
-```
+- `title` (≤150 chars)
+- `slug` (NN-kebab-case, auto-numbered by the prompt generator)
+- `author` (string)
+- `published` (ISO date)
+- `tags` (3-5 strings, first must be `build-in-public`)
+- `og_description` (≤200 chars target)
+- `lede` (plain text, one sentence, ≤30 words)
+- `body_html` (HTML fragment — allowed tags listed in SYSTEM.md)
+- `word_count` (integer)
+- `image_brief` (hero prompt + alt + filename)
+- `quotable_lines` (array of shareable sentences)
+- `angle_note` (editorial commentary, not published)
 
-- `slug` prefix is sequential (`01-`, `02-`, …). Never reuse.
-- `tags` are learner-facing topics only — `ai-learning`, `curriculum`, `certificates`, `leaderboard`, `solo-founder`, `product`. Never `fastapi` / `sqlite` / `weasyprint`.
-- `og_description` should be short enough to fit in a LinkedIn link card (≤ 200 chars is safe).
+Tag picks must be learner-facing: `ai-learning`, `curriculum`,
+`certificates`, `leaderboard`, `solo-founder`, `product`,
+`gamification`, `career`, `education`. **NEVER** use technology names
+as tags.
 
 ## 5. Structure
 
@@ -116,16 +121,23 @@ Default outline — deviate when the topic demands it, but start here:
 
 Target length **800–1500 words**. Under 800 feels like a tweet. Over 1500 loses the recruiter.
 
-## 6. Rendering — both copies stay in sync
+## 6. Storage — the VPS is the source of truth
 
-Every post lives in **two places**:
+Posts live as JSON under `/data/blog/` on the VPS:
 
-- `docs/blog/<slug>.md` — markdown source of truth.
-- A hand-converted HTML block in `backend/app/routers/blog.py` — what the site actually serves.
+- `drafts/<slug>.json` — in-progress, invisible to readers
+- `published/<slug>.json` — live at `/blog/<slug>`
+- `assets/<slug>-hero.<ext>` — uploaded hero images
+- `_legacy.json` — visibility flag for the hardcoded post 01
 
-When you update one, update the other in the same commit. When a second or third post ships, lift the markdown-to-HTML step into a tiny renderer; don't carry this duplication indefinitely.
+No markdown source files, no git commits per post, no hand-converted
+HTML twins. Every admin action (save, publish, edit, image upload,
+unpublish) writes to disk directly through the admin UI. Full
+architecture in [SYSTEM.md](./SYSTEM.md).
 
-Images referenced in the markdown (`docs/blog/assets/…`) must be copied / linked so the published page can load them. Static assets live under `frontend/` or are served by the backend via a `/blog/assets/*` route.
+The only exception is post 01, which was written before the JSON
+pipeline existed and still lives as Python constants in
+`routers/blog.py`. It'll migrate to JSON when I next regenerate it.
 
 ## 7. Checklist before publishing
 
