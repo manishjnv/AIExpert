@@ -628,7 +628,7 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
 </head>
 <body>
 {{ADMIN_NAV}}
-<main class="page" style="max-width:1100px;margin:0 auto;padding:28px 24px 80px">
+<main class="page" style="max-width:100%;margin:0 auto;padding:28px clamp(20px,4vw,64px) 80px">
   <header style="margin-bottom:18px">
     <h1 style="font-family:'Fraunces',Georgia,serif;color:#e8a849;font-weight:400;font-size:28px;margin:0 0 6px">Blog</h1>
     <p style="color:#94a3b8;font-size:14px;line-height:1.6;max-width:780px">
