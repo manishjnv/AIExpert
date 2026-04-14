@@ -821,10 +821,14 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
     <div class="row-actions">
       <button class="btn danger" onclick="clearJsonInput()">Clear</button>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn" onclick="downloadJson()" title="Save current textarea contents as a .json file">⬇ Download .json</button>
         <button class="btn" onclick="validateJson()">Validate</button>
         <button class="btn primary" onclick="saveDraft()">Save as draft</button>
       </div>
+    </div>
+    <div class="note" style="margin-top:10px;font-size:11px;color:#64748b;font-family:'IBM Plex Mono',ui-monospace,monospace;letter-spacing:0.03em">
+      Saved drafts → <code>/data/blog/drafts/&lt;slug&gt;.json</code> on the VPS.
+      Published posts → <code>/data/blog/published/&lt;slug&gt;.json</code>.
+      Both persist across container rebuilds via the <code>/data</code> volume mount.
     </div>
   </section>
 
@@ -967,25 +971,6 @@ function clearJsonInput() {
   document.getElementById('validationResult').innerHTML = '';
   document.getElementById('bpFileName').textContent = '';
   document.getElementById('blogJsonFile').value = '';
-}
-
-function downloadJson() {
-  const text = document.getElementById('blogJsonInput').value.trim();
-  if (!text) { alert('Paste or upload some JSON first.'); return; }
-  // Try to derive filename from the JSON's slug; fall back to timestamp.
-  let filename = 'blog-post.json';
-  try {
-    const obj = JSON.parse(text);
-    if (obj && typeof obj.slug === 'string' && obj.slug) {
-      filename = obj.slug.replace(/[^a-z0-9-]/gi, '') + '.json';
-    }
-  } catch (e) { /* invalid JSON — still allow download for editing */ }
-  const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
 
 function handleJsonFile(evt) {
