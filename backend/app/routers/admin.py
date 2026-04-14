@@ -526,7 +526,8 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
       <li>Commit both files + image, push, deploy.</li>
     </ol>
     <div style="margin-top:8px;color:#8a92a0;font-size:12px">
-      <strong>Cost:</strong> zero — Claude Max chat is unmetered; no backend AI call. <strong>Content gating:</strong> human-in-the-loop by design; no auto-publish path exists for blogs.
+      <strong>Cost:</strong> zero — Claude Max chat is unmetered; no backend AI call. <strong>Content gating:</strong> human-in-the-loop by design; no auto-publish path exists for blogs.<br>
+      <strong>Full runbook:</strong> <a href="https://github.com/manishjnv/AIExpert/blob/master/docs/blog/ADMIN_GUIDE.md" target="_blank" style="color:#e8a849">docs/blog/ADMIN_GUIDE.md</a> · <strong>Editorial rules:</strong> <a href="https://github.com/manishjnv/AIExpert/blob/master/docs/blog/STYLE.md" target="_blank" style="color:#e8a849">docs/blog/STYLE.md</a>
     </div>
   </details>
 
