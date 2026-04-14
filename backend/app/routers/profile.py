@@ -277,3 +277,39 @@ async def export_profile(
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=my-roadmap-data.json"},
     )
+
+
+# ---- Weekly jobs digest: one-click unsubscribe (no login) ----
+# Link comes from an email; user may not be signed in on this device.
+# The token is a short signed JWT (k=unsub) issued by services.jobs_digest.
+@router.get("/digest/unsubscribe", response_class=Response)
+async def digest_unsubscribe(t: str, db=Depends(get_db)):
+    from jose import jwt, JWTError
+    from app.config import get_settings
+    from app.models.user import User
+    from sqlalchemy import select
+
+    try:
+        payload = jwt.decode(t, get_settings().jwt_secret, algorithms=["HS256"])
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired link")
+    if payload.get("k") != "unsub" or not payload.get("sub"):
+        raise HTTPException(status_code=400, detail="Invalid token")
+    try:
+        uid = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    user = (await db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.email_notifications = False
+    await db.commit()
+
+    html = ("<html><body style='font-family:sans-serif;max-width:500px;margin:60px auto;"
+            "text-align:center;padding:24px'>"
+            "<h2 style='color:#1a1a1a'>Unsubscribed</h2>"
+            f"<p style='color:#555'>{user.email} won't receive more jobs digests. "
+            "You can re-enable email notifications anytime on your "
+            "<a href='/account' style='color:#0a7'>account page</a>.</p></body></html>")
+    return Response(content=html, media_type="text/html")

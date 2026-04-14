@@ -387,9 +387,26 @@ async def job_detail(slug: str, db: AsyncSession = Depends(get_db)) -> HTMLRespo
     const tone = m.score >= 70 ? "#6db585" : m.score >= 40 ? "#e8a849" : "#4a5560";
     const textColor = m.score >= 40 ? "#0f1419" : "#c0c4cc";
     const missing = (m.missing_skills||[]);
-    const gap = missing.length
-      ? `<p style="margin:12px 0 0"><b style="color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase">Close the gap:</b><br>${{missing.map(s => `<span class=\\"chip\\">${{s.replace(/[<>]/g,'')}}</span>`).join(" ")}}</p>`
-      : `<p style="margin:12px 0 0;color:#6db585">You match every listed must-have skill. 👏</p>`;
+    const gapWeeks = (m.gap_weeks||[]);
+    const noCurr = (m.skills_without_curriculum||[]);
+    let gap = '';
+    if (!missing.length) {{
+      gap = `<p style="margin:12px 0 0;color:#6db585">You match every listed must-have skill. 👏</p>`;
+    }} else {{
+      gap = `<p style="margin:14px 0 6px"><b style="color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase">Close the gap</b></p>`;
+      gap += `<p style="margin:0 0 10px;font-size:13px;color:#c0c4cc">Missing: ${{missing.map(s => `<span class=\\"chip\\">${{s.replace(/[<>]/g,'')}}</span>`).join(" ")}}</p>`;
+      if (gapWeeks.length) {{
+        gap += `<p style="margin:10px 0 4px;font-size:12px;color:#94a3b8">Our curriculum teaches these in:</p><ul style="margin:0 0 8px 0;padding-left:20px;color:#e8e4d8;font-size:13px">`;
+        for (const w of gapWeeks) {{
+          const safeTitle = (w.title||'').replace(/[<>]/g,'');
+          gap += `<li style="margin:3px 0"><a href="/account" style="color:#e8a849">${{safeTitle}}</a> <span style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace">· Month ${{w.month}}, Week ${{w.week_num}}</span></li>`;
+        }}
+        gap += `</ul><a href="/" style="display:inline-block;margin-top:8px;padding:7px 14px;background:#e8a849;color:#0f1419;text-decoration:none;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:500">Enroll in a plan →</a>`;
+      }}
+      if (noCurr.length) {{
+        gap += `<p style="margin:10px 0 0;font-size:12px;color:#94a3b8">Not yet covered by our curriculum: ${{noCurr.map(s => `<span class=\\"chip\\" style=\\"opacity:.7\\">${{s.replace(/[<>]/g,'')}}</span>`).join(" ")}}</p>`;
+      }}
+    }}
     box.innerHTML = `
       <div style="display:flex;align-items:center;gap:16px">
         <div style="background:${{tone}};color:${{textColor}};padding:8px 16px;border-radius:4px;font-weight:600;font-size:18px;font-family:'IBM Plex Mono',monospace">${{m.score}}% match</div>

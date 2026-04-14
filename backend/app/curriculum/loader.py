@@ -252,6 +252,13 @@ def set_template_status(
     meta[key] = entry
     _save_meta(meta)
     load_template.cache_clear()
+    # Jobs module consumes published templates to build its skill → week index.
+    # Lazy import to avoid a cycle (jobs_modules imports from here).
+    try:
+        from app.services.jobs_modules import invalidate_skill_index
+        invalidate_skill_index()
+    except Exception:  # noqa: BLE001 — service optional; template publish must not fail
+        pass
     logger.info("Template %s → %s (score: %d, reviewer: %s)",
                 key, status, quality_score, reviewer_name or "-")
 
@@ -279,6 +286,11 @@ def unpublish_template(key: str) -> None:
         meta[key]["status"] = "draft"
         _save_meta(meta)
         load_template.cache_clear()
+        try:
+            from app.services.jobs_modules import invalidate_skill_index
+            invalidate_skill_index()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def list_published() -> list[str]:
