@@ -37,6 +37,7 @@ ALLOWED_TOPIC = {"LLM", "CV", "NLP", "RL", "MLOps", "Data Eng", "Research", "App
 ALLOWED_REMOTE = {"Remote", "Hybrid", "Onsite"}
 ALLOWED_JOB_TYPE = {"Full-time", "Part-time", "Contract", "Internship"}
 ALLOWED_SHIFT = {"Day", "Night", "Flexible", "Unknown"}
+ALLOWED_TONE = {"primary", "success", "warning", "info", "neutral"}
 
 
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
@@ -96,6 +97,78 @@ def _clamp_multi(values, allowed: set[str], cap: int) -> list[str]:
     return out[:cap]
 
 
+def _clip(s: Any, cap: int) -> str:
+    return (s[:cap] if isinstance(s, str) else "")
+
+
+def _validate_summary(raw_summary: Any) -> dict[str, Any] | None:
+    """Clamp the LLM-produced summary card. Returns None if nothing usable."""
+    if not isinstance(raw_summary, dict):
+        return None
+
+    chips_raw = raw_summary.get("headline_chips") or []
+    chips: list[dict[str, str]] = []
+    if isinstance(chips_raw, list):
+        for c in chips_raw[:6]:
+            if not isinstance(c, dict):
+                continue
+            label = _clip(c.get("label"), 32)
+            if not label:
+                continue
+            tone = c.get("tone") if isinstance(c.get("tone"), str) else "neutral"
+            if tone not in ALLOWED_TONE:
+                tone = "neutral"
+            chips.append({"label": label, "tone": tone})
+
+    comp = raw_summary.get("comp_snapshot")
+    if isinstance(comp, dict):
+        comp = {
+            "base": _clip(comp.get("base"), 40) or None,
+            "bonus": _clip(comp.get("bonus"), 40) or None,
+            "equity": _clip(comp.get("equity"), 40) or None,
+            "total_est": _clip(comp.get("total_est"), 40) or None,
+        }
+        if not comp["base"] and not comp["bonus"] and not comp["equity"]:
+            comp = None
+    else:
+        comp = None
+
+    resp_list: list[dict[str, str]] = []
+    for item in (raw_summary.get("responsibilities") or [])[:8]:
+        if not isinstance(item, dict):
+            continue
+        title = _clip(item.get("title"), 64)
+        if not title:
+            continue
+        detail = _clip(item.get("detail"), 120)
+        resp_list.append({"title": title, "detail": detail})
+
+    def _str_list(key: str, cap_items: int, cap_len: int) -> list[str]:
+        out: list[str] = []
+        for s in (raw_summary.get(key) or [])[:cap_items]:
+            v = _clip(s, cap_len).strip()
+            if v:
+                out.append(v)
+        return out
+
+    must = _str_list("must_haves", 8, 130)
+    benefits = _str_list("benefits", 7, 140)
+    watch = _str_list("watch_outs", 4, 140)
+
+    # If nothing useful came back, signal fallback to render path.
+    if not (chips or comp or resp_list or must or benefits or watch):
+        return None
+
+    return {
+        "headline_chips": chips,
+        "comp_snapshot": comp,
+        "responsibilities": resp_list,
+        "must_haves": must,
+        "benefits": benefits,
+        "watch_outs": watch,
+    }
+
+
 def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str, Any]:
     """Clamp/fallback every field so downstream code never crashes on AI output."""
     loc = raw_resp.get("location") or {}
@@ -143,6 +216,7 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
         "nice_to_have_skills": [s for s in (raw_resp.get("nice_to_have_skills") or []) if isinstance(s, str)][:5],
         "roadmap_modules_matched": modules,
         "apply_url": raw["source_url"],
+        "summary": _validate_summary(raw_resp.get("summary")),
     }
 
 

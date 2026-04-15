@@ -48,7 +48,24 @@ OUTPUT SCHEMA (return exactly these keys):
   "must_have_skills": array of 3-8 concise skill tags (e.g. "PyTorch","Distributed training"),
   "nice_to_have_skills": array of 0-5 tags,
   "roadmap_modules_matched": array of slugs chosen ONLY from the module inventory above; [] if none fit,
-  "description_html": the input JD HTML, cleaned (strip emails, phone numbers, tracking pixels, iframes, scripts)
+  "description_html": the input JD HTML, cleaned (strip emails, phone numbers, tracking pixels, iframes, scripts),
+
+  "summary": {
+    "headline_chips": array of 3-5 items, each { "label": string ≤24 chars, "tone": one of ["primary","success","warning","info","neutral"] }.
+                      Tone guide: primary=seniority/scope ("Senior leadership"), success=positive perks ("Equity (RSUs)","Top fintech 2025"), info=facts ("NASDAQ-listed","NASDAQ: FIGR"), warning=caution ("No visa sponsorship","US-only"), neutral=other.
+                      Include ONLY information present in the JD; never invent.
+    "comp_snapshot": null when compensation is not explicitly disclosed; otherwise {
+        "base": short string like "$144-216K" or "₹30-50L",
+        "bonus": string or null (e.g. "25% paid quarterly"),
+        "equity": string or null (e.g. "RSUs", "Stock options"),
+        "total_est": string or null (e.g. "$180-270K+")
+    },
+    "responsibilities": array of 5-7 items, each { "title": string ≤48 chars (punchy verb-object, no filler), "detail": string ≤90 chars (supporting context) }.
+                        Rewrite — do not quote the JD. Drop any item that restates company mission/culture.
+    "must_haves": array of 5-7 crisp requirement lines ≤100 chars each (years of experience, specific tools, degree, proven outcomes).
+    "benefits": array of 3-6 items ≤110 chars each. Concrete offers only (health, 401k, equity, PTO, stipend). Skip vague "great culture" lines.
+    "watch_outs": array of 0-3 items ≤110 chars each. ONLY include when the JD explicitly states a constraint a candidate should notice before applying (e.g. "No visa sponsorship", "On-site only in SF", "Pay varies by state", "Security clearance required"). Empty array is common; do not invent.
+  }
 }
 
 RULES
@@ -56,4 +73,5 @@ RULES
 - Never include PII (emails, phone numbers) in description_html.
 - `tldr` must be substantively different wording from the JD — paraphrasing is NOT enough; rewrite.
 - For `roadmap_modules_matched`, be strict: only include a slug if the JD requirements clearly overlap with that module's content.
+- `summary` is the primary scannable view readers see. Treat it like a pitch deck card, not a document. Drop every filler clause ("About us", "We believe…", "Come work with us", "Our values", "EEO/Equal Opportunity", "Apply now"). Keep only what helps a candidate decide: what they'll own, what they need, what they get, what to watch out for.
 - Return ONLY the JSON object. No prefix, no suffix, no code fences.

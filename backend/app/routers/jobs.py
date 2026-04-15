@@ -187,6 +187,33 @@ _BASE_CSS = """
   .jd-simple .jd-bullets li{position:relative;padding:6px 0 6px 22px;color:#d0cbc2;font-size:14.5px;line-height:1.6;border-bottom:1px dashed #1f2731}
   .jd-simple .jd-bullets li:last-child{border-bottom:none}
   .jd-simple .jd-bullets li::before{content:"▸";position:absolute;left:2px;top:6px;color:#e8a849;font-size:12px}
+  .summary-card{margin:22px 0 8px;max-width:780px;display:flex;flex-direction:column;gap:18px}
+  .sc-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .sc-chip{padding:4px 12px;border-radius:100px;font-size:12px;font-family:'IBM Plex Sans',sans-serif;font-weight:500;letter-spacing:.01em;border:1px solid transparent;line-height:1.4}
+  .sc-chip.sc-primary{background:rgba(232,168,73,.14);color:#f0b968;border-color:rgba(232,168,73,.45)}
+  .sc-chip.sc-success{background:rgba(109,181,133,.14);color:#86c99a;border-color:rgba(109,181,133,.4)}
+  .sc-chip.sc-info{background:rgba(99,140,200,.14);color:#8fb0dc;border-color:rgba(99,140,200,.4)}
+  .sc-chip.sc-warning{background:rgba(210,125,110,.14);color:#d99688;border-color:rgba(210,125,110,.4)}
+  .sc-chip.sc-neutral{background:#1a2029;color:#c0c4cc;border-color:#2a323d}
+  .sc-comp{background:linear-gradient(180deg,#1a2029 0%,#141a21 100%);border:1px solid #2a323d;border-radius:8px;padding:14px 16px}
+  .sc-comp-head{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px}
+  .sc-comp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px}
+  .sc-comp-cell{padding:6px 0}
+  .sc-comp-v{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:500;color:#f5f1e8;line-height:1.15}
+  .sc-comp-k{font-size:11px;color:#94a3b8;margin-top:2px}
+  .sc-section{border-radius:8px;padding:14px 18px;border:1px solid #2a323d;background:#141a21}
+  .sc-sec-head{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px}
+  .sc-list{list-style:none;padding:0;margin:0}
+  .sc-list li{position:relative;padding:7px 0 7px 20px;color:#e8e4d8;font-size:14.5px;line-height:1.55;border-bottom:1px dashed #1f2731}
+  .sc-list li:last-child{border-bottom:none}
+  .sc-list li::before{content:"▸";position:absolute;left:0;top:8px;color:#e8a849;font-size:12px}
+  .sc-list li b{color:#f5f1e8;font-weight:600}
+  .sc-list .sc-dim{color:#94a3b8;font-size:13.5px}
+  .sc-own{border-left:3px solid #e8a849}
+  .sc-must{border-left:3px solid #6db585}
+  .sc-benefits{border-left:3px solid #8fb0dc}
+  .sc-watch{border-left:3px solid #d27d6e}
+  .sc-watch li::before{color:#d27d6e}
   .card{background:#1a2029;border:1px solid #2a323d;border-radius:8px;padding:18px 22px;margin:12px 0;transition:all .2s ease;position:relative}
   .card:hover{border-color:#e8a849;background:#1d242e}
   .card a{color:inherit;text-decoration:none}
@@ -312,6 +339,70 @@ def _card_html(j: Job) -> str:
   <div><span class="chip">{esc(j.designation)}</span> {loc_chip} {yrs_chip} {verified_chip}</div>
   <p>{tldr}</p>
 </div>"""
+
+
+def _render_summary_card(summary: dict) -> str:
+    """Render the LLM-generated summary as a scannable card layout.
+    Supersedes the rule-based simplified view when `data.summary` is present.
+    """
+    parts: list[str] = ['<div class="summary-card">']
+
+    chips = summary.get("headline_chips") or []
+    if chips:
+        parts.append('<div class="sc-chips">')
+        for c in chips:
+            tone = c.get("tone", "neutral")
+            parts.append(f'<span class="sc-chip sc-{esc(tone)}">{esc(c.get("label", ""))}</span>')
+        parts.append("</div>")
+
+    comp = summary.get("comp_snapshot") or None
+    if isinstance(comp, dict):
+        cells = [
+            ("Base salary", comp.get("base")),
+            ("Bonus", comp.get("bonus")),
+            ("Equity", comp.get("equity")),
+            ("Total comp (est.)", comp.get("total_est")),
+        ]
+        filled = [(k, v) for k, v in cells if v]
+        if filled:
+            parts.append('<div class="sc-comp"><div class="sc-comp-head">Compensation snapshot</div><div class="sc-comp-grid">')
+            for k, v in filled:
+                parts.append(f'<div class="sc-comp-cell"><div class="sc-comp-v">{esc(v)}</div><div class="sc-comp-k">{esc(k)}</div></div>')
+            parts.append('</div></div>')
+
+    resp = summary.get("responsibilities") or []
+    if resp:
+        parts.append('<div class="sc-section sc-own"><div class="sc-sec-head">What you\'ll own</div><ul class="sc-list">')
+        for item in resp:
+            title = esc(item.get("title", ""))
+            detail = esc(item.get("detail", ""))
+            body = f'<b>{title}</b>' + (f' <span class="sc-dim">— {detail}</span>' if detail else '')
+            parts.append(f'<li>{body}</li>')
+        parts.append('</ul></div>')
+
+    must = summary.get("must_haves") or []
+    if must:
+        parts.append('<div class="sc-section sc-must"><div class="sc-sec-head">Must-haves</div><ul class="sc-list">')
+        for item in must:
+            parts.append(f'<li>{esc(item)}</li>')
+        parts.append('</ul></div>')
+
+    benefits = summary.get("benefits") or []
+    if benefits:
+        parts.append('<div class="sc-section sc-benefits"><div class="sc-sec-head">Benefits highlights</div><ul class="sc-list">')
+        for item in benefits:
+            parts.append(f'<li>{esc(item)}</li>')
+        parts.append('</ul></div>')
+
+    watch = summary.get("watch_outs") or []
+    if watch:
+        parts.append('<div class="sc-section sc-watch"><div class="sc-sec-head">Watch-outs</div><ul class="sc-list">')
+        for item in watch:
+            parts.append(f'<li>{esc(item)}</li>')
+        parts.append('</ul></div>')
+
+    parts.append('</div>')
+    return "".join(parts)
 
 
 def _yrs_label(mn, mx) -> str:
@@ -455,14 +546,19 @@ async def job_detail(
         for k, v in highlights
     )
 
-    # Simplified JD: drop filler sections (about us / culture / EEO / etc),
-    # convert wall-of-text paragraphs into bullets under canonical headings.
-    # When extraction yields nothing usable, fall back to the raw JD open.
+    # Prefer the LLM-generated structured summary (data.summary). If absent
+    # (older jobs not yet re-enriched), fall back to the rule-based simplifier.
+    # If both fail, show the raw JD open by default.
     from app.services.jobs_readable import render_simplified, simplify_jd
-    _sections = simplify_jd(d.get("description_html") or "")
-    _simplified_block = render_simplified(_sections)
+    _summary = d.get("summary")
+    if isinstance(_summary, dict) and any(_summary.get(k) for k in
+            ("headline_chips", "comp_snapshot", "responsibilities", "must_haves", "benefits", "watch_outs")):
+        _simplified_block = _render_summary_card(_summary)
+    else:
+        _sections = simplify_jd(d.get("description_html") or "")
+        _simplified_block = render_simplified(_sections)
     _jd_open_attr = "" if _simplified_block else " open"
-    _jd_label = "Full job description" if _simplified_block else "Full job description"
+    _jd_label = "Full job description"
 
     modules = d.get("roadmap_modules_matched") or []
     modules_html = (
