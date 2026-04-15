@@ -26,6 +26,9 @@ API = "https://api.lever.co/v0/postings/{slug}?mode=json"
 #   investigate before re-adding (may have moved to Ashby/Greenhouse).
 LEVER_BOARDS: list[tuple[str, str]] = [
     ("mistral", "Mistral AI"),
+    # India-focused additions (verified 2026-04-15).
+    ("cred", "CRED"),
+    ("mindtickle", "Mindtickle"),
 ]
 
 

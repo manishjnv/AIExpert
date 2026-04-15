@@ -301,6 +301,25 @@ async def stats(
     return {"sources": out}
 
 
+@router.post("/api/sources/probe")
+async def probe_sources(
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+):
+    """Run an on-demand liveness probe across every configured source board.
+    Auto-disables boards failing 3+ runs in a row (see services/jobs_sources/probe.py)."""
+    _check_origin(request)
+    from app.services.jobs_sources.probe import probe_all
+    results = await probe_all()
+    summary = {
+        "total": len(results),
+        "ok": sum(1 for v in results.values() if v.get("ok")),
+        "failing": sum(1 for v in results.values() if not v.get("ok")),
+        "disabled": sum(1 for v in results.values() if not v.get("enabled", True)),
+    }
+    return {"summary": summary, "results": results}
+
+
 @router.get("/api/sources")
 async def list_sources(
     _admin: User = Depends(get_current_admin),

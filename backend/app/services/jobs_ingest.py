@@ -25,6 +25,7 @@ from sqlalchemy.exc import OperationalError
 import app.db as _db
 from app.models import Job, JobCompany, JobSource
 from app.services.jobs_sources import RawJob
+from app.services.jobs_sources.ashby import ASHBY_BOARDS, fetch_all as ash_fetch_all
 from app.services.jobs_sources.greenhouse import GREENHOUSE_BOARDS, fetch_all as gh_fetch_all
 from app.services.jobs_sources.lever import LEVER_BOARDS, fetch_all as lv_fetch_all
 
@@ -79,6 +80,7 @@ async def ensure_source_rows() -> None:
     registry: list[tuple[str, str, list[tuple[str, str]]]] = [
         ("greenhouse", "Greenhouse", GREENHOUSE_BOARDS),
         ("lever", "Lever", LEVER_BOARDS),
+        ("ashby", "Ashby", ASHBY_BOARDS),
     ]
     async with _db.async_session_factory() as db:
         for kind, label_suffix, boards in registry:
@@ -229,6 +231,39 @@ async def _stage_with_retry(raw: RawJob, source_key: str, max_attempts: int = 4)
 
 # ---------------------------------------------------------------- auto-expire
 
+async def _auto_expire_past_valid_through(stats: dict) -> None:
+    """Flip published jobs whose valid_through has elapsed to expired.
+
+    Without this, a job whose `posted_on + 45d` has passed remained
+    status=published forever and only rendered the "closed" banner via the
+    is_expired check at render time — but it kept appearing in /api/jobs
+    and the sitemap. This pass fixes the underlying status.
+    """
+    try:
+        async with _db.async_session_factory() as db:
+            today = date.today()
+            stmt = select(Job).where(
+                Job.status == "published",
+                Job.valid_through.is_not(None),
+                Job.valid_through < today,
+            )
+            rows = (await db.execute(stmt)).scalars().all()
+            for job in rows:
+                job.status = "expired"
+                data = dict(job.data or {})
+                meta = dict(data.get("_meta") or {})
+                meta.setdefault("expired_reason", "date_based")
+                meta.setdefault("expired_on", today.isoformat())
+                data["_meta"] = meta
+                job.data = data
+                stats["auto_expired"] = stats.get("auto_expired", 0) + 1
+            if rows:
+                logger.info("date-expired %d jobs (valid_through past)", len(rows))
+            await db.commit()
+    except Exception as exc:
+        logger.exception("date-based auto-expire failed: %s", exc)
+
+
 async def _auto_expire_missing(by_source: dict[str, list[RawJob]], stats: dict) -> None:
     """Flip `published` jobs to `expired` when their ATS listing disappears.
 
@@ -285,9 +320,27 @@ async def run_daily_ingest() -> dict[str, int]:
     because fetch is read-only HTTP.
     """
     await ensure_source_rows()
-    stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0, "skipped": 0, "errors": 0}
+    # Probe every board first; auto-disable degraded ones so the fetch loop
+    # doesn't waste a slot on a known-dead slug. Probe is cheap (parallel
+    # GETs, ~1s wall time for ~30 boards) and writes JobSource.last_run_error.
+    from app.services.jobs_sources.probe import probe_all
+    probe_results = {}
+    try:
+        probe_results = await probe_all()
+    except Exception as exc:
+        logger.warning("probe pass failed (continuing with fetch): %s", exc)
+    disabled_keys = {k for k, v in probe_results.items() if not v.get("enabled", True)}
+    if disabled_keys:
+        logger.info("skipping %d disabled boards: %s", len(disabled_keys), sorted(disabled_keys))
 
-    fetchers = [("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all), ("lever", LEVER_BOARDS, lv_fetch_all)]
+    stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0,
+             "skipped": 0, "errors": 0, "disabled_skipped": len(disabled_keys)}
+
+    fetchers = [
+        ("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all),
+        ("lever", LEVER_BOARDS, lv_fetch_all),
+        ("ashby", ASHBY_BOARDS, ash_fetch_all),
+    ]
     sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
 
     # Group fetched jobs per source so we can apply the cap to genuinely NEW
@@ -295,6 +348,8 @@ async def run_daily_ingest() -> dict[str, int]:
     by_source: dict[str, list[RawJob]] = {}
     for _kind, _boards, fetch in fetchers:
         async for source_key, raw in fetch():
+            if source_key in disabled_keys:
+                continue
             stats["fetched"] += 1
             by_source.setdefault(source_key, []).append(raw)
 
@@ -337,6 +392,8 @@ async def run_daily_ingest() -> dict[str, int]:
     # transient source outage by only inspecting boards that returned ≥1 row.
     stats["auto_expired"] = 0
     await _auto_expire_missing(by_source, stats)
+    # Date-based: flip published rows whose valid_through has elapsed.
+    await _auto_expire_past_valid_through(stats)
 
     # Stamp JobSource.last_run_* in a short final transaction.
     try:

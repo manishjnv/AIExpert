@@ -37,6 +37,10 @@ GREENHOUSE_BOARDS: list[tuple[str, str]] = [
     ("moveworks", "Moveworks"),
     ("figure", "Figure"),
     ("inflectionai", "Inflection AI"),
+    # India-focused additions (verified 2026-04-15). Not all are AI-pure;
+    # admin review filters non-AI roles via the off_topic reject reason.
+    ("phonepe", "PhonePe"),
+    ("groww", "Groww"),
 ]
 
 
