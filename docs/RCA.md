@@ -136,6 +136,12 @@
 - **Fix:** [main.py:193](backend/app/main.py#L193) trimmed to `{"status": "ok"}`. Version/env remain available on the authenticated `/api/admin/*` dashboards.
 - **Prevention:** Public endpoints must declare, in a comment, the exact keys they expose. Rule of thumb: an anonymous caller never needs to know the build version. If monitoring wants it, add a separate authenticated `/api/admin/version`. Add to code-review checklist: "does this endpoint expose any non-essential server metadata?"
 
+### 022 — AI Usage dashboard shows $0.00 everywhere (2026-04-16) [Observability]
+- **Symptom:** Every cost widget on `/admin/pipeline/ai-usage` showed $0.00. `tokens_estimated` was 0 for all 196 rows in `ai_usage_log`.
+- **Root cause:** Three independent bugs: (1) `jobs_enrich.py` called `provider.complete()` without `db=`, so `log_usage()` was never called — zero rows logged for the biggest AI consumer. (2) `quality_pipeline.py` called `log_usage()` without `tokens_estimated=` after direct Gemini/Groq calls — defaulted to 0. (3) `evaluate.py`, `content_refresh.py`, `topic_discovery.py` (triage + Groq fallback) all called AI without `db=` or manual logging.
+- **Fix:** [health.py](backend/app/ai/health.py) — added `get_last_tokens(provider)` centralized helper. [provider.py](backend/app/ai/provider.py) — uses helper + includes response length in fallback estimate. [jobs_enrich.py](backend/app/services/jobs_enrich.py), [jobs_ingest.py](backend/app/services/jobs_ingest.py) — pass `db=` through. [quality_pipeline.py](backend/app/services/quality_pipeline.py) — reads `_last_usage` via helper. [evaluate.py](backend/app/services/evaluate.py), [content_refresh.py](backend/app/services/content_refresh.py), [topic_discovery.py](backend/app/services/topic_discovery.py) — pass `db=` and `task=`. Commits: `e3bfbaa`, `d060b88`.
+- **Prevention:** Every new AI call site MUST pass `db=` to `provider.complete()`, or manually call `log_usage()` with `tokens_estimated=get_last_tokens(provider)` after direct provider calls. Add to code-review checklist: "does this AI call log to `ai_usage_log` with non-zero tokens?"
+
 ---
 
 ## Patterns to watch for
@@ -155,3 +161,4 @@
 | Raw setattr from JSON | Medium | Always validate with Pydantic model first |
 | DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
 | Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
+| AI call without `db=` or `log_usage` | High | Every AI call must log to `ai_usage_log` with `tokens > 0`. Use `get_last_tokens()` helper. |

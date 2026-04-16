@@ -4,48 +4,93 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
-## Current state as of 2026-04-16 (session 14c — Phase 14.6 + 14.7)
+## Current state as of 2026-04-16 (session 14d — AI Usage dashboard + token tracking)
 
-**Last worked on:** Completed all 7 Phase 14 cost optimizations.
+**Last worked on:** AI Usage admin dashboard overhaul — trimmed 15→8 widgets, fixed all-zero cost data, ensured every AI call logs tokens.
 **Branch:** master
+**Commits:** `e1790c7` (dashboard trim), `e3bfbaa` (token capture + cost-opt), `d060b88` (comprehensive token tracking)
 **Live site:** https://automateedge.cloud
-**Tests:** 273 passed, 1 skipped, 0 failures (53 cost-opt tests + 220 existing).
+**Tests:** 276 passed, 3 pre-existing failures (1 test_jobs_match, 2 test_jobs_cost_opt awaiting backfill script commit), 0 new failures.
 
-### What shipped (14.6 + 14.7)
+### What shipped
 
-**Phase 14.6 — Module-match backfill script (zero AI cost):**
-- `scripts/backfill_modules_matched.py` — derives `roadmap_modules_matched` from `must_have_skills` + `topic` using the local skill→weeks index. No Gemini calls.
-- Supports `--dry-run`, `--status published`. Idempotent.
-- Run on VPS: `python scripts/backfill_modules_matched.py --status published`
+**1. Dashboard cleanup (15→8 widgets)** — commit `e1790c7`
 
-**Phase 14.7 — JD-hash dedup cache:**
-- Process-local LRU (`OrderedDict`, max 256) in `jobs_enrich.py`. Key: SHA256 of stripped+lowercased JD text.
-- On cache hit: reuses raw AI response, skips Gemini call. `_validate()` still runs per-job (company/title accurate).
-- Separate `"lite:"` prefix for Tier-2 enrichment cache keys.
-- `enrich_cache_stats()` for observability.
-- 11 new tests (LRU mechanics, hash stability, integration).
+Removed 6 low-value sections from `/admin/pipeline/ai-usage`:
+
+| Removed | Why |
+|---------|-----|
+| Provider Health (6 status cards) | Free-tier only, $0 cost, redundant with Usage by Provider |
+| All-Time Usage by Model | Vanity metric, not actionable |
+| Daily Usage by Model (30d) | Too granular, Cost Trend covers signal |
+| Monthly Usage by Model (12mo) | Low value at current scale |
+| Reconciliation (30d) | Over-engineered, requires admin API keys |
+| Reliability / Failure Rate | Merged into Usage by Provider as "Fail %" column |
+
+Merged 2 sections:
+
+- Usage by Task → compact chip bar in "Cost & Volume per Template"
+- Reliability → "Fail %" column in Usage by Provider table
+
+Fixed stale data: "Tokens this month" was server-rendered once at page load. Now fetched live via `/api/ai-usage` (new `tokens_this_month` field). Removed unused `db` dependency from page handler.
+
+Backend cleanup: `/api/ai-usage/analytics` returns only `trend` + `top_tasks_by_cost` (removed `alltime`, `monthly`, `daily`, `fallback_rate`). Recent calls: 50→20.
+
+**Final 8 widgets (all live, no stale data):**
+
+1. Alerts Banner — `/api/ai-usage/alerts`
+2. Cost Summary (Today/7d/30d/Tokens) — `/api/ai-usage`
+3. Provider Caps & Balances (inline-editable) — `/api/ai-usage`
+4. Usage by Provider + Fail % — `/api/ai-usage`
+5. Cost Trend (7d vs prior 7d) — `/api/ai-usage/analytics`
+6. Top Tasks by Cost (30d) — `/api/ai-usage/analytics`
+7. Cost & Volume per Template + task chips — `/api/ai-usage/cost-per-template`
+8. Recent Calls (last 20) — `/api/ai-usage`
+
+**2. Token tracking fix (all costs were $0.00)** — commits `e3bfbaa`, `d060b88`
+
+Root cause: 3 independent bugs (RCA-022):
+
+| Bug | Where | Problem | Fix |
+|-----|-------|---------|-----|
+| #1 | jobs_enrich.py | `provider.complete()` called without `db=` — zero rows logged | Added `db=` param, passed from jobs_ingest.py |
+| #2 | quality_pipeline.py | `log_usage()` called without `tokens_estimated=` — defaulted to 0 | Read `_last_usage` via `get_last_tokens()` helper |
+| #3 | evaluate.py, content_refresh.py, topic_discovery.py | AI calls without `db=` or manual logging — invisible to dashboard | Added `db=`, `task=`, `subtask=` to all calls |
+
+New infrastructure:
+
+- `health.py:get_last_tokens(provider)` — centralized helper reads `_last_usage` from any provider module
+- `provider.py` — fallback estimate now includes response length: `(len(prompt) + len(result)) // 4`
+- Historical backfill: 195 rows updated with task-based estimates on VPS
+
+All 22 AI call sites now log to `ai_usage_log` with `tokens_estimated > 0`.
 
 ### Files changed
 
-- `backend/app/services/jobs_enrich.py` — LRU cache + JD hash dedup
-- `scripts/backfill_modules_matched.py` — new backfill script
-- `backend/tests/test_jobs_cost_opt.py` — 11 new tests (53 total)
-- `docs/TASKS.md` — Phase 14.6 + 14.7 marked done
+- `backend/app/routers/pipeline.py` — dashboard HTML/JS: -396 lines, +45 lines
+- `backend/app/ai/health.py` — `get_last_tokens()` helper
+- `backend/app/ai/provider.py` — use helper, improved fallback estimate
+- `backend/app/services/quality_pipeline.py` — token capture for Gemini/Groq review + refine
+- `backend/app/services/jobs_enrich.py` — `db=` param on both enrich functions + cost-opt changes
+- `backend/app/services/jobs_ingest.py` — pass `db=` through + cost-opt changes
+- `backend/app/services/evaluate.py` — `db=`, `task=`, `subtask=`
+- `backend/app/services/content_refresh.py` — `db=`, `task=`, `subtask=`
+- `backend/app/services/topic_discovery.py` — log_usage for Groq fallback + triage chain
+- `backend/app/services/curriculum_generator.py` — use `get_last_tokens()`
+- `docs/RCA.md` — entry 022 + new pattern in watch table
 
 ### Next priorities
 
 1. Rotate Gemini API key (leaked in prior session transcript)
-2. Deploy all session 14 changes and run one daily ingest
-3. Run `python scripts/backfill_modules_matched.py --status published` on VPS
-4. Admin to review + publish drafts at `/admin/jobs`
+2. Run one daily ingest to verify token counts appear in dashboard
+3. Admin to review + publish drafts at `/admin/jobs`
 
 ---
 
-## Prior state as of 2026-04-16 (session 14b — AI Usage dashboard cleanup)
+## Prior state as of 2026-04-16 (session 14c — Phase 14.6 + 14.7)
 
-**Last worked on:** Trimmed the admin AI Usage dashboard from 15 widgets to 8.
-**Commit:** e1790c7
-**Tests:** 225 passed, 1 pre-existing failure (test_jobs_match), 0 new failures.
+**Last worked on:** Completed all 7 Phase 14 cost optimizations.
+**Tests:** 273 passed, 1 skipped, 0 failures.
 
 ---
 

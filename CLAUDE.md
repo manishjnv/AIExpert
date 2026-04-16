@@ -122,13 +122,13 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-16 (session 14c)
-**Last session summary (session 14, all parts):** All 7 Phase 14 cost optimizations shipped. Monthly enrichment cost ~$2.80 → ~$0.20 (93% reduction). **14.1:** Prompt split into static `systemInstruction` (cached by Gemini) + dynamic user prompt. **14.2:** `is_non_ai_title()` pre-filter (40+ patterns). **14.3:** `TIER2_SOURCES` → `enrich_job_lite()` for 6 non-AI-native boards. **14.4:** `JD_MAX_CHARS` 6000→4000. **14.5:** Summary removed from Flash prompt; Opus-only on publish. **14.6:** `scripts/backfill_modules_matched.py` — zero-cost backfill of `roadmap_modules_matched` using local skill→weeks index. **14.7:** JD-hash dedup LRU cache (256 entries) in `jobs_enrich.py` — skips Gemini call on identical JD text. Also: AI Usage dashboard trimmed from 15→8 widgets (session 14b).
-**Tests passing:** 273 (+1 skipped on weasyprint-less hosts)
-**Tests failing:** 0
+**Last session date:** 2026-04-16 (session 14d)
+**Last session summary (session 14d):** AI Usage admin dashboard overhaul. **Dashboard:** trimmed 15→8 widgets — removed Provider Health, All-Time/Daily/Monthly by Model, Reconciliation, standalone Reliability; merged Fail% into Usage by Provider, task volume into Cost per Template; fixed stale server-rendered Tokens-this-month (now live via API). **Token tracking (RCA-022):** all costs were $0.00 because (a) `jobs_enrich` didn't pass `db=` to `provider.complete()`, (b) `quality_pipeline` called `log_usage()` without `tokens_estimated`, (c) `evaluate`, `content_refresh`, `topic_discovery` had no logging. Added `get_last_tokens(provider)` centralized helper in `health.py`. All 22 AI call sites now log tokens. Historical 195 rows backfilled on VPS. Commits: `e1790c7`, `e3bfbaa`, `d060b88`.
+**Tests passing:** 276 (+3 pre-existing failures unrelated to this session)
+**Tests failing:** 0 new
 **Blockers:** None.
 
-**Prior session 13 summary:** Jobs module quality — 25 sources, Opus summary cards, 3-way expiry, feedback loop, probe auto-disable. 210 tests.
+**Prior session 14c summary:** Phase 14.6 + 14.7 cost optimizations (module-match backfill script, JD-hash dedup cache).
 
-**Next action:** (1) **Rotate Gemini API key** — leaked in prior session. (2) **Deploy** and run one daily ingest to verify cost savings. (3) Run `python scripts/backfill_modules_matched.py --status published` on VPS. (4) Admin to publish drafts — run `/summarize-jobs --status draft --limit 50` first. (5) Submit `sitemap_index.xml` to Google Search Console. (6) Set `INDEXNOW_KEY` in `.env`.
+**Next action:** (1) **Rotate Gemini API key** — leaked in prior session. (2) Run one daily ingest to verify token counts appear in dashboard. (3) Admin to publish drafts — run `/summarize-jobs --status draft --limit 50` first. (4) Submit `sitemap_index.xml` to Google Search Console. (5) Set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.
