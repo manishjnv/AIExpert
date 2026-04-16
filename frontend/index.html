@@ -902,11 +902,16 @@ function render() {
       const isComplete = wDone === wTotal;
       const wEl = document.createElement("div");
       wEl.className = "week" + (isComplete ? " complete" : "") + (w.isBuffer ? " buffer" : "");
+      wEl.dataset.week = w.n;
       wEl.style.animationDelay = `${wi * 0.05}s`;
       const newBadge = w.isNew ? '<span class="new">UPDATED</span>' : '';
       // Video vs reference split — left column = video courses (YouTube,
       // Coursera, fast.ai, DeepLearning.AI), right column = docs / practice.
-      const isVid = r => /youtube\.com|youtu\.be|vimeo\.com|coursera\.org\/(learn|specializations)|fast\.ai|deeplearning\.ai\/(courses|short-courses|programs)|udacity\.com|khanacademy\.org/.test((r.url || '').toLowerCase());
+      const isVid = r => {
+        if (r.type === 'video') return true;
+        if (r.type === 'doc' || r.type === 'reference') return false;
+        return /youtube\.com|youtu\.be|vimeo\.com|coursera\.org\/(learn|specializations)|fast\.ai|deeplearning\.ai\/(courses|short-courses|programs)|udacity\.com|khanacademy\.org|udemy\.com|linkedin\.com\/learning|educative\.io|pluralsight\.com|edx\.org\/(course|learn)|ocw\.mit\.edu\/courses|oreilly\.com\/videos|learning\.oreilly\.com\/videos|maven\.com/.test((r.url || '').toLowerCase());
+      };
       const renderRes = r => `<a class="res-item" href="${r.url}" target="_blank" rel="noopener noreferrer">
         <span class="res-arrow">→</span>
         <span class="res-name">${r.name}</span>
@@ -1004,7 +1009,16 @@ function render() {
       state[k] = !state[k];
       saveState();
       syncTick(wN, idx, !!state[k]);
+      const openWeeks = Array.from(document.querySelectorAll('.week-details[open]'))
+        .map(d => d.closest('.week')?.dataset?.week)
+        .filter(Boolean);
+      const scrollY = window.scrollY;
       render();
+      openWeeks.forEach(wn => {
+        const d = document.querySelector(`.week[data-week="${wn}"] .week-details`);
+        if (d) d.open = true;
+      });
+      window.scrollTo(0, scrollY);
     });
   });
 }

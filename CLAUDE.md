@@ -166,14 +166,14 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-17 (session 23 — week-row collapse UX)
-**Last session summary (session 23):** Roadmap week rows now collapse by default for all weeks (previously only completed weeks) and the per-row toggle is an obvious bordered pill reading `EXPAND` / `COLLAPSE` with a rotating chevron, not a bare grey glyph. Also shipped session 21's bulk-reject feature end-to-end (commit `2dece31`, deployed via `git pull + --build --force-recreate backend`; verified `POST /admin/jobs/api/bulk-reject` returns 401 unauth, 200 authed from the 16/16-green test suite).
+**Last session date:** 2026-04-17 (session 24 — roadmap resources + checkbox UX)
+**Last session summary (session 24):** Two small UX fixes on the public roadmap. (1) Widened video-vs-reference split so the 2-column TOP RESOURCES layout fires for more weeks: `isVid` now honours an explicit `type: 'video' | 'doc' | 'reference'` field on resource objects and URL-sniffs an expanded host list (udemy, linkedin.com/learning, educative, pluralsight, edX, MIT OCW, O'Reilly videos, Maven) in addition to the prior set. (2) Fixed "checking a checklist item collapses the week and jumps the page to top": the click handler now snapshots open-week ids + `window.scrollY` before calling `render()` and restores both after.
 
-- **Frontend (single file, per rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [line 904](frontend/index.html#L904) `collapsedByDefault = true`, (2) [lines 191-220](frontend/index.html#L191-L220) `.wk-toggle` redesigned (bordered mono-caps pill, accent-on-hover, chevron rotation on `::after` so the text doesn't invert), (3) [line 950](frontend/index.html#L950) markup wraps `.label-closed` / `.label-open` spans. Mobile ≤480px hides the text, chevron-only.
-- **Deploy:** frontend is volume-mounted (`./frontend:/usr/share/nginx/html:ro` per docker-compose); `git pull` on VPS is sufficient — no rebuild, no restart.
-- **Standalone guarantee preserved** (CLAUDE.md rule 8): pure CSS + JS edits to the existing single file, no new deps.
+- **Frontend (single file, per rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [line 905](frontend/index.html#L905) added `wEl.dataset.week = w.n` so weeks are re-findable after re-render, (2) [lines 910-914](frontend/index.html#L910-L914) `isVid` became a multi-line function with type-field short-circuit + expanded regex, (3) [lines 1012-1022](frontend/index.html#L1012-L1022) click handler captures `.week-details[open]` + scrollY pre-render and restores post-render.
+- **Deploy:** frontend is volume-mounted (`./frontend:/usr/share/nginx/html:ro`); `git pull` on VPS is sufficient — no rebuild, no restart.
+- **No data migration:** existing resource objects without a `type` field keep working via the URL regex; curation can *opt in* to explicit tagging.
 
 **Tests passing:** 432 (unchanged — frontend UX, no backend test changes).
 
-**Next action:** Editorial-summary burn-down continues — ~521 rows with no summary + ~105 stale; resume prompt in `docs/HANDOFF.md`. Tiny chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
+**Next action:** Editorial-summary burn-down continues — after session 22's +70 chunk (draft sonnet-4.6 now 221), **~464 rows with no summary** (298 draft + 166 published) + **~92 stale** remain; resume prompt lives in `docs/HANDOFF.md` "Next-session resume prompt (session 22 handoff)". Tiny chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.
