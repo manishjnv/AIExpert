@@ -188,6 +188,86 @@ def _clip(s: Any, cap: int) -> str:
     return (s[:cap] if isinstance(s, str) else "")
 
 
+# Each topic must have at least one of these phrases in the JD body, otherwise
+# it's stripped — prevents Gemini from tagging a non-AI role with a topic
+# based on the role's existence at an AI company or vague resume mentions.
+# All anchors are multi-word phrases or unambiguous brand/acronym terms — no
+# 3-letter substrings (e.g. "ppo"/"sft"/"vit") that produce false matches in
+# unrelated words. See Wave 1 Rule D.
+_TOPIC_ANCHORS: dict[str, tuple[str, ...]] = {
+    "LLM": ("large language model", "language model", "fine-tun",
+            "prompt engineer", "openai api", "claude api", "gemini api",
+            "gpt-4", "gpt-5", "foundation model", "transformer architecture",
+            "transformer model", "llama", "mistral", "anthropic api"),
+    "CV": ("computer vision", "image classification", "object detection",
+           "image segmentation", "vision transformer", "image recognition",
+           "opencv", "yolo"),
+    "NLP": ("natural language processing", "named entity", "sentiment analysis",
+            "text classification", "tokenization", "named-entity"),
+    "RL": ("reinforcement learning", "rlhf", "reward model", "policy gradient",
+           "q-learning", "proximal policy", "monte carlo tree"),
+    "MLOps": ("mlops", "ml platform", "model registry", "kubeflow", "mlflow",
+              "feature store", "model serving", "deployment pipeline",
+              "ml infrastructure", "ml pipeline"),
+    "Data Eng": ("data pipeline", "airflow", "data lake", "data warehouse",
+                 "snowflake", "bigquery", "apache spark", "kafka",
+                 "streaming data", "data ingestion"),
+    "Research": ("research paper", "publication", "arxiv", "neurips", "icml",
+                 "iclr", "peer-reviewed", "peer reviewed", "ablation",
+                 "empirical research"),
+    "Applied ML": ("machine learning", "deep learning", "model training",
+                   "pytorch", "tensorflow", "production model", "ml model"),
+    "GenAI": ("generative ai", "genai", "stable diffusion", "image generation",
+              "text generation", "dall-e", "midjourney", "diffusion model"),
+    "Robotics": ("robotics", "robot manipulation", "locomotion", " slam ",
+                 "autonomous vehicle", "motion planning"),
+    "Safety": ("ai safety", "ai alignment", "red-team", "red team",
+               "jailbreak", "interpretability", "mechanistic", "constitutional ai"),
+    "Agents": ("agentic", "multi-agent", "tool use", "function calling",
+               "autonomous agent", "ai agent"),
+    "RAG": ("retrieval augmented", "retrieval-augmented", "rag pipeline",
+            "rag system", "vector database", "vector store"),
+    "Fine-tuning": ("fine-tuning", "fine tuning", "supervised fine",
+                    "instruction tuning", "lora ", "lora,", " peft",
+                    "adapter tuning", "rlhf"),
+    "Evals": ("eval harness", "benchmark", "evaluation metric", "ablation",
+              "hallucination", "mmlu", "helm benchmark", "eval suite"),
+}
+
+# Designations where Gemini tends to over-assign topics (AI-adjacent rather
+# than core-AI roles). Cap topics to 1 to keep classification honest.
+_AI_ADJACENT_DESIGNATIONS: set[str] = {
+    "AI Developer Advocate", "AI Solutions Architect",
+    "AI Product Manager", "Prompt Engineer",
+}
+
+
+def _enforce_topic_anchors(topics: list[str], jd_text: str) -> list[str]:
+    """Drop topics that have no anchor term in the JD body."""
+    if not topics:
+        return []
+    jd = jd_text.lower()
+    kept: list[str] = []
+    for t in topics:
+        anchors = _TOPIC_ANCHORS.get(t)
+        if anchors is None or any(a in jd for a in anchors):
+            kept.append(t)
+    return kept
+
+
+def _enforce_designation_topic_consistency(designation: str, topics: list[str]) -> list[str]:
+    """designation==Other → no topics; AI-adjacent designations → cap at 1.
+
+    Catches the structural inconsistency where Gemini marks a role as "Other"
+    (acknowledging it isn't a core AI role) but still assigns AI topics.
+    """
+    if designation == "Other":
+        return []
+    if designation in _AI_ADJACENT_DESIGNATIONS:
+        return topics[:1]
+    return topics
+
+
 def _validate_summary(raw_summary: Any) -> dict[str, Any] | None:
     """Clamp the LLM-produced summary card. Returns None if nothing usable."""
     if not isinstance(raw_summary, dict):
@@ -280,11 +360,16 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
     desc = raw_resp.get("description_html") or raw["jd_html"]
     desc = _scrub_pii(desc)
 
+    designation = _clamp_enum(raw_resp.get("designation"), ALLOWED_DESIGNATION, "Other")
+    topic = _clamp_multi(raw_resp.get("topic"), ALLOWED_TOPIC, 3)
+    topic = _enforce_topic_anchors(topic, _strip_html(raw["jd_html"]))
+    topic = _enforce_designation_topic_consistency(designation, topic)
+
     return {
         "title_raw": raw["title_raw"],
-        "designation": _clamp_enum(raw_resp.get("designation"), ALLOWED_DESIGNATION, "Other"),
+        "designation": designation,
         "seniority": _clamp_enum(raw_resp.get("seniority"), ALLOWED_SENIORITY, "Mid"),
-        "topic": _clamp_multi(raw_resp.get("topic"), ALLOWED_TOPIC, 3),
+        "topic": topic,
         "company": {"name": raw["company"], "slug": raw["company_slug"]},
         "location": {
             "country": loc.get("country") if isinstance(loc.get("country"), str) else None,
@@ -383,11 +468,16 @@ async def enrich_job_lite(raw: RawJob, db=None) -> dict[str, Any]:
     salary = (emp.get("salary") or {}) if isinstance(emp.get("salary"), dict) else {}
     exp = (emp.get("experience_years") or {}) if isinstance(emp.get("experience_years"), dict) else {}
 
+    designation = _clamp_enum(resp.get("designation"), ALLOWED_DESIGNATION, "Other")
+    topic = _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3)
+    topic = _enforce_topic_anchors(topic, jd_text)
+    topic = _enforce_designation_topic_consistency(designation, topic)
+
     return {
         "title_raw": raw["title_raw"],
-        "designation": _clamp_enum(resp.get("designation"), ALLOWED_DESIGNATION, "Other"),
+        "designation": designation,
         "seniority": _clamp_enum(resp.get("seniority"), ALLOWED_SENIORITY, "Mid"),
-        "topic": _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3),
+        "topic": topic,
         "company": {"name": raw["company"], "slug": raw["company_slug"]},
         "location": {
             "country": loc.get("country") if isinstance(loc.get("country"), str) else None,

@@ -63,6 +63,16 @@ _NON_AI_TITLE_PATTERNS: list[str] = [
     "customer success", "customer support", "customer service",
     "office manager", "office coordinator", "executive assistant",
     "administrative assistant", "receptionist", "facilities",
+    # Sales engineering / pre-sales (jargon-heavy but role is sales)
+    "sales engineer", "pre-sales", "presales", "solutions engineer",
+    "field engineer", "customer solutions architect", "technical account manager",
+    # Partnerships / business development
+    "business development manager", "business development director",
+    "head of business development", "strategic partnerships",
+    "partnerships manager", "partnerships lead", "alliance manager",
+    # Program / project management (coordination roles)
+    "program manager", "technical program manager", " tpm ",
+    "chief of staff", "project manager", "portfolio manager",
     # Legal / finance / HR
     "legal counsel", "general counsel", "paralegal", "attorney",
     "legal manager", "manager, legal", "manager - legal", "manager-legal",
@@ -77,10 +87,46 @@ _NON_AI_TITLE_PATTERNS: list[str] = [
     "human resources", " hr manager", " hr business partner",
     "benefits administration", "benefits manager", "benefits analyst",
     "merchant kyc", "kyc analyst", "kyc specialist", "merchant onboarding",
+    # Finance specializations / IR / RevOps
+    "investor relations", "revenue operations", "revops",
+    "treasury manager", "audit manager",
     # Marketing (non-technical)
     "content writer", "copywriter", "social media manager",
     "event manager", "event coordinator", "public relations",
     "communications manager", "brand manager",
+    # Marketing specializations (often AI-jargon-heavy, role is marketing)
+    "product marketing", "growth manager", "demand generation",
+    "demand gen", "field marketing", "lifecycle marketing",
+    # Policy / governance / ethics (AI labs hire these)
+    "policy analyst", "policy manager", "ai ethicist", "governance manager",
+    "public policy", "policy advisor",
+    # Community / DevRel (non-code) / technical writing
+    "community manager", "community lead",
+    "technical writer", "ux writer", "documentation lead",
+    # Training / education
+    "instructor", "curriculum designer", "teaching assistant",
+    "learning and development", " l&d ",
+    # Design (AI-product designers — design is the job, not AI)
+    "ux designer", "ui designer", "product designer", "visual designer",
+    "ux researcher", "graphic designer",
+    # Cybersecurity (not AI safety)
+    "application security", "appsec", "infosec", "soc analyst",
+    "security operations engineer",
+    # IT / workplace
+    "it support", "help desk", "helpdesk", "workplace engineer",
+    "systems administrator", "it administrator",
+    # Creative / video / podcast
+    "video producer", "creative director", "podcast producer",
+    "motion designer", "video editor",
+    # Clinical / medical (domain SMEs for AI annotation)
+    "clinical reviewer", "medical writer", "clinical specialist",
+    "medical reviewer",
+    # Localization (translation/linguistic ops, not computational linguistics)
+    "localization manager", "localization lead", "translation manager",
+    # Physical security
+    "physical security", "security officer", "building operations",
+    # Vendor / sourcing
+    "vendor manager", "sourcing manager", "strategic sourcing",
     # Supply chain / logistics
     "supply chain", "logistics", "warehouse", "procurement",
     "inventory manager",

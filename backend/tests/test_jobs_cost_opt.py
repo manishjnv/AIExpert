@@ -227,6 +227,219 @@ async def test_jd_prefilter_skips_enrichment():
     await close_db()
 
 
+# ===================================================================
+# Wave 1 #1 — title pattern expansion (21 new "AI-adjacent but not AI" scenarios)
+# ===================================================================
+
+class TestWave1TitlePatterns:
+    """The 21 'requires AI knowledge but isn't an AI role' scenarios that
+    Gemini routinely misclassifies because the JD legitimately mentions
+    machine learning / LLMs / AI — but as a job *requirement* for a non-AI
+    role. Each pattern represents one of those scenarios."""
+
+    def test_sales_engineer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Sales Engineer, AI Platform") is True
+
+    def test_solutions_engineer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Solutions Engineer - LLM Products") is True
+
+    def test_pre_sales_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Pre-Sales Engineer, Enterprise AI") is True
+
+    def test_business_development_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Business Development Manager, AI Tools") is True
+
+    def test_partnerships_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Partnerships Manager, AI APIs") is True
+
+    def test_program_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Program Manager, ML Research") is True
+
+    def test_technical_program_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Technical Program Manager, AI Safety") is True
+
+    def test_chief_of_staff_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Chief of Staff, AI Research Team") is True
+
+    def test_product_marketing_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Senior Product Marketing Manager, GenAI") is True
+
+    def test_growth_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Growth Manager, AI Products") is True
+
+    def test_policy_analyst_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Senior Policy Analyst, AI Governance") is True
+
+    def test_ai_ethicist_filtered(self):
+        """An ethicist who studies AI is a policy/ethics role, not an AI builder."""
+        assert jobs_ingest.is_non_ai_title("AI Ethicist") is True
+
+    def test_investor_relations_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Investor Relations Manager") is True
+
+    def test_revops_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Revenue Operations Lead") is True
+
+    def test_community_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Community Manager, Developer AI") is True
+
+    def test_technical_writer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Senior Technical Writer, AI Documentation") is True
+
+    def test_ux_designer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Senior UX Designer, Claude Mobile") is True
+
+    def test_ux_researcher_filtered(self):
+        assert jobs_ingest.is_non_ai_title("UX Researcher, AI Products") is True
+
+    def test_appsec_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Application Security Engineer") is True
+
+    def test_infosec_filtered(self):
+        assert jobs_ingest.is_non_ai_title("InfoSec Analyst") is True
+
+    def test_help_desk_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Help Desk Technician") is True
+
+    def test_video_producer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Senior Video Producer, AI Storytelling") is True
+
+    def test_clinical_reviewer_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Clinical Reviewer, Medical AI") is True
+
+    def test_localization_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Localization Manager, Claude") is True
+
+    def test_vendor_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Strategic Sourcing Manager") is True
+
+    def test_customer_solutions_architect_filtered(self):
+        """Sales-side 'CSA' is post-sales, not engineering."""
+        assert jobs_ingest.is_non_ai_title("Customer Solutions Architect, Enterprise") is True
+
+    def test_technical_account_manager_filtered(self):
+        assert jobs_ingest.is_non_ai_title("Technical Account Manager, AI APIs") is True
+
+    # ---- Must NOT be filtered (regression guards) ----
+
+    def test_ml_engineer_passes(self):
+        assert jobs_ingest.is_non_ai_title("Senior ML Engineer, Inference") is False
+
+    def test_research_scientist_passes(self):
+        assert jobs_ingest.is_non_ai_title("Research Scientist, Reinforcement Learning") is False
+
+    def test_ai_solutions_architect_passes(self):
+        """Different from sales-side 'Customer Solutions Architect' — AI SA is whitelisted."""
+        assert jobs_ingest.is_non_ai_title("AI Solutions Architect") is False
+
+    def test_ai_developer_advocate_passes(self):
+        """Whitelisted designation; do NOT filter."""
+        assert jobs_ingest.is_non_ai_title("AI Developer Advocate") is False
+
+    def test_prompt_engineer_passes(self):
+        assert jobs_ingest.is_non_ai_title("Prompt Engineer") is False
+
+    def test_applied_scientist_passes(self):
+        assert jobs_ingest.is_non_ai_title("Applied Scientist, NLP") is False
+
+
+# ===================================================================
+# Wave 1 #2 — designation↔topic consistency
+# ===================================================================
+
+class TestDesignationTopicConsistency:
+    """designation=='Other' must force topic=[]; AI-adjacent designations
+    capped at 1 topic. Catches Gemini self-contradictions where it labels a
+    role 'Other' but still assigns AI topics."""
+
+    def test_other_designation_forces_empty_topic(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("Other", ["Applied ML", "LLM"]) == []
+
+    def test_ml_engineer_designation_keeps_topics(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("ML Engineer", ["Applied ML", "LLM"]) == ["Applied ML", "LLM"]
+
+    def test_ai_product_manager_capped_to_one(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("AI Product Manager", ["Applied ML", "LLM", "GenAI"]) == ["Applied ML"]
+
+    def test_ai_solutions_architect_capped_to_one(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("AI Solutions Architect", ["LLM", "RAG"]) == ["LLM"]
+
+    def test_ai_developer_advocate_capped_to_one(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("AI Developer Advocate", ["LLM", "GenAI", "Agents"]) == ["LLM"]
+
+    def test_research_scientist_keeps_all(self):
+        from app.services.jobs_enrich import _enforce_designation_topic_consistency
+        assert _enforce_designation_topic_consistency("Research Scientist", ["RL", "Research", "Safety"]) == ["RL", "Research", "Safety"]
+
+
+# ===================================================================
+# Wave 1 #4 — topic↔anchor requirement
+# ===================================================================
+
+class TestTopicAnchors:
+    """Each topic must have a corresponding JD anchor; topics with no
+    anchor are stripped to prevent Gemini-over-reach."""
+
+    def test_llm_topic_with_no_anchor_stripped(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        # JD has no LLM anchor terms (no "large language model", no API names, no fine-tuning)
+        jd = "Backend engineer role. Python, FastAPI, PostgreSQL, Docker."
+        assert _enforce_topic_anchors(["LLM"], jd) == []
+
+    def test_llm_topic_with_anchor_kept(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Build production systems using the OpenAI API and fine-tuning workflows."
+        assert _enforce_topic_anchors(["LLM"], jd) == ["LLM"]
+
+    def test_cv_topic_with_object_detection_kept(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Computer vision engineer working on object detection and image classification."
+        assert _enforce_topic_anchors(["CV"], jd) == ["CV"]
+
+    def test_cv_topic_without_anchors_stripped(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Backend engineer for the platform team. Python, Postgres."
+        assert _enforce_topic_anchors(["CV"], jd) == []
+
+    def test_rl_topic_with_rlhf_kept(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Train reward models for RLHF and explore policy gradient methods."
+        assert _enforce_topic_anchors(["RL"], jd) == ["RL"]
+
+    def test_nlp_topic_with_sentiment_kept(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "NLP team — work on sentiment analysis and text classification pipelines."
+        assert _enforce_topic_anchors(["NLP"], jd) == ["NLP"]
+
+    def test_applied_ml_with_pytorch_kept(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Train deep learning models in PyTorch for production deployment."
+        assert _enforce_topic_anchors(["Applied ML"], jd) == ["Applied ML"]
+
+    def test_multiple_topics_partial_strip(self):
+        """Only topics without anchors are stripped; others kept."""
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = "Train large language models with RLHF. Build fine-tuning pipelines."
+        # LLM, RL, Fine-tuning all have anchors. CV does not.
+        assert sorted(_enforce_topic_anchors(["LLM", "CV", "RL", "Fine-tuning"], jd)) == sorted(["LLM", "RL", "Fine-tuning"])
+
+    def test_phonepe_legal_jd_strips_applied_ml(self):
+        """The motivating example: legal JD with no AI anchors → 'Applied ML' stripped."""
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        jd = ("LLB / LLM from a recognized university. 7 years PQE in corporate "
+              "legal practice. Draft procurement contracts, MSAs, NDAs.")
+        assert _enforce_topic_anchors(["Applied ML"], jd) == []
+
+    def test_empty_topic_list_passthrough(self):
+        from app.services.jobs_enrich import _enforce_topic_anchors
+        assert _enforce_topic_anchors([], "any jd text") == []
+
+
 @pytest.mark.asyncio
 async def test_prefilter_skips_enrichment_and_sets_admin_note():
     """Non-AI title should be staged with admin_notes='auto-skipped' and no AI call."""
