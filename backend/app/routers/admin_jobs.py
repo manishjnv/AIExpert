@@ -69,6 +69,7 @@ def _serialize(job: Job) -> dict[str, Any]:
         "remote_policy": job.remote_policy,
         "verified": bool(job.verified),
         "admin_notes": job.admin_notes,
+        "hash": job.hash,
         "data": job.data,
     }
 
@@ -86,6 +87,7 @@ async def list_queue(
     remote: str | None = None,
     verified_only: bool = False,
     expired_reason: str | None = None,
+    flag: str | None = None,
     q: str | None = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
@@ -113,6 +115,13 @@ async def list_queue(
         stmt = stmt.where(Job.remote_policy == remote)
     if verified_only:
         stmt = stmt.where(Job.verified == 1)
+    # Quick-filters on admin_notes surface flag.
+    if flag == "non_ai":
+        stmt = stmt.where(Job.admin_notes.like("auto-skipped%"))
+    elif flag == "tier2_lite":
+        stmt = stmt.where(Job.admin_notes.like("tier2-lite%"))
+    elif flag == "enrichment_failed":
+        stmt = stmt.where(Job.admin_notes.like("enrichment failed%"))
     # Sub-filter on Expired tab: distinguish auto-expired (source_removed) from
     # date-based (posted_on+45d) and admin-rejected-as-expired.
     if expired_reason:
@@ -159,12 +168,27 @@ async def list_queue(
         )
     )).scalar() or 0
 
+    # Duplicate detection — hashes that appear in multiple Job rows.
+    # Surfaces near-identical postings (same title+company+JD) across sources
+    # or re-ingested rows. Query is cheap because `hash` is indexed.
+    dup_hashes: set[str] = set()
+    hashes = [r.hash for r in rows if r.hash]
+    if hashes:
+        dup_stmt = (
+            select(Job.hash, func.count(Job.id))
+            .where(Job.hash.in_(hashes))
+            .group_by(Job.hash)
+            .having(func.count(Job.id) > 1)
+        )
+        dup_hashes = {h for h, _ in (await db.execute(dup_stmt)).all()}
+
     return {
         "items": [_serialize(j) for j in rows],
         "counts": counts,
         "auto_expired_24h": auto_expired_24h,
         "missing_streak_1": missing_streak_1,
         "missing_streak_2": missing_streak_2,
+        "duplicate_hashes": list(dup_hashes),
     }
 
 
@@ -455,6 +479,16 @@ _ADMIN_HTML = """<!DOCTYPE html>
   .btn.danger:hover{background:rgba(217,119,87,.1)}
   .chip{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;background:#1a2029;color:#c0c4cc;border:1px solid #2a323d;margin-right:4px}
   .chip.verified{background:rgba(232,168,73,.12);color:#e8a849;border-color:rgba(232,168,73,.4)}
+  .chip.tier1{background:rgba(109,181,133,.12);color:#6db585;border-color:rgba(109,181,133,.4);font-weight:600}
+  .chip.tier2{background:rgba(148,163,184,.08);color:#94a3b8;border-color:rgba(148,163,184,.3)}
+  .chip.flag-nonai{background:rgba(217,119,87,.15);color:#d97757;border-color:rgba(217,119,87,.5);font-weight:600}
+  .chip.flag-lite{background:rgba(232,168,73,.1);color:#e8a849;border-color:rgba(232,168,73,.3)}
+  .chip.flag-dup{background:rgba(217,119,87,.15);color:#d97757;border-color:rgba(217,119,87,.5);font-weight:600}
+  .chip.flag-fail{background:rgba(195,51,51,.15);color:#d97757;border-color:rgba(195,51,51,.5)}
+  .qtoggles{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0}
+  .qtoggle{padding:5px 10px;border:1px solid #2a323d;background:transparent;color:#c0c4cc;cursor:pointer;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+  .qtoggle:hover{border-color:#e8a849;color:#e8a849}
+  .qtoggle.active{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:600}
   .tldr{color:#94a3b8;font-size:13px;max-width:480px;margin-top:6px}
   .stats{margin:16px 0;background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:10px 16px;font-size:12px}
   .stats summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e8a849}
@@ -514,6 +548,12 @@ _ADMIN_HTML = """<!DOCTYPE html>
   </select>
   <button class="btn" id="qf-clear">Clear</button>
   <span class="pill-count" id="qf-count"></span>
+  <div class="qtoggles" style="flex-basis:100%">
+    <button class="qtoggle" data-flag="" data-verified="1">Tier-1 only</button>
+    <button class="qtoggle" data-flag="non_ai">⚠ Non-AI (auto-skipped)</button>
+    <button class="qtoggle" data-flag="tier2_lite">Tier-2 lite</button>
+    <button class="qtoggle" data-flag="enrichment_failed">Enrichment failed</button>
+  </div>
 </div>
 
 <div id="list">Loading…</div>
@@ -521,6 +561,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
 <script>
 const REJECT_REASONS = ["fake","expired","off_topic","duplicate","low_quality"];
 let currentStatus = "draft";
+let currentFlag = "";           // quick-filter: "", "non_ai", "tier2_lite", "enrichment_failed"
+let duplicateHashes = new Set(); // hashes appearing in 2+ jobs — flagged with a dup chip
 
 function qfilterParams() {
   const p = new URLSearchParams();
@@ -542,6 +584,7 @@ function qfilterParams() {
   if (ver) p.set("verified_only", "true");
   const expReason = document.getElementById("qf-expired-reason").value.trim();
   if (expReason && currentStatus === "expired") p.set("expired_reason", expReason);
+  if (currentFlag) p.set("flag", currentFlag);
   return p.toString();
 }
 
@@ -559,6 +602,7 @@ async function load() {
     `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}${streakChip}`;
   document.getElementById("qf-expired-reason").style.display = (currentStatus === "expired") ? "" : "none";
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
+  duplicateHashes = new Set(data.duplicate_hashes || []);
   populateCompanyDropdown(data.items);
   renderList(data.items);
   loadStats();
@@ -620,12 +664,29 @@ function renderList(items) {
          <button class="btn danger" onclick="rej(${j.id})">Reject</button>`
       : `<span>${esc(j.status)}${j.reject_reason?" ("+esc(j.reject_reason)+")":""}</span>`;
     const previewUrl = `/jobs/${encodeURIComponent(j.slug)}?preview=1`;
+    // Derive surface flags (were previously buried inside Details).
+    const notes = j.admin_notes || "";
+    const isNonAI = notes.startsWith("auto-skipped");
+    const isTier2Lite = notes.startsWith("tier2-lite");
+    const isFailed = notes.startsWith("enrichment failed");
+    const isDup = j.hash && duplicateHashes.has(j.hash);
+    const tierChip = j.verified
+      ? `<span class="chip tier1" title="Tier-1 verified AI-native company — bulk-approve eligible">T1</span>`
+      : `<span class="chip tier2" title="Tier-2 aggregated source — individual review required">T2</span>`;
+    const flagChips = [
+      isNonAI ? `<span class="chip flag-nonai" title="Auto-skipped: title matched non-AI list (Sales/HR/Legal/etc). Reject off_topic unless false positive.">⚠ non-AI</span>` : "",
+      isTier2Lite ? `<span class="chip flag-lite" title="Lightweight extraction — missing nice_to_have, modules, summary. Run /summarize-jobs --id ${j.id} before publish.">tier2-lite</span>` : "",
+      isFailed ? `<span class="chip flag-fail" title="AI enrichment errored — minimal data only. Retry or reject low_quality.">enrich-failed</span>` : "",
+      isDup ? `<span class="chip flag-dup" title="Another job has the same content hash (title+company+JD). Candidate for reject duplicate.">⚠ dup</span>` : "",
+    ].filter(Boolean).join("");
     return `<tr>
       <td><input type="checkbox" class="sel" value="${j.id}" ${j.status==='draft'?'':'disabled'}></td>
       <td>
         <a href="${previewUrl}" target="_blank" rel="noopener" style="color:#e8a849;text-decoration:none"><b>${esc(j.title)}</b></a>
         <a href="${previewUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;font-size:10px;padding:2px 8px">Preview ↗</a>
-        <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span><br>
+        ${tierChip}
+        <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span>
+        ${flagChips}<br>
         <span class="chip">${esc(j.designation)}</span>
         <span class="chip">${esc(locStr||'—')}</span>
         <span class="chip">${esc(emp.job_type||'—')}</span>
@@ -708,7 +769,27 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
     ["qf-q","qf-country","qf-city"].forEach(id => document.getElementById(id).value = "");
     ["qf-company","qf-designation","qf-remote","qf-expired-reason"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("qf-verified").checked = false;
+    currentFlag = "";
+    document.querySelectorAll(".qtoggle").forEach(b => b.classList.remove("active"));
     load();
+  });
+
+  // Quick-filter toggle buttons: Tier-1 / non-AI / tier2-lite / enrich-failed.
+  // Click to apply, click again (or Clear) to turn off. Only one active at a time.
+  document.querySelectorAll(".qtoggle").forEach(b => {
+    b.addEventListener("click", () => {
+      const wasActive = b.classList.contains("active");
+      document.querySelectorAll(".qtoggle").forEach(x => x.classList.remove("active"));
+      if (wasActive) {
+        currentFlag = "";
+        document.getElementById("qf-verified").checked = false;
+      } else {
+        b.classList.add("active");
+        currentFlag = b.dataset.flag || "";
+        document.getElementById("qf-verified").checked = b.dataset.verified === "1";
+      }
+      load();
+    });
   });
 })();
 
