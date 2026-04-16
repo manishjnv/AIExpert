@@ -1,0 +1,655 @@
+"""Tests for Phase 14 cost optimizations (pre-filter, JD cap, prompt split,
+summary removal, tier enrichment).
+
+Covers:
+  - Opt #4: Non-AI title pre-filter (is_non_ai_title + ingest integration)
+  - Opt #7: JD_MAX_CHARS reduced to 4000
+  - Opt #1: system_instruction passed through provider to Gemini
+  - Opt #5: Flash prompt has no summary schema; summary=None in output
+  - Opt #3: Tier-2 lightweight enrichment (enrich_job_lite)
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import date
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from sqlalchemy import select
+
+import app.db as db_module
+from app.db import Base, close_db, init_db
+from app.models import Job, JobCompany
+from app.services import jobs_ingest
+from app.services.jobs_sources import RawJob
+
+
+async def _setup():
+    await init_db(url="sqlite+aiosqlite:///:memory:")
+    async with db_module.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+def _raw(**over) -> RawJob:
+    base = RawJob(
+        external_id="gh-1",
+        source_url="https://boards.greenhouse.io/anthropic/jobs/1",
+        title_raw="Senior ML Engineer",
+        company="Anthropic",
+        company_slug="anthropic",
+        location_raw="San Francisco, CA",
+        jd_html="<p>Build LLMs at scale. Must have PyTorch.</p>",
+        posted_on="2026-04-10",
+        extra={},
+    )
+    base.update(over)  # type: ignore[call-arg]
+    return base
+
+
+def _fake_enrich(raw: RawJob) -> dict:
+    return {
+        "title_raw": raw["title_raw"],
+        "designation": "ML Engineer",
+        "seniority": "Senior",
+        "topic": ["LLM"],
+        "company": {"name": raw["company"], "slug": raw["company_slug"]},
+        "location": {"country": "US", "city": "San Francisco", "remote_policy": "Hybrid", "regions_allowed": []},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 5, "max": 8},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "description_html": raw["jd_html"],
+        "tldr": "Rewrite of the JD.",
+        "must_have_skills": ["PyTorch"],
+        "nice_to_have_skills": [],
+        "roadmap_modules_matched": [],
+        "apply_url": raw["source_url"],
+        "summary": None,
+    }
+
+
+# ===================================================================
+# Opt #4: Pre-filter non-AI titles
+# ===================================================================
+
+class TestNonAITitleFilter:
+    """is_non_ai_title should catch obviously non-AI roles."""
+
+    def test_sales_manager(self):
+        assert jobs_ingest.is_non_ai_title("Sales Manager, Enterprise") is True
+
+    def test_recruiter(self):
+        assert jobs_ingest.is_non_ai_title("Senior Technical Recruiter") is True
+
+    def test_accountant(self):
+        assert jobs_ingest.is_non_ai_title("Staff Accountant") is True
+
+    def test_legal_counsel(self):
+        assert jobs_ingest.is_non_ai_title("General Counsel") is True
+
+    def test_office_manager(self):
+        assert jobs_ingest.is_non_ai_title("Office Manager") is True
+
+    def test_facilities(self):
+        assert jobs_ingest.is_non_ai_title("Facilities Coordinator") is True
+
+    def test_hr_business_partner(self):
+        assert jobs_ingest.is_non_ai_title("Senior HR Business Partner") is True
+
+    def test_content_writer(self):
+        assert jobs_ingest.is_non_ai_title("Content Writer - Blog") is True
+
+    def test_executive_assistant(self):
+        assert jobs_ingest.is_non_ai_title("Executive Assistant to CEO") is True
+
+    # ---- Should NOT be filtered ----
+
+    def test_ml_engineer_passes(self):
+        assert jobs_ingest.is_non_ai_title("Senior ML Engineer") is False
+
+    def test_research_scientist_passes(self):
+        assert jobs_ingest.is_non_ai_title("Research Scientist, LLMs") is False
+
+    def test_data_scientist_passes(self):
+        assert jobs_ingest.is_non_ai_title("Data Scientist") is False
+
+    def test_ai_product_manager_passes(self):
+        assert jobs_ingest.is_non_ai_title("AI Product Manager") is False
+
+    def test_mlops_passes(self):
+        assert jobs_ingest.is_non_ai_title("MLOps Engineer") is False
+
+    def test_prompt_engineer_passes(self):
+        assert jobs_ingest.is_non_ai_title("Prompt Engineer") is False
+
+    def test_software_engineer_passes(self):
+        """Generic SWE titles should NOT be filtered — they may be AI-adjacent."""
+        assert jobs_ingest.is_non_ai_title("Software Engineer, Backend") is False
+
+    def test_case_insensitive(self):
+        assert jobs_ingest.is_non_ai_title("SALES MANAGER") is True
+        assert jobs_ingest.is_non_ai_title("sales manager") is True
+
+
+@pytest.mark.asyncio
+async def test_prefilter_skips_enrichment_and_sets_admin_note():
+    """Non-AI title should be staged with admin_notes='auto-skipped' and no AI call."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        async with db_module.async_session_factory() as db:
+            r = _raw(title_raw="Sales Manager, Enterprise")
+            result = await jobs_ingest._stage_one(r, "greenhouse:phonepe", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "auto-skipped" in (job.admin_notes or "")
+            assert job.designation == "Other"  # minimal enrichment
+            # Enrichment should NOT have been called.
+            m.assert_not_called()
+    await close_db()
+
+
+# ===================================================================
+# Opt #7: JD_MAX_CHARS = 4000
+# ===================================================================
+
+def test_jd_max_chars_is_4000():
+    from app.services.jobs_enrich import JD_MAX_CHARS
+    assert JD_MAX_CHARS == 4000
+
+
+# ===================================================================
+# Opt #1: Prompt caching — system_instruction split
+# ===================================================================
+
+class TestPromptSplit:
+    """Verify the prompt files exist and the system prompt has no job-specific placeholders."""
+
+    def test_system_prompt_exists(self):
+        from app.services.jobs_enrich import SYSTEM_PROMPT_PATH
+        assert SYSTEM_PROMPT_PATH.exists()
+
+    def test_user_prompt_exists(self):
+        from app.services.jobs_enrich import PROMPT_PATH
+        assert PROMPT_PATH.exists()
+
+    def test_system_prompt_has_no_placeholders(self):
+        """System prompt must be static — no {{...}} template vars."""
+        from app.services.jobs_enrich import SYSTEM_PROMPT_PATH
+        text = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert "{{" not in text, "System prompt must not contain template placeholders"
+
+    def test_user_prompt_has_placeholders(self):
+        """User prompt must have the dynamic template vars."""
+        from app.services.jobs_enrich import PROMPT_PATH
+        text = PROMPT_PATH.read_text(encoding="utf-8")
+        assert "{{company}}" in text
+        assert "{{jd_text}}" in text
+
+    def test_system_prompt_has_schema(self):
+        """Schema (designation enum, etc.) must be in the system prompt."""
+        from app.services.jobs_enrich import SYSTEM_PROMPT_PATH
+        text = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert '"designation"' in text
+        assert "ML Engineer" in text
+
+    def test_system_prompt_no_summary(self):
+        """Summary schema must NOT be in the system prompt (Opt #5)."""
+        from app.services.jobs_enrich import SYSTEM_PROMPT_PATH
+        text = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert '"summary"' not in text
+        assert "headline_chips" not in text
+        assert "comp_snapshot" not in text
+
+
+@pytest.mark.asyncio
+async def test_system_instruction_passed_to_provider():
+    """enrich_job must pass system_instruction kwarg to the provider."""
+    await _setup()
+
+    fake_resp = {
+        "designation": "ML Engineer", "seniority": "Senior",
+        "topic": ["LLM"],
+        "location": {"country": "US", "country_name": "United States",
+                     "city": "SF", "remote_policy": "Hybrid", "regions_allowed": []},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 3, "max": None},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "tldr": "Build stuff.", "must_have_skills": ["Python"],
+        "nice_to_have_skills": [], "roadmap_modules_matched": [],
+        "description_html": "<p>JD</p>",
+    }
+
+    with patch("app.services.jobs_enrich.complete", new_callable=AsyncMock) as mock_complete, \
+         patch("app.services.jobs_enrich._get_module_slugs", new_callable=AsyncMock, return_value=[]), \
+         patch("app.services.jobs_enrich._get_source_feedback", new_callable=AsyncMock, return_value=""):
+        mock_complete.return_value = (fake_resp, "gemini-2.5-flash")
+        from app.services.jobs_enrich import enrich_job
+        await enrich_job(_raw(), source_key="greenhouse:anthropic")
+
+        # Verify system_instruction was passed
+        call_kwargs = mock_complete.call_args
+        assert "system_instruction" in call_kwargs.kwargs
+        assert len(call_kwargs.kwargs["system_instruction"]) > 100
+        assert "designation" in call_kwargs.kwargs["system_instruction"]
+    await close_db()
+
+
+# ===================================================================
+# Opt #5: No summary in Flash output
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_enrichment_without_summary_produces_none():
+    """When Flash returns no summary field, the validated output has summary=None."""
+    await _setup()
+
+    fake_resp = {
+        "designation": "ML Engineer", "seniority": "Senior",
+        "topic": ["LLM"],
+        "location": {"country": "US", "country_name": "United States",
+                     "city": "SF", "remote_policy": "Hybrid", "regions_allowed": []},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 3, "max": None},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "tldr": "Build stuff.", "must_have_skills": ["Python"],
+        "nice_to_have_skills": [], "roadmap_modules_matched": [],
+        "description_html": "<p>JD</p>",
+        # No "summary" key at all — simulates Flash without summary schema
+    }
+
+    with patch("app.services.jobs_enrich.complete", new_callable=AsyncMock) as mock_complete, \
+         patch("app.services.jobs_enrich._get_module_slugs", new_callable=AsyncMock, return_value=[]), \
+         patch("app.services.jobs_enrich._get_source_feedback", new_callable=AsyncMock, return_value=""):
+        mock_complete.return_value = (fake_resp, "gemini-2.5-flash")
+        from app.services.jobs_enrich import enrich_job
+        result = await enrich_job(_raw(), source_key="greenhouse:anthropic")
+        assert result["summary"] is None
+    await close_db()
+
+
+# ===================================================================
+# Opt #3: Tier-2 lightweight enrichment
+# ===================================================================
+
+class TestTier2Sources:
+    """TIER2_SOURCES set and lightweight enrichment path."""
+
+    def test_tier2_sources_defined(self):
+        assert len(jobs_ingest.TIER2_SOURCES) >= 4
+        assert "greenhouse:phonepe" in jobs_ingest.TIER2_SOURCES
+        assert "ashby:notion" in jobs_ingest.TIER2_SOURCES
+
+    def test_tier1_not_in_tier2(self):
+        """AI-native companies must NOT be in TIER2_SOURCES."""
+        assert "greenhouse:anthropic" not in jobs_ingest.TIER2_SOURCES
+        assert "ashby:cohere" not in jobs_ingest.TIER2_SOURCES
+        assert "greenhouse:scaleai" not in jobs_ingest.TIER2_SOURCES
+
+    def test_lite_prompt_files_exist(self):
+        from app.services.jobs_enrich import LITE_PROMPT_PATH, LITE_SYSTEM_PROMPT_PATH
+        assert LITE_PROMPT_PATH.exists()
+        assert LITE_SYSTEM_PROMPT_PATH.exists()
+
+    def test_lite_system_prompt_has_no_summary(self):
+        from app.services.jobs_enrich import LITE_SYSTEM_PROMPT_PATH
+        text = LITE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert "summary" not in text.lower()
+        assert "headline_chips" not in text
+
+    def test_lite_system_prompt_has_no_nice_to_have(self):
+        from app.services.jobs_enrich import LITE_SYSTEM_PROMPT_PATH
+        text = LITE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert "nice_to_have" not in text
+
+    def test_lite_system_prompt_has_no_modules(self):
+        from app.services.jobs_enrich import LITE_SYSTEM_PROMPT_PATH
+        text = LITE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        assert "roadmap_modules" not in text
+
+    def test_lite_prompt_shorter_jd(self):
+        """Lite user prompt should reference shorter JD (2000 chars)."""
+        from app.services.jobs_enrich import LITE_PROMPT_PATH
+        text = LITE_PROMPT_PATH.read_text(encoding="utf-8")
+        assert "2000" in text
+
+    def test_jd_max_chars_lite(self):
+        from app.services.jobs_enrich import JD_MAX_CHARS_LITE
+        assert JD_MAX_CHARS_LITE == 2000
+
+
+@pytest.mark.asyncio
+async def test_enrich_job_lite_returns_correct_shape():
+    """enrich_job_lite must return all required keys with correct defaults."""
+    fake_resp = {
+        "designation": "Data Scientist", "seniority": "Mid",
+        "topic": ["Applied ML"],
+        "location": {"country": "IN", "country_name": "India",
+                     "city": "Bangalore", "remote_policy": "Hybrid"},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 2, "max": 5},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "tldr": "Data role at PhonePe.",
+        "must_have_skills": ["Python", "SQL"],
+    }
+
+    with patch("app.services.jobs_enrich.complete", new_callable=AsyncMock) as mock_complete:
+        mock_complete.return_value = (fake_resp, "gemini-2.5-flash")
+        from app.services.jobs_enrich import enrich_job_lite
+        result = await enrich_job_lite(_raw(company="PhonePe", company_slug="phonepe"))
+
+    # All required keys present
+    assert result["designation"] == "Data Scientist"
+    assert result["tldr"] == "Data role at PhonePe."
+    assert result["must_have_skills"] == ["Python", "SQL"]
+    # Deferred fields have safe defaults
+    assert result["nice_to_have_skills"] == []
+    assert result["roadmap_modules_matched"] == []
+    assert result["summary"] is None
+    # description_html is the raw HTML (not rewritten by LLM)
+    assert "<p>" in result["description_html"]
+
+
+@pytest.mark.asyncio
+async def test_tier2_source_uses_lite_enrichment():
+    """_stage_one for a TIER2 source should call enrich_job_lite, not enrich_job."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job_lite", new_callable=AsyncMock) as lite_mock, \
+         patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as full_mock:
+        lite_mock.return_value = _fake_enrich(_raw())
+        async with db_module.async_session_factory() as db:
+            r = _raw(company="PhonePe", company_slug="phonepe")
+            result = await jobs_ingest._stage_one(r, "greenhouse:phonepe", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "tier2-lite" in (job.admin_notes or "")
+            lite_mock.assert_called_once()
+            full_mock.assert_not_called()
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_tier1_source_uses_full_enrichment():
+    """_stage_one for a Tier-1 source should call enrich_job (full), not lite."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as full_mock, \
+         patch("app.services.jobs_enrich.enrich_job_lite", new_callable=AsyncMock) as lite_mock:
+        full_mock.return_value = _fake_enrich(_raw())
+        async with db_module.async_session_factory() as db:
+            r = _raw()
+            result = await jobs_ingest._stage_one(r, "greenhouse:anthropic", db)
+            assert result == "new"
+            await db.commit()
+            full_mock.assert_called_once()
+            lite_mock.assert_not_called()
+    await close_db()
+
+
+# ===================================================================
+# Opt #1: provider.complete passes system_instruction
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_provider_passes_system_instruction_to_gemini():
+    """provider.complete should forward system_instruction to gemini.complete."""
+    from app.ai import provider
+
+    with patch("app.ai.provider.get_settings") as mock_settings, \
+         patch("app.ai.provider.is_available", return_value=True):
+        s = MagicMock()
+        s.gemini_api_key = "test-key"
+        s.gemini_model = "gemini-2.5-flash"
+        mock_settings.return_value = s
+
+        fake_gemini = AsyncMock(return_value={"result": "ok"})
+        with patch.dict("sys.modules", {}):  # force re-import
+            with patch.object(provider, "_PROVIDERS", [
+                ("gemini", lambda: fake_gemini,
+                 lambda: Exception, lambda: Exception, "gemini_model"),
+            ]):
+                result, model = await provider.complete(
+                    "test prompt",
+                    task="jobs_enrich",
+                    system_instruction="You are an extractor.",
+                )
+                # Gemini should receive system_instruction in kwargs
+                call_kwargs = fake_gemini.call_args.kwargs
+                assert call_kwargs.get("system_instruction") == "You are an extractor."
+
+
+@pytest.mark.asyncio
+async def test_provider_prepends_system_instruction_for_non_gemini():
+    """For non-Gemini providers, system_instruction should be prepended to prompt."""
+    from app.ai import provider
+
+    with patch("app.ai.provider.get_settings") as mock_settings, \
+         patch("app.ai.provider.is_available", return_value=True):
+        s = MagicMock()
+        s.gemini_api_key = ""  # disable gemini
+        s.groq_api_key = "test-key"
+        s.groq_model = "llama-3.3-70b"
+        mock_settings.return_value = s
+
+        fake_groq = AsyncMock(return_value={"result": "ok"})
+        with patch.object(provider, "_PROVIDERS", [
+            ("groq", lambda: fake_groq,
+             lambda: Exception, lambda: Exception, "groq_model"),
+        ]):
+            result, model = await provider.complete(
+                "test prompt",
+                task="jobs_enrich",
+                system_instruction="You are an extractor.",
+            )
+            # Groq should receive the system instruction prepended to prompt
+            call_prompt = fake_groq.call_args.args[0]
+            assert call_prompt.startswith("You are an extractor.")
+            assert "test prompt" in call_prompt
+
+
+# ===================================================================
+# Integration: pre-filter + tier-2 priority
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_prefilter_takes_priority_over_tier2():
+    """A non-AI title on a Tier-2 board should be pre-filtered, not lite-enriched."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job_lite", new_callable=AsyncMock) as lite_mock, \
+         patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as full_mock:
+        async with db_module.async_session_factory() as db:
+            r = _raw(title_raw="Sales Manager", company="PhonePe", company_slug="phonepe")
+            result = await jobs_ingest._stage_one(r, "greenhouse:phonepe", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "auto-skipped" in (job.admin_notes or "")
+            # Neither enrichment function should be called
+            lite_mock.assert_not_called()
+            full_mock.assert_not_called()
+    await close_db()
+
+
+# ===================================================================
+# Pricing table
+# ===================================================================
+
+def test_flash_lite_pricing_is_cheaper():
+    """Flash-Lite must be cheaper than Flash."""
+    from app.ai.pricing import get_price
+    flash_in, flash_out = get_price("gemini", "gemini-2.5-flash")
+    lite_in, lite_out = get_price("gemini", "gemini-2.0-flash-lite")
+    assert lite_in < flash_in
+    assert lite_out < flash_out
+
+
+# ===================================================================
+# Phase 14.7: JD-hash dedup cache
+# ===================================================================
+
+class TestJDDedupCache:
+    """LRU cache for identical JD texts — skips AI call on cache hit."""
+
+    def setup_method(self):
+        """Clear the cache between tests."""
+        from app.services.jobs_enrich import _enrich_cache
+        _enrich_cache.clear()
+
+    def test_cache_put_and_get(self):
+        from app.services.jobs_enrich import _cache_get, _cache_put
+        _cache_put("abc", {"designation": "ML Engineer"})
+        assert _cache_get("abc") == {"designation": "ML Engineer"}
+
+    def test_cache_miss_returns_none(self):
+        from app.services.jobs_enrich import _cache_get
+        assert _cache_get("nonexistent") is None
+
+    def test_cache_evicts_oldest(self):
+        from app.services.jobs_enrich import _cache_get, _cache_put, _ENRICH_CACHE_MAX
+        # Fill cache to max
+        for i in range(_ENRICH_CACHE_MAX):
+            _cache_put(f"key-{i}", {"i": i})
+        # All should be present
+        assert _cache_get("key-0") is not None
+        assert _cache_get(f"key-{_ENRICH_CACHE_MAX - 1}") is not None
+        # Add one more — oldest (key-0) was just accessed so key-1 is oldest
+        _cache_put("overflow", {"overflow": True})
+        assert _cache_get("overflow") is not None
+        assert _cache_get("key-1") is None  # evicted
+
+    def test_jd_hash_stable(self):
+        from app.services.jobs_enrich import _jd_hash
+        h1 = _jd_hash("Build LLMs at scale. Must have PyTorch.")
+        h2 = _jd_hash("Build LLMs at scale. Must have PyTorch.")
+        assert h1 == h2
+
+    def test_jd_hash_case_insensitive(self):
+        from app.services.jobs_enrich import _jd_hash
+        h1 = _jd_hash("Build LLMs at Scale")
+        h2 = _jd_hash("build llms at scale")
+        assert h1 == h2
+
+    def test_jd_hash_differs_for_different_text(self):
+        from app.services.jobs_enrich import _jd_hash
+        h1 = _jd_hash("Build LLMs at scale.")
+        h2 = _jd_hash("Build computer vision models.")
+        assert h1 != h2
+
+    def test_enrich_cache_stats(self):
+        from app.services.jobs_enrich import _cache_put, enrich_cache_stats
+        _cache_put("k1", {"x": 1})
+        _cache_put("k2", {"x": 2})
+        stats = enrich_cache_stats()
+        assert stats["size"] == 2
+        assert stats["max"] == 256
+
+
+@pytest.mark.asyncio
+async def test_enrich_job_uses_cache_on_identical_jd():
+    """Second call with identical JD text should hit cache and skip AI."""
+    from app.services.jobs_enrich import _enrich_cache
+    _enrich_cache.clear()
+
+    fake_resp = {
+        "designation": "ML Engineer", "seniority": "Senior",
+        "topic": ["LLM"],
+        "location": {"country": "US", "country_name": "United States",
+                     "city": "SF", "remote_policy": "Hybrid", "regions_allowed": []},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 3, "max": None},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "tldr": "Build stuff.", "must_have_skills": ["Python"],
+        "nice_to_have_skills": [], "roadmap_modules_matched": [],
+        "description_html": "<p>JD</p>",
+    }
+
+    with patch("app.services.jobs_enrich.complete", new_callable=AsyncMock) as mock_complete, \
+         patch("app.services.jobs_enrich._get_module_slugs", new_callable=AsyncMock, return_value=[]), \
+         patch("app.services.jobs_enrich._get_source_feedback", new_callable=AsyncMock, return_value=""):
+        mock_complete.return_value = (fake_resp, "gemini-2.5-flash")
+        from app.services.jobs_enrich import enrich_job
+
+        # First call — cache miss, calls AI
+        r1 = _raw()
+        result1 = await enrich_job(r1, source_key="greenhouse:anthropic")
+        assert mock_complete.call_count == 1
+        assert result1["designation"] == "ML Engineer"
+
+        # Second call with same JD — cache hit, no AI call
+        r2 = _raw(external_id="gh-2", title_raw="Another ML Engineer")
+        result2 = await enrich_job(r2, source_key="greenhouse:anthropic")
+        assert mock_complete.call_count == 1  # still 1 — cache hit!
+        assert result2["designation"] == "ML Engineer"
+        # But title_raw should reflect the second job (validation per-job)
+        assert result2["title_raw"] == "Another ML Engineer"
+
+    _enrich_cache.clear()
+
+
+@pytest.mark.asyncio
+async def test_enrich_job_cache_miss_on_different_jd():
+    """Different JD text should miss cache and call AI again."""
+    from app.services.jobs_enrich import _enrich_cache
+    _enrich_cache.clear()
+
+    fake_resp = {
+        "designation": "ML Engineer", "seniority": "Senior", "topic": ["LLM"],
+        "location": {"country": "US", "country_name": "US", "city": "SF",
+                     "remote_policy": "Hybrid", "regions_allowed": []},
+        "employment": {"job_type": "Full-time", "shift": "Day",
+                       "experience_years": {"min": 3, "max": None},
+                       "salary": {"min": None, "max": None, "currency": None, "disclosed": False}},
+        "tldr": "Build stuff.", "must_have_skills": ["Python"],
+        "nice_to_have_skills": [], "roadmap_modules_matched": [],
+        "description_html": "<p>JD</p>",
+    }
+
+    with patch("app.services.jobs_enrich.complete", new_callable=AsyncMock) as mock_complete, \
+         patch("app.services.jobs_enrich._get_module_slugs", new_callable=AsyncMock, return_value=[]), \
+         patch("app.services.jobs_enrich._get_source_feedback", new_callable=AsyncMock, return_value=""):
+        mock_complete.return_value = (fake_resp, "gemini-2.5-flash")
+        from app.services.jobs_enrich import enrich_job
+
+        r1 = _raw(jd_html="<p>Build LLMs at scale.</p>")
+        await enrich_job(r1, source_key="greenhouse:anthropic")
+        assert mock_complete.call_count == 1
+
+        r2 = _raw(jd_html="<p>Build computer vision models.</p>", external_id="gh-2")
+        await enrich_job(r2, source_key="greenhouse:anthropic")
+        assert mock_complete.call_count == 2  # different JD, cache miss
+
+    _enrich_cache.clear()
+
+
+# ===================================================================
+# Phase 14.6: Module-match backfill (derive_modules)
+# ===================================================================
+
+def test_derive_modules_from_skills():
+    """derive_modules should return template keys matching job skills."""
+    # This test exercises the function in isolation; it relies on
+    # published templates existing. If none published, returns [].
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
+    from backfill_modules_matched import derive_modules
+
+    data = {
+        "must_have_skills": ["PyTorch", "Distributed training", "RLHF"],
+        "topic": ["LLM", "Safety"],
+    }
+    modules = derive_modules(data)
+    # Should return a list (possibly empty if no templates loaded)
+    assert isinstance(modules, list)
+    assert len(modules) <= 6  # capped at 6
+
+
+def test_derive_modules_empty_skills():
+    """Empty skills should return empty modules."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
+    from backfill_modules_matched import derive_modules
+
+    assert derive_modules({"must_have_skills": [], "topic": []}) == []
+    assert derive_modules({}) == []

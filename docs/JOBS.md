@@ -171,18 +171,71 @@ Tier 1 jobs get `verified: true` badge. Tier 2 requires admin review before publ
 
 ## 6. AI enrichment
 
-**Model:** Gemini 2.5 Flash (free tier, per [AI_INTEGRATION.md](AI_INTEGRATION.md)).
-**Prompt:** [backend/app/ai/prompts/jobs_extract.txt](backend/app/ai/prompts/jobs_extract.txt)
-**Input:** `{ title, company, location, jd_html }` (stripped of boilerplate, capped at 6000 chars).
-**Output:** JSON matching §3.2 enriched fields. Response schema enforced via Gemini's structured output mode.
-**Caching:** keyed on `hash`. Never re-enriched unless hash changes.
-**Sanitization:** strip any email/phone/tracking pixels from `description_html` before storage (reuse `app/ai/sanitize.py`).
+### 6.1 Model strategy (Phase 14 cost-optimized)
 
-**Prompt must enforce:**
+Three-tier model pipeline minimizes cost while maximizing quality on published jobs:
+
+| Tier | Model | When | Cost/job |
+|------|-------|------|----------|
+| **Pre-filter** | Rule-based (no model) | Non-AI titles (Sales, Legal, HR, etc.) | $0 |
+| **Tier-2 lite** | Gemini 2.5 Flash | Non-AI-native boards (PhonePe, Notion, etc.) | ~$0.00008 |
+| **Tier-1 full** | Gemini 2.5 Flash | AI-native boards (Anthropic, Scale, xAI, etc.) | ~$0.00012 |
+| **Summary (publish)** | Claude Opus via Max | Admin publishes → `/summarize-jobs` | $0 (subscription) |
+
+### 6.2 Prompt architecture
+
+Prompts split into **static system instruction** (cached by Gemini across calls) and **dynamic user prompt** (job-specific data):
+
+| File | Purpose | Tokens |
+|------|---------|--------|
+| `prompts/jobs_extract_system.txt` | Schema + rules (Tier-1 full) | ~800 |
+| `prompts/jobs_extract.txt` | Job data template (Tier-1 full) | ~200 + JD |
+| `prompts/jobs_extract_lite_system.txt` | Reduced schema (Tier-2 lite) | ~500 |
+| `prompts/jobs_extract_lite.txt` | Job data template (Tier-2 lite) | ~100 + JD |
+
+**JD caps:** Full enrichment = 4000 chars. Lite enrichment = 2000 chars. Median JD after HTML strip is ~3500 chars.
+
+### 6.3 Pre-filter (Phase 14.2)
+
+`is_non_ai_title()` in `jobs_ingest.py` matches against 40+ non-AI title patterns. Matched titles are staged with `admin_notes = "auto-skipped: non-AI title"` and no AI call. Admin can override from the queue.
+
+### 6.4 Tier-2 sources (Phase 14.3)
+
+`TIER2_SOURCES` in `jobs_ingest.py`: `phonepe`, `groww`, `cred`, `mindtickle`, `notion`, `replit`. These use `enrich_job_lite()` — produces only designation, seniority, topic, location, employment, tldr, must_have_skills. No nice_to_have, no roadmap_modules, no description_html rewrite, no summary. Full enrichment deferred to publish.
+
+### 6.5 Enrichment flow
+
+```
+title pre-filter? ──yes──→ stage with minimal payload, admin_notes="auto-skipped"
+        │no
+        ▼
+tier-2 source? ──yes──→ enrich_job_lite() → stage with admin_notes="tier2-lite"
+        │no
+        ▼
+enrich_job() (full) → stage as draft
+```
+
+**Caching:** keyed on `hash`. Never re-enriched unless hash changes.
+**Sanitization:** strip email/phone/tracking pixels from `description_html` before storage.
+
+**Prompt rules enforced:**
 - `tldr` is 2 lines max, **rewritten** not paraphrased (duplicate content SEO).
 - All enum fields return one of the allowed values or `Unknown`.
 - `roadmap_modules_matched` returns only slugs that exist in current `PlanTemplate` module inventory (pass inventory in prompt).
 - No hallucinated salaries — `disclosed: false` if not in JD.
+- `summary` removed from Flash prompt — comes exclusively from Opus via Max on publish.
+
+### 6.6 Cost summary
+
+| Metric | Before (Phase 13) | After (Phase 14) |
+|--------|-------------------|-------------------|
+| Model | Flash for everything | Flash (extraction) + Opus (summary on publish) |
+| JD cap | 6000 chars | 4000 (full) / 2000 (lite) |
+| Prompt caching | None | systemInstruction cached (~40% input savings) |
+| Pre-filter | None | ~40% fewer calls on mixed boards |
+| Tier-2 deferral | None | ~60% fewer tokens for Tier-2 |
+| Summary | Flash (every job) | Opus on publish only ($0 via Max) |
+| **Monthly cost** | **~$2.80** | **~$0.22** |
 
 ---
 
@@ -314,16 +367,81 @@ Computed on-demand (cached 1h per `(user_id, job_id)`).
 
 > This section is the operational manual for whoever reviews jobs daily. Keep it bookmarked.
 
-### 10.1 Daily workflow (5–10 min/day)
+### 10.1 Daily workflow — step by step (10–15 min/day)
 
-1. Open `/admin/jobs` around 09:00 IST (after the 04:30 cron).
-2. Top banner shows: `X new drafts · Y changed · Z flagged`.
-3. Work the queue top to bottom:
-   - **Tier-1 Verified** batch → scan, **Bulk Approve** if nothing looks off.
-   - **Tier-2 Aggregated** → click each, review, approve/reject.
-   - **Changed** → diff view, approve the diff (not the whole job).
-   - **Flagged** (enum violation or low-confidence extraction) → manual fix or reject.
-4. Clear queue. Done.
+#### Step 1: Generate summaries for the queue (before reviewing)
+
+Open Claude Code terminal and run:
+
+```bash
+/summarize-jobs --status draft --limit 50
+```
+
+This generates Opus-quality summary cards for up to 50 draft jobs. Flash no longer produces summaries (Phase 14.5), so **every job needs this step before publishing**. Wait for it to finish (~2 min for 50 jobs).
+
+#### Step 2: Open the admin queue
+
+Go to `/admin/jobs` around 09:00 IST (after the 04:30 cron).
+Top banner shows: `X new drafts · Y changed · Z flagged`.
+
+#### Step 3: Handle pre-filtered jobs first
+
+Filter by `admin_notes` containing **"auto-skipped"**. These are non-AI titles (Sales, HR, Legal, etc.) that skipped enrichment to save cost.
+
+- **If genuinely non-AI** → Reject with reason `off_topic`. Done.
+- **If actually AI** (rare false positive, e.g. "AI Sales Engineer") → click the job → trigger full enrichment from the queue → then run `/summarize-jobs --id <JOB_ID>` → review and publish.
+
+#### Step 4: Handle Tier-2 lightweight jobs
+
+Filter by `admin_notes` containing **"tier2-lite"**. These are from PhonePe, Groww, CRED, Mindtickle, Notion, Replit — they got cheaper extraction (no nice_to_have, no modules, no summary).
+
+For each job worth publishing:
+1. Click → review title, designation, location, tldr, skills.
+2. If it looks good, run: `/summarize-jobs --id <JOB_ID>` (if not already done in Step 1).
+3. Verify the summary card rendered on Preview.
+4. Publish.
+
+For junk → Reject with reason (`off_topic`, `low_quality`, etc.).
+
+#### Step 5: Review Tier-1 full-enriched jobs
+
+These are from AI-native companies (Anthropic, Scale, xAI, Cohere, etc.) with complete enrichment.
+
+- **Bulk Approve** Tier-1 Verified batch if nothing looks off.
+- Spot-check 2–3 random jobs: does the summary card look good? Is `tldr` rewritten (not copied)?
+- Any job missing summary → run `/summarize-jobs --id <JOB_ID>` before publishing.
+
+#### Step 6: Handle changed + flagged jobs
+
+- **Changed** → diff view, approve the diff (not the whole job).
+- **Flagged** (enum violation or low-confidence extraction) → manual fix or reject.
+
+#### Step 7: Clear queue
+
+All jobs processed. Done.
+
+#### Quick-reference: admin_notes cheat sheet
+
+| `admin_notes` value | What happened | What to do |
+|---|---|---|
+| `auto-skipped: non-AI title` | Title matched Sales/HR/Legal/etc. No AI call made. | Reject `off_topic` (most cases) or trigger enrichment if false positive |
+| `tier2-lite: full enrichment on publish` | Cheaper extraction from Tier-2 board. Missing: nice_to_have, modules, summary. | Run `/summarize-jobs --id N` → review → publish |
+| `enrichment failed: ...` | AI provider returned an error. Minimal data only. | Check error message. Retry enrichment or fix manually. |
+| _(empty / null)_ | Full Tier-1 enrichment succeeded. | Verify summary exists; run `/summarize-jobs --id N` if missing → publish |
+
+#### One-liner: batch publish session
+
+If you have a backlog of 50+ drafts to clear:
+
+```bash
+# Step 1: Generate all summaries
+/summarize-jobs --status draft --limit 100
+
+# Step 2: Dry-run preview (optional)
+/summarize-jobs --dry-run --limit 5
+
+# Step 3: Open /admin/jobs, bulk-approve Tier-1, review Tier-2 individually
+```
 
 ### 10.2 Review checklist — approve only if ALL true
 
@@ -377,20 +495,19 @@ Every row in the admin queue has a clickable title + `Preview ↗` button. Opens
 
 Published jobs render a **structured summary card** (headline chips, compensation snapshot, "What you'll own", "Must-haves", "Benefits highlights", "Watch-outs") above the collapsible raw JD.
 
-**Two quality tiers:**
+**Summary is Opus-only (Phase 14.5).** Flash extraction no longer generates summary. All summaries come from Claude Opus via the Max subscription at $0 marginal cost.
 
-- **Flash-generated** (automatic at ingest) — adequate for review but often too verbose.
-- **Opus-generated** (via `/summarize-jobs` in Claude Code) — editorial-tier quality, matching the design target.
-
-**To Opus-upgrade a published job's summary:**
+**Before publishing any job**, run the summary generator:
 
 ```bash
 /summarize-jobs --id <JOB_ID>         # single job
-/summarize-jobs --status published    # all published, batched in 10s
-/summarize-jobs --dry-run --limit 5   # preview 5, then inspect at /admin/jobs before bulk run
+/summarize-jobs --status draft --limit 50  # batch before publish session
+/summarize-jobs --dry-run --limit 5   # preview 5, then inspect at /admin/jobs
 ```
 
 Each summary carries `_meta.prompt_version`; when the prompt is bumped, `scripts/export_jobs_for_summary.py` auto-surfaces stale rows in the next `/summarize-jobs` run.
+
+**If summary is missing on a published job:** the page renders the tldr + skills as a fallback. No summary card appears. Run `/summarize-jobs --id N` to fix.
 
 ### 10.9 Expiry mechanisms
 
@@ -424,6 +541,20 @@ Rejections aren't wasted. Every daily enrichment run injects the last 45 days of
 - Edit `posted_on` (it's the source's truth, not ours).
 - Bulk-reject without picking reasons (breaks the extractor feedback loop).
 - Manually disable a board the probe auto-disabled without first verifying the slug is truly dead (the probe re-enables it automatically on first OK).
+
+### 10.13 Cost optimization — background (Phase 14)
+
+Five automatic optimizations reduced monthly enrichment cost from ~$2.80 to ~$0.22 (92%). Admin doesn't configure anything — the pipeline applies them silently. The daily workflow in **§10.1** already incorporates all the steps you need; this section is background context only.
+
+| Optimization | What it does | Admin-visible effect |
+|---|---|---|
+| **Pre-filter non-AI titles** | Sales/HR/Legal/Finance titles skip AI entirely | `admin_notes = "auto-skipped: non-AI title"` — see §10.1 Step 3 |
+| **Tier-2 lightweight enrichment** | PhonePe, Groww, CRED, Mindtickle, Notion, Replit get cheaper extraction | `admin_notes = "tier2-lite"` — see §10.1 Step 4 |
+| **No Flash summary** | Summary removed from Flash prompt; Opus-only on publish | Must run `/summarize-jobs` before publishing — see §10.1 Step 1 |
+| **JD cap 4000 chars** | Input capped at 4000 chars (was 6000); Tier-2 at 2000 | No admin impact (95th percentile JD is under 4000) |
+| **Prompt caching** | Static schema cached via Gemini `systemInstruction` | No admin impact (transparent) |
+
+**Monthly cost target:** ~$0.22/mo. Monitor at `/admin/ai-usage`.
 
 ---
 

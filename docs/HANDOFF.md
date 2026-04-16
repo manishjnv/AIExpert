@@ -4,58 +4,48 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
-## Current state as of 2026-04-16 (session 14b — AI Usage dashboard cleanup)
+## Current state as of 2026-04-16 (session 14c — Phase 14.6 + 14.7)
 
-**Last worked on:** Trimmed the admin AI Usage dashboard from 15 widgets to 8.
+**Last worked on:** Completed all 7 Phase 14 cost optimizations.
 **Branch:** master
-**Commit:** e1790c7
 **Live site:** https://automateedge.cloud
-**Tests:** 225 passed, 1 pre-existing failure (test_jobs_match), 0 new failures.
+**Tests:** 273 passed, 1 skipped, 0 failures (53 cost-opt tests + 220 existing).
 
-### What shipped
+### What shipped (14.6 + 14.7)
 
-Removed 6 low-value sections from `/admin/pipeline/ai-usage`:
+**Phase 14.6 — Module-match backfill script (zero AI cost):**
+- `scripts/backfill_modules_matched.py` — derives `roadmap_modules_matched` from `must_have_skills` + `topic` using the local skill→weeks index. No Gemini calls.
+- Supports `--dry-run`, `--status published`. Idempotent.
+- Run on VPS: `python scripts/backfill_modules_matched.py --status published`
 
-| Removed | Reason |
-|---------|--------|
-| Provider Health (6 status cards) | Free-tier only, no cost impact, redundant with Usage by Provider |
-| All-Time Usage by Model | Vanity metric, not actionable |
-| Daily Usage by Model (30d) | Too granular, Cost Trend already captures signal |
-| Monthly Usage by Model (12mo) | Low value at current scale |
-| Reconciliation (30d) | Over-engineered, requires admin API keys |
-| Reliability / Failure Rate | Merged into Usage by Provider as "Fail %" column |
-
-Merged 2 sections:
-- **Usage by Task** → compact chip bar above Cost & Volume per Template
-- **Reliability** → "Fail %" column in Usage by Provider table
-
-Fixed stale data:
-- **Tokens this month** was server-rendered once at page load. Now fetched live via `/api/ai-usage` (`tokens_this_month` field added to API response).
-- Removed unused `db` dependency and `_get_settings()` from the page handler (page is now pure HTML shell, all data loaded by JS).
-
-Backend cleanup:
-- `/api/ai-usage/analytics` returns only `trend` + `top_tasks_by_cost` (removed `alltime`, `monthly`, `daily`, `fallback_rate`)
-- Recent calls query: 50 → 20
-
-**Final 8 widgets (all live, no stale data):**
-1. Alerts Banner (`/api/ai-usage/alerts`)
-2. Cost Summary — Today / 7d / 30d / Tokens this month (`/api/ai-usage`)
-3. Provider Caps & Balances — inline-editable (`/api/ai-usage`)
-4. Usage by Provider + Fail % (`/api/ai-usage`)
-5. Cost Trend — 7d vs prior 7d (`/api/ai-usage/analytics`)
-6. Top Tasks by Cost — 30d (`/api/ai-usage/analytics`)
-7. Cost & Volume per Template + task volume chips (`/api/ai-usage/cost-per-template` + task_stats)
-8. Recent Calls — last 20 (`/api/ai-usage`)
+**Phase 14.7 — JD-hash dedup cache:**
+- Process-local LRU (`OrderedDict`, max 256) in `jobs_enrich.py`. Key: SHA256 of stripped+lowercased JD text.
+- On cache hit: reuses raw AI response, skips Gemini call. `_validate()` still runs per-job (company/title accurate).
+- Separate `"lite:"` prefix for Tier-2 enrichment cache keys.
+- `enrich_cache_stats()` for observability.
+- 11 new tests (LRU mechanics, hash stability, integration).
 
 ### Files changed
 
-- `backend/app/routers/pipeline.py` — 396 lines removed, 45 added
+- `backend/app/services/jobs_enrich.py` — LRU cache + JD hash dedup
+- `scripts/backfill_modules_matched.py` — new backfill script
+- `backend/tests/test_jobs_cost_opt.py` — 11 new tests (53 total)
+- `docs/TASKS.md` — Phase 14.6 + 14.7 marked done
 
 ### Next priorities
 
 1. Rotate Gemini API key (leaked in prior session transcript)
-2. Admin to review + publish drafts at `/admin/jobs`
-3. Phase 14.6: Re-enrich stale `roadmap_modules_matched` on published jobs
+2. Deploy all session 14 changes and run one daily ingest
+3. Run `python scripts/backfill_modules_matched.py --status published` on VPS
+4. Admin to review + publish drafts at `/admin/jobs`
+
+---
+
+## Prior state as of 2026-04-16 (session 14b — AI Usage dashboard cleanup)
+
+**Last worked on:** Trimmed the admin AI Usage dashboard from 15 widgets to 8.
+**Commit:** e1790c7
+**Tests:** 225 passed, 1 pre-existing failure (test_jobs_match), 0 new failures.
 
 ---
 
