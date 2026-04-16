@@ -33,7 +33,7 @@ PRICING: dict[tuple[str, str], tuple[float, float]] = {
     ("gemini", "gemini-2.5-flash"): (0.075, 0.30),
     ("gemini", "gemini-2.5-pro"): (1.25, 5.00),
     ("gemini", "gemini-1.5-flash"): (0.075, 0.30),
-    ("gemini", "gemini-2.0-flash-lite"): (0.075, 0.30),
+    ("gemini", "gemini-2.0-flash-lite"): (0.0375, 0.15),
     ("gemini", "*"): (0.075, 0.30),
 
     # ---- Paid providers ----

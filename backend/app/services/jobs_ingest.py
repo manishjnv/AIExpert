@@ -49,6 +49,56 @@ ENRICH_CONCURRENCY = 4
 # See docs/JOBS.md §7.6 and docs/TASKS.md Phase 13.
 MISSING_STREAK_THRESHOLD = 2
 
+# ---------------------------------------------------------------- pre-filter
+
+# Titles matching these patterns are almost certainly non-AI roles and should
+# skip enrichment entirely. They still get staged as draft with admin_notes so
+# admin can override manually. Patterns are case-insensitive substring matches
+# against the raw title. Keep this list tight — false positives waste admin time;
+# false negatives only waste a cheap Flash call.
+_NON_AI_TITLE_PATTERNS: list[str] = [
+    # Business / operations
+    "sales manager", "sales director", "sales representative", "account executive",
+    "account manager", "business development representative", "bdr ",
+    "customer success", "customer support", "customer service",
+    "office manager", "office coordinator", "executive assistant",
+    "administrative assistant", "receptionist", "facilities",
+    # Legal / finance / HR
+    "legal counsel", "general counsel", "paralegal", "attorney",
+    "tax manager", "tax analyst", "accountant", "accounting",
+    "financial analyst", "fp&a", "controller", "accounts payable",
+    "accounts receivable", "payroll", "compensation analyst",
+    "recruiter", "recruiting coordinator", "talent acquisition",
+    "human resources", " hr manager", " hr business partner",
+    # Marketing (non-technical)
+    "content writer", "copywriter", "social media manager",
+    "event manager", "event coordinator", "public relations",
+    "communications manager", "brand manager",
+    # Supply chain / logistics
+    "supply chain", "logistics", "warehouse", "procurement",
+    "inventory manager",
+]
+
+# Tier-2 boards: non-AI-native companies where most listings are non-AI roles.
+# These get lightweight enrichment (no nice_to_have, no modules, no desc rewrite)
+# to save ~40% tokens per call. Full enrichment runs on-demand when admin publishes.
+# AI-native companies (Anthropic, Scale, xAI, Cohere, etc.) stay Tier-1 = full enrichment.
+TIER2_SOURCES: set[str] = {
+    "greenhouse:phonepe", "greenhouse:groww",
+    "lever:cred", "lever:mindtickle",
+    "ashby:notion", "ashby:replit",
+}
+
+
+def is_non_ai_title(title: str) -> bool:
+    """Return True if the title matches a known non-AI pattern.
+
+    Used to skip enrichment (saves ~$0.0004/job) on roles that would be
+    rejected by admin anyway. The row is still staged so admin can override.
+    """
+    t = title.lower()
+    return any(pat in t for pat in _NON_AI_TITLE_PATTERNS)
+
 
 # ---------------------------------------------------------------- helpers
 
@@ -117,15 +167,33 @@ async def _stage_one(raw: RawJob, source_key: str, db) -> str:
     if existing and existing.hash == job_hash:
         return "unchanged"
 
-    # Enrich (best-effort; see jobs_enrich). Minimal fallback keeps row stageable.
-    try:
-        from app.services.jobs_enrich import enrich_job
-        enriched = await enrich_job(raw, source_key=source_key)
-        enrich_error = None
-    except Exception as exc:  # never break ingest on enrichment failure
-        logger.exception("enrichment failed for %s/%s: %s", source_key, raw["external_id"], exc)
+    # Pre-filter: skip enrichment for titles that are obviously non-AI.
+    # Row is still staged (admin can override), but no Gemini call is made.
+    if is_non_ai_title(raw["title_raw"]):
         enriched = _minimal_enrichment(raw)
-        enrich_error = f"enrichment failed: {exc}"
+        enrich_error = "auto-skipped: non-AI title"
+        logger.debug("pre-filtered non-AI title: %s (%s)", raw["title_raw"], source_key)
+    elif source_key in TIER2_SOURCES:
+        # Tier-2 boards get lightweight enrichment — fewer fields, shorter JD,
+        # smaller prompt. Full enrichment deferred to publish time.
+        try:
+            from app.services.jobs_enrich import enrich_job_lite
+            enriched = await enrich_job_lite(raw, db=db)
+            enrich_error = "tier2-lite: full enrichment on publish"
+        except Exception as exc:
+            logger.exception("lite enrichment failed for %s/%s: %s", source_key, raw["external_id"], exc)
+            enriched = _minimal_enrichment(raw)
+            enrich_error = f"lite enrichment failed: {exc}"
+    else:
+        # Enrich (best-effort; see jobs_enrich). Minimal fallback keeps row stageable.
+        try:
+            from app.services.jobs_enrich import enrich_job
+            enriched = await enrich_job(raw, source_key=source_key, db=db)
+            enrich_error = None
+        except Exception as exc:  # never break ingest on enrichment failure
+            logger.exception("enrichment failed for %s/%s: %s", source_key, raw["external_id"], exc)
+            enriched = _minimal_enrichment(raw)
+            enrich_error = f"enrichment failed: {exc}"
 
     posted_on = _parse_date(raw["posted_on"])
     valid_through = posted_on + timedelta(days=VALID_FOR_DAYS)

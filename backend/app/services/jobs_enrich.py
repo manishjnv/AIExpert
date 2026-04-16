@@ -9,9 +9,11 @@ See docs/JOBS.md §6.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +23,57 @@ from app.services.jobs_sources import RawJob
 logger = logging.getLogger("roadmap.jobs.enrich")
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "jobs_extract.txt"
+SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "jobs_extract_system.txt"
+LITE_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "jobs_extract_lite.txt"
+LITE_SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "jobs_extract_lite_system.txt"
+
+# Loaded once at import time — identical for every call, cached by Gemini's
+# systemInstruction mechanism (~40% input token savings on repeated calls).
+_SYSTEM_INSTRUCTION: str | None = None
+_LITE_SYSTEM_INSTRUCTION: str | None = None
+
+# Tier-2 lightweight enrichment caps JD even shorter (2000 chars) — these are
+# draft-only until admin publishes, so we only need enough to classify.
+JD_MAX_CHARS_LITE = 2000
+
+# ---- JD-hash dedup cache (Phase 14.7) ----
+# Process-local LRU: stripped_jd_hash → raw AI response dict.
+# On cache hit, we skip the Gemini call but still run _validate() with
+# per-job company/title/URL data. Saves 10-20% of calls on boards with
+# duplicate/near-identical JDs (fellowship series, cross-posted roles).
+_ENRICH_CACHE_MAX = 256
+_enrich_cache: OrderedDict[str, dict] = OrderedDict()
+
+
+def _jd_hash(jd_text: str) -> str:
+    """Hash the stripped JD text for dedup. Ignores company/title/location."""
+    return hashlib.sha256(jd_text.strip().lower().encode("utf-8")).hexdigest()[:16]
+
+
+def _cache_get(key: str) -> dict | None:
+    """LRU get — moves hit to end."""
+    if key in _enrich_cache:
+        _enrich_cache.move_to_end(key)
+        return _enrich_cache[key]
+    return None
+
+
+def _cache_put(key: str, value: dict) -> None:
+    """LRU put — evicts oldest if full."""
+    _enrich_cache[key] = value
+    _enrich_cache.move_to_end(key)
+    while len(_enrich_cache) > _ENRICH_CACHE_MAX:
+        _enrich_cache.popitem(last=False)
+
+
+def enrich_cache_stats() -> dict:
+    """For observability — size and max of the dedup cache."""
+    return {"size": len(_enrich_cache), "max": _ENRICH_CACHE_MAX}
 
 # Hard cap on JD chars sent to the model — keeps cost bounded (AI efficiency rule #3).
-JD_MAX_CHARS = 6000
+# Median JD after HTML strip is ~3500 chars; 4000 covers 95th percentile with no
+# quality loss (was 6000; reduced in Phase 14.4 cost optimization).
+JD_MAX_CHARS = 4000
 
 
 ALLOWED_DESIGNATION = {
@@ -267,16 +317,132 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
     }
 
 
-async def enrich_job(raw: RawJob, source_key: str | None = None) -> dict[str, Any]:
+def _get_system_instruction() -> str:
+    """Load the static system instruction (schema + rules). Cached in module global."""
+    global _SYSTEM_INSTRUCTION
+    if _SYSTEM_INSTRUCTION is None:
+        _SYSTEM_INSTRUCTION = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    return _SYSTEM_INSTRUCTION
+
+
+def _get_lite_system_instruction() -> str:
+    """Load the lightweight system instruction for Tier-2 boards."""
+    global _LITE_SYSTEM_INSTRUCTION
+    if _LITE_SYSTEM_INSTRUCTION is None:
+        _LITE_SYSTEM_INSTRUCTION = LITE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    return _LITE_SYSTEM_INSTRUCTION
+
+
+async def enrich_job_lite(raw: RawJob, db=None) -> dict[str, Any]:
+    """Lightweight enrichment for Tier-2 boards — cheaper, fewer fields.
+
+    Produces only: designation, seniority, topic, location, employment, tldr,
+    must_have_skills. Skips: nice_to_have, roadmap_modules, description_html
+    rewrite, summary. Full enrichment deferred to publish time.
+    """
+    jd_text = _strip_html(raw["jd_html"])[:JD_MAX_CHARS_LITE]
+
+    # Check JD dedup cache (shared with full enrichment).
+    cache_key = "lite:" + _jd_hash(jd_text)
+    cached_resp = _cache_get(cache_key)
+    if cached_resp is not None:
+        logger.debug("JD dedup cache hit (lite) for %s", raw["title_raw"])
+        resp = cached_resp
+    else:
+        prompt = LITE_PROMPT_PATH.read_text(encoding="utf-8")
+        prompt = (prompt
+                  .replace("{{company}}", raw["company"])
+                  .replace("{{title_raw}}", raw["title_raw"])
+                  .replace("{{location_raw}}", raw["location_raw"])
+                  .replace("{{jd_text}}", jd_text))
+
+        system_instr = _get_lite_system_instruction()
+
+        resp, _model = await complete(
+            prompt,
+            json_response=True,
+            task="jobs_enrich_lite",
+            subtask=raw["title_raw"][:50],
+            system_instruction=system_instr,
+            db=db,
+        )
+        if isinstance(resp, str):
+            try:
+                resp = json.loads(resp)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"lite enrichment returned non-JSON: {exc}")
+
+        if not isinstance(resp, dict):
+            raise RuntimeError("lite enrichment returned non-object payload")
+
+        _cache_put(cache_key, resp)
+
+    # Build a full-shaped payload with missing fields set to defaults.
+    loc = resp.get("location") or {}
+    emp = resp.get("employment") or {}
+    salary = (emp.get("salary") or {}) if isinstance(emp.get("salary"), dict) else {}
+    exp = (emp.get("experience_years") or {}) if isinstance(emp.get("experience_years"), dict) else {}
+
+    return {
+        "title_raw": raw["title_raw"],
+        "designation": _clamp_enum(resp.get("designation"), ALLOWED_DESIGNATION, "Other"),
+        "seniority": _clamp_enum(resp.get("seniority"), ALLOWED_SENIORITY, "Mid"),
+        "topic": _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3) or ["Applied ML"],
+        "company": {"name": raw["company"], "slug": raw["company_slug"]},
+        "location": {
+            "country": loc.get("country") if isinstance(loc.get("country"), str) else None,
+            "country_name": loc.get("country_name") if isinstance(loc.get("country_name"), str) else None,
+            "city": loc.get("city") if isinstance(loc.get("city"), str) else None,
+            "remote_policy": _clamp_enum(loc.get("remote_policy"), ALLOWED_REMOTE, "Onsite"),
+            "regions_allowed": [],
+        },
+        "employment": {
+            "job_type": _clamp_enum(emp.get("job_type"), ALLOWED_JOB_TYPE, "Full-time"),
+            "shift": _clamp_enum(emp.get("shift"), ALLOWED_SHIFT, "Unknown"),
+            "experience_years": {
+                "min": exp.get("min") if isinstance(exp.get("min"), int) else None,
+                "max": exp.get("max") if isinstance(exp.get("max"), int) else None,
+            },
+            "salary": {
+                "min": salary.get("min") if isinstance(salary.get("min"), (int, float)) else None,
+                "max": salary.get("max") if isinstance(salary.get("max"), (int, float)) else None,
+                "currency": salary.get("currency") if isinstance(salary.get("currency"), str) else None,
+                "disclosed": bool(salary.get("disclosed")),
+            },
+        },
+        "description_html": _scrub_pii(raw["jd_html"][:20000]),
+        "tldr": (resp.get("tldr") or "")[:400],
+        "must_have_skills": [s for s in (resp.get("must_have_skills") or []) if isinstance(s, str)][:8],
+        "nice_to_have_skills": [],
+        "roadmap_modules_matched": [],
+        "apply_url": raw["source_url"],
+        "summary": None,
+    }
+
+
+async def enrich_job(raw: RawJob, source_key: str | None = None, db=None) -> dict[str, Any]:
     """Call the AI provider chain, validate, and return the enriched payload.
 
     Raises on repeated provider failure — caller (jobs_ingest) catches and
     falls back to `_minimal_enrichment`. `source_key` (e.g. "ashby:sarvam")
     powers the rejection-feedback hint in the prompt; omit it and the
     feedback line is "(no recent feedback)".
+
+    JD-hash dedup cache (Phase 14.7): if the stripped JD text matches a
+    previously enriched job in this ingest run, we reuse the raw AI response
+    and skip the Gemini call. Validation still runs per-job (company/title vary).
     """
     jd_text = _strip_html(raw["jd_html"])[:JD_MAX_CHARS]
     module_slugs = await _get_module_slugs()
+
+    # Check JD dedup cache before making an AI call.
+    cache_key = _jd_hash(jd_text)
+    cached_resp = _cache_get(cache_key)
+
+    if cached_resp is not None:
+        logger.debug("JD dedup cache hit for %s (%s)", raw["title_raw"], cache_key[:8])
+        return _validate(cached_resp, raw, module_slugs)
+
     feedback = await _get_source_feedback(source_key) if source_key else ""
 
     prompt = PROMPT_PATH.read_text(encoding="utf-8")
@@ -288,7 +454,16 @@ async def enrich_job(raw: RawJob, source_key: str | None = None) -> dict[str, An
               .replace("{{source_feedback}}", feedback or "(no recent feedback)")
               .replace("{{module_slugs}}", ", ".join(module_slugs) if module_slugs else "(none available — return [])"))
 
-    resp, _model = await complete(prompt, json_response=True, task="jobs_enrich")
+    system_instr = _get_system_instruction()
+
+    resp, _model = await complete(
+        prompt,
+        json_response=True,
+        task="jobs_enrich",
+        subtask=raw["title_raw"][:50],
+        system_instruction=system_instr,
+        db=db,
+    )
     if isinstance(resp, str):
         # Provider returned text (shouldn't happen with json_response=True, but guard).
         try:
@@ -298,5 +473,8 @@ async def enrich_job(raw: RawJob, source_key: str | None = None) -> dict[str, An
 
     if not isinstance(resp, dict):
         raise RuntimeError("enrichment returned non-object payload")
+
+    # Cache the raw AI response for future JD-identical jobs.
+    _cache_put(cache_key, resp)
 
     return _validate(resp, raw, module_slugs)

@@ -1,0 +1,7 @@
+Company: {{company}}
+Title: {{title_raw}}
+Location (raw): {{location_raw}}
+Job description (first 2000 chars, HTML stripped):
+---
+{{jd_text}}
+---

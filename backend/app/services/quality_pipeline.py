@@ -703,17 +703,37 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
         if isinstance(result, str):
             result = json.loads(result)
 
-        # Log usage
+        # Log usage with actual token count
         if db is not None:
             from app.ai.health import log_usage
-            await log_usage(db, model_name, model_name, "quality_review", "ok")
+            from app.config import get_settings as _s
+            tokens = 0
+            if model_name == "gemini":
+                from app.ai.gemini import _last_usage as _gem_u
+                tokens = int((_gem_u or {}).get("total_tokens", 0))
+                prov, mdl = "gemini", _s().gemini_model
+            elif model_name == "groq":
+                prov, mdl = "groq", _s().groq_model
+            else:
+                prov, mdl = model_name, model_name
+            if tokens == 0:
+                tokens = max(1, len(prompt) // 4)
+            await log_usage(db, prov, mdl, "quality_review", "ok",
+                           tokens_estimated=tokens)
 
         return result
     except Exception as e:
         logger.error("AI review failed (%s): %s", model_name, e)
         if db is not None:
             from app.ai.health import log_usage
-            await log_usage(db, model_name, model_name, "quality_review", "error",
+            from app.config import get_settings as _s
+            if model_name == "gemini":
+                prov, mdl = "gemini", _s().gemini_model
+            elif model_name == "groq":
+                prov, mdl = "groq", _s().groq_model
+            else:
+                prov, mdl = model_name, model_name
+            await log_usage(db, prov, mdl, "quality_review", "error",
                            error_message=str(e))
         return None
 
@@ -807,6 +827,10 @@ async def _run_refinement(
         if db is not None:
             from app.ai.health import log_usage
             from app.config import get_settings as _s
+            tokens = 0
+            if model_name in ("gemini-pro", "gemini"):
+                from app.ai.gemini import _last_usage as _gem_u
+                tokens = int((_gem_u or {}).get("total_tokens", 0))
             if model_name == "gemini-pro":
                 prov, mdl = "gemini", _s().gemini_pro_model
             elif model_name == "gemini":
@@ -815,9 +839,12 @@ async def _run_refinement(
                 prov, mdl = "anthropic", _s().anthropic_model
             else:
                 prov, mdl = model_name, model_name
+            if tokens == 0:
+                tokens = max(1, len(prompt) // 4)
             weeks_str = ",".join(str(n) for n in fix_week_nums)
             await log_usage(db, prov, mdl, "quality_refine", "ok",
-                           subtask=f"weeks:{weeks_str}")
+                           subtask=f"weeks:{weeks_str}",
+                           tokens_estimated=tokens)
 
         # Merge fixed weeks back into the plan
         if not isinstance(fixed_weeks, list):
