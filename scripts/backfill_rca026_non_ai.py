@@ -48,7 +48,13 @@ from sqlalchemy import select
 import app.db as db_module
 from app.db import close_db, init_db
 from app.models import Job
-from app.services.jobs_ingest import has_non_ai_jd_signals, is_non_ai_title
+from app.services.jobs_ingest import (
+    AI_INTENSITY_THRESHOLD,
+    compute_ai_intensity,
+    has_non_ai_jd_signals,
+    is_bare_verb_title,
+    is_non_ai_title,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger("backfill_rca026")
@@ -74,6 +80,7 @@ async def run(dry_run: bool, all_statuses: bool, source_filter: str | None) -> N
 
             title_hits = 0
             jd_hits = 0
+            bare_verb_hits = 0
             already_marked = 0
             updated = 0
 
@@ -86,17 +93,30 @@ async def run(dry_run: bool, all_statuses: bool, source_filter: str | None) -> N
                 data = job.data or {}
                 desc_html = data.get("description_html") or ""
                 jd_match = has_non_ai_jd_signals(desc_html)
+                # Wave 3 #13: bare-verb title (Manager/Director/Lead/Head/VP)
+                # without AI anchor + low JD intensity.
+                bare_verb_match = (
+                    is_bare_verb_title(job.title or "")
+                    and compute_ai_intensity(desc_html) < AI_INTENSITY_THRESHOLD
+                )
 
-                if not (title_match or jd_match):
+                if not (title_match or jd_match or bare_verb_match):
                     continue
 
                 if title_match:
                     title_hits += 1
                 if jd_match:
                     jd_hits += 1
+                if bare_verb_match:
+                    bare_verb_hits += 1
 
                 current_topic = data.get("topic") or []
-                reason = "title" if title_match else "JD"
+                if title_match:
+                    reason = "title"
+                elif jd_match:
+                    reason = "JD"
+                else:
+                    reason = "bare-verb"
                 logger.info(
                     "  [%s] %s | %s | topic=%s | %s",
                     job.source, job.external_id,
@@ -119,8 +139,10 @@ async def run(dry_run: bool, all_statuses: bool, source_filter: str | None) -> N
                 await db.commit()
 
             logger.info(
-                "done — scanned=%d  title_hits=%d  jd_hits=%d  already_marked=%d  updated=%d  (dry_run=%s)",
-                len(jobs), title_hits, jd_hits, already_marked, updated, dry_run,
+                "done — scanned=%d  title_hits=%d  jd_hits=%d  bare_verb_hits=%d  "
+                "already_marked=%d  updated=%d  (dry_run=%s)",
+                len(jobs), title_hits, jd_hits, bare_verb_hits,
+                already_marked, updated, dry_run,
             )
     finally:
         await close_db()
