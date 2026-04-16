@@ -82,7 +82,7 @@ async def run(dry_run: bool, all_statuses: bool, source_filter: str | None) -> N
                     already_marked += 1
                     continue
 
-                title_match = is_non_ai_title(job.title_raw or "")
+                title_match = is_non_ai_title(job.title or "")
                 data = job.data or {}
                 desc_html = data.get("description_html") or ""
                 jd_match = has_non_ai_jd_signals(desc_html)
@@ -100,7 +100,7 @@ async def run(dry_run: bool, all_statuses: bool, source_filter: str | None) -> N
                 logger.info(
                     "  [%s] %s | %s | topic=%s | %s",
                     job.source, job.external_id,
-                    (job.title_raw or "")[:60],
+                    (job.title or "")[:60],
                     current_topic,
                     f"match={reason}",
                 )
