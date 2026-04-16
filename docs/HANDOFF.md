@@ -4,12 +4,12 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
-## Current state as of 2026-04-16 (session 17 — Waves 1–5 #18 + admin docs)
+## Current state as of 2026-04-16 (session 18 — Jobs Review page UX polish + signals)
 
-**Branch:** `master` (HEAD: `4a79082`)
+**Branch:** `master` (HEAD: `7e10ca9`)
 **Live site:** [automateedge.cloud](https://automateedge.cloud)
 **VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy.
-**Tests:** **431 passed** on full backend suite (+5 from Jinja2 migration tests). 1 pre-existing unrelated failure (`test_skills_with_no_curriculum_match` — fails on parent commits too).
+**Tests:** **431 passed** (no new tests this session — purely frontend/template changes). 1 pre-existing unrelated failure (`test_skills_with_no_curriculum_match` — fails on parent commits too).
 
 ### Sessions 15–17 — single-thread arc on AI Jobs classification
 
@@ -36,6 +36,7 @@ The whole arc started with one motivating example: PhonePe **"Manager, Legal"** 
 | `4b78608` | `docs/RCA.md` | RCA-027 entry + updated "f-strings with HTML/JS/JSON" pattern row |
 | `3233850` | `docs/HANDOFF.md` | Session 17 close handoff |
 | `4a79082` | `admin.py`, `templates/admin/jobs_guide.html` (new), `prompts/jobs_summary_claude.txt`, tests, `HANDOFF.md` | Jinja2 migration of `_JOBS_GUIDE_HTML` (RCA-027 prevention) + bumped PROMPT_VERSION to `2026-04-16.2` + cleaned stale handoff items |
+| `7e10ca9` | `admin_jobs.py`, `templates/admin/jobs_guide.html` | Session 18 — Jobs Review UX polish + missing signals (KPI tiles, intensity histogram, noisy-source table, auto-disabled guard, last-audit chip, 7d-published chip) + admin guide Section 10 |
 
 ---
 
@@ -59,7 +60,7 @@ Wave 5 #19 (two-stage classifier) **deliberately not shipped** — cost-benefit 
 ## Documentation map
 
 - **Developer reference:** [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) — all 10 layers with code locations, calibration data, configuration constants, and "Adding a new defense layer" guidance
-- **Admin user guide:** [/admin/jobs-guide](../backend/app/routers/admin.py) sections #7 + #8 — what they see in the queue, COPY PROMPT workflow with curl example, "Never do this" updated
+- **Admin user guide:** [/admin/jobs-guide](../backend/app/routers/admin.py) sections #7, #8, #10 — classification layers, Opus audit workflow, and new "Reading the Dashboard Signals" reference covering KPI tiles / histogram / noisy sources / audit staleness
 - **Bug records:** [docs/RCA.md](./RCA.md) RCA-026 (LLM-as-law-degree fix) + RCA-027 (f-string outage from this session)
 - **Backfill script:** `python scripts/backfill_rca026_non_ai.py --apply` — idempotent, runs Layers 1+2+3 against historical rows
 
@@ -77,7 +78,7 @@ Other admin f-strings (templates page 141 lines, users page 76 lines, dashboard 
 
 ## Next session
 
-**Primary action: measure for 1–2 weeks.** The Wave 4 observability stack (rejection-rate alarm, intensity histogram, weekly Opus audit) surfaces drift automatically. No new code work needed unless:
+**Primary action: measure for 1–2 weeks.** The Wave 4 observability stack (rejection-rate alarm, intensity histogram, weekly Opus audit) surfaces drift automatically. The Jobs Review page now has full signal coverage — KPI tiles, intensity histogram, noisy-source table, auto-disabled guardrail count, last-audit staleness, and 7d-published throughput chip. No new code work needed unless:
 
 - Admin reports a false positive that slipped through all 10 layers → identify which layer should have caught it, add patterns/anchors per [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) "Adding a new defense layer" section
 - Drift detection (Layer 9 auto-disable or Layer 10 audit mismatch) reveals a systematic gap → may revisit Wave 5 #19 (two-stage classifier)
