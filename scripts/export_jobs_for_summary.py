@@ -8,7 +8,9 @@ Selection:
 - data.summary is missing OR has _meta.prompt_version != current version
   (so a prompt upgrade auto-surfaces stale summaries for re-gen).
 - optional --status filter (draft|published|all)
-- ordered by posted_on DESC so freshest-first
+- prioritises jobs with NO summary (what the admin UI shows as "Missing
+  summary") ahead of legacy-summary rows needing a prompt-version refresh,
+  then posted_on DESC / id DESC within each tier.
 
 Output shape (one JSON object on stdout):
   {
@@ -76,6 +78,18 @@ def _needs_regen(data: dict | None) -> bool:
     return meta.get("prompt_version") != CURRENT_PROMPT_VERSION
 
 
+def _missing_summary(data: dict | None) -> bool:
+    """True when the admin UI shows this row as 'Missing summary'.
+    Matches the admin_jobs filter: $.summary.headline_chips IS NULL.
+    """
+    if not isinstance(data, dict):
+        return True
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return True
+    return not summary.get("headline_chips")
+
+
 async def _main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=10,
@@ -101,6 +115,13 @@ async def _main() -> int:
                 stmt = stmt.where(Job.status == args.status)
             stmt = stmt.order_by(Job.posted_on.desc(), Job.id.desc())
             rows = (await db.execute(stmt)).scalars().all()
+
+        # Missing-summary rows first (what the admin UI counts as "Missing
+        # summary"), then legacy-summary rows needing a prompt-version
+        # refresh. Python sort is stable, so the SQL ordering
+        # (posted_on DESC, id DESC) is preserved within each tier.
+        if not args.id:
+            rows = sorted(rows, key=lambda r: 0 if _missing_summary(r.data) else 1)
 
         out: list[dict] = []
         # Hash-dedup within this batch: if two jobs share content hash
