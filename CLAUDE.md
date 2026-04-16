@@ -122,13 +122,13 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-16 (session 14d)
-**Last session summary (session 14d):** AI Usage admin dashboard overhaul. **Dashboard:** trimmed 15→8 widgets — removed Provider Health, All-Time/Daily/Monthly by Model, Reconciliation, standalone Reliability; merged Fail% into Usage by Provider, task volume into Cost per Template; fixed stale server-rendered Tokens-this-month (now live via API). **Token tracking (RCA-022):** all costs were $0.00 because (a) `jobs_enrich` didn't pass `db=` to `provider.complete()`, (b) `quality_pipeline` called `log_usage()` without `tokens_estimated`, (c) `evaluate`, `content_refresh`, `topic_discovery` had no logging. Added `get_last_tokens(provider)` centralized helper in `health.py`. All 22 AI call sites now log tokens. Historical 195 rows backfilled on VPS. Commits: `e1790c7`, `e3bfbaa`, `d060b88`.
+**Last session date:** 2026-04-16 (session 14e)
+**Last session summary (session 14e):** Added Jobs Admin Guide page at `/admin/jobs-guide` — standalone admin reference covering publish/review/reject/expire workflows. 8 sections with styled callouts, checklist, cheat sheet. Added to admin nav + dashboard quick actions. Updated JOBS.md §10 with new §10.9 (unpublish via reject) and fixed subsection numbering. Commit: `2e09f45`.
 **Tests passing:** 276 (+3 pre-existing failures unrelated to this session)
 **Tests failing:** 0 new
 **Blockers:** None.
 
-**Prior session 14c summary:** Phase 14.6 + 14.7 cost optimizations (module-match backfill script, JD-hash dedup cache).
+**Prior session 14d summary:** AI Usage dashboard overhaul (15→8 widgets) + token tracking fix (RCA-022).
 
 **Next action:** (1) **Rotate Gemini API key** — leaked in prior session. (2) Run one daily ingest to verify token counts appear in dashboard. (3) Admin to publish drafts — run `/summarize-jobs --status draft --limit 50` first. (4) Submit `sitemap_index.xml` to Google Search Console. (5) Set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.
