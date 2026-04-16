@@ -180,6 +180,18 @@
   - Title-based pre-filter is fragile on flexible title formats (punctuation/capitalization/abbreviation). Back it with a JD-content scanner gated on "zero AI signal" so legit AI roles are never accidentally filtered.
   - When extending `_NON_AI_TITLE_PATTERNS`, also update `TestNonAITitleFilter` in the same commit — regressions are silent otherwise.
 
+### 027 — Backend crash-loop from unescaped JSON braces in f-string admin guide (2026-04-16) [Self-inflicted production outage]
+
+- **Symptom:** After deploying the Wave 4 #16 admin guideline section to `/admin/jobs-guide` (commit `7585db0`), the backend container entered a crash-loop with `NameError: name 'job_id' is not defined` at `app/routers/admin.py:2409`. Production was down for ~5 minutes between deploy and hotfix.
+- **Root cause:** `_JOBS_GUIDE_HTML` is a triple-quoted f-string (`f"""..."""`). My new admin-guideline content included literal JSON in `<code>` blocks: `<code>{job_id, agreed, opus_topic, opus_designation, notes}</code>` and the curl example body `'{"results":[ {"job_id":20, ...} ]}'`. Python interpreted every single `{...}` as an f-string interpolation, calling `eval()` on the contents at module-import time. `job_id` is not a defined symbol → NameError → uvicorn never finished loading → container crashed → restart loop.
+- **Fix:** Doubled all literal `{` and `}` in the new sections so Python emits single braces in the rendered HTML. Verified by extracting the f-string and `eval()`-ing it in isolation: produces 23,219 chars cleanly. Hotfix in commit `784f8d8`. Container healthy 16s after redeploy.
+- **Prevention:**
+  - **EVERY single brace inside a `f"""..."""` block must be doubled** when it's literal output, not an interpolation. This is the second time this exact pattern has bitten us (RCA-024 was JS strings; RCA-027 is JSON strings — same root cause).
+  - The pattern table below already lists "f-strings with HTML" — extend it to **"f-strings with ANY embedded code (HTML attributes, JS strings, JSON, CSS)"**. The risk is universal to f-strings, not just HTML.
+  - Pre-commit check: extract every `f"""..."""` block in `app/routers/*.py` and run `eval()` against it with dummy values for the named interpolations (`{ADMIN_CSS}`, `{ADMIN_NAV}`, etc.). A brace-counting heuristic isn't enough — need actual parse.
+  - Migration target: move `_JOBS_GUIDE_HTML` and similar large templates to actual template files served via `Jinja2Templates` or `aiofiles`. F-strings are the wrong tool for >100-line HTML blobs containing arbitrary code samples. Tracked but deferred — too much surface to migrate in this session.
+  - When adding example code to admin docs, always test the rendered page in a browser BEFORE pushing. The `python -m py_compile` syntax check passes for f-strings with mismatched `{}` because evaluation is deferred to runtime.
+
 ---
 
 ## Patterns to watch for
@@ -188,7 +200,7 @@
 |---------|------|------------|
 | Cookie name conflicts | High | Check all middleware before naming cookies |
 | `.env` changes not applied | High | Always `--force-recreate`, never just `restart` |
-| f-strings with HTML | Medium | Use HTML entities, not backslash escapes |
+| f-strings with HTML / JS / JSON / CSS | High | Double EVERY literal brace `{{ }}`. Test rendered output before push. Move >100-line templates to Jinja2 files. |
 | SQLite NOT NULL migrations | Medium | Always add `server_default` |
 | Real credentials in docs | Critical | Never. Use placeholders. Grep staged diff. |
 | AI model retirement | Medium | Verify model exists before deploying |
