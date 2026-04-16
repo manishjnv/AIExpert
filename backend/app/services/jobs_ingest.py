@@ -126,7 +126,14 @@ def build_slug(title: str, company_slug: str) -> str:
 # ---------------------------------------------------------------- source registry
 
 async def ensure_source_rows() -> None:
-    """Upsert JobSource rows for every hardcoded source. Idempotent."""
+    """Upsert JobSource rows for every hardcoded source. Idempotent.
+
+    Sources in TIER2_SOURCES (non-AI-native companies) get tier=2, bulk_approve=0,
+    and their JobCompany.verified=0. Bulk-publish and the green T1 chip are both
+    gated on verified/tier=1, so this keeps mixed-role boards (PhonePe, Groww, …)
+    out of the fast path — they require per-row review regardless of the
+    lite-enrichment path already taken in _stage_one.
+    """
     registry: list[tuple[str, str, list[tuple[str, str]]]] = [
         ("greenhouse", "Greenhouse", GREENHOUSE_BOARDS),
         ("lever", "Lever", LEVER_BOARDS),
@@ -136,16 +143,19 @@ async def ensure_source_rows() -> None:
         for kind, label_suffix, boards in registry:
             for board_slug, company_name in boards:
                 key = f"{kind}:{board_slug}"
+                is_tier2 = key in TIER2_SOURCES
                 existing = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
                 if not existing:
                     db.add(JobSource(
                         key=key, kind=kind,
                         label=f"{company_name} ({label_suffix})",
-                        tier=1, enabled=1, bulk_approve=1,
+                        tier=2 if is_tier2 else 1,
+                        enabled=1,
+                        bulk_approve=0 if is_tier2 else 1,
                     ))
                 has_co = (await db.execute(select(JobCompany).where(JobCompany.slug == board_slug))).scalar_one_or_none()
                 if not has_co:
-                    db.add(JobCompany(slug=board_slug, name=company_name, verified=1))
+                    db.add(JobCompany(slug=board_slug, name=company_name, verified=0 if is_tier2 else 1))
         await db.commit()
 
 

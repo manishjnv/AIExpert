@@ -288,6 +288,34 @@ class TestTier2Sources:
         assert "ashby:cohere" not in jobs_ingest.TIER2_SOURCES
         assert "greenhouse:scaleai" not in jobs_ingest.TIER2_SOURCES
 
+    @pytest.mark.asyncio
+    async def test_ensure_source_rows_tiers_tier2_sources_correctly(self):
+        """TIER2_SOURCES must land as tier=2, bulk_approve=0, verified=0.
+
+        Regression guard for RCA-025: non-AI-native companies (PhonePe, Groww,
+        …) were getting T1 badges and bulk-publish eligibility, defeating the
+        point of TIER2_SOURCES.
+        """
+        from app.models import JobSource
+        await _setup()
+        try:
+            await jobs_ingest.ensure_source_rows()
+            async with db_module.async_session_factory() as db:
+                for key in jobs_ingest.TIER2_SOURCES:
+                    src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one()
+                    assert src.tier == 2, f"{key}: tier={src.tier}, expected 2"
+                    assert src.bulk_approve == 0, f"{key}: bulk_approve={src.bulk_approve}, expected 0"
+                    slug = key.split(":", 1)[1]
+                    co = (await db.execute(select(JobCompany).where(JobCompany.slug == slug))).scalar_one()
+                    assert co.verified == 0, f"{slug}: verified={co.verified}, expected 0"
+                # Spot-check a Tier-1 AI-native stays Tier-1.
+                src = (await db.execute(select(JobSource).where(JobSource.key == "greenhouse:anthropic"))).scalar_one()
+                assert src.tier == 1 and src.bulk_approve == 1
+                co = (await db.execute(select(JobCompany).where(JobCompany.slug == "anthropic"))).scalar_one()
+                assert co.verified == 1
+        finally:
+            await close_db()
+
     def test_lite_prompt_files_exist(self):
         from app.services.jobs_enrich import LITE_PROMPT_PATH, LITE_SYSTEM_PROMPT_PATH
         assert LITE_PROMPT_PATH.exists()
