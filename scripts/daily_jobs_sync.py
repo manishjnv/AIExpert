@@ -16,6 +16,8 @@ import sys
 
 async def _main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    from app.logging_redact import install_redacting_filter
+    install_redacting_filter()
     # Script runs outside FastAPI lifecycle — bind the async engine explicitly.
     from app.db import close_db, init_db
     from app.services.jobs_ingest import run_daily_ingest

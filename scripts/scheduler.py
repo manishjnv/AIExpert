@@ -22,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+from app.logging_redact import install_redacting_filter  # noqa: E402
+install_redacting_filter()
 logger = logging.getLogger("scheduler")
 
 

@@ -158,6 +158,34 @@ async def test_probe_resets_streak_on_recovery():
 
 
 @pytest.mark.asyncio
+async def test_module_grounding_returns_published_template_keys():
+    """Bug #2 fix: _get_module_slugs must return real template keys, not
+    crash on the phantom PlanVersion.status column."""
+    from unittest.mock import patch
+    from app.services.jobs_enrich import _get_module_slugs
+
+    with patch("app.curriculum.loader.list_published",
+               return_value=["ai-zero-to-hero-12mo", "fast-track-6mo", "beginner-3mo"]):
+        slugs = await _get_module_slugs()
+    assert "ai-zero-to-hero-12mo" in slugs
+    assert len(slugs) == 3
+    # Sorted output so the prompt is deterministic across runs.
+    assert slugs == sorted(slugs)
+
+
+@pytest.mark.asyncio
+async def test_module_grounding_returns_empty_on_loader_failure():
+    """Enricher must still run if the template loader explodes."""
+    from unittest.mock import patch
+    from app.services.jobs_enrich import _get_module_slugs
+
+    with patch("app.curriculum.loader.list_published",
+               side_effect=RuntimeError("disk gone")):
+        slugs = await _get_module_slugs()
+    assert slugs == []
+
+
+@pytest.mark.asyncio
 async def test_date_based_auto_expire_flips_status():
     """Bug fix: published jobs whose valid_through has passed must flip to expired."""
     from datetime import date, timedelta

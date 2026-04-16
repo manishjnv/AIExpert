@@ -37,6 +37,11 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 
+# Strip API keys from any log record before it hits handlers. Must run
+# BEFORE any provider client is constructed so early init logs are covered.
+from app.logging_redact import install_redacting_filter  # noqa: E402
+install_redacting_filter()
+
 # Map HTTP status codes to API_SPEC error slugs
 _STATUS_SLUGS = {
     400: "invalid_input",

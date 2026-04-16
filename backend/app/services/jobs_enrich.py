@@ -64,23 +64,17 @@ def _scrub_pii(html: str) -> str:
 
 
 async def _get_module_slugs() -> list[str]:
-    """Fetch current roadmap module slugs so the prompt can ground `roadmap_modules_matched`.
-    Best-effort — empty list on any DB failure; enricher still runs."""
+    """Return published curriculum template keys so the prompt can ground
+    `roadmap_modules_matched`. Template keys are the public identifiers
+    readers see on their plan (e.g. "ai-zero-to-hero-12mo"); tagging a job
+    with them lets the match-% UX link jobs → plans. Best-effort — returns
+    [] on any loader failure so the enricher still runs.
+    """
     try:
-        from sqlalchemy import select
-        from app.db import async_session_factory
-        from app.models import PlanVersion
-        async with async_session_factory() as db:
-            rows = (await db.execute(select(PlanVersion).where(PlanVersion.status == "published"))).scalars().all()
-            slugs: set[str] = set()
-            for pv in rows:
-                data = pv.data if isinstance(pv.data, dict) else {}
-                for m in data.get("modules", []) or []:
-                    if isinstance(m, dict) and m.get("slug"):
-                        slugs.add(str(m["slug"]))
-            return sorted(slugs)[:80]
+        from app.curriculum.loader import list_published
+        return sorted(list_published())[:80]
     except Exception as exc:
-        logger.warning("could not load module slugs for enrichment prompt: %s", exc)
+        logger.warning("could not load published template keys: %s", exc)
         return []
 
 

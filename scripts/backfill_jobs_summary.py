@@ -105,6 +105,8 @@ async def _main() -> int:
 
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    from app.logging_redact import install_redacting_filter
+    install_redacting_filter()
 
     import app.db as _db
     from sqlalchemy import select

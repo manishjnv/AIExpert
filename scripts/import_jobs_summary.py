@@ -94,6 +94,8 @@ async def _main() -> int:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
         stream=sys.stderr,
     )
+    from app.logging_redact import install_redacting_filter
+    install_redacting_filter()
 
     raw = sys.stdin.read()
     if not raw.strip():
