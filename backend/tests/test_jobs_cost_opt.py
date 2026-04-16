@@ -48,6 +48,20 @@ def _raw(**over) -> RawJob:
     return base
 
 
+def _make_job(*, source: str, external_id: str, status: str = "draft", title: str = "Test Role") -> Job:
+    """Minimal Job row for Wave 4 rejection-rate / intensity-histogram tests."""
+    today = date(2026, 4, 16)
+    return Job(
+        source=source, external_id=external_id,
+        source_url=f"https://example.test/{external_id}",
+        hash=f"hash-{external_id}", status=status,
+        posted_on=today, valid_through=today,
+        slug=f"{external_id}-slug",
+        title=title, company_slug="test-co", designation="Other",
+        data={},
+    )
+
+
 def _fake_enrich(raw: RawJob) -> dict:
     return {
         "title_raw": raw["title_raw"],
@@ -762,6 +776,137 @@ class TestBareVerbTitleGate:
     def test_research_scientist_not_bare_verb(self):
         from app.services.jobs_ingest import is_bare_verb_title
         assert is_bare_verb_title("Research Scientist") is False
+
+
+# ===================================================================
+# Wave 4 #14 — per-source rejection-rate alarm
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_rejection_rate_alarm_disables_high_reject_source():
+    """Source with >40% rejection rate over min sample → auto-disabled."""
+    from datetime import datetime, timedelta
+    from app.models import JobSource
+    from app.services.jobs_ingest import check_source_rejection_rates
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        # Seed: source with 15 rejected + 5 published = 75% reject rate (>40%)
+        # 20 total reviewed = meets min_sample
+        db.add(JobSource(key="greenhouse:noisy", kind="greenhouse",
+                         label="Noisy (Greenhouse)", tier=1, enabled=1, bulk_approve=1))
+        for i in range(15):
+            db.add(_make_job(source="greenhouse:noisy", external_id=f"noisy-{i}",
+                             status="rejected"))
+        for i in range(5):
+            db.add(_make_job(source="greenhouse:noisy", external_id=f"ok-{i}",
+                             status="published"))
+        await db.commit()
+
+    disabled = await check_source_rejection_rates()
+    assert len(disabled) == 1
+    src, rej, total, rate = disabled[0]
+    assert src == "greenhouse:noisy"
+    assert rej == 15
+    assert total == 20
+    assert rate == 0.75
+
+    # Verify DB state
+    async with db_module.async_session_factory() as db:
+        row = (await db.execute(
+            select(JobSource).where(JobSource.key == "greenhouse:noisy")
+        )).scalar_one()
+        assert row.enabled == 0
+        assert "auto-disabled" in (row.last_run_error or "")
+        assert "75%" in (row.last_run_error or "")
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_rejection_rate_alarm_skips_low_reject_source():
+    """Source with <40% rejection rate stays enabled."""
+    from app.models import JobSource
+    from app.services.jobs_ingest import check_source_rejection_rates
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        # 5 rejected + 25 published = 17% reject rate (<40%)
+        db.add(JobSource(key="greenhouse:healthy", kind="greenhouse",
+                         label="Healthy (Greenhouse)", tier=1, enabled=1, bulk_approve=1))
+        for i in range(5):
+            db.add(_make_job(source="greenhouse:healthy", external_id=f"r-{i}",
+                             status="rejected"))
+        for i in range(25):
+            db.add(_make_job(source="greenhouse:healthy", external_id=f"p-{i}",
+                             status="published"))
+        await db.commit()
+
+    disabled = await check_source_rejection_rates()
+    assert disabled == []
+
+    async with db_module.async_session_factory() as db:
+        row = (await db.execute(
+            select(JobSource).where(JobSource.key == "greenhouse:healthy")
+        )).scalar_one()
+        assert row.enabled == 1
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_rejection_rate_alarm_skips_below_min_sample():
+    """Source with high reject % but < 20 reviewed rows is not touched."""
+    from app.models import JobSource
+    from app.services.jobs_ingest import check_source_rejection_rates
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:tiny", kind="greenhouse",
+                         label="Tiny (Greenhouse)", tier=1, enabled=1, bulk_approve=1))
+        # 8 rejected + 2 published = 80% reject but only 10 sampled (< 20)
+        for i in range(8):
+            db.add(_make_job(source="greenhouse:tiny", external_id=f"r-{i}",
+                             status="rejected"))
+        for i in range(2):
+            db.add(_make_job(source="greenhouse:tiny", external_id=f"p-{i}",
+                             status="published"))
+        await db.commit()
+
+    disabled = await check_source_rejection_rates()
+    assert disabled == []
+
+    async with db_module.async_session_factory() as db:
+        row = (await db.execute(
+            select(JobSource).where(JobSource.key == "greenhouse:tiny")
+        )).scalar_one()
+        assert row.enabled == 1
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_rejection_rate_alarm_already_disabled_not_overwritten():
+    """An already-disabled source keeps its existing last_run_error reason."""
+    from app.models import JobSource
+    from app.services.jobs_ingest import check_source_rejection_rates
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:already-off", kind="greenhouse",
+                         label="Off (Greenhouse)", tier=1, enabled=0, bulk_approve=1,
+                         last_run_error="probe failed: connection refused"))
+        for i in range(15):
+            db.add(_make_job(source="greenhouse:already-off", external_id=f"r-{i}",
+                             status="rejected"))
+        for i in range(5):
+            db.add(_make_job(source="greenhouse:already-off", external_id=f"p-{i}",
+                             status="published"))
+        await db.commit()
+
+    disabled = await check_source_rejection_rates()
+    assert disabled == []  # already disabled — not re-disabled
+
+    async with db_module.async_session_factory() as db:
+        row = (await db.execute(
+            select(JobSource).where(JobSource.key == "greenhouse:already-off")
+        )).scalar_one()
+        assert row.enabled == 0
+        assert "probe failed" in (row.last_run_error or "")  # original reason preserved
+    await close_db()
 
 
 @pytest.mark.asyncio

@@ -487,10 +487,50 @@ async def summary_stats(
         )
     )).scalar() or 0
 
+    # Wave 4 #15: AI-intensity distribution per source over last 30 days.
+    # Lets admin spot drifting sources before the rejection-rate alarm fires.
+    # A source whose median intensity drops below 5 is generating noise.
+    from app.services.jobs_ingest import compute_ai_intensity
+    intensity_cutoff = datetime.utcnow() - timedelta(days=30)
+    drafts_30d = (await db.execute(
+        select(Job.source, Job.data).where(
+            Job.status == "draft",
+            Job.updated_at >= intensity_cutoff,
+        )
+    )).all()
+    # Bins: [0], [1-2], [3-4], [5-7], [8-15], [16+]
+    bin_defs = [(0, 0, "0"), (1, 2, "1-2"), (3, 4, "3-4"),
+                (5, 7, "5-7"), (8, 15, "8-15"), (16, 10**9, "16+")]
+    bin_labels = [b[2] for b in bin_defs]
+    per_source: dict[str, dict[str, int]] = {}
+    overall = {label: 0 for label in bin_labels}
+    for src, data in drafts_30d:
+        desc = (data or {}).get("description_html") or ""
+        score = compute_ai_intensity(desc) if desc else 0
+        bucket = next((label for low, high, label in bin_defs if low <= score <= high),
+                      bin_labels[-1])
+        per_source.setdefault(src, {label: 0 for label in bin_labels})[bucket] += 1
+        overall[bucket] += 1
+    intensity_distribution = {
+        "bins": bin_labels,
+        "threshold": 5,
+        "overall": overall,
+        "per_source": [
+            {"source": src, "buckets": buckets,
+             "total": sum(buckets.values()),
+             "below_threshold_pct": (
+                 round(100 * sum(buckets[l] for l in ("0", "1-2", "3-4")) / sum(buckets.values()))
+                 if sum(buckets.values()) else None
+             )}
+            for src, buckets in sorted(per_source.items())
+        ],
+    }
+
     return {
         "coverage": coverage,
         "versions": versions,
         "generated_last_7d": generated_last_7d,
+        "ai_intensity_distribution": intensity_distribution,
     }
 
 

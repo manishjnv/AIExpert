@@ -918,5 +918,96 @@ async def run_daily_ingest() -> dict[str, int]:
     except Exception as exc:
         logger.warning("failed to stamp JobSource.last_run_at: %s", exc)
 
+    # Wave 4 #14: auto-disable sources whose admin-rejection rate exceeds
+    # threshold. Catches drifting sources that start emitting non-AI roles
+    # before the admin queue gets buried. PhonePe-RCA-026 in hindsight.
+    try:
+        auto_disabled = await check_source_rejection_rates()
+        stats["auto_disabled_high_reject"] = len(auto_disabled)
+        for src, rej, total, rate in auto_disabled:
+            logger.warning(
+                "auto-disabled source %s: %d/%d rejected (%.0f%%) — exceeds threshold",
+                src, rej, total, rate * 100,
+            )
+    except Exception as exc:
+        logger.warning("rejection-rate check failed (non-fatal): %s", exc)
+        stats["auto_disabled_high_reject"] = 0
+
     logger.info("jobs ingest complete: %s", stats)
     return stats
+
+
+# ---------------------------------------------------------------- Wave 4 #14
+# Per-source rejection-rate alarm.
+#
+# When admin keeps rejecting drafts from a source as "off-topic" or "non-AI",
+# that source is drifting and should be paused for review. The check runs at
+# the end of every daily ingest and auto-disables sources exceeding the
+# rejection-rate threshold over a recent window. Admin can re-enable from
+# /admin/jobs/api/sources after fixing the underlying issue.
+#
+# Defaults tuned for our scale: 30-day window, min 20 reviewed rows
+# (rejected+published+expired) to avoid flapping on small samples,
+# threshold 40%.
+
+REJECTION_RATE_WINDOW_DAYS = 30
+REJECTION_RATE_MIN_SAMPLE = 20
+REJECTION_RATE_THRESHOLD = 0.40
+
+
+async def check_source_rejection_rates(
+    window_days: int = REJECTION_RATE_WINDOW_DAYS,
+    min_sample: int = REJECTION_RATE_MIN_SAMPLE,
+    threshold: float = REJECTION_RATE_THRESHOLD,
+) -> list[tuple[str, int, int, float]]:
+    """Find sources with high admin-rejection rates and auto-disable them.
+
+    Window: jobs whose updated_at is within `window_days` AND whose status
+    is one of (rejected/published/expired) — i.e. admin has acted on them.
+    Drafts are excluded — not yet reviewed.
+
+    Returns list of (source_key, rejected_count, reviewed_total, reject_rate)
+    for sources that were disabled in this call. Already-disabled sources
+    are not touched (no double-stamping over probe-disable reasons).
+    """
+    from sqlalchemy import func as _func
+    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    disabled: list[tuple[str, int, int, float]] = []
+    async with _db.async_session_factory() as db:
+        stmt = (
+            select(Job.source, Job.status, _func.count(Job.id))
+            .where(
+                Job.updated_at >= cutoff,
+                Job.status.in_(["rejected", "published", "expired"]),
+            )
+            .group_by(Job.source, Job.status)
+        )
+        rows = (await db.execute(stmt)).all()
+        per_source: dict[str, dict[str, int]] = {}
+        for src, status, n in rows:
+            per_source.setdefault(src, {})[status] = n
+
+        for src, counts in per_source.items():
+            rejected = counts.get("rejected", 0)
+            published = counts.get("published", 0)
+            expired = counts.get("expired", 0)
+            reviewed_total = rejected + published + expired
+            if reviewed_total < min_sample:
+                continue
+            reject_rate = rejected / reviewed_total
+            if reject_rate < threshold:
+                continue
+            src_row = (await db.execute(
+                select(JobSource).where(JobSource.key == src)
+            )).scalar_one_or_none()
+            if src_row is None or not src_row.enabled:
+                continue
+            src_row.enabled = 0
+            src_row.last_run_error = (
+                f"auto-disabled: {int(reject_rate * 100)}% reject rate "
+                f"({rejected}/{reviewed_total} over {window_days}d)"
+            )
+            disabled.append((src, rejected, reviewed_total, reject_rate))
+        if disabled:
+            await db.commit()
+    return disabled
