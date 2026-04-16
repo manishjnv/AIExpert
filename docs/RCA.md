@@ -160,6 +160,15 @@
   - Add a CI/pre-commit check that extracts `<script>...</script>` bodies from admin HTML templates and runs `node --check` on them. A single `node --check` invocation would have caught this in seconds.
   - Test fixture needed: render `_ADMIN_HTML` in a unit test and assert no literal LF inside any double-quoted JS string (regex: `"[^"\n]*\n[^"]*"` on the extracted script body must not match).
 
+### 025 — TIER2_SOURCES companies stamped as T1 / bulk-approve-eligible (2026-04-16) [Data model / safety]
+- **Symptom:** Admin `/admin/jobs` with the "TIER-2 LITE" quick-filter on showed rows badged with the green `T1` chip *and* the `TIER2-LITE` chip — specifically PhonePe jobs like "Lead Exit and Benefits Administration" and "Operations Associate, Merchant KYC". The two axes looked contradictory. Hidden worse consequence: bulk-publish's server gate ([admin_jobs.py:293](backend/app/routers/admin_jobs.py#L293)) keys on `JobSource.tier == 1 AND bulk_approve`, so those HR/KYC drafts were eligible for one-click bulk approval without individual review — defeating the whole point of `TIER2_SOURCES`.
+- **Root cause:** `ensure_source_rows()` in [jobs_ingest.py:128-149](backend/app/services/jobs_ingest.py#L128-L149) unconditionally created every Greenhouse/Lever/Ashby source with `tier=1, bulk_approve=1` and every JobCompany with `verified=1`. It never consulted the `TIER2_SOURCES` hardcoded set — which is used *only* downstream in `_stage_one()` to pick the lite-enrichment prompt. Result: two parallel tiering models that disagreed on non-AI-native boards (PhonePe, Groww, CRED, Mindtickle, Notion, Replit).
+- **Fix:** (1) `ensure_source_rows()` now checks `key in TIER2_SOURCES` and stamps those with `tier=2, bulk_approve=0` and their `JobCompany.verified=0`. (2) One-off backfill on VPS via SQLAlchemy updates: 6 job_sources, 6 job_companies, 65 jobs rows corrected. (3) Added regression test `TestTier2Sources.test_ensure_source_rows_tiers_tier2_sources_correctly` that spins up an in-memory DB, calls `ensure_source_rows()`, and asserts per-key/per-slug flags for both tiers. Commits `7eb8165` (code+test) and live backfill at 2026-04-16 06:32 UTC.
+- **Prevention:**
+  - Single source of truth for tiering: `TIER2_SOURCES` is the canonical set. Any code that classifies a source/company as tier-1 must consult it instead of assuming "registered = tier-1".
+  - Bulk-approve, filter chips, and enrichment path are three downstream consumers of the same axis. When adding a fourth, search for all call sites that branch on `tier`, `verified`, or `bulk_approve` and make sure the new code reads from the same place.
+  - Data-classification bugs are silent: tests pass, UI renders, the defect surfaces only when an admin trusts the chip. Add a post-ingest invariant test: for every row in `TIER2_SOURCES`, assert `JobSource.tier == 2` and `JobCompany.verified == 0`. Caught this at the model layer in `test_ensure_source_rows_tiers_tier2_sources_correctly`.
+
 ---
 
 ## Patterns to watch for
