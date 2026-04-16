@@ -357,3 +357,82 @@ If a new failure pattern appears:
 - **Wave 5 #19 (two-stage classifier):** insert a cheap Gemini YES/NO gate before full enrichment. Cost-benefit currently unfavorable post-Waves 1–5; revisit if drift detection (Layers 9, 10) reveals new failure patterns.
 - **Sales-cluster expansion:** the non-AI cluster scanner is tuned for legal/HR/finance. A "Sales Development" JD with no legal/HR words but heavy GTM jargon might still reach enrichment. Wave 3 #11 added some sales terms but the gap could widen.
 - **Embedding-based similarity check:** could compare each JD against a corpus of known AI/non-AI JDs. Out of scope for now (overengineering — current rule-based system is precise enough).
+
+---
+
+## Adjacent: Jinja2 migration of admin templates (RCA-027 prevention)
+
+Not strictly part of the classification pipeline, but related — and shipped in the same session arc. Documented here for reference.
+
+### Problem
+
+`_JOBS_GUIDE_HTML` in [`backend/app/routers/admin.py`](../backend/app/routers/admin.py) was a 313-line `f"""..."""` block. Every literal `{` and `}` in the rendered HTML had to be escaped as `{{` / `}}` because Python f-strings interpret single braces as variable interpolation.
+
+This bit us **twice** in the same week:
+- **RCA-024** — JS template strings inside `_ADMIN_HTML` had unescaped `\n\n` that Python decoded at module load time, breaking the rendered JS with literal newlines inside string literals.
+- **RCA-027** (this session) — added Wave 4 #16 admin guideline section with literal JSON code samples (`{job_id, agreed, ...}` and `{"results":[...]}`); Python tried to evaluate `job_id` as an f-string variable, raised `NameError` at module import time, container crash-looped for ~5 minutes between deploy `7585db0` and hotfix `784f8d8`.
+
+The hotfix doubled all the literal braces, but the underlying surface — a 300+ line f-string with mixed CSS/HTML/code samples — was still landmine-rich for the next edit.
+
+### Fix (commit `4a79082`)
+
+Migrated `_JOBS_GUIDE_HTML` to a Jinja2 template at [`backend/app/templates/admin/jobs_guide.html`](../backend/app/templates/admin/jobs_guide.html).
+
+| Aspect | Before (f-string) | After (Jinja2) |
+|---|---|---|
+| Brace semantics | `{` is interpolation, `{{` is literal `{` | `{` is literal, `{{ var }}` is interpolation |
+| Adding code samples | Must remember to double every `{` | Just paste the code, no escaping |
+| Template-syntax errors | Caught at module import (crashes container) | Caught at render time (returns 500 for one route) |
+| Editor support | None (it's a Python string) | Syntax highlighting, snippet completion |
+| Diff readability | f-string noise everywhere | Reads like the actual HTML |
+
+### What was kept vs. removed
+
+- **New:** [`backend/app/templates/admin/jobs_guide.html`](../backend/app/templates/admin/jobs_guide.html) — 313-line template, identical rendered output, no escape doubling
+- **New:** `_admin_template_env` Jinja2 environment in [admin.py](../backend/app/routers/admin.py) — `FileSystemLoader` on `app/templates/`, `select_autoescape(["html"])` (matches existing certificate template pattern)
+- **Removed entirely:** the legacy `_JOBS_GUIDE_HTML` f-string constant. Per CLAUDE.md "no backwards-compatibility shims" — kept fallbacks accumulate as dead code and confuse future edits
+
+### Why other admin f-strings were left alone
+
+| File / constant | Lines | Decision | Reason |
+|---|---|---|---|
+| `_JOBS_GUIDE_HTML` (admin.py) | 313 | **Migrated** | RCA-027 trigger; high edit-frequency for admin docs |
+| Templates page (admin.py:1985) | 141 | Defer | Mostly dynamic data rendering, not code samples; lower edit risk |
+| Users page (admin.py:1760) | 76 | Defer | Below 100-line threshold; low edit risk |
+| Admin home dashboard (admin.py:1584) | 37 | Defer | Below threshold |
+| Template detail page (admin.py:342) | 16 | Defer | Below threshold |
+
+Threshold heuristic: f-strings under 100 lines and not containing code samples (CSS/JS/JSON) stay as f-strings. The migration ROI is in the high-edit, code-sample-heavy templates.
+
+### How to add a new admin page
+
+If you're adding a new admin route that renders >50 lines of HTML or any code samples:
+
+1. Create `backend/app/templates/admin/<page_name>.html`
+2. Use `{{ var | safe }}` for pre-built HTML (`admin_css`, `admin_nav`)
+3. Write `{ ... }` literally for CSS rules / JSON / JS — no escaping needed
+4. In the route handler:
+
+   ```python
+   from app.routers.admin import _admin_template_env, ADMIN_CSS, ADMIN_NAV
+
+   @router.get("/<path>", response_class=HTMLResponse)
+   async def my_page(_user: User = Depends(get_current_admin)):
+       html = _admin_template_env.get_template("admin/<page_name>.html").render(
+           admin_css=ADMIN_CSS,
+           admin_nav=ADMIN_NAV,
+           # ... your page-specific vars
+       )
+       return HTMLResponse(html)
+   ```
+
+5. Add `test_<page>_template_file_exists` and `test_<page>_renders_with_dummies` to your test file (see [`backend/tests/test_jobs_admin.py`](../backend/tests/test_jobs_admin.py) tail for the pattern).
+
+### Tests added
+
+Four new tests in [`backend/tests/test_jobs_admin.py`](../backend/tests/test_jobs_admin.py):
+
+- `test_jobs_guide_renders_for_admin` — full HTTP roundtrip; verifies all 9 sections render and the literal JSON code samples (RCA-027 trigger) survive intact
+- `test_jobs_guide_requires_admin` — auth-gate regression check
+- `test_jobs_guide_template_file_exists` — anti-regression for accidental f-string reintroduction
+- `test_legacy_jobs_guide_constant_removed` — enforces the no-compat-shim rule

@@ -6,10 +6,10 @@
 
 ## Current state as of 2026-04-16 (session 17 — Waves 1–5 #18 + admin docs)
 
-**Branch:** `master` (HEAD: `4b78608`)
+**Branch:** `master` (HEAD: `4a79082`)
 **Live site:** [automateedge.cloud](https://automateedge.cloud)
 **VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy.
-**Tests:** **426 passed** on full backend suite. 1 pre-existing unrelated failure (`test_skills_with_no_curriculum_match` — fails on parent commits too).
+**Tests:** **431 passed** on full backend suite (+5 from Jinja2 migration tests). 1 pre-existing unrelated failure (`test_skills_with_no_curriculum_match` — fails on parent commits too).
 
 ### Sessions 15–17 — single-thread arc on AI Jobs classification
 
@@ -34,6 +34,8 @@ The whole arc started with one motivating example: PhonePe **"Manager, Legal"** 
 | `7585db0` | `docs/JOBS_CLASSIFICATION.md`, `admin.py`, `CLAUDE.md` | 10-layer documentation + admin guideline sections #7+#8 |
 | `784f8d8` | `admin.py` | Hotfix — escape JSON braces in f-string admin guide (RCA-027 outage) |
 | `4b78608` | `docs/RCA.md` | RCA-027 entry + updated "f-strings with HTML/JS/JSON" pattern row |
+| `3233850` | `docs/HANDOFF.md` | Session 17 close handoff |
+| `4a79082` | `admin.py`, `templates/admin/jobs_guide.html` (new), `prompts/jobs_summary_claude.txt`, tests, `HANDOFF.md` | Jinja2 migration of `_JOBS_GUIDE_HTML` (RCA-027 prevention) + bumped PROMPT_VERSION to `2026-04-16.2` + cleaned stale handoff items |
 
 ---
 
@@ -63,11 +65,13 @@ Wave 5 #19 (two-stage classifier) **deliberately not shipped** — cost-benefit 
 
 ---
 
-## RCA-027 (this session) — production hotfix
+## RCA-027 (this session) — production hotfix + structural fix
 
 After deploying the admin guideline (commit `7585db0`), the backend crashed with `NameError: name 'job_id' is not defined` because `_JOBS_GUIDE_HTML` is an f-string and my new section had literal `{job_id, agreed, ...}` and `{"results":[...]}` JSON in `<code>` blocks. Same root cause as RCA-024 (JS strings in f-strings). Hotfix `784f8d8` doubled all literal braces. Down ~5 minutes.
 
-**Pattern table now flags f-strings containing ANY embedded code (HTML/JS/JSON/CSS) as High risk**, not just HTML. Future migration target: move >100-line HTML f-string blobs to Jinja2 template files.
+**Structural fix shipped same session (commit `4a79082`):** migrated the entire 313-line `_JOBS_GUIDE_HTML` to a proper Jinja2 template at `backend/app/templates/admin/jobs_guide.html`. Jinja2 inverts the brace semantics (`{` is literal by default; `{{ var }}` is interpolation) so adding HTML/JSON/code samples can no longer crash module import. Per CLAUDE.md "no compat shims" — the legacy f-string was removed entirely (315 lines deleted from admin.py), not kept as fallback. 4 new tests guard against regression. Pattern documented in [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) "Jinja2 migration" section.
+
+Other admin f-strings (templates page 141 lines, users page 76 lines, dashboard 37 lines) left as-is — below the high-risk threshold (no code samples, lower edit frequency).
 
 ---
 
@@ -80,11 +84,13 @@ After deploying the admin guideline (commit `7585db0`), the backend crashed with
 
 **Outstanding (verified live state 2026-04-16 session 17 close):**
 
-1. ✅ Gemini API key — rotated in a prior session. Stale carry-over, dropped.
-2. ✅ Summary coverage — verified 962/962 drafts have summaries; nothing pending.
-3. Submit `sitemap_index.xml` to Google Search Console (manual one-time admin task)
-4. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently; minor SEO loss, not a bug)
-5. **Editorial uplift (optional):** 669 published/draft rows are still on the legacy Flash-era summary; 297 are on current Opus prompt `2026-04-16.1`. Bumping `PROMPT_VERSION` in `prompts/jobs_summary_claude.txt` would mark the 669 stale and the next `/summarize-jobs` sweep would regenerate them via Claude Max in VS Code ($0 API spend, but requires manual paste-cycle time).
+1. Submit `sitemap_index.xml` to Google Search Console (manual one-time admin task)
+2. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently; minor SEO loss, not a bug)
+3. **Editorial uplift queued (commit `4a79082` bumped `PROMPT_VERSION` to `2026-04-16.2`):** 669 Flash-era + 297 prior-Opus rows are now stale. Run `/summarize-jobs --status published --limit 100` (or similar) when convenient. $0 API spend (Claude Max in VS Code), only manual paste-cycle time.
+
+**Recently dropped (verified done):** Gemini API key (rotated prior session); `/summarize-jobs --status draft` (962/962 drafts already have summaries).
+
+**Future migration (deferred, not urgent):** other admin f-string blobs (templates page 141 lines, users page 76 lines) could be migrated to Jinja2 too — but they're below the high-risk threshold. Only do this if one of them gets a code-sample edit that requires brace-doubling.
 
 **Open questions for the user:** None.
 
