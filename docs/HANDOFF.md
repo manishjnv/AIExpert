@@ -4,39 +4,84 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
-## Current state as of 2026-04-17 (session 19 — editorial summary refresh, chunk 1/many)
+## Current state as of 2026-04-17 (session 21 — admin bulk-reject)
 
-**Branch:** `master` (HEAD: `918d7f6`; session 19 adds a doc-only commit on top)
+**Branch:** `master` (new commit this session — bulk-reject feature on top of `ddf6688`)
 **Live site:** [automateedge.cloud](https://automateedge.cloud)
-**VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy.
-**Tests:** **431 passed** (no code changes this session — pure data-plane work).
+**VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy. **Deploy pending.**
+**Tests:** **432 passed** (+1 new: `test_bulk_reject_accepts_any_tier_and_records_reason`). Full admin-jobs suite 16/16 green.
 
-### Session 19 — editorial summary refresh via /summarize-jobs (Claude Max)
+### Session 21 — admin Bulk-Reject in Jobs Review queue
+
+**Scope:** feature add. User-reported gap: the queue had "Bulk publish selected (Tier-1 only)" but no bulk-reject. Added a mirrored action so admins can clear low-quality drafts in one click with a shared reason.
+
+**Design decisions:**
+
+- **No tier gate on reject** (unlike bulk-publish). Publish gates to Tier-1 + `bulk_approve=1` sources because a bad approval creates a public URL. Rejection is safe to allow everywhere — the whole point is to clear noise fast.
+- **Shared reason per batch**, not per row. The UI prompts once, applies the same reason to every selected id. Matches how reviewers actually triage noisy sources ("all of these are `off_topic`"); a per-row flow would defeat the purpose.
+- **Same cap as bulk-publish** (100 ids per call). Consistency with the existing limit and the `docs/JOBS.md §10.7` note.
+- **No IndexNow ping.** Publish pings IndexNow because a new public URL appeared. Reject changes no public URLs.
+- **Two-step confirm** (reason prompt → count confirm) — mis-click protection on an irreversible-feeling action. The count echo (`Reject N jobs as "off_topic"?`) is specifically to catch "wrong tab selected" errors.
+
+**Files changed (1 feature file + 1 test):**
+
+- [backend/app/routers/admin_jobs.py](../backend/app/routers/admin_jobs.py)
+  - Line 8 — docstring updated (bulk-reject added to action list)
+  - Lines 365-395 — new `POST /api/bulk-reject` endpoint (mirrors `bulk_publish` structure)
+  - Line 1252 — "Bulk reject selected" button next to existing bulk-publish button
+  - Lines 1308-1322 — `bulkRej()` JS function (reason prompt + count confirm + fetch)
+- [backend/tests/test_jobs_admin.py](../backend/tests/test_jobs_admin.py)
+  - Line 1 — module docstring updated
+  - Lines 137-166 — new `test_bulk_reject_accepts_any_tier_and_records_reason` covering the three primary paths (invalid reason 400, empty ids 400, mixed-tier success 200 + DB state verification)
+
+**Not touched:** no prompt changes, no migration, no nginx config change (route is under the already-allowlisted `/admin/jobs/api/` prefix).
+
+**Deploy:** pending. Per memory `feedback_deploy_rebuild.md`:
+
+```bash
+ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose up -d --build --force-recreate backend"
+```
+
+Plain `restart` won't pick up the code change.
+
+**Verification plan post-deploy:** load `/admin/jobs`, select a handful of tier-2 drafts, hit "Bulk reject selected", pick `off_topic` in the prompt, confirm. Confirm rows disappear from the draft tab and appear under the Rejected tab with the right reason. Also verify the existing single-row reject still works.
+
+### Session 20 — editorial summary refresh chunk 3 (Claude Max)
 
 **Scope:** data-plane only. No repo files modified (this HANDOFF + CLAUDE.md §9 the sole exceptions). No git-level deploy required.
 
-**What ran:** `/summarize-jobs --status draft --limit 100 --batch 10` using the VPS export/import scripts, with the generated JSON stamped `--model sonnet-4.6` against `prompt_version 2026-04-16.2`. Summaries were authored by this Opus session (the user's Max plan covers it at $0 API spend) and piped to the VPS via the standard skill flow: `export_jobs_for_summary → generate → import_jobs_summary`.
+**What ran:** 7 rounds of `/summarize-jobs --status draft --batch 10` using the VPS export/import scripts, generated JSON stamped `--model sonnet-4.6` against `prompt_version 2026-04-16.2`. Summaries authored by this Opus session (Max plan, $0 API spend) via the standard skill flow: `export_jobs_for_summary → generate → import_jobs_summary`.
 
-**Progress this chunk:** **70 / 100 rows** stamped (Rounds 1–7 imported cleanly). Round 8 generator is pre-drafted at `C:/tmp/gen_r8.py` on the user's Windows box (IDs 50, 15, 892, 819, 792, 784, 716, 509, 470, 424) but was not executed in this session — left for the next session to finish the 100-row cap (Rounds 8, 9, 10).
+**Target & outcome:** User target was **+69 net** draft-pool `sonnet-4.6` stamps. Result: **+70 net** (81→151). 70 rows processed, 0 retries, 0 malformed outputs, 0 post-import schema violations.
 
-**Coverage so far — IDs stamped in this chunk:**
+**Export-filter premise verified.** The session-kickoff hypothesis — that `scripts.export_jobs_for_summary` was re-serving already-sonnet-4.6 rows — was **not** the actual cause of session 19's apparent overlap. `_needs_regen()` correctly skips rows already at `prompt_version 2026-04-16.2`. The overlap was `import_jobs_summary._propagate_to_siblings` copying summaries to cross-source-duplicate rows in **published** status (each Opus draft was only requested once, but summaries fanned out to all rows sharing the same `jobs.hash`). No export-side fix needed; the client-side `already_sonnet.txt` safety filter was built but unused.
 
-- R1 (554, 551, 511, 487, 483, 479, 464, 422, 382, 363) — mixed Scale AI + xAI + Figure
-- R2 (269, 268, 267, 266, 265, 264, 263, 262, 261, 260) — xAI roles + language tutors; 260 has EN/JP employment-type contradiction flagged
-- R3 (259, 258, 257, 256, 255, 254, 253, 252, 251, 250) — xAI infra/sec/accounting; introduced `XAI_BENEFITS` helper
-- R4 (249, 248, 247, 246, 245, 244, 243, 242, 241, 240) — xAI senior ML/neteng/storage + writing/math contractors; 241 has TX-vs-Memphis location contradiction flagged
-- R5 (220, 208, 207, 206, 202, 196, 187, 169, 165, 813) — Scale HFC fellows + Anthropic Zürich ML + CapLoan GRC; introduced `hfc_ml()` helper; 220 JD is in Japanese (flagged)
-- R6 (728, 710, 589, 528, 466, 426, 423, 413, 224, 176) — Groww + PhonePe + GDM + Databricks + Anthropic LATAM/UI + Figure trio; introduced `figure_team_manager()` helper
-- R7 (135, 113, 100, 59, 48, 18, 17, 16, 839, 179) — Scale HFC (UK STEM + US Legal) + Anthropic Fellows program (16/17/18) + Databricks SA Utilities + Anthropic Enterprise AE manager
+**IDs stamped this session:**
 
-**Schema discipline:** all 70 rows imported via `import_jobs_summary`. Ingest logged 3 soft violations across the run (1× `chip_label`, 2× `resp_detail`) — all marginally over cap, all accepted by the importer and not re-drafted.
+- R1 (847, 845, 838, 833, 831, 830, 829, 827, 824, 802) — Databricks (RSA Atlanta, Counsel, GTM Dir, SE Aarhus, Backend Aarhus, SE Retail-CPG, FINS SEA, Dir R&CPG DE, Dir Emerging Ent) + Scale AI GenAI SWE
+- R2 (771, 712, 698, 553, 552, 549, 548, 547, 546, 544) — Anthropic PM Monetization, PhonePe HR Coord + AI Creative Head, 7 Databricks (CS Enablement, Hunter AE, APM Berlin, SWE Delta, Org Dev Arch, AI FDE Mgr, Core AE Zurich)
+- R3 (542, 541, 539, 538, 537, 536, 535, 533, 531, 530) — 2× UC Runtime Enforcement (Zurich/Berlin), EM Streaming Bellevue, CEA Bellevue, MFG AE Arizona, AI FDE, Sr Mgr FE FSI, PM Repos Seattle, AE FSI NYC, Named Core AE Retail
+- R4 (529, 527, 526, 525, 524, 425, 421, 420, 419, 416) — Databricks SA Japan (JP JD), SA FSI EC, SWE Delta Aarhus, Sr Resident SA SG, Fed Sec Assurance + 5 Figure roles (Transfer Agent, Partner Support, Controller, CCO, Principal PD)
+- R5 (414, 238, 237, 235, 234, 230, 229, 228, 227, 226) — Figure Sr Mgr Strategic Finance + 9 Databricks (DSA Nordics, EBC Mgr SF, Dir FE SG, EntAE FSI, Mgr FE MEL, EM Notebook DP, Hunter AE SG, Finance Mgr, CEC Amsterdam)
+- R6 (225, 223, 219, 218, 216, 215, 213, 212, 211, 205) — Databricks SSA AI Tooling, CEC Belgrade, Partner Enablement, Learning PM, DSA H&LS, AI FDE Federal (citizenship+clearance), Partner Sales Dir, MBA Intern SF, SA Public Sector LEAPS, Scale Staff Applied AI
+- R7 (171, 149, 147, 146, 144, 142, 141, 139, 103, 80) — Anthropic SLG AE $360-435K + 7 Databricks + Anthropic Incident Mgr D&R + Anthropic Privacy RE $320-485K
 
-**Known operator gotchas surfaced this session (for future operators running the skill on Windows):**
+**Generator-side validator caught 3 chip-label caps pre-flight:** "Spark Structured Streaming" (R3, 26 chars), "Principal Product Designer" (R4, 26), "C-level customer audience" (R5, 25). All trimmed before import. **0 post-import schema violations** reported by the `_validate_summary` clamp.
 
-1. **Heredoc + apostrophes:** single-quoted bash heredocs break when the JSON payload contains `'` (e.g. `Bachelor's`). Workaround: always write summaries to a local file and pipe via `cat local.json | ssh VPS "cat > /tmp/remote.json"` → `docker compose exec -T backend ... < /tmp/remote.json`. Never heredoc the JSON inline.
-2. **Windows stdout codec (cp1252):** `python3 -c "print(json.dumps(..., ensure_ascii=False))"` crashes on Unicode (Japanese, CJK, typographic dashes). Workaround: the generator script opens a file with `encoding="utf-8"` and writes there — never pipe through stdout.
-3. **Path quoting:** on Git Bash / MINGW64, `python3 C:/tmp/gen_r7.py` works but unquoted `/tmp/gen_r7.py` gets remapped. Always use explicit `"C:/tmp/gen_rN.py"`.
-4. **Helper functions pay off:** reused role templates (Scale HFC fellows, xAI language tutors, Figure ops managers, Anthropic Fellows program) — each helper also enforces consistent chip/detail caps for the family. Recommended pattern for subsequent chunks.
+**Carry-forward operator gotchas (confirmed still live on Windows):**
+
+1. **Heredoc + apostrophes:** single-quoted bash heredocs break when the JSON payload contains `'`. Workaround: always write summaries to a local file and pipe via `cat local.json | ssh VPS "docker compose exec -T backend python -m scripts.import_jobs_summary ..."`. Never heredoc JSON inline.
+2. **Container `/tmp` ≠ host `/tmp`:** `docker compose exec -T backend cat /tmp/x.json` reads the **container's** `/tmp`, not the host. A prior attempt to stage JSON via `cat local | ssh VPS "cat > /tmp/x"` then separately `docker compose exec ... cat /tmp/x` failed (file on host, container couldn't see it). Fix: pipe stdin all the way through in one chain: `cat local.json | ssh VPS "docker compose exec -T backend python -m scripts.import_jobs_summary --model sonnet-4.6"`.
+3. **Windows stdout codec (cp1252):** Python prints crash on Japanese JDs / Cyrillic titles. Workarounds: `sys.stdout.reconfigure(encoding='utf-8')` at script top, or read export JSON via a Read tool / file open with `encoding="utf-8"` instead of piping through stdout.
+4. **Session-artifact naming:** `C:/tmp/gen_r{N}.py` and `C:/tmp/r{N}_summaries.json` from prior sessions are still on disk. Use a session prefix (e.g., `s20_r{N}`) to avoid collision; sweep old ones periodically.
+
+### Session 19 — editorial summary refresh chunk 2 (Claude Max, 30 rows)
+
+Previous chunk stamped 30 rows (Rounds 8-10) continuing from chunk 1. Data-plane only; see git commit `ddf6688` doc-level note and session 20's baseline (sonnet-4.6 draft = 81 at start). Rounds 8-10 IDs: 50, 15, 892, 819, 792, 784, 716, 509, 470, 424, 418, 415, 331, 312, 239, 231, 210, 181, 168, 163, 152, 143, 120, 70, 64, 63, 851, 850, 849, 848.
+
+### Session 18 — editorial summary refresh chunk 1 (Claude Max, 70 rows)
+
+First chunk of the `2026-04-16.2` refresh campaign. Stamped 70 rows via Rounds 1-7 (Scale HFC fellows, xAI roles, Anthropic Fellows 16/17/18, Databricks APAC, Figure trio, etc.). Introduced helper-function pattern for repeated role templates (`XAI_BENEFITS`, `hfc_ml()`, `figure_team_manager()`) — carry-forward recommendation for subsequent chunks.
 
 ### Sessions 15–17 — single-thread arc on AI Jobs classification
 
@@ -110,80 +155,101 @@ Other admin f-strings (templates page 141 lines, users page 76 lines, dashboard 
 - Admin reports a false positive that slipped through all 10 layers → identify which layer should have caught it, add patterns/anchors per [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) "Adding a new defense layer" section
 - Drift detection (Layer 9 auto-disable or Layer 10 audit mismatch) reveals a systematic gap → may revisit Wave 5 #19 (two-stage classifier)
 
-**Outstanding (verified live state 2026-04-17 session 19 close):**
+**Outstanding (verified live state 2026-04-17 session 20 close):**
 
 1. Submit `sitemap_index.xml` to Google Search Console (manual one-time admin task)
 2. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently; minor SEO loss, not a bug)
-3. **Editorial uplift — chunk in flight.** Session 18 stamped the first 100 `sonnet-4.6`-grade rows at `prompt_version 2026-04-16.2`. Session 19 stamped the next 70 under the same stamp. Remaining legacy rows (null `_meta.prompt_version`) at session close: **~467** (see "next-session resume prompt" section below). Run another `/summarize-jobs --status draft --limit 100 --batch 10` chunk whenever convenient. $0 API spend (Claude Max in VS Code), only paste-cycle operator time. Goal: burn down the legacy backlog to zero, then sweep `--status published` for the 669 Flash-era + 297 prior-Opus rows.
+3. **Editorial uplift — burn-down continues.** Sessions 18+19+20 have stamped **169 rows** at `prompt_version 2026-04-16.2 / sonnet-4.6` (151 draft + 18 propagated to published). Remaining work at session 20 close:
+   - **521 rows with no summary** (355 draft + 166 published) — pure-null, untouched by Flash or Opus
+   - **105 rows with stale prompt_version summaries** (68 opus-4.6@old in draft + 32 in published + 5 test-propagation)
+   - **Total refreshable: 626 rows** → plan 6-10 more chunks of 70-100 each
 
-**Recently dropped (verified done):** Gemini API key (rotated prior session); `/summarize-jobs --status draft` full coverage (962/962 drafts have summaries — now being *refreshed* against the new prompt version, not seeded).
+   $0 API spend (Claude Max in VS Code), only paste-cycle operator time. Goal: burn down to zero, then optionally sweep published-side prior-Opus rows for consistency.
 
-### Next-session resume prompt (session 19 handoff)
+**Recently dropped (verified done):** Gemini API key (rotated prior session); `/summarize-jobs --status draft` full seed coverage (drafts all have *a* summary — now in prompt-version-refresh mode, not seed mode).
 
-Paste the following prompt verbatim into a fresh session to pick up the in-flight chunk:
+### Next-session resume prompt (session 20 handoff)
+
+Paste the following prompt verbatim into a fresh session to pick up a new chunk:
 
 ```text
 Continue the legacy-summary refresh on the AI Roadmap Platform VPS using the
-/summarize-jobs skill. Previous session stamped 70 rows this chunk (Rounds 1-7
-with --model sonnet-4.6 at prompt_version 2026-04-16.2). Target is 100 rows
-total this chunk, so 30 rows remain across Rounds 8, 9, 10.
+/summarize-jobs skill. Session 20 stamped 70 rows (all clean, +70 net
+sonnet-4.6 stamps in draft pool). This session: run another 70-100 row chunk.
 
-CRITICAL FLAGS
+CURRENT STATE AT SESSION START
+Draft-pool model distribution:
+  null (no summary)      : 355
+  opus-4.6 @ 2026-04-16.2: 80    (current version — SKIPPED by export filter)
+  opus-4.6 @ 2026-04-16.1: 68    (stale — WILL be re-exported)
+  sonnet-4.6 @ current   : 151   (SKIPPED by export filter)
+  test-propagation       : 5
+
+EXPORT-FILTER BEHAVIOR (verified session 20)
+scripts/export_jobs_for_summary.py uses _needs_regen() which SKIPS rows whose
+summary._meta.prompt_version == current (2026-04-16.2). So rows already at
+current prompt_version + sonnet-4.6 will NOT be re-served. Each export of
+--batch 10 should give 10 fresh rows from the null-summary pool and the
+stale-opus-4.6@2026-04-16.1 pool. No client-side filter needed.
+
+TARGET THIS SESSION
+Pick a row target (e.g. +70 net draft sonnet-4.6 stamps, or +100). Report
+totals every 30 rows. Stop when target hit or at 100-row ceiling.
+
+CRITICAL FLAGS (unchanged across chunks)
 - Import with --model sonnet-4.6 (NOT opus-4.6 — overrides skill default)
 - Prompt template version is 2026-04-16.2
 - Data-plane only: no git commits, no container rebuilds, no code edits
 
-IMMEDIATE NEXT STEP — Round 8 is already drafted but not executed:
-File exists at C:/tmp/gen_r8.py with summaries for IDs:
-  50, 15, 892, 819, 792, 784, 716, 509, 470, 424
-
-Run this pipeline to finish Round 8:
-  python3 "C:/tmp/gen_r8.py"
-  # schema-validate: chip ≤24, resp title ≤48, detail ≤90, must_have ≤100, watch_out ≤110
-  cat "C:/tmp/r8_summaries.json" | ssh a11yos-vps "cat > /tmp/r8_summaries.json"
-  ssh a11yos-vps "cd /srv/roadmap && cat /tmp/r8_summaries.json | docker compose exec -T backend python -m scripts.import_jobs_summary --model sonnet-4.6"
-
-Then do Rounds 9 and 10 fresh (export → generate → import) using the standard
-skill loop:
-  ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python -m scripts.export_jobs_for_summary --batch 10 --status draft"
-
 WORKFLOW PER ROUND
-1. Export batch of 10 from VPS (above command)
-2. Draft summaries as an internal Python generator script at C:/tmp/gen_rN.py
-   - Write JSON to C:/tmp/rN_summaries.json with open(..., encoding="utf-8")
-   - DO NOT pipe JSON to stdout on Windows (cp1252 breaks on Unicode)
-3. Schema-validate output — fix any chip/title/detail/must_have/watch_out over cap
-4. cat local file | ssh VPS "cat > /tmp/rN_summaries.json"
-5. Import via docker compose exec with --model sonnet-4.6
+1. Export batch of 10 from VPS:
+     ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python -m scripts.export_jobs_for_summary --batch 10 --status draft"
+   Save to C:/tmp/s{N}_r{R}_export.json (use a session prefix to avoid
+   collision with prior sessions' artifacts still on disk).
+2. Read the JDs via the Read tool (NOT via python -c printing — Windows cp1252
+   chokes on Japanese/CJK titles). Or add sys.stdout.reconfigure(encoding='utf-8').
+3. Draft summaries in a Python generator at C:/tmp/s{N}_r{R}.py:
+   - Enforce caps: chip ≤24, resp title ≤48, detail ≤90, must_have ≤100,
+     benefit ≤110, watch_out ≤110
+   - Write JSON to C:/tmp/s{N}_r{R}.json with open(..., encoding="utf-8")
+   - Validator in the generator should print violations and exit 1 if any
+4. Import via stdin piped all the way through in one chain:
+     cat C:/tmp/s{N}_r{R}.json | ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python -m scripts.import_jobs_summary --model sonnet-4.6"
+   DO NOT stage JSON to /tmp on VPS between ssh and docker exec — the
+   container's /tmp is separate from host /tmp.
 
-KNOWN WORKAROUNDS
-- Heredocs break on apostrophes in JSON — always use file + ssh cat pattern
-- Windows stdout codec is cp1252 — write JSON to file with encoding="utf-8"
-- VPS /tmp persists across ssh calls, but mkdir -p /tmp if first call fails
-
-AFTER ROUND 10
-Run the progress check one-liner and report totals to the user:
+PROGRESS CHECK ONE-LINER (run after every round)
   ssh a11yos-vps 'docker compose -f /srv/roadmap/docker-compose.yml exec -T backend sqlite3 /data/app.db "SELECT json_extract(data,'\''$.summary._meta.model'\'') AS m, COUNT(*) FROM jobs WHERE status='\''draft'\'' GROUP BY m ORDER BY 2 DESC;"'
 
 QUALITY RULES
-- Enforce every schema cap (reject too-long bullets — better to drop one)
-- Preserve every id exactly as exported
+- Enforce every schema cap (pre-flight validator in the generator)
+- Preserve every id exactly as exported (the import script matches by id)
 - Flag anomalies in watch_outs: JD/posting contradictions, sparse JDs,
-  language requirements, unusual comp structures, visa constraints
-- Use Python helper functions for repeating role templates (e.g., Scale HFC
-  fellows, xAI AI tutors, Figure benefits) — consistency matters
+  language requirements (non-English JDs like Japanese), unusual comp
+  structures, visa constraints, security-clearance requirements, fixed-term
+  contracts, onsite-with-no-city-named
+- Use Python helper functions for repeating role templates (e.g., Figure
+  benefits, Scale HFC fellows, xAI AI tutors, Databricks UC Runtime
+  Enforcement) — the /summarize-jobs skill template lives in the repo:
+    ssh a11yos-vps "docker compose -f /srv/roadmap/docker-compose.yml exec -T backend cat /app/app/prompts/jobs_summary_claude.txt"
+
+KNOWN WORKAROUNDS (confirmed session 20)
+- Heredocs break on apostrophes in JSON (e.g. "Bachelor's") — always use the
+  `cat local | ssh VPS "docker compose exec -T backend ..."` one-chain pattern
+- Windows stdout codec is cp1252 — always write JSON to a file with
+  encoding="utf-8" or reconfigure sys.stdout
+- Container `/tmp` ≠ host `/tmp` — DO NOT stage files between them, pipe stdin
+- Use session-prefixed artifact names (e.g. s21_r1.py) to avoid collision
+  with C:/tmp files left over from sessions 18/19/20
 
 SETUP CONTEXT
 - Repo root: e:\code\AIExpert (Windows)
 - VPS SSH alias: a11yos-vps
 - Skill reference: /summarize-jobs (projectSettings:summarize-jobs)
-- Current chunk stats at start of new session: 70 rows stamped sonnet-4.6,
-  ~467 legacy null-prompt-version rows remaining platform-wide after this chunk
-- Read the skill template once at session start:
-    ssh a11yos-vps "docker compose -f /srv/roadmap/docker-compose.yml exec -T backend cat /app/app/prompts/jobs_summary_claude.txt"
 
-Start by executing Round 8 (the pre-drafted script), then continue with 9 and
-10. Stop at 100 rows and report.
+Start by reading the prompt template + snapshotting the current model
+distribution, then run rounds until target hit or 100-row ceiling, then stop
+and report.
 ```
 
 **Future migration (deferred, not urgent):** other admin f-string blobs (templates page 141 lines, users page 76 lines) could be migrated to Jinja2 too — but they're below the high-risk threshold. Only do this if one of them gets a code-sample edit that requires brace-doubling.

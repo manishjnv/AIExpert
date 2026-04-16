@@ -1,4 +1,4 @@
-"""Admin review-queue endpoint tests: auth, publish, reject, bulk-publish gate."""
+"""Admin review-queue endpoint tests: auth, publish, reject, bulk-publish gate, bulk-reject."""
 
 from __future__ import annotations
 
@@ -130,6 +130,39 @@ async def test_bulk_publish_tier1_only():
                           json={"ids": [t1]}, cookies={"auth_token": token})
         assert r2.status_code == 200
         assert r2.json()["published"] == 1
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_bulk_reject_accepts_any_tier_and_records_reason():
+    """Bulk-reject works across tiers (unlike bulk-publish) and stamps reason + reviewer."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+    t1 = await _mk_job(source="greenhouse:anthropic", tier=1, bulk=1, slug="t1", ext="a")
+    t2 = await _mk_job(source="yc:aggregate", tier=2, bulk=0, slug="t2", ext="b")
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        # Invalid reason rejected.
+        r_bad = await c.post("/admin/jobs/api/bulk-reject",
+                             json={"ids": [t1], "reason": "bogus"}, cookies={"auth_token": token})
+        assert r_bad.status_code == 400
+        # Empty ids rejected.
+        r_empty = await c.post("/admin/jobs/api/bulk-reject",
+                               json={"ids": [], "reason": "off_topic"}, cookies={"auth_token": token})
+        assert r_empty.status_code == 400
+        # Mixed-tier batch succeeds — no tier gate on reject.
+        r_ok = await c.post("/admin/jobs/api/bulk-reject",
+                            json={"ids": [t1, t2], "reason": "off_topic"}, cookies={"auth_token": token})
+        assert r_ok.status_code == 200
+        body = r_ok.json()
+        assert body["rejected"] == 2
+        assert body["reason"] == "off_topic"
+    async with db_module.async_session_factory() as db:
+        for jid in (t1, t2):
+            job = (await db.execute(select(Job).where(Job.id == jid))).scalar_one()
+            assert job.status == "rejected"
+            assert job.reject_reason == "off_topic"
+            assert job.last_reviewed_by == "a@t.com"
+            assert job.last_reviewed_on == date.today()
     await close_db()
 
 

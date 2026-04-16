@@ -5,7 +5,7 @@ Mounted at /admin/jobs. Requires get_current_admin. See docs/JOBS.md §10.
 Actions:
   - list / filter the queue (draft / published / rejected / expired)
   - read one job detail
-  - publish, reject (with reason), bulk-publish (Tier-1 only)
+  - publish, reject (with reason), bulk-publish (Tier-1 only), bulk-reject (any tier)
   - trigger ingest on-demand
   - edit core fields (valid_through, designation, slug) for admin corrections
 """
@@ -359,6 +359,41 @@ async def bulk_publish(
     await db.commit()
     _ping_indexnow([r.slug for r in rows])
     return {"ok": True, "published": len(rows)}
+
+
+@router.post("/api/bulk-reject")
+async def bulk_reject(
+    payload: dict,
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _check_origin(request)
+    ids = (payload or {}).get("ids") or []
+    reason = (payload or {}).get("reason")
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
+        raise HTTPException(400, "ids must be a non-empty int list")
+    if len(ids) > 100:
+        raise HTTPException(400, "max 100 per bulk action (see docs/JOBS.md §10.7)")
+    if reason not in VALID_REJECT_REASONS:
+        raise HTTPException(400, f"reason must be one of {sorted(VALID_REJECT_REASONS)}")
+
+    rows = (await db.execute(select(Job).where(Job.id.in_(ids)))).scalars().all()
+    by_source = {r.source for r in rows}
+    sources = {s.key: s for s in (await db.execute(select(JobSource).where(JobSource.key.in_(by_source)))).scalars().all()}
+
+    reviewer = _admin.name or _admin.email
+    today = date.today()
+    for r in rows:
+        r.status = "rejected"
+        r.reject_reason = reason
+        r.last_reviewed_on = today
+        r.last_reviewed_by = reviewer
+        src = sources.get(r.source)
+        if src:
+            src.total_rejected = (src.total_rejected or 0) + 1
+    await db.commit()
+    return {"ok": True, "rejected": len(rows), "reason": reason}
 
 
 @router.post("/api/ingest/run")
@@ -1249,6 +1284,7 @@ function renderList(items) {
   document.getElementById("list").innerHTML = `
     <div style="margin:.5rem 0">
       <button class="btn primary" onclick="bulkPub()">Bulk publish selected (Tier-1 only)</button>
+      <button class="btn" onclick="bulkRej()">Bulk reject selected</button>
     </div>
     <table>
       <thead><tr><th><input type="checkbox" onchange="toggleAll(this)"></th><th>Job</th><th>Posted</th><th></th></tr></thead>
@@ -1300,6 +1336,21 @@ async function bulkPub() {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ids}),
+  });
+  if (!r.ok) { const msg = await r.text(); alert("Failed: " + msg); return; }
+  load();
+}
+
+async function bulkRej() {
+  const ids = [...document.querySelectorAll(".sel:checked")].map(x => +x.value);
+  if (!ids.length) { alert("Select some rows."); return; }
+  const reason = prompt(`Reject ${ids.length} jobs.\nReason (` + REJECT_REASONS.join(" / ") + "):");
+  if (!reason || !REJECT_REASONS.includes(reason)) { alert("Invalid reason."); return; }
+  if (!confirm(`Reject ${ids.length} jobs as "${reason}"? This can be undone via the Rejected tab.`)) return;
+  const r = await fetch(`/admin/jobs/api/bulk-reject`, {
+    method:"POST", credentials:"include",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ids, reason}),
   });
   if (!r.ok) { const msg = await r.text(); alert("Failed: " + msg); return; }
   load();

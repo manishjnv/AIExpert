@@ -166,16 +166,14 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-17 (session 19 — editorial summary refresh, chunk 1/many)
-**Last session summary (session 19):** Data-plane only. Ran `/summarize-jobs --status draft --limit 100 --batch 10`: imported **70 rows** stamped `sonnet-4.6` at `prompt_version 2026-04-16.2` across 7 rounds of 10. Round 8 generator pre-drafted at `C:/tmp/gen_r8.py` (not executed — belongs to the next session to complete the 100-cap). No repo code changed; only `docs/HANDOFF.md` and this file updated + committed at session close.
+**Last session date:** 2026-04-17 (session 21 — admin bulk-reject)
+**Last session summary (session 21):** Added bulk-reject to the Jobs Review queue, mirroring the existing bulk-publish UX. Admins can now select multiple drafts and reject them in one action with a shared reason — parity with publish, no tier gate (unlike bulk-publish which is Tier-1 only).
 
-- **Coverage this chunk:** IDs across Scale AI (HFC fellows, SecEng, SPL), xAI (ML, infra, net, storage, AI tutors, writing/math contractors, power-plant CM, HR), Anthropic (UI, CSM, Contracts, FP&A, Fellows 16/17/18, Enterprise AE manager, SLG AE, FDE manager, Community Ops), Databricks (SA Tokyo/London/India, Enterprise AE), Figure (ops, solutions eng, team managers trio), Google DeepMind (InfoQuality RS), PhonePe (VKYC, KYC mgr), Groww, CapLoan GRC, SIA.
-- **Anomalies flagged in `watch_outs`:** JD-in-Japanese for id=220 (Databricks DSA Tokyo), TX-vs-Memphis location contradiction for id=241 (xAI power-plant CM), EN/JP employment-type contradiction for id=260 (xAI Tokyo recruiter), published-credentials NDA disqualifier for id=243 (xAI writing specialist).
-- **Operator gotchas logged in HANDOFF.md:** bash heredocs break on JSON apostrophes → always use `cat local.json | ssh VPS "cat > /tmp/remote.json"`; Windows stdout is cp1252 → always write JSON through `open(..., encoding="utf-8")`; path quoting on Git Bash; helper-function pattern pays off for repeated role templates.
-- **Schema discipline:** 3 soft violations logged by the importer across 70 rows (1× chip_label, 2× resp_detail) — all marginally over, all accepted by the importer; not re-drafted.
+- **Backend:** new `POST /admin/jobs/api/bulk-reject` in [admin_jobs.py:365-395](backend/app/routers/admin_jobs.py#L365-L395) — validates `ids` (int list, ≤100) + `reason` (one of `VALID_REJECT_REASONS`), stamps `last_reviewed_by` + `last_reviewed_on`, increments `total_rejected` per source. No IndexNow ping (no published URLs changed).
+- **Frontend (same file, embedded HTML/JS):** "Bulk reject selected" button at [admin_jobs.py:1252](backend/app/routers/admin_jobs.py#L1252); `bulkRej()` at [admin_jobs.py:1308-1322](backend/app/routers/admin_jobs.py#L1308-L1322). Two-step UX: reason prompt (REJECT_REASONS list) then count-confirm dialog.
+- **Tests:** new `test_bulk_reject_accepts_any_tier_and_records_reason` covers invalid reason (400), empty ids (400), mixed-tier success (200 + DB rows flipped to rejected with correct reason + reviewer + date).
 
-**Tests passing:** 431 (no code change this session). **Tests failing:** 0 new (1 pre-existing unrelated `test_skills_with_no_curriculum_match` fails on parent commits too).
-**Blockers:** None. Pure data-plane run landed cleanly on VPS SQLite (import script commits per row, WAL-safe against live backend per `feedback_sqlite_writer_sessions.md`).
+**Tests passing:** 16/16 admin-jobs suite (full project suite ~432 — +1 new test vs session 20). **Blockers:** None.
 
-**Next action:** Resume the chunk in a fresh session — Round 8 script is pre-drafted at `C:/tmp/gen_r8.py`; then Rounds 9 + 10 to hit the 100-cap. Full resume prompt lives in the "Next-session resume prompt" subsection of `docs/HANDOFF.md`. After this chunk closes, ~467 legacy null-prompt-version rows remain; plan multiple future chunks of 100 each. Tiny outstanding admin chores (no blockers): submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
+**Next action:** Deploy to VPS — per memory `feedback_deploy_rebuild.md`, requires `docker compose up -d --build --force-recreate backend` (plain `restart` won't pick up code). Editorial-summary burn-down continues in parallel; resume prompt lives in `docs/HANDOFF.md`. Tiny outstanding admin chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.
