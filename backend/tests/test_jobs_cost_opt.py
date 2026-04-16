@@ -378,6 +378,218 @@ class TestDesignationTopicConsistency:
 
 
 # ===================================================================
+# Wave 2 #6–#10 — AI-intensity scoring (word-boundary regex, 3-tier
+# scoring with per-JD dedup, company boilerplate stripped before scoring)
+# ===================================================================
+
+class TestAIIntensityScoring:
+    """compute_ai_intensity returns a weighted score: STRONG x3 + MEDIUM x2
+    + WEAK x1, each pattern counted once per JD. Threshold = 5."""
+
+    def test_strong_alone_scores_3(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Build deep learning models") == 3
+
+    def test_two_distinct_strongs_sum(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Use PyTorch and TensorFlow") == 6
+
+    def test_three_distinct_strongs_sum(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        # pytorch + fine-tuning + RLHF = 9
+        assert compute_ai_intensity("PyTorch fine-tuning with RLHF") == 9
+
+    def test_medium_alone_scores_2(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Some LLM applications") == 2
+
+    def test_weak_alone_scores_1(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("AI-powered platform") == 1
+
+    def test_strong_plus_medium_passes_threshold(self):
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        # 3 + 2 = 5 == threshold
+        assert compute_ai_intensity("Build deep learning. LLM is involved.") >= AI_INTENSITY_THRESHOLD
+
+    def test_one_strong_alone_below_threshold(self):
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        assert compute_ai_intensity("Use PyTorch for some task") < AI_INTENSITY_THRESHOLD
+
+    def test_dedup_repeated_terms(self):
+        """Each pattern counts at most once per JD — boilerplate can't inflate."""
+        from app.services.jobs_ingest import compute_ai_intensity
+        # 5 hits of weak "AI-powered" = 1, not 5
+        assert compute_ai_intensity("AI-powered AI-powered AI-powered AI-powered AI-powered") == 1
+        # 3 hits of strong "pytorch" = 3, not 9
+        assert compute_ai_intensity("PyTorch PyTorch PyTorch") == 3
+
+    def test_substring_noise_not_matched(self):
+        """Word-boundary regex avoids the old substring-in noise problem."""
+        from app.services.jobs_ingest import compute_ai_intensity
+        # "shopping"/"appointment" must not match \bppo\b (not in our list anyway)
+        # "fragment" must not match \brag\b
+        # "fulfillment" must not match \bllm\b
+        # "Albert" must not match \bbert\b (not in list)
+        # "jaxon" must not match \bjax\b
+        # "ACL" must not match \bacl\b (not in list)
+        text = "Shopping carts. Albert. Aggregate fragment data. Fulfillment of orders. Jaxon manages ACLs."
+        assert compute_ai_intensity(text) == 0
+
+    def test_word_boundary_llm(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        # \bllm\b must match
+        assert compute_ai_intensity("Work on LLM applications") == 2
+        # \bllm\b must NOT match "fulfillment"
+        assert compute_ai_intensity("Order fulfillment specialist") == 0
+        # \bllm\b must match "LLM-based" (hyphen is a word boundary)
+        assert compute_ai_intensity("LLM-based system") >= 2
+
+    def test_word_boundary_rag(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Build a RAG system") == 2
+        # "fragment", "aggregate", "drag" must not match
+        assert compute_ai_intensity("Fragment data, drag-drop, aggregate views") == 0
+
+    def test_word_boundary_jax(self):
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Build models in JAX") == 3
+        # "Jaxon", "jaxson" must not match
+        assert compute_ai_intensity("Hi I am Jaxon") == 0
+
+    def test_qualified_brand_names(self):
+        """Bare 'Claude'/'Gemini' must not match — require API/model qualifier."""
+        from app.services.jobs_ingest import compute_ai_intensity
+        # Bare "Claude" (could be a person's name) — no match
+        assert compute_ai_intensity("Met with Claude yesterday") == 0
+        # Qualified "Claude Sonnet" — strong
+        assert compute_ai_intensity("Use Claude Sonnet for inference") == 3
+        # "Claude API" — strong
+        assert compute_ai_intensity("Integrate the Claude API") == 3
+        # Bare "Gemini" — no match
+        assert compute_ai_intensity("Born under Gemini zodiac") == 0
+        # "Gemini API" — strong
+        assert compute_ai_intensity("Call the Gemini API for completions") == 3
+
+    def test_acl_not_a_signal(self):
+        """ACL = access control list. Must NOT count as AI signal."""
+        from app.services.jobs_ingest import compute_ai_intensity
+        assert compute_ai_intensity("Configure ACLs for the API") == 0
+
+    def test_threshold_constant(self):
+        from app.services.jobs_ingest import AI_INTENSITY_THRESHOLD
+        assert AI_INTENSITY_THRESHOLD == 5
+
+
+class TestBoilerplateStripping:
+    """Company-mission/about-us paragraphs get stripped before scoring."""
+
+    def test_about_anthropic_section_stripped(self):
+        from app.services.jobs_ingest import _strip_company_boilerplate
+        jd = ("About Anthropic. Anthropic mission is to create reliable AI. "
+              "We work on machine learning, deep learning, and large language models. "
+              "About the role. You will manage office facilities and visitor logistics.")
+        stripped = _strip_company_boilerplate(jd)
+        assert "machine learning" not in stripped.lower()
+        assert "office facilities" in stripped.lower()
+
+    def test_our_mission_stripped(self):
+        from app.services.jobs_ingest import _strip_company_boilerplate
+        jd = ("Our mission is to advance generative AI. About the role. Help with travel arrangements.")
+        stripped = _strip_company_boilerplate(jd)
+        assert "generative ai" not in stripped.lower()
+        assert "travel arrangements" in stripped.lower()
+
+    def test_no_boilerplate_passthrough(self):
+        from app.services.jobs_ingest import _strip_company_boilerplate
+        jd = "Build PyTorch models and deploy to production."
+        assert _strip_company_boilerplate(jd) == jd
+
+    def test_about_openai_section_stripped(self):
+        from app.services.jobs_ingest import _strip_company_boilerplate
+        jd = ("About OpenAI. We build large language models and AI agents. "
+              "Responsibilities. Manage office logistics.")
+        stripped = _strip_company_boilerplate(jd)
+        assert "large language models" not in stripped.lower()
+        assert "office logistics" in stripped.lower()
+
+    def test_real_ai_role_passes_intensity(self):
+        """A genuine AI Research role at Anthropic should still pass after boilerplate strip."""
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        jd = ("About Anthropic. Anthropic mission is to create reliable AI. "
+              "About the role. You will work on RLHF and reward model training. "
+              "Build PyTorch pipelines for fine-tuning large language models. "
+              "Requirements: experience with deep learning and machine learning.")
+        assert compute_ai_intensity(jd) >= AI_INTENSITY_THRESHOLD
+
+    def test_office_manager_at_ai_lab_doesnt_pass(self):
+        """The motivating example: office manager at Anthropic — boilerplate strip
+        prevents the AI-lab vocabulary from inflating the role's intensity."""
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        jd = ("About Anthropic. Anthropic builds AI systems with machine learning "
+              "and large language models. About the role. Manage office facilities, "
+              "vendor coordination, visitor logistics. Requirements: organizational "
+              "skills, calendar management, attention to detail.")
+        assert compute_ai_intensity(jd) < AI_INTENSITY_THRESHOLD
+
+
+class TestHasNonAIJDSignalsWithIntensity:
+    """has_non_ai_jd_signals (Wave 2) uses intensity scoring instead of
+    binary substring-AI-signal check. Must preserve all RCA-026 behaviors."""
+
+    def test_phonepe_legal_still_flagged(self):
+        """The motivating PhonePe case — must remain flagged after Wave 2."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("LLB / LLM from a recognized university. Minimum 7 years of "
+              "post-qualification experience in corporate legal practice. "
+              "Draft and negotiate procurement contracts, MSAs, NDAs. "
+              "Ensure contracts comply with Indian Contract Act.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_real_ml_jd_with_nda_mention_not_flagged(self):
+        """Legit AI engineer JD that mentions NDA in passing — must NOT flag.
+        Passes because intensity score (RLHF + fine-tuning + PyTorch + LLM) >= 5."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Train large language models with RLHF. Fine-tuning PyTorch "
+              "pipelines for production. You will sign a standard NDA before starting.")
+        assert has_non_ai_jd_signals(jd) is False
+
+    def test_legal_jd_with_minimal_ai_mention_still_flagged(self):
+        """Legal JD with one stray 'AI products' weak mention must still flag —
+        Wave 2 closes the loophole where old binary substring check would pass."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Manage MSAs, NDAs, and procurement contracts. LLB required. "
+              "PQE 7+ years. Familiarity with AI products is a plus.")
+        # >=2 non-AI cluster hits (MSA, NDA, procurement, LLB, PQE), and
+        # AI intensity = 1 (weak "AI products") < 5
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_software_engineer_with_single_nda_not_flagged(self):
+        """Generic SWE jd with one NDA mention — below cluster threshold."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = "Software engineer role. Backend systems. You will sign an NDA before starting."
+        assert has_non_ai_jd_signals(jd) is False
+
+    def test_llm_degree_with_law_firm_flagged(self):
+        """RCA-026 carry-forward: LLM-degree + law firm = law role."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("We are hiring an associate with LL.M. from a top law school. "
+              "Law firm experience preferred. Contract drafting required.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_anthropic_office_manager_pattern(self):
+        """About Anthropic boilerplate doesn't rescue an office-mgr role."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        # JD has no non-AI cluster signals (it's not legal/HR-coded JD body)
+        # so this returns False — title pre-filter would catch "office manager" instead.
+        # This test confirms the JD scanner doesn't false-positive on AI-lab boilerplate.
+        jd = ("About Anthropic. Anthropic builds AI systems with machine learning. "
+              "About the role. Manage office facilities and visitor logistics.")
+        # No legal/HR/finance cluster hits, so returns False (correct — title would catch this)
+        assert has_non_ai_jd_signals(jd) is False
+
+
+# ===================================================================
 # Wave 1 #4 — topic↔anchor requirement
 # ===================================================================
 

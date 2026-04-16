@@ -154,10 +154,10 @@ def is_non_ai_title(title: str) -> bool:
 
 
 # JD-body cluster of terms that strongly indicate non-AI domains (law, HR,
-# procurement, finance). A job hitting >=2 of these AND zero AI signals is
-# almost certainly a false positive like PhonePe "Manager, Legal" where
-# "LLB / LLM from a recognized university" tricked the enricher into
-# tagging it as "Applied ML". See RCA-026.
+# procurement, finance). A job hitting >=2 of these AND low AI-intensity
+# score (Wave 2) is almost certainly a false positive like PhonePe
+# "Manager, Legal" where "LLB / LLM from a recognized university" tricked
+# the enricher into tagging it as "Applied ML". See RCA-026.
 _NON_AI_JD_SIGNALS: tuple[str, ...] = (
     # Legal
     "llb", "ll.b", "ll.m", "pqe", "post-qualification experience",
@@ -172,39 +172,261 @@ _NON_AI_JD_SIGNALS: tuple[str, ...] = (
     "bookkeeping", "gst filing", "tds ",
 )
 
-# Strong AI-signal words in JD body. If ANY hit, we do NOT suppress by JD
-# signals — keeps legit AI roles that happen to mention contracts/NDAs safe.
-# Keep tight and high-precision — false positives here cost us accuracy.
-_AI_JD_SIGNALS: tuple[str, ...] = (
-    "machine learning", "deep learning", "neural network", "transformer",
-    "pytorch", "tensorflow", "jax ", "hugging face", "huggingface",
-    "large language model", "large-language model", "llm-based",
-    "fine-tuning", "fine tuning", "prompt engineering", "rag pipeline",
-    "retrieval augmented", "retrieval-augmented",
-    "computer vision", "nlp model", "natural language processing",
-    "reinforcement learning", "mlops", "ml ops", "ml platform",
-    "model training", "model inference", "model evaluation", "embedding model",
-    "vector database", "langchain", "llamaindex",
-    "openai", "anthropic", "claude api", "gemini api", "gpt-4", "gpt-5",
-    "generative ai", "gen ai ", "genai ",
-    "data scientist", "ml engineer", "ai engineer", "research scientist",
+
+# ---------------------------------------------------------------- Wave 2: AI-intensity scoring
+#
+# Replaces the old binary _AI_JD_SIGNALS substring check. The substring
+# approach mis-scored "ppo" against "shopping", "vit" against "activity",
+# "rag" against "fragment" — inflating the AI signal of non-AI JDs.
+#
+# New model: weighted three-tier score with word-boundary regex.
+# - STRONG (3 pts): AI-specific terms with no non-AI meaning ("pytorch",
+#   "fine-tuning", "rlhf", "machine learning", "neural networks").
+# - MEDIUM (2 pts): Ambiguous alone; need cluster context ("llm" — Master
+#   of Laws degree, "rag" — fragment, "agent" — hiring agent).
+# - WEAK   (1 pt):  Generic AI mentions in marketing/boilerplate copy
+#   ("AI-powered", "AI-driven", "using AI"). Won't carry a JD alone.
+#
+# Each pattern matches AT MOST ONCE per JD (per-JD dedup) — boilerplate
+# repeating "AI" 10 times can't inflate the score.
+#
+# Threshold: score >= 5 to qualify as AI. One STRONG + one MEDIUM = 5.
+# Two STRONG = 6. One STRONG alone = 3 (insufficient — needs corroboration).
+
+_AI_STRONG_PATTERNS: tuple[str, ...] = (
+    # Core ML techniques (multi-word, no ambiguity)
+    r"\bmachine learning\b",
+    r"\bdeep learning\b",
+    r"\bgenerative ai\b",
+    r"\bgenai\b",
+    r"\bgen[- ]ai\b",
+    r"\bneural networks?\b",
+    r"\breinforcement learning\b",
+    r"\bnatural language processing\b",
+    r"\bcomputer vision\b",
+    r"\btransfer learning\b",
+    r"\bfew[- ]shot learning\b",
+    r"\bzero[- ]shot learning\b",
+    r"\bin[- ]context learning\b",
+    # Foundation-model vocabulary
+    r"\blarge language models?\b",
+    r"\blanguage models?\b",
+    r"\bfoundation models?\b",
+    r"\btransformer (?:model|architecture|layer)s?\b",
+    r"\battention mechanism\b",
+    r"\bmixture of experts\b",
+    r"\bcontext window\b",
+    r"\btokeniz(?:er|ation)\b",
+    # Training & optimization
+    r"\bfine[- ]tuning\b",
+    r"\bpretraining\b", r"\bpre[- ]training\b",
+    r"\bpost[- ]training\b",
+    r"\binstruction tuning\b",
+    r"\brlhf\b",
+    r"\bdpo\b",
+    r"\bsupervised fine[- ]tun\w*",
+    r"\bknowledge distillation\b",
+    r"\bmodel quantization\b",
+    r"\bmodel training\b",
+    r"\btraining loop\b",
+    r"\bgradient descent\b",
+    r"\bbackpropagation\b",
+    r"\bloss function\b",
+    r"\bcross[- ]entropy\b",
+    # Inference & serving
+    r"\bmodel inference\b",
+    r"\binference latency\b",
+    r"\binference throughput\b",
+    r"\binference engine\b",
+    r"\binference server\b",
+    r"\bbatch(?:ed)? inference\b",
+    r"\bonline inference\b",
+    r"\bmodel serving\b",
+    r"\bmodel deployment\b",
+    r"\bmodel registry\b",
+    r"\bmodel weights\b",
+    # RAG / agents / prompt
+    r"\bretrieval[- ]augmented\b",
+    r"\bvector databases?\b",
+    r"\bvector stores?\b",
+    r"\bembedding models?\b",
+    r"\bprompt engineering\b",
+    r"\bchain of thought\b",
+    r"\bfunction calling\b",
+    r"\bmulti[- ]agent\b",
+    r"\bagentic\b",
+    r"\bconstitutional ai\b",
+    # MLOps & platform
+    r"\bmlops\b",
+    r"\bml ops\b",
+    r"\bml platforms?\b",
+    r"\bdistributed training\b",
+    r"\bmulti[- ]gpu\b",
+    r"\btensor parallel\b",
+    r"\bpipeline parallel\b",
+    r"\bdata parallel\b",
+    r"\bdeepspeed\b",
+    r"\bmegatron\b",
+    r"\bfsdp\b",
+    r"\bnccl\b",
+    r"\bcuda kernel\b",
+    r"\bkubeflow\b",
+    r"\bmlflow\b",
+    r"\bfeature store\b",
+    r"\bsagemaker\b",
+    r"\bvertex ai\b",
+    # Frameworks (brand names — high precision)
+    r"\bpytorch\b",
+    r"\btensorflow\b",
+    r"\bjax\b",
+    r"\bhugging[- ]?face\b",
+    r"\blangchain\b",
+    r"\bllamaindex\b",
+    # Models / brand APIs (qualified to avoid bare-name false matches)
+    r"\bopenai (?:api|models?|platform)\b",
+    r"\banthropic api\b",
+    r"\bclaude api\b",
+    r"\bgemini api\b",
+    r"\bgpt-[345]\b",
+    r"\bclaude (?:sonnet|opus|haiku)\b",
+    r"\bllama[- ]?\d+\b",
+    r"\bmistral (?:large|medium|small|7b|ai)\b",
+    r"\bstable diffusion\b",
+    r"\bdall-?e\b",
+    # Research signals
+    r"\bresearch papers?\b",
+    r"\barxiv\b",
+    r"\bpeer[- ]reviewed\b",
+    r"\bneurips\b", r"\bicml\b", r"\biclr\b",
+    r"\bemnlp\b", r"\bcvpr\b", r"\baaai\b",
+    r"\bempirical research\b",
+    r"\bablation stud(?:y|ies)\b",
+    # Safety (qualified — bare "alignment"/"safety" too generic)
+    r"\bai safety\b",
+    r"\bai alignment\b",
+    r"\bmechanistic interpretability\b",
+    r"\binterpretability\b",
+    # Inference hardware (AI-specific contexts only)
+    r"\binference cluster\b",
+    r"\bgpu cluster\b",
+    r"\btpu pod\b",
+)
+
+_AI_MEDIUM_PATTERNS: tuple[str, ...] = (
+    r"\bllm\b",          # Master of Laws ambiguity
+    r"\brag\b",          # Cleaning rag, rag time, fragment
+    r"\bagents?\b",      # Hiring agent, escrow agent
+    r"\bgpus?\b",        # Generic infra mention
+    r"\bnlp\b",          # National pension liability and similar
+    r"\bml engineer\b",
+    r"\bdata scientist\b",
+    r"\bai engineer\b",
+    r"\bresearch scientist\b",
+    r"\bapplied ml\b",
+    r"\btraining data\b",
+    r"\bmodel evaluation\b",
+)
+
+_AI_WEAK_PATTERNS: tuple[str, ...] = (
+    r"\bai[- ](?:powered|driven|first|native|enabled)\b",
+    r"\bml[- ](?:driven|powered|enabled)\b",
+    r"\busing (?:ai|ml)\b",
+    r"\b(?:ai|ml)[- ]based\b",
+    r"\b(?:ai|ml) (?:products?|tools?|platforms?)\b",
+)
+
+# Compile regex patterns once at module load (perf — JD scoring is hot path).
+_AI_STRONG_RE = tuple(re.compile(p, re.IGNORECASE) for p in _AI_STRONG_PATTERNS)
+_AI_MEDIUM_RE = tuple(re.compile(p, re.IGNORECASE) for p in _AI_MEDIUM_PATTERNS)
+_AI_WEAK_RE = tuple(re.compile(p, re.IGNORECASE) for p in _AI_WEAK_PATTERNS)
+
+AI_INTENSITY_THRESHOLD = 5  # min score to qualify a JD as AI-relevant
+
+# Boilerplate sections (company mission, "About <Company>", "Why join us")
+# get stripped before scoring. Critical for AI labs where every JD opens
+# with "Anthropic's mission is to build safe AI…" — a mission paragraph
+# that contains AI terms shouldn't elevate a non-AI role's intensity.
+_BOILERPLATE_PATTERNS = (
+    re.compile(
+        r"\babout (?:anthropic|openai|databricks|cerebras|deepmind|cohere"
+        r"|hugging\s?face|the company|us|our (?:company|team|firm|mission))\b"
+        r".*?(?=\b(?:about the role|the role|in this role|role overview"
+        r"|responsibilities|key responsibilities|what you[' ]ll do"
+        r"|what you do|requirements|qualifications|must[- ]haves?)\b|\Z)",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\bour mission\b.*?(?=\b(?:about the role|the role|in this role"
+        r"|role overview|responsibilities|key responsibilities"
+        r"|what you[' ]ll do|requirements|qualifications)\b|\Z)",
+        re.I | re.S,
+    ),
+    re.compile(
+        r"\bwhy (?:join|work at|anthropic|openai|us)\b"
+        r".*?(?=\b(?:about the role|the role|in this role|role overview"
+        r"|responsibilities|key responsibilities|what you[' ]ll do"
+        r"|requirements|qualifications)\b|\Z)",
+        re.I | re.S,
+    ),
 )
 
 
-def has_non_ai_jd_signals(jd_html: str) -> bool:
-    """Return True if the JD body looks like a non-AI role (legal/HR/finance).
+def _strip_company_boilerplate(jd_text: str) -> str:
+    """Remove company-mission and "about us" sections before AI scoring.
 
-    Uses a conservative two-gate rule: (a) >=2 distinct legal/HR/finance
-    cluster hits, AND (b) zero strong AI-signal terms. This catches PhonePe
-    "Manager, Legal" (with LLB, PQE, procurement contracts, MSA/NDA, Indian
-    Contract Act) while keeping safe an AI Solutions Architect who happens
-    to mention commercial contracts in passing.
+    AI lab JDs uniformly open with "About Anthropic — Anthropic's mission
+    is to build safe AI…" — that paragraph contains AI terms regardless
+    of the role being hired for. Stripping prevents non-AI roles at AI
+    labs from inheriting their employer's AI vocabulary.
+    """
+    out = jd_text
+    for pat in _BOILERPLATE_PATTERNS:
+        out = pat.sub(" ", out)
+    return out
+
+
+def compute_ai_intensity(jd_text: str) -> int:
+    """Three-tier weighted AI-intensity score for a JD body.
+
+    Returns sum(strong x3 + medium x2 + weak x1). Each pattern counts at
+    most once per JD (dedup) — repeated boilerplate cannot inflate.
+
+    Score >= AI_INTENSITY_THRESHOLD (5) qualifies a JD as AI-relevant.
+    Below threshold ⇒ JD is not concrete-AI work even if it mentions AI.
+    """
+    text = _strip_company_boilerplate(jd_text)
+    score = 0
+    for r in _AI_STRONG_RE:
+        if r.search(text):
+            score += 3
+    for r in _AI_MEDIUM_RE:
+        if r.search(text):
+            score += 2
+    for r in _AI_WEAK_RE:
+        if r.search(text):
+            score += 1
+    return score
+
+
+def has_non_ai_jd_signals(jd_html: str) -> bool:
+    """Return True if the JD body looks like a non-AI role.
+
+    Wave 2 evolution of the original two-gate rule:
+      (a) >=2 distinct legal/HR/finance cluster hits, AND
+      (b) AI-intensity score < AI_INTENSITY_THRESHOLD (5).
+
+    The intensity score replaces the old "any AI substring" guard. The
+    old check failed open on substring noise — "shopping" matched "ppo",
+    "fragment" matched "rag", "Albert" matched "bert". The new gate uses
+    word-boundary regex with weighted scoring so a JD must show genuine
+    AI work content (one strong + one medium, or two strong terms) to
+    overcome a non-AI cluster.
     """
     text = jd_html.lower()
     non_ai_hits = sum(1 for sig in _NON_AI_JD_SIGNALS if sig in text)
     if non_ai_hits < 2:
         return False
-    if any(sig in text for sig in _AI_JD_SIGNALS):
+    if compute_ai_intensity(jd_html) >= AI_INTENSITY_THRESHOLD:
         return False
     return True
 
