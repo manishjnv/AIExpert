@@ -779,6 +779,118 @@ class TestBareVerbTitleGate:
 
 
 # ===================================================================
+# Wave 4 #16 — Opus audit sample selection (manual review via Claude Code)
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_audit_sample_picks_tier1_published_only():
+    """Selection limits to Tier-1 published; ignores drafts and Tier-2."""
+    from app.models import JobSource
+    from scripts.select_audit_sample import select_sample
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:t1", kind="greenhouse",
+                         label="T1", tier=1, enabled=1, bulk_approve=1))
+        db.add(JobSource(key="greenhouse:t2", kind="greenhouse",
+                         label="T2", tier=2, enabled=1, bulk_approve=0))
+        # 50 Tier-1 published
+        for i in range(50):
+            db.add(_make_job(source="greenhouse:t1", external_id=f"t1p-{i}",
+                             status="published"))
+        # 10 Tier-1 draft (must be ignored)
+        for i in range(10):
+            db.add(_make_job(source="greenhouse:t1", external_id=f"t1d-{i}",
+                             status="draft"))
+        # 50 Tier-2 published (must be ignored)
+        for i in range(50):
+            db.add(_make_job(source="greenhouse:t2", external_id=f"t2p-{i}",
+                             status="published"))
+        await db.commit()
+
+    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+    # 1% of 50 = 0 → MIN_SAMPLE clamps to 1
+    assert len(picked) >= 1
+    # Ensure only Tier-1 published got marked
+    async with db_module.async_session_factory() as db:
+        for jid in picked:
+            j = (await db.execute(select(Job).where(Job.id == jid))).scalar_one()
+            assert j.source == "greenhouse:t1"
+            assert j.status == "published"
+            assert (j.data or {}).get("audit", {}).get("status") == "pending"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_audit_sample_skips_already_pending():
+    """A row already audit.status=pending isn't re-selected."""
+    from app.models import JobSource
+    from scripts.select_audit_sample import select_sample
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:t1", kind="greenhouse",
+                         label="T1", tier=1, enabled=1, bulk_approve=1))
+        for i in range(5):
+            j = _make_job(source="greenhouse:t1", external_id=f"p-{i}",
+                          status="published")
+            j.data = {"audit": {"status": "pending", "selected_at": "2026-04-01T00:00:00"}}
+            db.add(j)
+        await db.commit()
+
+    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+    assert picked == []  # all 5 are pending — none eligible
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_audit_sample_respects_cooldown():
+    """A row reviewed within cooldown window is NOT re-selected."""
+    from app.models import JobSource
+    from scripts.select_audit_sample import select_sample
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:t1", kind="greenhouse",
+                         label="T1", tier=1, enabled=1, bulk_approve=1))
+        # Reviewed 5 days ago — within 90d cooldown → ineligible
+        recent = _make_job(source="greenhouse:t1", external_id="recent",
+                           status="published")
+        recent.data = {"audit": {
+            "status": "reviewed",
+            "reviewed_at": (datetime(2026, 4, 11)).isoformat(timespec="seconds"),
+        }}
+        db.add(recent)
+        await db.commit()
+
+    # Patch utcnow indirectly: we use datetime.utcnow() inside select_sample;
+    # since recent was reviewed 5 days before "today", cooldown=90 still excludes it.
+    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+    # Only 1 row total and it's within cooldown — picked must be empty
+    assert picked == []
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_audit_sample_dry_run_no_writes():
+    from app.models import JobSource
+    from scripts.select_audit_sample import select_sample
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:t1", kind="greenhouse",
+                         label="T1", tier=1, enabled=1, bulk_approve=1))
+        for i in range(10):
+            db.add(_make_job(source="greenhouse:t1", external_id=f"p-{i}",
+                             status="published"))
+        await db.commit()
+
+    picked = await select_sample(sample_size=3, cooldown_days=90, dry_run=True)
+    assert len(picked) == 3
+    async with db_module.async_session_factory() as db:
+        rows = (await db.execute(select(Job))).scalars().all()
+        for r in rows:
+            assert (r.data or {}).get("audit") is None  # no stamp written
+    await close_db()
+
+
+# ===================================================================
 # Wave 4 #14 — per-source rejection-rate alarm
 # ===================================================================
 

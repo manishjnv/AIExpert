@@ -116,6 +116,17 @@ async def quarterly_sync_loop() -> None:
         await asyncio.sleep(60)  # guard against clock rewind
 
 
+async def weekly_audit_select_loop() -> None:
+    """Wave 4 #16e — Mon 04:30 UTC pick 1% of Tier-1 published as audit-pending."""
+    from scripts.select_audit_sample import select_sample
+    while True:
+        target = _next_weekly(0, 4, 30, datetime.now(timezone.utc))
+        await _sleep_until(target, "weekly_audit_select")
+        async def _go():
+            await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+        await _run_guarded(_go, "weekly_audit_select")
+
+
 # ---------- test-mode override ----------
 # Set JOBS_SCHEDULER_TEST=1 to run every job once on a 60-second cycle —
 # useful for smoke-testing the container without waiting 24h.
@@ -144,6 +155,7 @@ async def main() -> None:
         daily_jobs_loop(),
         weekly_digest_loop(),
         quarterly_sync_loop(),
+        weekly_audit_select_loop(),
     )
 
 

@@ -526,11 +526,176 @@ async def summary_stats(
         ],
     }
 
+    # Wave 4 #16d — count of jobs awaiting Opus audit (selected weekly,
+    # reviewed manually via Claude Code in VS Code — no API spend).
+    audit_pending_expr = func.json_extract(Job.data, "$.audit.status")
+    audit_pending_count = (await db.execute(
+        select(func.count(Job.id)).where(audit_pending_expr == "pending")
+    )).scalar() or 0
+
     return {
         "coverage": coverage,
         "versions": versions,
         "generated_last_7d": generated_last_7d,
         "ai_intensity_distribution": intensity_distribution,
+        "audit_pending_count": audit_pending_count,
+    }
+
+
+# ---------------------------------------------------------------- Wave 4 #16
+# Audit workflow: 1% of Tier-1 published jobs are stamped pending weekly
+# (scripts/select_audit_sample.py). Admin lists them via /api/audit-pending,
+# copies the generated Claude Code prompt into VS Code with Claude Max
+# (no API spend), pastes Claude's JSON response into /api/audit-submit.
+
+_AUDIT_PROMPT_TEMPLATE = """You are auditing AI Roadmap job classifications. For each job below, evaluate whether the assigned `topic` and `designation` match the JD's actual content.
+
+ALLOWED_TOPIC = ["LLM","CV","NLP","RL","MLOps","Data Eng","Research","Applied ML","GenAI","Robotics","Safety","Agents","RAG","Fine-tuning","Evals"]
+ALLOWED_DESIGNATION = ["ML Engineer","Research Scientist","Applied Scientist","Data Scientist","Data Engineer","MLOps Engineer","AI Product Manager","AI Engineer","Prompt Engineer","Research Engineer","Computer Vision Engineer","NLP Engineer","AI Solutions Architect","AI Developer Advocate","Other"]
+
+Rules:
+- "LLM" topic = Large Language Model ONLY. Never Master of Laws degree (LLB/LL.M).
+- "Other" designation MUST come with `opus_topic: []`. The two are coupled.
+- AI-adjacent roles (sales engineer, recruiter, marketer, policy analyst — even at AI labs) are non-AI: `opus_topic: []`, `opus_designation: "Other"`.
+- "Experience with ML/AI" as a job REQUIREMENT does not make a role AI. Only assign topics when the day-to-day work is concrete AI/ML (training, fine-tuning, inference, research, MLOps, dataset engineering, prompt engineering for production).
+- Empty topic preferred over wrong guess.
+
+Return STRICT JSON array, one entry per job, no prose:
+
+[
+  {
+    "job_id": <int>,
+    "agreed": <true|false>,
+    "opus_topic": [<string>, ...],
+    "opus_designation": "<one of ALLOWED_DESIGNATION>",
+    "notes": "<one-line rationale; required if agreed=false, else empty>"
+  }
+]
+
+Jobs to audit:
+
+"""
+
+
+@router.get("/api/audit-pending")
+async def list_audit_pending(
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """List jobs awaiting Opus audit + return ready-to-paste Claude Code prompt.
+
+    Workflow:
+      1. Cron stamps 1% of Tier-1 published rows weekly (audit.status=pending)
+      2. Admin GETs this endpoint, gets `claude_code_prompt`
+      3. Pastes prompt into Claude Code (VS Code, Claude Max)
+      4. Pastes Claude's JSON response into POST /api/audit-submit
+    """
+    from app.services.jobs_enrich import _strip_html
+    audit_status_expr = func.json_extract(Job.data, "$.audit.status")
+    rows = (await db.execute(
+        select(Job).where(audit_status_expr == "pending").order_by(Job.id)
+    )).scalars().all()
+
+    jobs_payload = []
+    for j in rows:
+        d = j.data or {}
+        jd_text = _strip_html(d.get("description_html") or "")[:3000]
+        jobs_payload.append({
+            "id": j.id,
+            "title": j.title,
+            "company": j.company_slug,
+            "current_topic": d.get("topic") or [],
+            "current_designation": j.designation,
+            "jd_text": jd_text,
+        })
+
+    import json as _json
+    prompt = _AUDIT_PROMPT_TEMPLATE + _json.dumps(jobs_payload, indent=2)
+    return {
+        "count": len(rows),
+        "jobs": jobs_payload,
+        "claude_code_prompt": prompt,
+        "instructions": (
+            "1. Copy `claude_code_prompt` into Claude Code in VS Code "
+            "(Claude Max — no API spend).\n"
+            "2. Claude returns a JSON array of audit verdicts.\n"
+            "3. POST that array to /admin/jobs/api/audit-submit "
+            "as { 'results': [...] }.\n"
+            "4. Disagreements stamp admin_notes for follow-up review."
+        ),
+    }
+
+
+@router.post("/api/audit-submit")
+async def submit_audit_results(
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept Claude-Max audit verdicts and update Job.data.audit.
+
+    Body: { "results": [ { "job_id": int, "agreed": bool,
+                            "opus_topic": [...], "opus_designation": "...",
+                            "notes": "..." }, ... ] }
+
+    For each verdict:
+      - Set audit.status='reviewed', audit.reviewed_at=now,
+        audit.agreed, audit.opus_topic, audit.opus_designation, audit.notes
+      - If agreed=false, prepend "OPUS-AUDIT mismatch: <notes>" to admin_notes
+    """
+    body = await request.json()
+    results = body.get("results")
+    if not isinstance(results, list):
+        raise HTTPException(400, "body must be {'results': [...]}")
+
+    from datetime import datetime as _dt
+    now_iso = _dt.utcnow().isoformat(timespec="seconds")
+    updated, mismatches, skipped = 0, 0, 0
+
+    for r in results:
+        if not isinstance(r, dict) or "job_id" not in r:
+            skipped += 1
+            continue
+        try:
+            jid = int(r["job_id"])
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+
+        job = (await db.execute(select(Job).where(Job.id == jid))).scalar_one_or_none()
+        if job is None:
+            skipped += 1
+            continue
+
+        agreed = bool(r.get("agreed"))
+        opus_topic = r.get("opus_topic") if isinstance(r.get("opus_topic"), list) else []
+        opus_des = r.get("opus_designation") if isinstance(r.get("opus_designation"), str) else None
+        notes = (r.get("notes") or "").strip()[:300]
+
+        new_data = dict(job.data or {})
+        prior = new_data.get("audit") or {}
+        new_data["audit"] = {
+            "selected_at": prior.get("selected_at"),
+            "reviewed_at": now_iso,
+            "status": "reviewed",
+            "agreed": agreed,
+            "opus_topic": opus_topic,
+            "opus_designation": opus_des,
+            "notes": notes,
+        }
+        job.data = new_data
+        if not agreed:
+            mismatches += 1
+            stamp = f"OPUS-AUDIT mismatch ({now_iso[:10]}): {notes or 'no notes'}"
+            existing_notes = (job.admin_notes or "").strip()
+            job.admin_notes = f"{stamp} | {existing_notes}".rstrip(" |") if existing_notes else stamp
+        updated += 1
+
+    await db.commit()
+    return {
+        "updated": updated,
+        "mismatches": mismatches,
+        "skipped": skipped,
     }
 
 
@@ -837,7 +1002,35 @@ async function loadSummaryStats() {
           <div style="margin-top:12px;color:#94a3b8;font-size:12px">Generated last 7 days: <b style="color:#e8a849;font-family:'IBM Plex Mono',monospace">${data.generated_last_7d || 0}</b></div>
         </div>
       </div>`;
+    // Wave 4 #16d — Opus audit reminder badge
+    const auditCount = data.audit_pending_count || 0;
+    const sumPanel = document.getElementById('sumstats-body');
+    const existing = document.getElementById('opus-audit-banner');
+    if (existing) existing.remove();
+    if (auditCount > 0 && sumPanel) {
+      const banner = document.createElement('div');
+      banner.id = 'opus-audit-banner';
+      banner.style.cssText = 'margin-top:14px;padding:10px 14px;border:1px solid #e8a849;background:#1a1410;border-radius:6px;color:#e8a849;font-size:13px;display:flex;justify-content:space-between;align-items:center';
+      banner.innerHTML = `<span><b>${auditCount}</b> Tier-1 published job${auditCount===1?'':'s'} pending Opus audit. <span style="color:#94a3b8;font-size:12px">Run weekly via Claude Code (no API spend).</span></span><button onclick="copyAuditPrompt()" style="background:#e8a849;color:#0f1419;border:0;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px">COPY PROMPT</button>`;
+      sumPanel.parentNode.insertBefore(banner, sumPanel);
+    }
   } catch(_) {}
+}
+
+// Wave 4 #16d — Opus audit prompt → clipboard
+async function copyAuditPrompt() {
+  try {
+    const r = await fetch('/admin/jobs/api/audit-pending', {credentials:'include'});
+    if (!r.ok) { alert('Failed to load audit list: ' + r.status); return; }
+    const data = await r.json();
+    if (!data.count) { alert('No jobs pending audit.'); return; }
+    await navigator.clipboard.writeText(data.claude_code_prompt);
+    alert(`Copied prompt for ${data.count} job${data.count===1?'':'s'}.\n\n` +
+          `Next steps:\n` +
+          `  1. Paste into Claude Code in VS Code (Claude Max — no API spend)\n` +
+          `  2. Save Claude's JSON response\n` +
+          `  3. POST to /admin/jobs/api/audit-submit as { "results": [...] }`);
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function loadStats() {
