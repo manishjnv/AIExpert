@@ -2406,20 +2406,20 @@ If a job is missing one, run <code>/summarize-jobs --id &lt;ID&gt;</code> first.
 <div class="flow">
 <div class="flow-step"><span class="step-num">1.</span><span class="step-text">Click <strong>COPY PROMPT</strong> in the banner. The Claude Code prompt (with all pending jobs JSON-embedded) is copied to clipboard.</span></div>
 <div class="flow-step"><span class="step-num">2.</span><span class="step-text">Open Claude Code in VS Code (with your <strong>Claude Max</strong> subscription &mdash; no API spend).</span></div>
-<div class="flow-step"><span class="step-num">3.</span><span class="step-text">Paste the prompt. Claude returns a JSON array with one entry per job: <code>{job_id, agreed, opus_topic, opus_designation, notes}</code>.</span></div>
-<div class="flow-step"><span class="step-num">4.</span><span class="step-text">POST that JSON back as <code>{"results":[...]}</code> to <code>/admin/jobs/api/audit-submit</code> (curl from your shell or the VS Code REST extension).</span></div>
+<div class="flow-step"><span class="step-num">3.</span><span class="step-text">Paste the prompt. Claude returns a JSON array with one entry per job: <code>{{job_id, agreed, opus_topic, opus_designation, notes}}</code>.</span></div>
+<div class="flow-step"><span class="step-num">4.</span><span class="step-text">POST that JSON back as <code>{{"results":[...]}}</code> to <code>/admin/jobs/api/audit-submit</code> (curl from your shell or the VS Code REST extension).</span></div>
 <div class="flow-step"><span class="step-num">5.</span><span class="step-text">Disagreements stamp <code>OPUS-AUDIT mismatch (date): notes</code> on the job's admin_notes for follow-up review.</span></div>
 </div>
 
 <h3>Submission example</h3>
 <pre><code>curl -X POST https://your-domain/admin/jobs/api/audit-submit \\
   -H "Cookie: session=..." -H "Content-Type: application/json" \\
-  -d '{"results":[
-    {"job_id":20,"agreed":true,"opus_topic":["RL","Safety","Research"],
-     "opus_designation":"Research Scientist","notes":""},
-    {"job_id":95,"agreed":false,"opus_topic":[],
-     "opus_designation":"Other","notes":"Customer support, not AI"}
-  ]}'</code></pre>
+  -d '{{"results":[
+    {{"job_id":20,"agreed":true,"opus_topic":["RL","Safety","Research"],
+     "opus_designation":"Research Scientist","notes":""}},
+    {{"job_id":95,"agreed":false,"opus_topic":[],
+     "opus_designation":"Other","notes":"Customer support, not AI"}}
+  ]}}'</code></pre>
 
 <div class="warn">
 <strong>Why no API spend?</strong> Claude Max in VS Code is a fixed monthly subscription, not metered API. The audit prompt + ~10 jobs fits in one Opus context window with room to spare.
