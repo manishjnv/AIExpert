@@ -1991,6 +1991,15 @@ async def get_ai_usage(
     cost_7d = await _sum_cost(seven_days_ago)
     cost_30d = await _sum_cost(thirty_days_ago)
 
+    # Tokens this month (live)
+    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    tokens_this_month = await db.scalar(
+        select(func.sum(AIUsageLog.tokens_estimated)).where(
+            AIUsageLog.called_at >= month_start,
+            AIUsageLog.status == "ok",
+        )
+    ) or 0
+
     # Per-provider stats
     provider_stats = (await db.execute(
         select(
@@ -2017,11 +2026,11 @@ async def get_ai_usage(
         .order_by(AIUsageLog.task, AIUsageLog.subtask)
     )).all()
 
-    # Recent calls (last 50)
+    # Recent calls (last 20)
     recent = (await db.execute(
         select(AIUsageLog)
         .order_by(AIUsageLog.called_at.desc())
-        .limit(50)
+        .limit(20)
     )).scalars().all()
 
     # Health state
@@ -2097,6 +2106,7 @@ async def get_ai_usage(
             "today": round(cost_today, 6),
             "last_7d": round(cost_7d, 6),
             "last_30d": round(cost_30d, 6),
+            "tokens_this_month": int(tokens_this_month),
         },
         "limits": limits_list,
         "provider_info": provider_info,
@@ -2263,91 +2273,16 @@ async def ai_usage_analytics(
     _user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Persistent usage analytics — all-time + monthly + daily, grouped per model.
+    """Usage analytics — cost trend + top tasks by cost.
 
     Source of truth: ai_usage_log (written on every AI call). Survives deploys,
-    container rebuilds, and restarts. Cost computed via ai.pricing.compute_cost
+    container rebuilds, and restarts. Cost computed via ai.pricing.get_price
     using real token counts captured from provider API responses.
     """
     from datetime import datetime as _dt, timedelta as _td, timezone as _tz
-    from sqlalchemy import case
     from app.ai.pricing import get_price
 
-    # --- All-time per-model totals ---
-    alltime_rows = (await db.execute(
-        select(
-            AIUsageLog.provider, AIUsageLog.model,
-            func.count().label("calls"),
-            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("success"),
-            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
-        )
-        .where(AIUsageLog.status == "ok")
-        .group_by(AIUsageLog.provider, AIUsageLog.model)
-        .order_by(func.sum(AIUsageLog.tokens_estimated).desc())
-    )).all()
-
-    alltime = []
-    for r in alltime_rows:
-        in_p, _ = get_price(r.provider, r.model)
-        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
-        alltime.append({
-            "provider": r.provider, "model": r.model,
-            "calls": r.calls, "success": r.success or 0,
-            "tokens": int(r.tokens or 0),
-            "cost_usd": round(cost, 6),
-        })
-
-    # --- Monthly per-model (last 12 months) ---
-    monthly_rows = (await db.execute(
-        select(
-            func.strftime("%Y-%m", AIUsageLog.called_at).label("month"),
-            AIUsageLog.provider, AIUsageLog.model,
-            func.count().label("calls"),
-            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
-        )
-        .where(AIUsageLog.status == "ok")
-        .group_by("month", AIUsageLog.provider, AIUsageLog.model)
-        .order_by("month")
-    )).all()
-
-    monthly = []
-    for r in monthly_rows:
-        in_p, _ = get_price(r.provider, r.model)
-        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
-        monthly.append({
-            "month": r.month, "provider": r.provider, "model": r.model,
-            "calls": r.calls,
-            "tokens": int(r.tokens or 0),
-            "cost_usd": round(cost, 6),
-        })
-
-    # --- Daily per-model (last 30 days) ---
     thirty_days_ago = _dt.now(_tz.utc).replace(tzinfo=None) - _td(days=30)
-    daily_rows = (await db.execute(
-        select(
-            func.strftime("%Y-%m-%d", AIUsageLog.called_at).label("day"),
-            AIUsageLog.provider, AIUsageLog.model,
-            func.count().label("calls"),
-            func.sum(AIUsageLog.tokens_estimated).label("tokens"),
-        )
-        .where(
-            AIUsageLog.status == "ok",
-            AIUsageLog.called_at >= thirty_days_ago,
-        )
-        .group_by("day", AIUsageLog.provider, AIUsageLog.model)
-        .order_by("day")
-    )).all()
-
-    daily = []
-    for r in daily_rows:
-        in_p, _ = get_price(r.provider, r.model)
-        cost = ((r.tokens or 0) / 1_000_000.0) * in_p
-        daily.append({
-            "day": r.day, "provider": r.provider, "model": r.model,
-            "calls": r.calls,
-            "tokens": int(r.tokens or 0),
-            "cost_usd": round(cost, 6),
-        })
 
     # --- Top tasks by cost (last 30d) — where the money is going ---
     task_rows = (await db.execute(
@@ -2411,34 +2346,9 @@ async def ai_usage_analytics(
         "pct_change": pct_change,
     }
 
-    # --- Fallback rate: how often a non-first provider served a task ---
-    # (A rough proxy: count non-ok statuses per provider as "needed fallback".)
-    fallback_rows = (await db.execute(
-        select(
-            AIUsageLog.provider,
-            func.sum(case((AIUsageLog.status == "ok", 1), else_=0)).label("ok_cnt"),
-            func.sum(case((AIUsageLog.status != "ok", 1), else_=0)).label("fail_cnt"),
-        )
-        .where(AIUsageLog.called_at >= thirty_days_ago)
-        .group_by(AIUsageLog.provider)
-    )).all()
-    fallback_rate = []
-    for r in fallback_rows:
-        total = (r.ok_cnt or 0) + (r.fail_cnt or 0)
-        if total > 0:
-            fallback_rate.append({
-                "provider": r.provider,
-                "ok": r.ok_cnt or 0,
-                "fail": r.fail_cnt or 0,
-                "fail_pct": round((r.fail_cnt or 0) / total * 100, 1),
-            })
-    fallback_rate.sort(key=lambda x: -x["fail_pct"])
-
     return {
-        "alltime": alltime, "monthly": monthly, "daily": daily,
         "top_tasks_by_cost": top_tasks_by_cost,
         "trend": trend,
-        "fallback_rate": fallback_rate,
     }
 
 
@@ -2660,98 +2570,14 @@ async def reset_provider_health(
 @router.get("/ai-usage", response_class=HTMLResponse)
 async def ai_usage_page(
     _user: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
 ):
-    """AI Usage dashboard — per-provider stats, per-task breakdown, health status."""
-    from app.ai.health import get_all_health
-
-    s = await _get_settings(db)
-
-    # Real tokens-this-month from ai_usage_log (not the stale track_tokens counter,
-    # which was incremented by hardcoded estimates regardless of actual usage).
-    from datetime import datetime as _dt, timezone as _tz
-    now_utc = _dt.now(_tz.utc).replace(tzinfo=None)
-    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    tokens_this_month_real = await db.scalar(
-        select(func.sum(AIUsageLog.tokens_estimated)).where(
-            AIUsageLog.called_at >= month_start,
-            AIUsageLog.status == "ok",
-        )
-    ) or 0
-
-    # Provider health for status indicators
-    health = get_all_health()
-
-    # All known providers
-    all_providers = ["gemini", "groq", "cerebras", "mistral", "deepseek", "sambanova"]
-    from app.config import get_settings as get_app_settings
-    app_settings = get_app_settings()
-
-    provider_cards = ""
-    for p in all_providers:
-        api_key = getattr(app_settings, f"{p}_api_key", "")
-        has_key = bool(api_key)
-        h = health.get(p, {})
-        available = h.get("available", True) if h else True
-        permanent = h.get("permanent_error", False) if h else False
-        successes = h.get("success_count", 0) if h else 0
-        errors = h.get("error_count", 0) if h else 0
-        rl_count = h.get("rate_limit_count", 0) if h else 0
-        last_err_raw = h.get("last_error_msg", "") or "" if h else ""
-        model = getattr(app_settings, f"{p}_model", "")
-
-        # Human-readable status + reason
-        if not has_key:
-            dot = "🔴"
-            status_text = "Not configured"
-            reason = "No API key set"
-        elif permanent:
-            dot = "🔴"
-            status_text = "Down"
-            if "402" in last_err_raw or "Insufficient" in last_err_raw:
-                reason = "Out of credits — needs top-up"
-            elif "404" in last_err_raw or "not found" in last_err_raw:
-                reason = "Model retired or invalid"
-            else:
-                reason = "Permanent error"
-        elif not available:
-            dot = "🟡"
-            status_text = "Cooling down"
-            reason = "Hit rate limit — auto-retries in 60s"
-        elif successes > 0:
-            dot = "🟢"
-            status_text = "Working"
-            reason = f"{successes} successful calls"
-        elif rl_count > 0:
-            dot = "🟡"
-            status_text = "Rate limited"
-            reason = f"Hit limit {rl_count} times — will retry"
-        else:
-            dot = "🟢"
-            status_text = "Ready"
-            reason = "No calls yet"
-
-        reset_btn = ""
-        if permanent or not available:
-            reset_btn = f'<button class="btn" style="margin-top:6px;font-size:12px" onclick="resetProvider(\'{p}\')">Retry This Provider</button>'
-
-        provider_cards += f"""<div class="card" style="flex:1;min-width:170px">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <strong style="color:#e8a849;text-transform:capitalize">{esc(p)}</strong>
-    <span style="font-size:13px">{dot}</span>
-  </div>
-  <div style="font-size:13px;margin:6px 0;color:#f5f1e8">{status_text}</div>
-  <div style="font-size:12px;color:#8a92a0">{esc(reason)}</div>
-  <div style="font-size:12px;color:#8a92a0;margin-top:4px">Model: {esc(model)}</div>
-  {reset_btn}
-</div>"""
-
+    """AI Usage dashboard — per-provider stats, per-task breakdown, token budget."""
     return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI Usage</title>
 <style>{ADMIN_CSS}</style></head><body>
 {NAV_HTML}
 <div class="page">
 <h1>AI Usage Dashboard</h1>
-<div class="subtitle">Provider health, usage per task, token budget</div>
+<div class="subtitle">Cost tracking, provider caps, task breakdown</div>
 
 <div id="alerts-banner" style="margin:12px 0"></div>
 
@@ -2760,7 +2586,7 @@ async def ai_usage_page(
 <div class="stat"><div class="num" id="cost-today" style="color:#6db585">$0.0000</div><div class="lbl">Today</div></div>
 <div class="stat"><div class="num" id="cost-7d" style="color:#e8a849">$0.0000</div><div class="lbl">Last 7 days</div></div>
 <div class="stat"><div class="num" id="cost-30d" style="color:#d97757">$0.0000</div><div class="lbl">Last 30 days</div></div>
-<div class="stat"><div class="num">{tokens_this_month_real:,}</div><div class="lbl">Tokens this month</div></div>
+<div class="stat"><div class="num" id="tokens-month">0</div><div class="lbl">Tokens this month</div></div>
 </div>
 <div style="font-size:12px;color:#8a92a0;margin-bottom:24px">
 Free-tier providers (Gemini / Groq / Cerebras / Mistral / Sambanova) contribute $0.00.
@@ -2779,16 +2605,8 @@ Cap breach blocks further calls that day; calls fall through to a cheaper provid
 
 <div id="provider-cards" style="margin-bottom:16px"><em style="color:#8a92a0">Loading...</em></div>
 
-<h2>Provider Health</h2>
-<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:24px">
-{provider_cards}
-</div>
-
 <h2>Usage by Provider</h2>
 <div id="provider-stats"><em style="color:#8a92a0">Loading...</em></div>
-
-<h2>Usage by Task</h2>
-<div id="task-stats"><em style="color:#8a92a0">Loading...</em></div>
 
 <h2>Usage Analytics (persistent)</h2>
 <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
@@ -2798,39 +2616,17 @@ All data from <code>ai_usage_log</code> — survives deploys and rebuilds. Costs
 <h3 style="color:#e8a849;margin:14px 0 6px 0">Cost Trend — last 7 days vs prior 7 days</h3>
 <div id="trend-card"><em style="color:#8a92a0">Loading...</em></div>
 
-<h3 style="color:#e8a849;margin:14px 0 6px 0">All-Time Usage by Model</h3>
-<div id="alltime-stats"><em style="color:#8a92a0">Loading...</em></div>
-
 <h3 style="color:#e8a849;margin:14px 0 6px 0">Top Tasks by Cost (last 30 days)</h3>
 <div id="top-tasks"><em style="color:#8a92a0">Loading...</em></div>
 
-<h3 style="color:#e8a849;margin:14px 0 6px 0">Monthly Usage by Model (last 12 months)</h3>
-<div id="monthly-stats"><em style="color:#8a92a0">Loading...</em></div>
-
-<h3 style="color:#e8a849;margin:14px 0 6px 0">Daily Usage by Model (last 30 days)</h3>
-<div id="daily-stats" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
-
-<h3 style="color:#e8a849;margin:14px 0 6px 0">Reliability — Failure Rate by Provider (last 30 days)</h3>
-<div id="fallback-stats"><em style="color:#8a92a0">Loading...</em></div>
-
-<h3 style="color:#e8a849;margin:14px 0 6px 0;display:flex;align-items:center;gap:12px">
-  Provider-Authoritative Reconciliation (last 30 days)
-  <button class="btn" style="font-size:12px;padding:4px 10px" onclick="syncNow()">Sync now</button>
-</h3>
-<div style="font-size:13px;color:#8a92a0;margin-bottom:4px">
-Pulled nightly from OpenAI + Anthropic Usage APIs (requires admin API keys in <code>.env</code>).
-Drift column = our local estimate vs provider-reported spend. Gemini not available — no public usage API.
-</div>
-<div id="sync-status" style="font-size:13px;margin-bottom:8px;min-height:20px"></div>
-<div id="reconciliation"><em style="color:#8a92a0">Loading...</em></div>
-
-<h2 style="margin-top:28px">Cost per Template</h2>
+<h2 style="margin-top:28px">Cost &amp; Volume per Template</h2>
 <div style="font-size:13px;color:#8a92a0;margin-bottom:8px">
-  AI spend attributed to each template via <code>subtask</code> substring matching. Useful for spotting templates that cost more than they should (e.g. repeated refinements that never lift past the publish threshold).
+  AI spend attributed to each template via <code>subtask</code> substring matching. Useful for spotting templates that cost more than they should.
 </div>
+<div id="task-volume-bar" style="margin-bottom:12px"></div>
 <div id="cost-per-template"><em style="color:#8a92a0">Loading...</em></div>
 
-<h2 style="margin-top:28px">Recent Calls (last 50)</h2>
+<h2 style="margin-top:28px">Recent Calls (last 20)</h2>
 <div id="recent-calls" style="max-height:400px;overflow-y:auto"><em style="color:#8a92a0">Loading...</em></div>
 
 <script>
@@ -3093,6 +2889,7 @@ async function loadUsageData() {{
       document.getElementById('cost-today').textContent = '$' + data.cost_summary.today.toFixed(4);
       document.getElementById('cost-7d').textContent = '$' + data.cost_summary.last_7d.toFixed(4);
       document.getElementById('cost-30d').textContent = '$' + data.cost_summary.last_30d.toFixed(4);
+      document.getElementById('tokens-month').textContent = (data.cost_summary.tokens_this_month || 0).toLocaleString();
     }}
 
     // Consolidated provider table — Provider | Balance | Rec. $ cap |
@@ -3203,9 +3000,11 @@ async function loadUsageData() {{
 
     // Provider stats table
     if (data.provider_stats.length > 0) {{
-      let html = '<table><tr><th>Provider</th><th>Total Calls</th><th>Succeeded</th><th>Rate Limited</th><th>Failed</th><th>Avg Speed</th><th>Cost</th></tr>';
+      let html = '<table><tr><th>Provider</th><th>Total Calls</th><th>Succeeded</th><th>Rate Limited</th><th>Failed</th><th>Fail %</th><th>Avg Speed</th><th>Cost</th></tr>';
       for (const p of data.provider_stats) {{
         const successRate = p.total_calls > 0 ? Math.round(p.success / p.total_calls * 100) : 0;
+        const failPct = p.total_calls > 0 ? ((p.errors / p.total_calls) * 100).toFixed(1) : '0.0';
+        const failColor = parseFloat(failPct) > 20 ? '#d97757' : (parseFloat(failPct) > 5 ? '#e8a849' : '#6db585');
         const speedLabel = p.avg_latency_ms < 1000 ? p.avg_latency_ms + 'ms' : (p.avg_latency_ms / 1000).toFixed(1) + 's';
         html += `<tr>
           <td style="text-transform:capitalize"><strong>${{p.provider}}</strong></td>
@@ -3213,6 +3012,7 @@ async function loadUsageData() {{
           <td style="color:#6db585">${{p.success}} (${{successRate}}%)</td>
           <td style="color:#e8a849">${{p.rate_limited}}</td>
           <td style="color:#d97757">${{p.errors}}</td>
+          <td style="color:${{failColor}}">${{failPct}}%</td>
           <td>${{speedLabel}}</td>
           <td>${{fmtCost(p.cost_usd || 0)}}</td>
         </tr>`;
@@ -3223,23 +3023,26 @@ async function loadUsageData() {{
       document.getElementById('provider-stats').innerHTML = '<p style="color:#8a92a0">No usage data yet. Run a pipeline task to generate data.</p>';
     }}
 
-    // Task stats table
-    if (data.task_stats.length > 0) {{
-      let html = '<table><tr><th>Task</th><th>Subtask</th><th>Calls</th><th>Success</th><th>Failures</th><th>Tokens</th></tr>';
+    // Task volume summary bar (merged from former "Usage by Task" section)
+    if (data.task_stats && data.task_stats.length > 0) {{
+      const taskMap = {{}};
       for (const t of data.task_stats) {{
-        html += `<tr>
-          <td>${{t.task}}</td>
-          <td style="font-size:12px;color:#8a92a0;max-width:200px;overflow:hidden;text-overflow:ellipsis">${{t.subtask}}</td>
-          <td>${{t.total_calls}}</td>
-          <td style="color:#6db585">${{t.success}}</td>
-          <td style="color:#d97757">${{t.failures}}</td>
-          <td>${{t.total_tokens.toLocaleString()}}</td>
-        </tr>`;
+        if (!taskMap[t.task]) taskMap[t.task] = {{calls:0, tokens:0, failures:0}};
+        taskMap[t.task].calls += t.total_calls;
+        taskMap[t.task].tokens += t.total_tokens;
+        taskMap[t.task].failures += t.failures;
       }}
-      html += '</table>';
-      document.getElementById('task-stats').innerHTML = html;
-    }} else {{
-      document.getElementById('task-stats').innerHTML = '<p style="color:#8a92a0">No task data yet.</p>';
+      const chips = Object.entries(taskMap).map(([task, v]) => {{
+        const failBit = v.failures > 0
+          ? ' <span style="color:#d97757">(' + v.failures + ' fail)</span>' : '';
+        return '<span style="display:inline-block;background:#1a1c22;border:1px solid #2a323d;'
+          + 'border-radius:4px;padding:4px 10px;font-size:12px;margin:2px 4px 2px 0">'
+          + '<strong style="color:#e8a849">' + task + '</strong> '
+          + v.calls + ' calls · ' + v.tokens.toLocaleString() + ' tok' + failBit
+          + '</span>';
+      }}).join('');
+      document.getElementById('task-volume-bar').innerHTML =
+        '<div style="font-size:12px;color:#8a92a0;margin-bottom:4px">Volume by task type (all-time):</div>' + chips;
     }}
 
     // Recent calls
@@ -3276,96 +3079,6 @@ async function loadUsageData() {{
   }}
 }}
 
-function setSyncStatus(html) {{
-  const el = document.getElementById('sync-status');
-  if (el) el.innerHTML = html;
-}}
-
-async function syncNow() {{
-  const btn = event && event.target;
-  if (btn) {{ btn.textContent = 'Syncing...'; btn.disabled = true; }}
-  setSyncStatus('<span style="color:#e8a849">⏳ Syncing...</span>');
-  try {{
-    const resp = await fetch('/admin/pipeline/api/ai-usage/sync-now', {{
-      method:'POST', credentials:'same-origin',
-      headers:{{'Content-Type':'application/json'}},
-    }});
-    const r = await resp.json();
-    if (!resp.ok) {{
-      setSyncStatus('<span style="color:#d97757">✗ failed: ' + (r.detail || resp.status) + '</span>');
-      return;
-    }}
-    const day = r.sync && r.sync.day ? r.sync.day : '?';
-    const provs = (r.sync && r.sync.providers) || {{}};
-    const bits = [];
-    let hasError = false;
-    for (const [name, info] of Object.entries(provs)) {{
-      if (info.status === 'ok') {{
-        const color = info.rows > 0 ? '#6db585' : '#8a92a0';
-        bits.push('<span style="color:' + color + '">' + name + ' ' + info.rows + 'r</span>');
-      }} else if (info.status === 'skipped') {{
-        bits.push('<span style="color:#8a92a0">' + name + ' skipped</span>');
-      }} else {{
-        hasError = true;
-        bits.push('<span style="color:#d97757">' + name + ' err</span>');
-      }}
-    }}
-    const arch = r.archive || {{}};
-    const archStr = arch.status === 'ok' && (arch.deleted_rows || 0) > 0
-      ? ' · archived ' + arch.deleted_rows : '';
-    const icon = hasError ? '⚠' : '✓';
-    const iconColor = hasError ? '#d97757' : '#6db585';
-    const now = new Date().toLocaleTimeString();
-    setSyncStatus('<span style="color:' + iconColor + '">' + icon + '</span> '
-      + day + ' · ' + bits.join(' · ') + archStr
-      + ' <span style="color:#4a4f5a">@ ' + now + '</span>');
-  }} finally {{
-    if (btn) {{ btn.textContent = 'Sync now'; btn.disabled = false; }}
-  }}
-  loadReconciliation();
-}}
-
-async function loadReconciliation() {{
-  try {{
-    const resp = await fetch('/admin/pipeline/api/ai-usage/reconciliation', {{credentials:'same-origin'}});
-    const d = await resp.json();
-    if (!d.rows || d.rows.length === 0) {{
-      const syncEl = document.getElementById('sync-status');
-      const hasSyncRun = syncEl && syncEl.textContent.trim().length > 0;
-      const msg = hasSyncRun
-        ? 'Sync completed · no paid-tier spend to reconcile yet. Any billed calls (OpenAI embeddings / Claude refinement) will appear here after the next sync.'
-        : 'No sync data yet. Click <b>Sync now</b>, or wait for the 06:00 UTC scheduled run. Reconciliation rows appear only when a provider has reported billed usage for a past day.';
-      document.getElementById('reconciliation').innerHTML =
-        '<p style="color:#8a92a0">' + msg + '</p>';
-      return;
-    }}
-    let h = '<table><tr><th>Day</th><th>Provider</th><th>Model</th><th>In tokens</th><th>Out tokens</th><th>Provider cost</th><th>Our estimate</th><th>Drift</th></tr>';
-    for (const r of d.rows) {{
-      let driftCell;
-      if (r.drift_pct === null) driftCell = '<span style="color:#8a92a0">—</span>';
-      else {{
-        const abs = Math.abs(r.drift_pct);
-        const color = abs > 10 ? '#d97757' : (abs > 3 ? '#e8a849' : '#6db585');
-        const sign = r.drift_pct > 0 ? '+' : '';
-        driftCell = '<span style="color:' + color + '">' + sign + r.drift_pct + '%</span>';
-      }}
-      h += '<tr><td style="font-size:12px">' + r.day + '</td>'
-        + '<td style="text-transform:capitalize">' + r.provider + '</td>'
-        + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
-        + '<td>' + r.input_tokens.toLocaleString() + '</td>'
-        + '<td>' + r.output_tokens.toLocaleString() + '</td>'
-        + '<td>' + fmtCost(r.cost_provider) + '</td>'
-        + '<td>' + fmtCost(r.cost_local) + '</td>'
-        + '<td>' + driftCell + '</td></tr>';
-    }}
-    h += '</table>';
-    document.getElementById('reconciliation').innerHTML = h;
-  }} catch(e) {{
-    document.getElementById('reconciliation').innerHTML =
-      '<p style="color:#d97757">Failed: ' + e.message + '</p>';
-  }}
-}}
-
 async function loadAnalytics() {{
   try {{
     const resp = await fetch('/admin/pipeline/api/ai-usage/analytics', {{credentials:'same-origin'}});
@@ -3387,22 +3100,6 @@ async function loadAnalytics() {{
         + '</div>';
     }}
 
-    // All-time per model
-    if (d.alltime && d.alltime.length > 0) {{
-      let h = '<table><tr><th>Provider</th><th>Model</th><th>Calls</th><th>Success</th><th>Tokens</th><th>Cost</th></tr>';
-      for (const r of d.alltime) {{
-        h += '<tr><td style="text-transform:capitalize">' + r.provider + '</td>'
-          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
-          + '<td>' + r.calls + '</td><td style="color:#6db585">' + r.success + '</td>'
-          + '<td>' + r.tokens.toLocaleString() + '</td>'
-          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
-      }}
-      h += '</table>';
-      document.getElementById('alltime-stats').innerHTML = h;
-    }} else {{
-      document.getElementById('alltime-stats').innerHTML = '<p style="color:#8a92a0">No usage logged yet.</p>';
-    }}
-
     // Top tasks by cost
     if (d.top_tasks_by_cost && d.top_tasks_by_cost.length > 0) {{
       let h = '<table><tr><th>Task</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Avg latency</th><th>Cost</th></tr>';
@@ -3420,55 +3117,8 @@ async function loadAnalytics() {{
       document.getElementById('top-tasks').innerHTML = '<p style="color:#8a92a0">No successful calls in last 30 days.</p>';
     }}
 
-    // Monthly per model
-    if (d.monthly && d.monthly.length > 0) {{
-      let h = '<table><tr><th>Month</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>';
-      for (const r of d.monthly) {{
-        h += '<tr><td>' + r.month + '</td>'
-          + '<td style="text-transform:capitalize">' + r.provider + '</td>'
-          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
-          + '<td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td>'
-          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
-      }}
-      h += '</table>';
-      document.getElementById('monthly-stats').innerHTML = h;
-    }} else {{
-      document.getElementById('monthly-stats').innerHTML = '<p style="color:#8a92a0">No monthly data yet.</p>';
-    }}
-
-    // Daily per model
-    if (d.daily && d.daily.length > 0) {{
-      let h = '<table><tr><th>Date</th><th>Provider</th><th>Model</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>';
-      for (const r of d.daily) {{
-        h += '<tr><td style="white-space:nowrap;font-size:12px">' + r.day + '</td>'
-          + '<td style="text-transform:capitalize">' + r.provider + '</td>'
-          + '<td style="font-family:monospace;font-size:12px">' + r.model + '</td>'
-          + '<td>' + r.calls + '</td><td>' + r.tokens.toLocaleString() + '</td>'
-          + '<td>' + fmtCost(r.cost_usd) + '</td></tr>';
-      }}
-      h += '</table>';
-      document.getElementById('daily-stats').innerHTML = h;
-    }} else {{
-      document.getElementById('daily-stats').innerHTML = '<p style="color:#8a92a0">No daily data yet.</p>';
-    }}
-
-    // Fallback / reliability
-    if (d.fallback_rate && d.fallback_rate.length > 0) {{
-      let h = '<table><tr><th>Provider</th><th>Successes</th><th>Failures</th><th>Failure rate</th></tr>';
-      for (const r of d.fallback_rate) {{
-        const color = r.fail_pct > 20 ? '#d97757' : (r.fail_pct > 5 ? '#e8a849' : '#6db585');
-        h += '<tr><td style="text-transform:capitalize">' + r.provider + '</td>'
-          + '<td style="color:#6db585">' + r.ok + '</td>'
-          + '<td style="color:#d97757">' + r.fail + '</td>'
-          + '<td style="color:' + color + '">' + r.fail_pct + '%</td></tr>';
-      }}
-      h += '</table>';
-      document.getElementById('fallback-stats').innerHTML = h;
-    }} else {{
-      document.getElementById('fallback-stats').innerHTML = '<p style="color:#8a92a0">No reliability data yet.</p>';
-    }}
   }} catch(e) {{
-    document.getElementById('alltime-stats').innerHTML = '<p style="color:#d97757">Failed: ' + e.message + '</p>';
+    console.error('loadAnalytics failed:', e);
   }}
 }}
 
@@ -3506,7 +3156,6 @@ async function loadCostPerTemplate() {{
 loadUsageData();
 loadAnalytics();
 loadCostPerTemplate();
-loadReconciliation();
 loadAlerts();
 </script>
 </div>
