@@ -228,7 +228,12 @@ async def review_template_currency(
 
     try:
         from app.ai.provider import complete as ai_complete
-        raw_result, model_used = await ai_complete(prompt, json_response=True)
+        raw_result, model_used = await ai_complete(
+            prompt, json_response=True,
+            task="currency_review",
+            subtask=tpl.title[:50],
+            db=db,
+        )
         await track_tokens(db, REVIEW_TOKENS_ESTIMATE)
 
         if isinstance(raw_result, str):

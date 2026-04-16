@@ -109,6 +109,27 @@ def get_all_health() -> dict[str, dict]:
 
 # ---- Usage logging to DB ----
 
+
+def get_last_tokens(provider_name: str) -> int:
+    """Read total_tokens from a provider module's _last_usage dict.
+
+    Every provider module (gemini, groq, cerebras, etc.) sets a module-level
+    `_last_usage` dict after each successful API call. This helper reads it
+    so callers don't need to repeat the __import__ + getattr dance.
+
+    Returns 0 if the provider doesn't expose _last_usage or if the value
+    is missing/empty.
+    """
+    try:
+        mod = __import__(f"app.ai.{provider_name}", fromlist=["_last_usage"])
+        last = getattr(mod, "_last_usage", None)
+        if last and isinstance(last, dict):
+            return int(last.get("total_tokens") or 0)
+    except Exception:
+        pass
+    return 0
+
+
 async def log_usage(
     db: AsyncSession,
     provider: str,

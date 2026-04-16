@@ -705,19 +705,20 @@ async def _run_ai_review(plan: dict, model_name: str, db: AsyncSession | None) -
 
         # Log usage with actual token count
         if db is not None:
-            from app.ai.health import log_usage
+            from app.ai.health import log_usage, get_last_tokens
             from app.config import get_settings as _s
-            tokens = 0
             if model_name == "gemini":
-                from app.ai.gemini import _last_usage as _gem_u
-                tokens = int((_gem_u or {}).get("total_tokens", 0))
                 prov, mdl = "gemini", _s().gemini_model
+                tokens = get_last_tokens("gemini")
             elif model_name == "groq":
                 prov, mdl = "groq", _s().groq_model
+                tokens = get_last_tokens("groq")
             else:
                 prov, mdl = model_name, model_name
-            if tokens == 0:
-                tokens = max(1, len(prompt) // 4)
+                tokens = 0
+            if tokens <= 0:
+                result_len = len(str(result)) if result else 0
+                tokens = max(1, (len(prompt) + result_len) // 4)
             await log_usage(db, prov, mdl, "quality_review", "ok",
                            tokens_estimated=tokens)
 
@@ -825,12 +826,14 @@ async def _run_refinement(
 
         # Log usage — map logical model_name to (provider, model_id) correctly.
         if db is not None:
-            from app.ai.health import log_usage
+            from app.ai.health import log_usage, get_last_tokens
             from app.config import get_settings as _s
-            tokens = 0
             if model_name in ("gemini-pro", "gemini"):
-                from app.ai.gemini import _last_usage as _gem_u
-                tokens = int((_gem_u or {}).get("total_tokens", 0))
+                tokens = get_last_tokens("gemini")
+            elif model_name == "claude":
+                tokens = get_last_tokens("anthropic")
+            else:
+                tokens = 0
             if model_name == "gemini-pro":
                 prov, mdl = "gemini", _s().gemini_pro_model
             elif model_name == "gemini":
@@ -839,8 +842,9 @@ async def _run_refinement(
                 prov, mdl = "anthropic", _s().anthropic_model
             else:
                 prov, mdl = model_name, model_name
-            if tokens == 0:
-                tokens = max(1, len(prompt) // 4)
+            if tokens <= 0:
+                result_len = len(str(fixed_weeks)) if fixed_weeks else 0
+                tokens = max(1, (len(prompt) + result_len) // 4)
             weeks_str = ",".join(str(n) for n in fix_week_nums)
             await log_usage(db, prov, mdl, "quality_refine", "ok",
                            subtask=f"weeks:{weeks_str}",

@@ -116,7 +116,12 @@ async def run_evaluation(
     )
 
     # Call AI
-    result, model = await ai_complete(prompt, json_response=True)
+    result, model = await ai_complete(
+        prompt, json_response=True,
+        task="evaluation",
+        subtask=f"week_{repo_link.week_num}",
+        db=db,
+    )
 
     # Parse and store
     import json

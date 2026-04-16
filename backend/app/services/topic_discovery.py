@@ -190,9 +190,19 @@ async def run_discovery(db: AsyncSession) -> dict:
 
     try:
         if use_fallback:
+            import time as _time
+            _t0 = _time.time()
             from app.ai.groq import complete as groq_complete
             raw_result = await groq_complete(prompt, json_response=True)
+            _lat = int((_time.time() - _t0) * 1000)
             model_used = "groq_fallback"
+            # Log usage for direct Groq call
+            from app.ai.health import log_usage, get_last_tokens
+            from app.config import get_settings as _gs
+            _tok = get_last_tokens("groq") or max(1, len(prompt) // 4)
+            await log_usage(db, "groq", _gs().groq_model, "discovery",
+                           "ok", subtask="groq_fallback",
+                           tokens_estimated=_tok, latency_ms=_lat)
         else:
             from app.ai.provider import complete as ai_complete
             raw_result, model_used = await ai_complete(
@@ -364,8 +374,11 @@ async def _triage_topic(
     last_err: Exception | None = None
     for provider_name, module_path in providers:
         try:
+            import time as _time
+            _t0 = _time.time()
             mod = __import__(module_path, fromlist=["complete"])
             raw = await mod.complete(prompt, json_response=True)
+            _lat = int((_time.time() - _t0) * 1000)
         except Exception as e:
             last_err = e
             logger.info("Triage via %s failed for %s: %s — trying next",
@@ -373,6 +386,17 @@ async def _triage_topic(
             continue
 
         try:
+            # Log AI usage
+            from app.ai.health import log_usage, get_last_tokens
+            from app.config import get_settings as _gs
+            _tok = get_last_tokens(provider_name)
+            if _tok <= 0:
+                result_len = len(str(raw)) if raw else 0
+                _tok = max(1, (len(prompt) + result_len) // 4)
+            _mdl = getattr(_gs(), f"{provider_name}_model", provider_name)
+            await log_usage(db, provider_name, _mdl, "triage", "ok",
+                           subtask=topic.topic_name[:50],
+                           tokens_estimated=_tok, latency_ms=_lat)
             await track_tokens(db, TRIAGE_TOKENS_ESTIMATE)
             if isinstance(raw, str):
                 raw = json.loads(raw)

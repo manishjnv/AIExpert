@@ -76,12 +76,14 @@ async def generate_curriculum(
                 )
                 model = _app_settings().gemini_model
                 if db is not None:
-                    from app.ai.health import log_usage
-                    from app.ai.gemini import _last_usage as _gem_usage
+                    from app.ai.health import log_usage, get_last_tokens
+                    tokens = get_last_tokens("gemini")
+                    if tokens <= 0:
+                        tokens = max(1, len(prompt) // 4)
                     await log_usage(
                         db, "gemini", model, "generation", "ok",
                         subtask=f"{topic} {duration_str} {level} [schema]",
-                        tokens_estimated=int((_gem_usage or {}).get("total_tokens", 0)),
+                        tokens_estimated=tokens,
                     )
             except GeminiError as e:
                 logger.warning("Gemini structured generation failed, using fallback chain: %s", e)

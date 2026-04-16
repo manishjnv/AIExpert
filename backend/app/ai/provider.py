@@ -155,14 +155,8 @@ async def complete(
 
                 # Best-effort actual-token capture from provider's _last_usage.
                 # Falls back to a character-based estimate if unavailable.
-                tokens_used = 0
-                try:
-                    mod = __import__(f"app.ai.{name}", fromlist=["_last_usage"])
-                    last = getattr(mod, "_last_usage", None)
-                    if last and isinstance(last, dict):
-                        tokens_used = int(last.get("total_tokens") or 0)
-                except Exception:
-                    pass
+                from app.ai.health import get_last_tokens
+                tokens_used = get_last_tokens(name)
                 if tokens_used <= 0:
                     # Rough fallback: ~4 chars per token (prompt + estimated output)
                     result_len = len(str(result)) if result else 0
