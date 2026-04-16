@@ -144,10 +144,27 @@ async def list_queue(
         )
     )).scalar() or 0
 
+    # Missing-streak counters: published jobs at risk of auto-expiry.
+    streak_expr = func.json_extract(Job.data, "$._meta.missing_streak")
+    missing_streak_1 = (await db.execute(
+        select(func.count(Job.id)).where(
+            Job.status == "published",
+            streak_expr == 1,
+        )
+    )).scalar() or 0
+    missing_streak_2 = (await db.execute(
+        select(func.count(Job.id)).where(
+            Job.status == "published",
+            streak_expr >= 2,
+        )
+    )).scalar() or 0
+
     return {
         "items": [_serialize(j) for j in rows],
         "counts": counts,
         "auto_expired_24h": auto_expired_24h,
+        "missing_streak_1": missing_streak_1,
+        "missing_streak_2": missing_streak_2,
     }
 
 
@@ -534,9 +551,12 @@ async function load() {
   const data = await r.json();
   const counts = data.counts || {};
   const autoExp = data.auto_expired_24h || 0;
+  const streak1 = data.missing_streak_1 || 0;
+  const streak2 = data.missing_streak_2 || 0;
   const autoChip = autoExp ? ` · <span style="color:#e8a849">auto-expired 24h: ${autoExp}</span>` : "";
+  const streakChip = (streak1 || streak2) ? ` · <span style="color:#e07a5f" title="Published jobs missing from source feed. Streak 1 = missed 1 run (at risk). Streak 2+ = will expire next run.">⚠ streak-1: ${streak1} · streak-2+: ${streak2}</span>` : "";
   document.getElementById("banner").innerHTML =
-    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}`;
+    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}${streakChip}`;
   document.getElementById("qf-expired-reason").style.display = (currentStatus === "expired") ? "" : "none";
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
   populateCompanyDropdown(data.items);
