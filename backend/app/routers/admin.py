@@ -1611,6 +1611,7 @@ async def admin_dashboard_page(
 <a href="/admin/pipeline/" class="btn" style="text-align:center">Run Pipeline</a>
 <a href="/admin/templates" class="btn" style="text-align:center">Manage Templates</a>
 <a href="/admin/pipeline/ai-usage" class="btn" style="text-align:center">AI Usage</a>
+<a href="/admin/jobs-guide" class="btn" style="text-align:center">Jobs Guide</a>
 </div>
 </div>
 
@@ -2121,4 +2122,245 @@ async function checkQuality(key) {{
   }}
 }}
 </script>
+</div></body></html>"""
+
+
+# ---- Jobs Admin Guide (static reference page) ---------------------------------
+
+@router.get("/jobs-guide", response_class=HTMLResponse)
+async def admin_jobs_guide(_user: User = Depends(get_current_admin)):
+    """Admin guide — how to publish, review, and expire jobs."""
+    return HTMLResponse(_JOBS_GUIDE_HTML)
+
+
+_JOBS_GUIDE_HTML = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jobs Admin Guide</title>
+<style>{ADMIN_CSS}
+.guide h2 {{ margin-top: 36px; border-bottom: 1px solid #2a323d; padding-bottom: 8px; }}
+.guide h3 {{ color: #d0cbc2; font-size: 14px; margin-top: 20px; }}
+.guide p, .guide li {{ color: #b0aaa0; font-size: 13px; line-height: 1.7; }}
+.guide ul, .guide ol {{ padding-left: 20px; }}
+.guide code {{ font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: #1a2030; padding: 2px 6px; border-radius: 3px; color: #e8a849; }}
+.guide pre {{ background: #1a2030; padding: 12px 16px; border-radius: 6px; overflow-x: auto; font-size: 12px; line-height: 1.5; color: #d0cbc2; }}
+.guide pre code {{ background: none; padding: 0; }}
+.guide table {{ margin-top: 8px; margin-bottom: 16px; }}
+.guide .checklist {{ list-style: none; padding-left: 4px; }}
+.guide .checklist li::before {{ content: "\\2610  "; color: #6a7280; }}
+.guide .warn {{ background: #2a1f10; border-left: 3px solid #e8a849; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 12px; color: #e0dbd2; }}
+.guide .danger {{ background: #2a1510; border-left: 3px solid #d97757; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 12px; color: #e0dbd2; }}
+.toc {{ background: #1d242e; padding: 16px 20px; border-radius: 6px; margin-bottom: 28px; }}
+.toc a {{ color: #e8a849; text-decoration: none; font-size: 13px; }}
+.toc a:hover {{ text-decoration: underline; }}
+.toc ol {{ margin: 0; padding-left: 20px; }}
+.toc li {{ margin: 4px 0; }}
+</style></head><body>
+{ADMIN_NAV}
+<div class="page guide">
+<h1>Jobs Admin Guide</h1>
+<div class="subtitle">Daily operations reference &mdash; publish, review, expire</div>
+
+<div class="toc">
+<strong style="font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#6a7280">Contents</strong>
+<ol>
+<li><a href="#publish">Publishing a Job</a></li>
+<li><a href="#review">Reviewing &amp; Rejecting</a></li>
+<li><a href="#expire">Removing &amp; Expiring Jobs</a></li>
+<li><a href="#company">Company Management</a></li>
+<li><a href="#source">Source Management</a></li>
+<li><a href="#batch">Batch Operations</a></li>
+<li><a href="#monitor">Monitoring &amp; Cost</a></li>
+<li><a href="#never">Things You Must Never Do</a></li>
+</ol>
+</div>
+
+<h2 id="publish">1. Publishing a Job</h2>
+
+<div class="warn">Every job <strong>must</strong> have an Opus summary card before publishing.
+Flash extraction no longer generates summaries (Phase 14.5).</div>
+
+<h3>Step-by-step</h3>
+
+<p><strong>Step 0 &mdash; Generate summaries</strong> (run in Claude Code terminal before opening the queue):</p>
+<pre><code>/summarize-jobs --status draft --limit 50</code></pre>
+<p>Wait ~2 min for 50 jobs. This is <strong>mandatory</strong> &mdash; jobs without summaries show a degraded public page.</p>
+
+<p><strong>Step 1 &mdash; Open <a href="/admin/jobs">/admin/jobs</a></strong> after 04:30 IST cron.
+Work through the tabs in order:</p>
+
+<h3>A. Auto-skipped jobs (non-AI titles)</h3>
+<ul>
+<li>Filter: <code>admin_notes</code> = "auto-skipped: non-AI title"</li>
+<li>These skipped AI enrichment entirely (Sales, HR, Legal titles)</li>
+<li><strong>Action:</strong> Reject with <code>off_topic</code> (99% of cases)</li>
+<li><strong>False positive</strong> (rare, e.g. "AI Sales Engineer"): click job &rarr; trigger enrichment &rarr;
+run <code>/summarize-jobs --id &lt;ID&gt;</code> &rarr; review &rarr; publish</li>
+</ul>
+
+<h3>B. Tier-2 lightweight jobs</h3>
+<ul>
+<li>Filter: <code>admin_notes</code> = "tier2-lite"</li>
+<li>Sources: PhonePe, Groww, CRED, Mindtickle, Notion, Replit</li>
+<li>These have cheaper extraction &mdash; missing: nice_to_have, modules, summary</li>
+<li><strong>Action:</strong> Review title / designation / location / skills &rarr;
+run <code>/summarize-jobs --id &lt;ID&gt;</code> if needed &rarr; publish or reject</li>
+</ul>
+
+<h3>C. Tier-1 full-enriched jobs</h3>
+<ul>
+<li>From verified AI-native companies (Anthropic, Scale, xAI, Cohere, etc.)</li>
+<li><strong>Bulk Approve:</strong> Use the "Bulk Publish Tier-1" button (max 100 per batch)</li>
+<li><strong>Spot-check:</strong> Open 2&ndash;3 random jobs &mdash; verify summary card, confirm <code>tldr</code> is rewritten (not copy-pasted)</li>
+<li>Any job missing summary &rarr; run <code>/summarize-jobs --id &lt;ID&gt;</code> first</li>
+</ul>
+
+<h3>D. Changed &amp; Flagged jobs</h3>
+<ul>
+<li><strong>Changed:</strong> review the diff view (green = added, red = removed, amber = modified). Approve the diff, not the whole job.</li>
+<li><strong>Flagged:</strong> enum violation or low-confidence extraction. Fix manually or reject.</li>
+</ul>
+
+<h3>Publish checklist &mdash; approve only if ALL true</h3>
+<ul class="checklist">
+<li>Company is a real AI/ML employer (not staffing firm or course-seller)</li>
+<li>Role is genuinely AI/ML (not "data analyst who uses Excel")</li>
+<li><code>posted_on</code> is within last 45 days</li>
+<li><code>designation</code> enum matches actual role</li>
+<li><code>location</code> is populated (country at minimum)</li>
+<li><code>tldr</code> reads naturally and is NOT copied from JD (SEO penalty)</li>
+<li><code>apply_url</code> resolves (use "Test link" button)</li>
+<li><code>roadmap_modules_matched</code> has &ge; 1 module</li>
+<li>No PII / email / phone leaked in <code>description_html</code></li>
+</ul>
+
+<p>On publish, the system automatically stamps review metadata, increments source stats, and pings IndexNow for SEO indexing.</p>
+
+<h2 id="review">2. Reviewing &amp; Rejecting</h2>
+
+<h3>Reject reasons &mdash; pick the right one</h3>
+<table>
+<tr><th>Reason</th><th>Use when</th></tr>
+<tr><td><code>fake</code></td><td>Obvious scam, ghost job, unverifiable company</td></tr>
+<tr><td><code>expired</code></td><td>JD says "closed" or <code>posted_on</code> &gt; 45d and not refreshed</td></tr>
+<tr><td><code>off_topic</code></td><td>Not AI/ML &mdash; devops, generic backend, sales, HR</td></tr>
+<tr><td><code>duplicate</code></td><td>Already published via another source (same company + title)</td></tr>
+<tr><td><code>low_quality</code></td><td>JD too vague, no skills listed, enum violations</td></tr>
+</table>
+
+<div class="warn"><strong>Always pick a reason.</strong> Rejection reasons feed back into the AI enrichment prompt
+(last 45 days per source). The extractor self-corrects based on your feedback.
+Bulk-rejecting without reasons breaks this loop.</div>
+
+<h3>How to unpublish a live job</h3>
+<p>There is no separate "unpublish" button. To remove a published job from public view,
+<strong>reject it</strong> with the appropriate reason. Rejection sets <code>status=rejected</code>,
+which immediately removes it from the public listing and detail pages.</p>
+
+<h2 id="expire">3. Removing &amp; Expiring Jobs</h2>
+
+<h3>Automatic expiry (no admin action needed)</h3>
+<table>
+<tr><th>Trigger</th><th>How it works</th><th>Latency</th></tr>
+<tr><td><strong>Role filled</strong></td><td>Job missing from source feed 2+ consecutive runs &rarr; <code>expired</code>, reason = <code>source_removed</code></td><td>&le; 48h</td></tr>
+<tr><td><strong>Date-based</strong></td><td><code>valid_through</code> passes (<code>posted_on + 45d</code>) &rarr; auto-expired in daily ingest</td><td>&lt; 24h</td></tr>
+<tr><td><strong>Source board down</strong></td><td>Probe fails 3 consecutive times &rarr; entire source disabled</td><td>~3 days</td></tr>
+<tr><td><strong>Old expired posts</strong></td><td>Return HTTP 410 (Gone) after 90 days post-expiry</td><td>Immediate</td></tr>
+</table>
+
+<h3>Admin visibility</h3>
+<ul>
+<li><strong>Expired tab</strong> in <a href="/admin/jobs">/admin/jobs</a> shows all expired jobs</li>
+<li><strong>Sub-filter:</strong> "Auto-expired (source removed)" vs "Date-based (45d)"</li>
+<li><strong>Banner chip:</strong> <code>auto-expired 24h: N</code> shows count from last run</li>
+</ul>
+
+<h3>Manual removal scenarios</h3>
+<table>
+<tr><th>Scenario</th><th>What to do</th></tr>
+<tr><td>Published job should no longer be live</td><td>Reject it (reason: <code>expired</code> or appropriate)</td></tr>
+<tr><td>Expired job re-appears on source</td><td>Auto-drafts on next ingest (new hash) &mdash; review normally</td></tr>
+<tr><td>Company requests takedown</td><td>Reject the job + blocklist the company</td></tr>
+<tr><td>Source is permanently dead</td><td>Check probe status; if auto-disabled, leave it</td></tr>
+</table>
+
+<div class="danger"><strong>Jobs are never deleted</strong> from the database. Rejection or expiry removes them from public view.
+Old entries provide historical data for source quality analysis.</div>
+
+<h2 id="company">4. Company Management</h2>
+
+<table>
+<tr><th>Action</th><th>How</th></tr>
+<tr><td>Blocklist a company</td><td>Click company &rarr; Blocklist &rarr; provide reason. All future jobs auto-rejected.</td></tr>
+<tr><td>Unblocklist</td><td>Click company &rarr; Remove blocklist. New jobs flow in on next ingest.</td></tr>
+<tr><td>Edit details</td><td>Update <code>slug</code>, <code>size</code>, <code>logo_url</code>, <code>verified</code> flag</td></tr>
+<tr><td>Upload logo</td><td>Stored at <code>/static/companies/&lt;slug&gt;.png</code> (128&times;128 PNG)</td></tr>
+</table>
+
+<h2 id="source">5. Source Management</h2>
+
+<table>
+<tr><th>Action</th><th>How</th></tr>
+<tr><td>Enable / Disable a source</td><td>Toggle in the source list. Disabled sources skip during ingest.</td></tr>
+<tr><td>Check source health</td><td>"Run Probe" button &rarr; HEAD-checks every board.</td></tr>
+<tr><td>Review source quality</td><td><strong>Publish-rate 45d</strong> column: Green &ge; 50%, Amber 20&ndash;50%, Red &lt; 20%.</td></tr>
+<tr><td>Toggle bulk-approve</td><td>Tier-1 only. Allows "Bulk Publish" to include this source.</td></tr>
+<tr><td>On-demand ingest</td><td>"Run Ingest" triggers <code>run_daily_ingest()</code> outside cron.</td></tr>
+</table>
+
+<div class="warn"><strong>Probe auto-disable:</strong> After 3 consecutive probe failures, a source is automatically disabled.
+It re-enables on first successful probe. Don't manually re-enable without verifying the board URL is back up.</div>
+
+<h2 id="batch">6. Batch Operations</h2>
+
+<h3>Batch publish session (backlog of 50+ drafts)</h3>
+<pre><code># 1. Generate all summaries
+/summarize-jobs --status draft --limit 100
+
+# 2. (Optional) dry-run preview
+/summarize-jobs --dry-run --limit 5
+
+# 3. Open /admin/jobs
+#    Bulk-approve Tier-1 verified
+#    Review Tier-2 individually</code></pre>
+
+<h3>On-demand ingest</h3>
+<p>If you need fresh jobs outside the 04:30 cron:</p>
+<ul>
+<li>Click "Run Ingest" in the <a href="/admin/jobs">admin UI</a>, or</li>
+<li>SSH to VPS: <code>docker compose exec backend python scripts/daily_jobs_sync.py</code></li>
+</ul>
+
+<h2 id="monitor">7. Monitoring &amp; Cost</h2>
+
+<table>
+<tr><th>What</th><th>Where</th></tr>
+<tr><td>Per-source stats (24h + 45d)</td><td><a href="/admin/jobs">/admin/jobs</a> &rarr; Stats panel</td></tr>
+<tr><td>AI usage &amp; token costs</td><td><a href="/admin/pipeline/ai-usage">/admin/pipeline/ai-usage</a></td></tr>
+<tr><td>Monthly enrichment target</td><td>~$0.22/month</td></tr>
+<tr><td>Jobs ingested per source/run</td><td>Max 30 new per source</td></tr>
+</table>
+
+<h3>admin_notes cheat sheet</h3>
+<table>
+<tr><th>Value</th><th>What happened</th><th>What to do</th></tr>
+<tr><td><code>auto-skipped: non-AI title</code></td><td>Title matched Sales/HR/Legal. No AI call.</td><td>Reject <code>off_topic</code> (or trigger enrichment if false positive)</td></tr>
+<tr><td><code>tier2-lite</code></td><td>Cheaper extraction. Missing: nice_to_have, modules, summary.</td><td>Run <code>/summarize-jobs --id N</code> &rarr; review &rarr; publish</td></tr>
+<tr><td><code>enrichment failed: ...</code></td><td>AI provider error. Minimal data only.</td><td>Check error &rarr; retry or fix manually</td></tr>
+<tr><td><em>(empty / null)</em></td><td>Full Tier-1 enrichment succeeded.</td><td>Verify summary exists &rarr; publish</td></tr>
+</table>
+
+<h2 id="never">8. Things You Must Never Do</h2>
+
+<div class="danger">
+<ol style="margin:0;padding-left:20px;color:#e0dbd2">
+<li>Publish without reading the JD &mdash; even Tier-1 verified jobs can have extraction errors</li>
+<li>Approve a Tier-2 job without checking the company's website</li>
+<li>Edit <code>posted_on</code> &mdash; it's the source's truth, not ours</li>
+<li>Bulk-reject without picking reasons &mdash; breaks the extractor feedback loop</li>
+<li>Manually re-enable a probe-disabled board without verifying the URL is back</li>
+<li>Publish without a summary card &mdash; run <code>/summarize-jobs</code> first</li>
+<li>Approve &gt; 20 jobs in one click without spot-checking</li>
+</ol>
+</div>
+
 </div></body></html>"""

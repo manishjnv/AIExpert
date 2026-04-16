@@ -366,6 +366,7 @@ Computed on-demand (cached 1h per `(user_id, job_id)`).
 ## 10. Admin guide
 
 > This section is the operational manual for whoever reviews jobs daily. Keep it bookmarked.
+> A standalone quick-reference version lives at [ADMIN_JOBS_GUIDE.md](ADMIN_JOBS_GUIDE.md).
 
 ### 10.1 Daily workflow — step by step (10–15 min/day)
 
@@ -509,7 +510,20 @@ Each summary carries `_meta.prompt_version`; when the prompt is bumped, `scripts
 
 **If summary is missing on a published job:** the page renders the tldr + skills as a fallback. No summary card appears. Run `/summarize-jobs --id N` to fix.
 
-### 10.9 Expiry mechanisms
+### 10.9 Unpublishing / removing a published job
+
+There is no delete or unpublish button. Jobs are never deleted from the database. To handle published jobs that should no longer be live:
+
+| Scenario | Action |
+|---|---|
+| Job is stale or filled | Reject with reason `expired` — removes from public view |
+| Job is off-topic / wrong | Reject with appropriate reason (`off_topic`, `low_quality`, etc.) |
+| Company requests takedown | Reject the job + blocklist the company via `/admin/jobs/companies` |
+| Expired job re-appears on source | It will auto-draft on next ingest (new hash) — review normally |
+
+Rejecting a published job sets `status=rejected`, which removes it from the public listing and job detail pages immediately.
+
+### 10.10 Expiry mechanisms
 
 Three auto-expire triggers protect public UX without admin action:
 
@@ -522,19 +536,19 @@ Three auto-expire triggers protect public UX without admin action:
 
 **Admin visibility:** Expired tab has a sub-filter "Auto-expired (source removed)" vs "Date-based (45d)". Banner shows `auto-expired 24h: N` chip when any flip occurred in the last run.
 
-### 10.10 Rejection feedback loop
+### 10.11 Rejection feedback loop
 
 Rejections aren't wasted. Every daily enrichment run injects the last 45 days of reject_reason counts from the same source into the prompt: *"Past reviewers rejected 12 of the last batch. Top reasons: off_topic(8), low_quality(4)."* The extractor adapts without manual prompt tuning.
 
 **How to maximise this:** always pick the correct reject reason (never "other" unless truly unclassifiable). The feedback loop only fires if `reject_reason IS NOT NULL` in the last 45 days for that source.
 
-### 10.11 Escalation
+### 10.12 Escalation
 
 - Source returns 0 jobs 2 days running → auto-expire logic does not fire for that source (treated as outage, not mass-fill). Admin should investigate if a board was replaced.
-- **Probe auto-disable** after 3 consecutive failures (see §10.6).
+- **Probe auto-disable** after 3 consecutive failures (see §10.7).
 - Any single admin action that affects > 20 jobs requires re-confirmation.
 
-### 10.12 Never do
+### 10.13 Never do
 
 - Publish a job you haven't read the JD for.
 - Approve a Tier-2 job without checking the company's own website.
@@ -542,7 +556,7 @@ Rejections aren't wasted. Every daily enrichment run injects the last 45 days of
 - Bulk-reject without picking reasons (breaks the extractor feedback loop).
 - Manually disable a board the probe auto-disabled without first verifying the slug is truly dead (the probe re-enables it automatically on first OK).
 
-### 10.13 Cost optimization — background (Phase 14)
+### 10.14 Cost optimization — background (Phase 14)
 
 Five automatic optimizations reduced monthly enrichment cost from ~$2.80 to ~$0.22 (92%). Admin doesn't configure anything — the pipeline applies them silently. The daily workflow in **§10.1** already incorporates all the steps you need; this section is background context only.
 
