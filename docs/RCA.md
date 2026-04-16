@@ -151,6 +151,15 @@
   - CLAUDE.md §5 rule 1 already lists redaction prefixes for pre-commit grep. Update that list: Gemini keys may now start with either `AIzaSy` (classic, 39 chars) **or** `AQ.Ab` (newer format, variable length). Both must be redacted in `logging_redact.py` and in pre-commit diff grep.
   - Rotation procedure is now codified in [docs/OPERATIONS.md §6.1](OPERATIONS.md#61-rotating-a-leaked-or-expired-ai-provider-key). Follow it verbatim for any future leak — it's an 8-step checklist that covers backup, replacement, force-recreate, smoke test, log scan, and revocation.
 
+### 024 — `/admin/jobs` stuck on "Loading…" (2026-04-16) [Frontend / Python-to-JS escaping]
+- **Symptom:** After session 14f deploy, `/admin/jobs` rendered the page shell (banner, filters, quick-filter toggles) but every data section ("Queue", "Source stats", "Summary-card pipeline", job list) stayed on "Loading…" forever. nginx access logs showed zero `/admin/jobs/api/queue` / `/api/stats` / `/api/summary-stats` hits from the user's browser — the fetches never fired.
+- **Root cause:** In the inline `<script>` block of `_ADMIN_HTML` (a Python triple-quoted string), the new publish-guardrail `confirm()` dialog at [admin_jobs.py:843-845](backend/app/routers/admin_jobs.py#L843-L845) used double-quoted JS strings containing `\n\n`. Python `"""..."""` is *not* a raw string — `\n` was interpreted as a real newline (LF) at module load, so the browser received JS like `"…yet.<LF><LF>" +` which is a `SyntaxError` inside a JS `"..."` literal. The entire `<script>` block failed to parse, so the top-level `load()` call and every event-handler wiring never ran.
+- **Fix:** Double-escaped each `\n` to `\\n` so Python emits the literal two-character `\n` escape that JS then parses correctly. Verified by piping the rendered script body through `node --check` — was throwing `Invalid or unexpected token`, now prints clean. Commit `bf184eb`.
+- **Prevention:**
+  - Any JS string literal emitted from inside a Python `"""..."""` block must **not** contain a single-backslash `\n` (or `\t`, `\r`, `\\`) — Python will eat the escape. Double them, or use a JS template literal (backticks) where real newlines are legal, or move the JS into a static file served from `/static/`.
+  - Add a CI/pre-commit check that extracts `<script>...</script>` bodies from admin HTML templates and runs `node --check` on them. A single `node --check` invocation would have caught this in seconds.
+  - Test fixture needed: render `_ADMIN_HTML` in a unit test and assert no literal LF inside any double-quoted JS string (regex: `"[^"\n]*\n[^"]*"` on the extracted script body must not match).
+
 ---
 
 ## Patterns to watch for
