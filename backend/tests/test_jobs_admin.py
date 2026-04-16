@@ -263,3 +263,91 @@ async def test_admin_queue_filters_by_city():
                         cookies={"auth_token": token})
         assert [j["external_id"] for j in r.json()["items"]] == ["c2"]
     await close_db()
+
+
+# ===================================================================
+# Wave 5+ — /admin/jobs-guide page (Jinja2 migration, RCA-027 prevention)
+# ===================================================================
+
+@pytest.mark.asyncio
+async def test_jobs_guide_renders_for_admin():
+    """Migrated from f-string to Jinja2 template. Verify rendered HTML
+    contains expected sections, no unrendered Jinja2 syntax leaked, and
+    the literal JSON code samples (RCA-027 trigger) survive intact."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/admin/jobs-guide", cookies={"auth_token": token})
+        assert r.status_code == 200
+        html = r.text
+        # Page identity
+        assert "Jobs Admin Guide" in html
+        # All 9 TOC sections present
+        for anchor in ("overview", "daily", "publish", "reject", "expire",
+                       "other", "classification", "audit", "never"):
+            assert f'id="{anchor}"' in html, f"missing section {anchor!r}"
+        # The Wave 4 #16 sections that triggered RCA-027 must render with
+        # SINGLE braces (not the f-string-doubled {{ }})
+        assert "{job_id, agreed, opus_topic, opus_designation, notes}" in html
+        assert '{"results":[' in html
+        assert '{"job_id":20' in html
+        # No unrendered Jinja2 syntax leaked
+        assert "{{ admin_css" not in html
+        assert "{{ admin_nav" not in html
+        assert "{% " not in html  # Jinja2 tag delimiter shouldn't appear
+        # CSS rules render with single braces
+        assert ".guide h2 { margin-top:" in html
+        # Admin nav is interpolated (not literal "{ADMIN_NAV}")
+        assert "{ADMIN_NAV}" not in html
+        assert "{ADMIN_CSS}" not in html
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_jobs_guide_requires_admin():
+    """Non-admin users get 403 — same auth gate as before migration."""
+    await _setup()
+    _, token = await _mk_user("u@t.com", is_admin=False)
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/admin/jobs-guide", cookies={"auth_token": token})
+        assert r.status_code == 403
+    await close_db()
+
+
+def test_jobs_guide_template_file_exists():
+    """Sanity check: the template file is bundled with the deployment."""
+    from pathlib import Path
+    import app
+    template = Path(app.__file__).parent / "templates" / "admin" / "jobs_guide.html"
+    assert template.exists(), f"missing template: {template}"
+    content = template.read_text(encoding="utf-8")
+    # The file must use Jinja2 syntax, not f-string syntax
+    assert "{{ admin_css | safe }}" in content
+    assert "{{ admin_nav | safe }}" in content
+    # The RCA-027 triggers (literal JSON in code blocks) must be SINGLE-braced
+    # in the template — Jinja2 treats { as literal by default
+    assert "<code>{job_id, agreed, opus_topic, opus_designation, notes}</code>" in content
+    assert '<code>{"results":[...]}</code>' in content
+
+
+def test_jobs_guide_template_renders_with_dummies():
+    """Direct render test bypassing the FastAPI auth layer.
+    Catches template-syntax bugs before they become 500s in prod."""
+    from app.routers.admin import _admin_template_env, ADMIN_CSS, ADMIN_NAV
+    html = _admin_template_env.get_template("admin/jobs_guide.html").render(
+        admin_css=ADMIN_CSS, admin_nav=ADMIN_NAV,
+    )
+    # Sanity bounds — too short means the template silently failed
+    assert 15000 < len(html) < 100000, f"unexpected length {len(html)}"
+    assert html.strip().startswith("<!DOCTYPE html>")
+    assert html.strip().endswith("</html>")
+
+
+def test_legacy_jobs_guide_constant_removed():
+    """Per CLAUDE.md 'no backwards-compatibility shims' — the legacy
+    f-string constant must be fully removed, not kept as a fallback."""
+    from app.routers import admin as admin_module
+    assert not hasattr(admin_module, "_JOBS_GUIDE_HTML"), \
+        "legacy f-string constant should be removed after Jinja2 migration"
+    assert not hasattr(admin_module, "_JOBS_GUIDE_HTML_LEGACY"), \
+        "legacy fallback constant should be removed (no compat shim)"

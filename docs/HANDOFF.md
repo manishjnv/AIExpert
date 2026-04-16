@@ -78,13 +78,13 @@ After deploying the admin guideline (commit `7585db0`), the backend crashed with
 - Admin reports a false positive that slipped through all 10 layers → identify which layer should have caught it, add patterns/anchors per [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) "Adding a new defense layer" section
 - Drift detection (Layer 9 auto-disable or Layer 10 audit mismatch) reveals a systematic gap → may revisit Wave 5 #19 (two-stage classifier)
 
-**Outstanding from prior sessions (unchanged across sessions 15–17):**
+**Outstanding (verified live state 2026-04-16 session 17 close):**
 
-1. Rotate Gemini API key (leaked session 14e — still pending)
-2. Run `/summarize-jobs --status draft --limit 100` to clear remaining drafts
-3. Bump `PROMPT_VERSION` in `jobs_summary_claude.txt` to force-regen 734 Flash-era summaries
-4. Submit `sitemap_index.xml` to Google Search Console
-5. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently)
+1. ✅ Gemini API key — rotated in a prior session. Stale carry-over, dropped.
+2. ✅ Summary coverage — verified 962/962 drafts have summaries; nothing pending.
+3. Submit `sitemap_index.xml` to Google Search Console (manual one-time admin task)
+4. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently; minor SEO loss, not a bug)
+5. **Editorial uplift (optional):** 669 published/draft rows are still on the legacy Flash-era summary; 297 are on current Opus prompt `2026-04-16.1`. Bumping `PROMPT_VERSION` in `prompts/jobs_summary_claude.txt` would mark the 669 stale and the next `/summarize-jobs` sweep would regenerate them via Claude Max in VS Code ($0 API spend, but requires manual paste-cycle time).
 
 **Open questions for the user:** None.
 
