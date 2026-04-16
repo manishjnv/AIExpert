@@ -779,6 +779,176 @@ class TestBareVerbTitleGate:
 
 
 # ===================================================================
+# Wave 5 #18 — evidence-span topic validation
+# ===================================================================
+
+class TestEvidenceSpanValidation:
+    """_validate_topic_with_evidence accepts new evidence-spans format from
+    Gemini and validates each topic's evidence quote against the JD body
+    plus per-topic forbidden patterns. Falls back gracefully to old
+    string-array format for backwards compatibility."""
+
+    ALLOWED_TOPIC = {"LLM", "CV", "NLP", "RL", "MLOps", "Data Eng", "Research",
+                     "Applied ML", "GenAI", "Robotics", "Safety", "Agents",
+                     "RAG", "Fine-tuning", "Evals"}
+
+    def test_new_format_with_valid_evidence(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Train large language models with RLHF. Fine-tune for production."
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "large language models with RLHF"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == ["LLM"]
+
+    def test_llm_evidence_about_law_degree_rejected(self):
+        """The motivating example: LLM topic cited from "LLB / LLM degree" → strip."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "LLB / LLM from a recognized university. PQE in legal practice."
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "LLB / LLM from a recognized university"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_llm_evidence_master_of_laws_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Candidate must hold a Master of Laws degree from a top university."
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "Master of Laws degree from a top university"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_llm_evidence_pqe_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "7+ years of PQE in corporate legal practice required."
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "7+ years of PQE in corporate legal practice"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_safety_evidence_workplace_safety_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Manage workplace safety and building security at the office."
+        result = _validate_topic_with_evidence(
+            [{"name": "Safety", "evidence": "workplace safety and building security"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_safety_evidence_ai_alignment_kept(self):
+        """Genuine AI safety evidence must pass."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Research AI alignment and red-team large language models for safety risks."
+        result = _validate_topic_with_evidence(
+            [{"name": "Safety", "evidence": "research AI alignment and red-team large language models"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == ["Safety"]
+
+    def test_research_evidence_user_research_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Conduct user research and usability testing for product designers."
+        result = _validate_topic_with_evidence(
+            [{"name": "Research", "evidence": "user research and usability testing"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_hallucinated_evidence_rejected(self):
+        """Evidence not in JD body → Gemini hallucinated → strip topic."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Backend engineer role. Python and Postgres."
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "fine-tune large language models"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_evidence_too_short_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "LLM"}],  # 3 chars < 8
+            "has LLM word in description body", ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_evidence_too_long_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        long_ev = "a" * 250
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": long_ev}], "a" * 300, ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_old_string_format_backwards_compat(self):
+        """Old format (array of strings, pre-Wave-5) still works — degrades to no-evidence-check."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        result = _validate_topic_with_evidence(
+            ["LLM", "Applied ML"], "any text", ALLOWED_TOPIC,
+        )
+        assert result == ["LLM", "Applied ML"]
+
+    def test_mixed_format_handled(self):
+        """Mixed old + new entries in same topic list."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Build deep learning models with PyTorch."
+        result = _validate_topic_with_evidence(
+            [
+                {"name": "Applied ML", "evidence": "deep learning models with PyTorch"},
+                "LLM",  # old format — accepted without evidence check
+            ],
+            jd, ALLOWED_TOPIC,
+        )
+        assert "Applied ML" in result
+        assert "LLM" in result
+
+    def test_dedup_and_cap(self):
+        """Duplicates removed; cap of 3 enforced."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "machine learning, deep learning, RLHF, fine-tuning, computer vision are core"
+        result = _validate_topic_with_evidence(
+            [
+                {"name": "LLM", "evidence": "machine learning, deep learning"},
+                {"name": "RL", "evidence": "RLHF, fine-tuning"},
+                {"name": "CV", "evidence": "computer vision"},
+                {"name": "Applied ML", "evidence": "machine learning"},
+                {"name": "Fine-tuning", "evidence": "RLHF, fine-tuning"},
+            ],
+            jd, ALLOWED_TOPIC,
+        )
+        assert len(result) == 3
+
+    def test_disallowed_topic_name_rejected(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        result = _validate_topic_with_evidence(
+            [{"name": "MadeUpTopic", "evidence": "valid quote here for sure"}],
+            "valid quote here for sure is in this JD", ALLOWED_TOPIC,
+        )
+        assert result == []
+
+    def test_empty_inputs_safe(self):
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        assert _validate_topic_with_evidence(None, "jd", ALLOWED_TOPIC) == []
+        assert _validate_topic_with_evidence([], "jd", ALLOWED_TOPIC) == []
+        assert _validate_topic_with_evidence([{}], "jd", ALLOWED_TOPIC) == []
+        assert _validate_topic_with_evidence("not a list", "jd", ALLOWED_TOPIC) == []
+
+    def test_case_insensitive_evidence_match(self):
+        """Evidence quote should match JD case-insensitively."""
+        from app.services.jobs_enrich import _validate_topic_with_evidence, ALLOWED_TOPIC
+        jd = "Train Large Language Models with RLHF."
+        # Gemini might lowercase or rephrase casing
+        result = _validate_topic_with_evidence(
+            [{"name": "LLM", "evidence": "train large language models with rlhf"}],
+            jd, ALLOWED_TOPIC,
+        )
+        assert result == ["LLM"]
+
+
+# ===================================================================
 # Wave 4 #16 — Opus audit sample selection (manual review via Claude Code)
 # ===================================================================
 

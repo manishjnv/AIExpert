@@ -242,6 +242,103 @@ _AI_ADJACENT_DESIGNATIONS: set[str] = {
 }
 
 
+# Wave 5 #18 — per-topic forbidden-evidence patterns. If Gemini cites an
+# evidence span that matches one of these for a given topic, the topic is
+# stripped (it means Gemini saw the keyword in a non-AI context). Catches:
+# - "LLM" cited from "LLB / LLM from a recognized university" (law degree)
+# - "Safety" cited from "workplace safety / building security" (HR/facilities)
+# - "Research" cited from "user research / market research" (UX/marketing)
+# - "Applied ML" cited from "AI-powered platform" (marketing copy)
+_TOPIC_FORBIDDEN_EVIDENCE: dict[str, tuple[re.Pattern, ...]] = {
+    "LLM": (
+        re.compile(r"\bllb\b|\bll\.\s?b\b", re.I),
+        re.compile(r"\bll\.?\s?m\b\s+(?:from|degree|in)", re.I),
+        re.compile(r"\bmaster of laws?\b", re.I),
+        re.compile(r"\bpqe\b|\bpost[- ]qualification experience\b", re.I),
+        re.compile(r"\blaw (?:firm|school)\b", re.I),
+        re.compile(r"\blegal counsel\b|\bcontract drafting\b", re.I),
+        re.compile(r"\bbar council\b|\badvocate\b", re.I),
+    ),
+    "Safety": (
+        re.compile(r"\bworkplace safety\b|\bbuilding security\b", re.I),
+        re.compile(r"\bphysical security\b|\bfire safety\b", re.I),
+        re.compile(r"\bproduct compliance\b|\boccupational safety\b", re.I),
+        re.compile(r"\bsafety officer\b|\bsafety manager\b", re.I),
+    ),
+    "Research": (
+        re.compile(r"\buser research\b|\bmarket research\b", re.I),
+        re.compile(r"\bcustomer research\b|\bux research\b", re.I),
+        re.compile(r"\bcompetitive research\b", re.I),
+    ),
+    "Applied ML": (
+        re.compile(r"^[\s\W]*ai[- ]?(?:powered|driven|first|native|enabled)", re.I),
+    ),
+}
+
+
+def _validate_topic_with_evidence(
+    raw_topic: Any, jd_text: str, allowed: set[str], cap: int = 3,
+) -> list[str]:
+    """Wave 5 #18 — accept Gemini's new evidence-spans format and validate.
+
+    Accepts BOTH formats for backwards compatibility:
+      - New: [{"name": "LLM", "evidence": "<JD quote>"}, ...]
+      - Old: ["LLM", "Applied ML", ...] (pre-Wave-5; no evidence check)
+
+    For new-format entries, strips topic if:
+      - evidence is missing/empty/oversized
+      - evidence is not a verbatim substring of the JD (Gemini hallucinated)
+      - evidence matches a forbidden pattern for this topic (saw keyword
+        in non-AI context — e.g. LLM cited from "LLB / LLM degree")
+
+    Returns flat list of topic names (storage format unchanged — DB stays
+    on legacy schema, no migration needed).
+    """
+    if not isinstance(raw_topic, list):
+        return []
+    jd_lower = jd_text.lower()
+    out: list[str] = []
+    for entry in raw_topic:
+        if isinstance(entry, str):
+            # Old format — accept if in allowed set; no evidence check
+            if entry in allowed:
+                out.append(entry)
+            continue
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or name not in allowed:
+            continue
+        evidence = entry.get("evidence") or ""
+        if not isinstance(evidence, str):
+            continue
+        ev = evidence.strip()
+        if not (8 <= len(ev) <= 200):
+            continue
+        # Anti-hallucination: the quoted span must actually exist in the JD.
+        if ev.lower() not in jd_lower:
+            logger.debug(
+                "topic %s rejected: evidence not in JD (hallucinated quote)", name
+            )
+            continue
+        # Per-topic forbidden patterns
+        forbidden = _TOPIC_FORBIDDEN_EVIDENCE.get(name, ())
+        if any(p.search(ev) for p in forbidden):
+            logger.debug(
+                "topic %s rejected: evidence matches forbidden pattern (%s)",
+                name, ev[:60],
+            )
+            continue
+        out.append(name)
+    # Dedup while preserving order, then cap
+    seen, deduped = set(), []
+    for t in out:
+        if t not in seen:
+            seen.add(t)
+            deduped.append(t)
+    return deduped[:cap]
+
+
 def _enforce_topic_anchors(topics: list[str], jd_text: str) -> list[str]:
     """Drop topics that have no anchor term in the JD body."""
     if not topics:
@@ -361,8 +458,11 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
     desc = _scrub_pii(desc)
 
     designation = _clamp_enum(raw_resp.get("designation"), ALLOWED_DESIGNATION, "Other")
-    topic = _clamp_multi(raw_resp.get("topic"), ALLOWED_TOPIC, 3)
-    topic = _enforce_topic_anchors(topic, _strip_html(raw["jd_html"]))
+    jd_clean = _strip_html(raw["jd_html"])
+    # Wave 5 #18 — evidence-span validation FIRST (parses Gemini's new format,
+    # falls back to old format if needed), then Wave 1 anchor + designation gates.
+    topic = _validate_topic_with_evidence(raw_resp.get("topic"), jd_clean, ALLOWED_TOPIC)
+    topic = _enforce_topic_anchors(topic, jd_clean)
     topic = _enforce_designation_topic_consistency(designation, topic)
 
     return {
@@ -469,7 +569,8 @@ async def enrich_job_lite(raw: RawJob, db=None) -> dict[str, Any]:
     exp = (emp.get("experience_years") or {}) if isinstance(emp.get("experience_years"), dict) else {}
 
     designation = _clamp_enum(resp.get("designation"), ALLOWED_DESIGNATION, "Other")
-    topic = _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3)
+    # Wave 5 #18 — evidence-span validation (lite path)
+    topic = _validate_topic_with_evidence(resp.get("topic"), jd_text, ALLOWED_TOPIC)
     topic = _enforce_topic_anchors(topic, jd_text)
     topic = _enforce_designation_topic_consistency(designation, topic)
 

@@ -9,7 +9,7 @@ OUTPUT SCHEMA (return exactly these keys):
 {
   "designation": one of ["ML Engineer","Research Scientist","Applied Scientist","Data Scientist","Data Engineer","MLOps Engineer","AI Product Manager","AI Engineer","Prompt Engineer","Research Engineer","Computer Vision Engineer","NLP Engineer","AI Solutions Architect","AI Developer Advocate","Other"],
   "seniority": one of ["Intern","Junior","Mid","Senior","Staff","Principal","Lead","Manager","Director"],
-  "topic": array (1-3 items) from ["LLM","CV","NLP","RL","MLOps","Data Eng","Research","Applied ML","GenAI","Robotics","Safety","Agents","RAG","Fine-tuning","Evals"],
+  "topic": array (0-3 items) of OBJECTS — NOT bare strings. Each object: {"name": one of ["LLM","CV","NLP","RL","MLOps","Data Eng","Research","Applied ML","GenAI","Robotics","Safety","Agents","RAG","Fine-tuning","Evals"], "evidence": exact JD substring (8-200 chars) that justifies this topic — see TOPIC EVIDENCE FORMAT rules below},
   "location": {
     "country": ISO-2 country code (e.g. "US","IN","GB") or null,
     "country_name": full country name or null,
@@ -46,6 +46,25 @@ DISAMBIGUATION — CRITICAL
 - "LLM" in the topic enum means **Large Language Model** ONLY. If the JD mentions "LLM" in the context of "LLB/LLM degree", "Master of Laws", "law firm", "PQE" (post-qualification experience), "legal counsel", "contract drafting", "procurement contracts", "Indian Contract Act", "bar council", or "advocate" — this is a LAW DEGREE, not AI. For such jobs return `"topic": []`, `"designation": "Other"`.
 - Only assign any AI topic when the JD demonstrates concrete AI/ML work: model training, fine-tuning, inference, dataset engineering, MLOps, research, prompt engineering for products, deploying LLMs/agents in production, RAG pipelines, embeddings, computer vision models, etc. A job mentioning AI only in passing ("company uses AI", "AI-driven platform") does NOT qualify — return `"topic": []` and `"designation": "Other"`.
 - Empty topic is allowed and preferred over a wrong guess. Do NOT default to "Applied ML" for non-AI roles.
+
+TOPIC EVIDENCE FORMAT — REQUIRED (Wave 5)
+Every topic you assign MUST include a literal `evidence` quote from the JD body that justifies the topic. Format:
+
+  "topic": [
+    {"name": "LLM", "evidence": "fine-tune large language models with RLHF"},
+    {"name": "Applied ML", "evidence": "deploy production ML models for ranking"}
+  ]
+
+Rules:
+- `evidence` MUST be a verbatim substring of the JD body (case-insensitive). DO NOT paraphrase, summarize, or invent quotes — the evidence is verified against the JD post-hoc.
+- `evidence` MUST justify the AI nature of the role, not just contain the keyword. "LLB / LLM from a recognized university" is NOT valid evidence for the LLM topic — it refers to a Master of Laws degree.
+- `evidence` length: 8–200 characters. Pick the most specific span; do not quote whole paragraphs.
+- For "LLM" topic: evidence MUST refer to Large Language Models. NEVER quote spans containing "LLB", "LL.M from", "Master of Laws", "PQE", "law firm", "law school", "legal counsel", or "contract drafting". For these, return `"topic": []` and `"designation": "Other"`.
+- For "Safety" topic: evidence MUST refer to AI safety/alignment work. NEVER quote spans about workplace safety, building security, or product compliance.
+- For "Research" topic: evidence MUST refer to AI/ML research output (papers, ablations, novel methods). NOT generic "research the market" or "user research".
+- For "Applied ML" topic: evidence MUST refer to actual model training/deployment. NOT generic "AI products" or "AI-powered platform".
+- If you can't find honest evidence for a topic, DO NOT assign it. Empty topic is correct.
+- Maximum 3 topic objects.
 
 SELF-REJECTION RULES — apply BEFORE filling the schema
 1. If the role's primary function is recruiting, sales, sales engineering, marketing, content, design, UX, legal, finance, accounting, HR, IT support, facilities, physical security, cybersecurity (non-AI), policy/governance, community/DevRel, program/project management, business development, partnerships, customer success, technical writing, video/creative production, clinical/medical review, localization, vendor/sourcing, or any operations role — even at an AI-first company (Anthropic, OpenAI, Databricks, etc.) — return `"topic": []`, `"designation": "Other"`.
