@@ -49,6 +49,24 @@ def _check_origin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Origin mismatch")
 
 
+def _strip_surrogates(obj: Any) -> Any:
+    """Recursively replace lone surrogate characters in strings.
+
+    SQLite stores raw bytes; some job descriptions scraped from external sites
+    arrive with invalid UTF-8 sequences decoded as surrogates (e.g. \\udcb7).
+    json.dumps / FastAPI's JSONResponse chokes on these with UnicodeEncodeError.
+    Replace each surrogate with the Unicode replacement character U+FFFD so the
+    data is still readable without crashing serialization.
+    """
+    if isinstance(obj, str):
+        return obj.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+    if isinstance(obj, dict):
+        return {k: _strip_surrogates(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_surrogates(v) for v in obj]
+    return obj
+
+
 def _serialize(job: Job) -> dict[str, Any]:
     # Derive "has_summary" + "summary_version" so the queue row can show a
     # Missing-summary chip and a prompt-version stamp without the frontend
@@ -83,7 +101,7 @@ def _serialize(job: Job) -> dict[str, Any]:
         "hash": job.hash,
         "has_summary": has_summary,
         "summary_version": summary_version,
-        "data": job.data,
+        "data": _strip_surrogates(job.data),
     }
 
 

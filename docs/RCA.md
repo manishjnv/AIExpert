@@ -192,6 +192,16 @@
   - Migration target: move `_JOBS_GUIDE_HTML` and similar large templates to actual template files served via `Jinja2Templates` or `aiofiles`. F-strings are the wrong tool for >100-line HTML blobs containing arbitrary code samples. Tracked but deferred — too much surface to migrate in this session.
   - When adding example code to admin docs, always test the rendered page in a browser BEFORE pushing. The `python -m py_compile` syntax check passes for f-strings with mismatched `{}` because evaluation is deferred to runtime.
 
+### 028 — Admin Jobs queue 500: UnicodeEncodeError from lone surrogate in job data (2026-04-16) [Data quality / serialization]
+
+- **Symptom:** `/admin/jobs` page showed "Load failed: 500". Banner stuck on "Loading…". Backend log: `UnicodeEncodeError: 'utf-8' codec can't encode character '\udcb7' in position 1154940: surrogates not allowed` inside `starlette/responses.py render()`. Health endpoint still 200 — backend was running, only the queue API crashed.
+- **Root cause:** A job scraped from an external source board had a lone surrogate character (`\udcb7`) in its `description_html` field. SQLite stores raw bytes and Python's `sqlite3` driver decodes them with `errors='surrogateescape'`, producing a Python `str` that contains a surrogate codepoint. This is legal in Python's internal string representation but JSON serialization (which must produce valid UTF-8) rejects it with `UnicodeEncodeError`. FastAPI's `JSONResponse` calls `json.dumps` → triggers the error → 500 on every queue request until the row is fixed or the serializer sanitizes it.
+- **Fix:** Added `_strip_surrogates(obj)` helper at [admin_jobs.py:52](backend/app/routers/admin_jobs.py#L52) — recursively walks dicts/lists/strings, re-encodes each string through `utf-8 errors=replace` to substitute `\ufffd` (Unicode replacement character) for any surrogate. Applied to `job.data` in `_serialize()`. Surrogates become `\ufffd` (visible as `?` in the UI) — data is still readable and the queue loads. Commit `<pending>`.
+- **Prevention:**
+  - Sanitize at ingest time: `jobs_ingest.py` should run `_strip_surrogates` (or equivalent) on `description_html` and other scraped string fields before writing to the DB, so surrogates never reach the DB at all.
+  - Add to the "Patterns to watch for" table: scraped HTML → surrogate leakage.
+  - The serializer fallback (`_strip_surrogates` in `_serialize`) is a safety net, not the primary fix. Primary fix should be at scrape time.
+
 ---
 
 ## Patterns to watch for
@@ -212,3 +222,4 @@
 | DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
 | Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
 | AI call without `db=` or `log_usage` | High | Every AI call must log to `ai_usage_log` with `tokens > 0`. Use `get_last_tokens()` helper. |
+| Scraped HTML with surrogate characters | Medium | Sanitize at ingest time with `_strip_surrogates`; fallback sanitizer in `_serialize` is a safety net only. |
