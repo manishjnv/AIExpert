@@ -624,8 +624,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
     <option value="">Any workplace</option>
     <option>Remote</option><option>Hybrid</option><option>Onsite</option>
   </select>
-  <input id="qf-country" placeholder="Country (US, IN…)" maxlength="2" style="width:110px;text-transform:uppercase">
-  <input id="qf-city" placeholder="City" style="width:140px">
+  <select id="qf-country" style="min-width:140px"><option value="">Any country</option></select>
+  <select id="qf-city" style="min-width:160px"><option value="">Any city</option></select>
   <label><input id="qf-verified" type="checkbox"> Verified only</label>
   <select id="qf-expired-reason" style="display:none">
     <option value="">Any expiry reason</option>
@@ -659,7 +659,7 @@ function qfilterParams() {
   const co = document.getElementById("qf-company").value.trim();
   const des = document.getElementById("qf-designation").value.trim();
   const rem = document.getElementById("qf-remote").value.trim();
-  const ctry = document.getElementById("qf-country").value.trim().toUpperCase();
+  const ctry = document.getElementById("qf-country").value.trim();
   const city = document.getElementById("qf-city").value.trim();
   const ver = document.getElementById("qf-verified").checked;
   if (q) p.set("q", q);
@@ -691,6 +691,7 @@ async function load() {
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
   duplicateHashes = new Set(data.duplicate_hashes || []);
   populateCompanyDropdown(data.items);
+  populateLocationDropdowns(data.items);
   renderList(data.items);
   loadStats();
   loadSummaryStats();
@@ -704,6 +705,37 @@ function populateCompanyDropdown(items) {
     const opt = document.createElement("option");
     opt.value = s; opt.textContent = s;
     sel.appendChild(opt);
+  }
+}
+
+// ISO-2 → friendly name. Extend as new source boards are added.
+const COUNTRY_NAMES = {
+  IN:"India", US:"United States", GB:"United Kingdom", CA:"Canada",
+  DE:"Germany", FR:"France", NL:"Netherlands", IE:"Ireland",
+  SG:"Singapore", AU:"Australia", JP:"Japan", CH:"Switzerland",
+  IL:"Israel", ES:"Spain", IT:"Italy", SE:"Sweden", PL:"Poland",
+  BR:"Brazil", MX:"Mexico", AE:"UAE", KR:"South Korea", HK:"Hong Kong",
+};
+
+function populateLocationDropdowns(items) {
+  const selCountry = document.getElementById("qf-country");
+  const selCity = document.getElementById("qf-city");
+  if (selCountry.options.length <= 1) {
+    const codes = [...new Set(items.map(j => j.country).filter(Boolean))].sort();
+    for (const c of codes) {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = COUNTRY_NAMES[c] ? `${COUNTRY_NAMES[c]} (${c})` : c;
+      selCountry.appendChild(opt);
+    }
+  }
+  if (selCity.options.length <= 1) {
+    const cities = [...new Set(items.map(j => (j.data && j.data.location && j.data.location.city) || null).filter(Boolean))].sort();
+    for (const c of cities) {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      selCity.appendChild(opt);
+    }
   }
 }
 
@@ -898,17 +930,17 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
 
 // Wire up the filter bar.
 (function initQFilters() {
-  const live = ["qf-designation","qf-remote","qf-company","qf-verified","qf-expired-reason"];
+  const live = ["qf-designation","qf-remote","qf-company","qf-country","qf-city","qf-verified","qf-expired-reason"];
   live.forEach(id => document.getElementById(id).addEventListener("change", load));
   let tm = null;
-  ["qf-q","qf-country","qf-city"].forEach(id => {
+  ["qf-q"].forEach(id => {
     document.getElementById(id).addEventListener("input", () => {
       clearTimeout(tm); tm = setTimeout(load, 250);
     });
   });
   document.getElementById("qf-clear").addEventListener("click", () => {
-    ["qf-q","qf-country","qf-city"].forEach(id => document.getElementById(id).value = "");
-    ["qf-company","qf-designation","qf-remote","qf-expired-reason"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("qf-q").value = "";
+    ["qf-company","qf-designation","qf-remote","qf-country","qf-city","qf-expired-reason"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("qf-verified").checked = false;
     currentFlag = "";
     document.querySelectorAll(".qtoggle").forEach(b => b.classList.remove("active"));
