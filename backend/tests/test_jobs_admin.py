@@ -265,6 +265,45 @@ async def test_admin_queue_filters_by_city():
     await close_db()
 
 
+@pytest.mark.asyncio
+async def test_admin_queue_searchable_by_job_id():
+    """Numeric q filter matches Job.id directly (overload alongside title/company)."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:anthropic", kind="greenhouse", label="X",
+                         tier=1, enabled=1, bulk_approve=1))
+        db.add(JobCompany(slug="anthropic", name="Anthropic"))
+        for ext in ("a1", "a2", "a3"):
+            db.add(Job(
+                source="greenhouse:anthropic", external_id=ext, source_url="http://x",
+                hash=ext, status="draft", posted_on=date.today(),
+                valid_through=date.today() + timedelta(days=45),
+                slug=ext, title=f"Role {ext}", company_slug="anthropic",
+                designation="ML Engineer", country="US", remote_policy="Hybrid",
+                verified=1, data={},
+            ))
+        await db.commit()
+        # Grab the id of the middle row to search for.
+        target = (await db.execute(
+            select(Job).where(Job.external_id == "a2")
+        )).scalar_one()
+        target_id = target.id
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        # Numeric q → id match (plus any title containing the digits, which is none here).
+        r = await c.get(f"/admin/jobs/api/queue?status=draft&q={target_id}",
+                        cookies={"auth_token": token})
+        ids = [j["id"] for j in r.json()["items"]]
+        assert target_id in ids
+        assert len(ids) == 1, f"expected only id={target_id}, got {ids}"
+        # Non-numeric q preserves title/company behavior.
+        r = await c.get("/admin/jobs/api/queue?status=draft&q=Role%20a1",
+                        cookies={"auth_token": token})
+        exts = sorted(j["external_id"] for j in r.json()["items"])
+        assert exts == ["a1"], f"expected only a1 by title match, got {exts}"
+    await close_db()
+
+
 # ===================================================================
 # Wave 5+ — /admin/jobs-guide page (Jinja2 migration, RCA-027 prevention)
 # ===================================================================

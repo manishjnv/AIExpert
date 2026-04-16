@@ -168,8 +168,12 @@ async def list_queue(
     if q:
         from sqlalchemy import or_
         like = f"%{q.lower()}%"
-        stmt = stmt.where(or_(func.lower(Job.title).like(like),
-                              func.lower(Job.company_slug).like(like)))
+        conditions = [func.lower(Job.title).like(like),
+                      func.lower(Job.company_slug).like(like)]
+        q_stripped = q.strip()
+        if q_stripped.isdigit() and int(q_stripped) < 10 ** 12:
+            conditions.append(Job.id == int(q_stripped))
+        stmt = stmt.where(or_(*conditions))
     stmt = stmt.order_by(Job.posted_on.desc(), Job.id.desc()).offset(offset).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
 
@@ -1222,6 +1226,7 @@ function renderList(items) {
       <td>
         <a href="${previewUrl}" target="_blank" rel="noopener" style="color:#e8a849;text-decoration:none"><b>${esc(j.title)}</b></a>
         <a href="${previewUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;font-size:10px;padding:2px 8px">Preview ↗</a>
+        <span class="chip" style="font-family:'IBM Plex Mono',monospace;color:#94a3b8" title="Job ID — searchable via the filter box above">#${j.id}</span>
         ${tierChip}
         <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span>
         ${flagChips}<br>
