@@ -76,6 +76,63 @@ def test_render_summary_card_has_all_sections():
     assert "Watch-outs" in html
 
 
+def test_validate_summary_preserves_meta_stamp():
+    """Import script writes _meta{model,prompt_version,generated_at}; clamp must keep it."""
+    raw = {
+        "must_haves": ["x"],
+        "_meta": {
+            "model": "opus-4.6",
+            "prompt_version": "2026-04-16.1",
+            "generated_at": "2026-04-16T09:00:00+00:00",
+        },
+    }
+    out = _validate_summary(raw)
+    assert out["_meta"]["model"] == "opus-4.6"
+    assert out["_meta"]["prompt_version"] == "2026-04-16.1"
+    assert out["_meta"]["generated_at"] == "2026-04-16T09:00:00+00:00"
+
+
+def test_validate_summary_drops_bogus_meta():
+    """Non-dict _meta or missing fields must not crash or leak."""
+    raw1 = {"must_haves": ["x"], "_meta": "not-a-dict"}
+    out1 = _validate_summary(raw1)
+    assert "_meta" not in out1
+    raw2 = {"must_haves": ["x"]}
+    out2 = _validate_summary(raw2)
+    assert "_meta" not in out2
+
+
+def _import_parse():
+    """scripts/ lives at repo root, outside backend/; add to sys.path once."""
+    import sys
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from scripts.import_jobs_summary import _tolerant_parse
+    return _tolerant_parse
+
+
+def test_import_script_tolerates_code_fences():
+    """Opus sometimes wraps output in ```json ... ```; parser must strip."""
+    _tolerant_parse = _import_parse()
+    raw = '```json\n[{"id": 1, "summary": {}}]\n```'
+    assert _tolerant_parse(raw) == [{"id": 1, "summary": {}}]
+
+
+def test_import_script_tolerates_leading_prose():
+    """Opus sometimes writes 'Here are the summaries:' before the JSON."""
+    _tolerant_parse = _import_parse()
+    raw = 'Here are the summaries:\n\n[{"id": 2, "summary": {}}]'
+    assert _tolerant_parse(raw) == [{"id": 2, "summary": {}}]
+
+
+def test_import_script_accepts_items_envelope():
+    _tolerant_parse = _import_parse()
+    raw = '{"items": [{"id": 3, "summary": {}}]}'
+    assert _tolerant_parse(raw) == [{"id": 3, "summary": {}}]
+
+
 def test_render_summary_card_escapes_labels():
     from app.routers.jobs import _render_summary_card
     summary = {"headline_chips": [{"label": "<script>", "tone": "neutral"}], "must_haves": ["x"]}

@@ -159,7 +159,7 @@ def _validate_summary(raw_summary: Any) -> dict[str, Any] | None:
     if not (chips or comp or resp_list or must or benefits or watch):
         return None
 
-    return {
+    out = {
         "headline_chips": chips,
         "comp_snapshot": comp,
         "responsibilities": resp_list,
@@ -167,6 +167,16 @@ def _validate_summary(raw_summary: Any) -> dict[str, Any] | None:
         "benefits": benefits,
         "watch_outs": watch,
     }
+    # Preserve provenance stamp when present (import_jobs_summary writes _meta
+    # with {model, prompt_version, generated_at}; Flash enrichment leaves it off).
+    if isinstance(raw_summary.get("_meta"), dict):
+        m = raw_summary["_meta"]
+        out["_meta"] = {
+            "model": _clip(m.get("model"), 40) or None,
+            "prompt_version": _clip(m.get("prompt_version"), 40) or None,
+            "generated_at": _clip(m.get("generated_at"), 40) or None,
+        }
+    return out
 
 
 def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str, Any]:
