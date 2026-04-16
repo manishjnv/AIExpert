@@ -28,8 +28,12 @@ import logging
 import sys
 from pathlib import Path
 
-# Ensure backend is importable when running from repo root.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+# Ensure backend is importable when running from repo root or container.
+_script_dir = Path(__file__).resolve().parent
+for candidate in [_script_dir.parent / "backend", _script_dir.parent]:
+    if (candidate / "app").is_dir():
+        sys.path.insert(0, str(candidate))
+        break
 
 from sqlalchemy import select
 
