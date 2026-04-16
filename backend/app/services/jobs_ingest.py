@@ -65,11 +65,18 @@ _NON_AI_TITLE_PATTERNS: list[str] = [
     "administrative assistant", "receptionist", "facilities",
     # Legal / finance / HR
     "legal counsel", "general counsel", "paralegal", "attorney",
+    "legal manager", "manager, legal", "manager - legal", "manager-legal",
+    "legal associate", "legal analyst", "legal specialist", "legal operations",
+    "legal affairs", "corporate counsel", "contracts manager", "contract manager",
+    "compliance manager", "compliance officer", "compliance analyst",
+    "chief legal officer", "head of legal", "vp, legal", "vp legal",
     "tax manager", "tax analyst", "accountant", "accounting",
     "financial analyst", "fp&a", "controller", "accounts payable",
     "accounts receivable", "payroll", "compensation analyst",
     "recruiter", "recruiting coordinator", "talent acquisition",
     "human resources", " hr manager", " hr business partner",
+    "benefits administration", "benefits manager", "benefits analyst",
+    "merchant kyc", "kyc analyst", "kyc specialist", "merchant onboarding",
     # Marketing (non-technical)
     "content writer", "copywriter", "social media manager",
     "event manager", "event coordinator", "public relations",
@@ -98,6 +105,62 @@ def is_non_ai_title(title: str) -> bool:
     """
     t = title.lower()
     return any(pat in t for pat in _NON_AI_TITLE_PATTERNS)
+
+
+# JD-body cluster of terms that strongly indicate non-AI domains (law, HR,
+# procurement, finance). A job hitting >=2 of these AND zero AI signals is
+# almost certainly a false positive like PhonePe "Manager, Legal" where
+# "LLB / LLM from a recognized university" tricked the enricher into
+# tagging it as "Applied ML". See RCA-026.
+_NON_AI_JD_SIGNALS: tuple[str, ...] = (
+    # Legal
+    "llb", "ll.b", "ll.m", "pqe", "post-qualification experience",
+    "bar council", "indian contract act", "indian penal code",
+    "law firm", "law school", "master of laws", "advocate",
+    "procurement contracts", "commercial contracts", "contract drafting",
+    "contract negotiation", "legal counsel", "legal advisory",
+    "redlining", "msa ", "nda ", "sla ",
+    # HR / benefits / KYC / finance
+    "payroll processing", "benefits administration", "kyc verification",
+    "kyc analyst", "merchant onboarding", "onboarding specialist",
+    "bookkeeping", "gst filing", "tds ",
+)
+
+# Strong AI-signal words in JD body. If ANY hit, we do NOT suppress by JD
+# signals — keeps legit AI roles that happen to mention contracts/NDAs safe.
+# Keep tight and high-precision — false positives here cost us accuracy.
+_AI_JD_SIGNALS: tuple[str, ...] = (
+    "machine learning", "deep learning", "neural network", "transformer",
+    "pytorch", "tensorflow", "jax ", "hugging face", "huggingface",
+    "large language model", "large-language model", "llm-based",
+    "fine-tuning", "fine tuning", "prompt engineering", "rag pipeline",
+    "retrieval augmented", "retrieval-augmented",
+    "computer vision", "nlp model", "natural language processing",
+    "reinforcement learning", "mlops", "ml ops", "ml platform",
+    "model training", "model inference", "model evaluation", "embedding model",
+    "vector database", "langchain", "llamaindex",
+    "openai", "anthropic", "claude api", "gemini api", "gpt-4", "gpt-5",
+    "generative ai", "gen ai ", "genai ",
+    "data scientist", "ml engineer", "ai engineer", "research scientist",
+)
+
+
+def has_non_ai_jd_signals(jd_html: str) -> bool:
+    """Return True if the JD body looks like a non-AI role (legal/HR/finance).
+
+    Uses a conservative two-gate rule: (a) >=2 distinct legal/HR/finance
+    cluster hits, AND (b) zero strong AI-signal terms. This catches PhonePe
+    "Manager, Legal" (with LLB, PQE, procurement contracts, MSA/NDA, Indian
+    Contract Act) while keeping safe an AI Solutions Architect who happens
+    to mention commercial contracts in passing.
+    """
+    text = jd_html.lower()
+    non_ai_hits = sum(1 for sig in _NON_AI_JD_SIGNALS if sig in text)
+    if non_ai_hits < 2:
+        return False
+    if any(sig in text for sig in _AI_JD_SIGNALS):
+        return False
+    return True
 
 
 # ---------------------------------------------------------------- helpers
@@ -183,6 +246,12 @@ async def _stage_one(raw: RawJob, source_key: str, db) -> str:
         enriched = _minimal_enrichment(raw)
         enrich_error = "auto-skipped: non-AI title"
         logger.debug("pre-filtered non-AI title: %s (%s)", raw["title_raw"], source_key)
+    elif has_non_ai_jd_signals(raw["jd_html"]):
+        # JD body is saturated with non-AI cluster terms (legal/HR/finance) and
+        # has no AI signals. Title alone wouldn't have caught it. See RCA-026.
+        enriched = _minimal_enrichment(raw)
+        enrich_error = "auto-skipped: non-AI JD content (legal/HR/finance cluster)"
+        logger.debug("pre-filtered non-AI JD: %s (%s)", raw["title_raw"], source_key)
     elif source_key in TIER2_SOURCES:
         # Tier-2 boards get lightweight enrichment — fewer fields, shorter JD,
         # smaller prompt. Full enrichment deferred to publish time.

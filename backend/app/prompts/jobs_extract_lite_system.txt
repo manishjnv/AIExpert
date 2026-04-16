@@ -37,3 +37,8 @@ RULES
 - Never hallucinate salary numbers — if JD does not disclose, set disclosed=false and min/max to null.
 - `tldr` must be substantively different wording from the JD — rewrite, don't paraphrase.
 - Return ONLY the JSON object. No prefix, no suffix, no code fences.
+
+DISAMBIGUATION — CRITICAL
+- "LLM" in the topic enum means **Large Language Model** ONLY. If the JD mentions "LLM" in the context of "LLB/LLM degree", "Master of Laws", "law firm", "PQE" (post-qualification experience), "legal counsel", "contract drafting", "procurement contracts", "Indian Contract Act", "bar council", or "advocate" — this is a LAW DEGREE, not AI. For such jobs return `"topic": []`, `"designation": "Other"`.
+- Only assign any AI topic when the JD demonstrates concrete AI/ML work: model training, fine-tuning, inference, dataset engineering, MLOps, research, prompt engineering for products, deploying LLMs/agents in production, RAG pipelines, embeddings, computer vision models, etc. A job mentioning AI only in passing ("company uses AI", "AI-driven platform") does NOT qualify — return `"topic": []` and `"designation": "Other"`.
+- Empty topic is allowed and preferred over a wrong guess. Do NOT default to "Applied ML" for non-AI roles.

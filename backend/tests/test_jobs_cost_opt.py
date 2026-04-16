@@ -131,6 +131,101 @@ class TestNonAITitleFilter:
         assert jobs_ingest.is_non_ai_title("SALES MANAGER") is True
         assert jobs_ingest.is_non_ai_title("sales manager") is True
 
+    # ---- RCA-026: legal titles that slipped through ----
+
+    def test_legal_manager(self):
+        """PhonePe variant: 'Legal Manager'."""
+        assert jobs_ingest.is_non_ai_title("Legal Manager") is True
+
+    def test_manager_comma_legal(self):
+        """PhonePe variant: 'Manager, Legal'."""
+        assert jobs_ingest.is_non_ai_title("Manager, Legal") is True
+
+    def test_corporate_counsel(self):
+        assert jobs_ingest.is_non_ai_title("Senior Corporate Counsel") is True
+
+    def test_compliance_manager(self):
+        assert jobs_ingest.is_non_ai_title("Compliance Manager, APAC") is True
+
+    def test_benefits_administration(self):
+        """Another PhonePe false-positive from session 14e."""
+        assert jobs_ingest.is_non_ai_title("Lead Exit and Benefits Administration") is True
+
+    def test_merchant_kyc(self):
+        assert jobs_ingest.is_non_ai_title("Operations Associate, Merchant KYC") is True
+
+
+class TestNonAIJDSignals:
+    """has_non_ai_jd_signals should flag legal/HR/finance JDs with no AI content.
+
+    Mirrors RCA-026: PhonePe 'Manager, Legal' had 'LLB / LLM from a recognized
+    university' + 'PQE' + 'Indian Contract Act' + 'procurement contracts' +
+    'MSA/NDA' but no AI signal words. The two-gate rule (>=2 non-AI hits AND
+    zero AI signals) must catch it.
+    """
+
+    def test_phonepe_legal_jd_flagged(self):
+        jd = (
+            "<p>LLB / LLM from a recognized university. Minimum 7 years of "
+            "post-qualification experience in corporate legal practice. "
+            "Draft and negotiate procurement contracts, MSAs, NDAs. "
+            "Ensure contracts comply with Indian Contract Act.</p>"
+        )
+        assert jobs_ingest.has_non_ai_jd_signals(jd) is True
+
+    def test_ml_engineer_jd_not_flagged(self):
+        """Must NOT flag legit AI jobs that mention contracts/NDAs in passing."""
+        jd = (
+            "<p>Build large language model systems at scale. "
+            "Fine-tuning, PyTorch, and RAG pipelines. "
+            "You'll sign a standard NDA before starting.</p>"
+        )
+        assert jobs_ingest.has_non_ai_jd_signals(jd) is False
+
+    def test_single_legal_term_not_flagged(self):
+        """Single non-AI hit is below the >=2 threshold."""
+        jd = "<p>Software Engineer role. You'll sign an NDA before starting.</p>"
+        assert jobs_ingest.has_non_ai_jd_signals(jd) is False
+
+    def test_generic_swe_jd_not_flagged(self):
+        jd = "<p>Backend engineer. Python, FastAPI, PostgreSQL.</p>"
+        assert jobs_ingest.has_non_ai_jd_signals(jd) is False
+
+    def test_llm_degree_with_law_firm_flagged(self):
+        """LLM-as-degree + law firm keyword = law job, not AI."""
+        jd = (
+            "<p>We are hiring an associate with LL.M. from a top law school. "
+            "Law firm experience preferred. Contract drafting required.</p>"
+        )
+        assert jobs_ingest.has_non_ai_jd_signals(jd) is True
+
+
+@pytest.mark.asyncio
+async def test_jd_prefilter_skips_enrichment():
+    """Legal JD must be staged with admin_notes and no AI call."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m, \
+         patch("app.services.jobs_enrich.enrich_job_lite", new_callable=AsyncMock) as ml:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        ml.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        async with db_module.async_session_factory() as db:
+            r = _raw(
+                title_raw="Senior Associate",  # generic title — passes title filter
+                jd_html=(
+                    "<p>LLB / LLM degree. 7 years PQE in corporate legal practice. "
+                    "Draft procurement contracts, MSAs, NDAs. Indian Contract Act.</p>"
+                ),
+            )
+            result = await jobs_ingest._stage_one(r, "greenhouse:phonepe", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "auto-skipped" in (job.admin_notes or "")
+            assert "non-AI JD" in (job.admin_notes or "")
+            m.assert_not_called()
+            ml.assert_not_called()
+    await close_db()
+
 
 @pytest.mark.asyncio
 async def test_prefilter_skips_enrichment_and_sets_admin_note():

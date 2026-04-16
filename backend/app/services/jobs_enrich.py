@@ -284,7 +284,7 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
         "title_raw": raw["title_raw"],
         "designation": _clamp_enum(raw_resp.get("designation"), ALLOWED_DESIGNATION, "Other"),
         "seniority": _clamp_enum(raw_resp.get("seniority"), ALLOWED_SENIORITY, "Mid"),
-        "topic": _clamp_multi(raw_resp.get("topic"), ALLOWED_TOPIC, 3) or ["Applied ML"],
+        "topic": _clamp_multi(raw_resp.get("topic"), ALLOWED_TOPIC, 3),
         "company": {"name": raw["company"], "slug": raw["company_slug"]},
         "location": {
             "country": loc.get("country") if isinstance(loc.get("country"), str) else None,
@@ -387,7 +387,7 @@ async def enrich_job_lite(raw: RawJob, db=None) -> dict[str, Any]:
         "title_raw": raw["title_raw"],
         "designation": _clamp_enum(resp.get("designation"), ALLOWED_DESIGNATION, "Other"),
         "seniority": _clamp_enum(resp.get("seniority"), ALLOWED_SENIORITY, "Mid"),
-        "topic": _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3) or ["Applied ML"],
+        "topic": _clamp_multi(resp.get("topic"), ALLOWED_TOPIC, 3),
         "company": {"name": raw["company"], "slug": raw["company_slug"]},
         "location": {
             "country": loc.get("country") if isinstance(loc.get("country"), str) else None,
