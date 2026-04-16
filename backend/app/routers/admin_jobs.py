@@ -533,12 +533,45 @@ async def summary_stats(
         select(func.count(Job.id)).where(audit_pending_expr == "pending")
     )).scalar() or 0
 
+    # Most recent completed audit — surfaces staleness next to the pending banner.
+    audit_reviewed_expr = func.json_extract(Job.data, "$.audit.reviewed_at")
+    last_audit_at = (await db.execute(
+        select(func.max(audit_reviewed_expr)).where(audit_reviewed_expr.is_not(None))
+    )).scalar()
+
+    # Throughput proxy: jobs that became published in the last 7 days. Pairs with
+    # `generated_last_7d` so admin can see review velocity vs draft backlog.
+    cutoff_7d = datetime.utcnow() - timedelta(days=7)
+    published_7d = (await db.execute(
+        select(func.count(Job.id)).where(
+            Job.status == "published",
+            Job.updated_at >= cutoff_7d,
+        )
+    )).scalar() or 0
+
+    # Wave 4 #14 guardrail status: sources auto-disabled by rejection-rate check.
+    # `last_run_error` is stamped with "auto-disabled: …% reject rate" when the
+    # rate guard fires; probe-disabled rows use a different prefix.
+    auto_disabled_rows = (await db.execute(
+        select(JobSource.key, JobSource.label, JobSource.last_run_error).where(
+            JobSource.enabled == 0,
+            JobSource.last_run_error.like("auto-disabled:%"),
+        )
+    )).all()
+    auto_disabled_sources = [
+        {"key": k, "label": lbl, "reason": err}
+        for k, lbl, err in auto_disabled_rows
+    ]
+
     return {
         "coverage": coverage,
         "versions": versions,
         "generated_last_7d": generated_last_7d,
+        "published_last_7d": published_7d,
         "ai_intensity_distribution": intensity_distribution,
         "audit_pending_count": audit_pending_count,
+        "last_audit_at": last_audit_at,
+        "auto_disabled_sources": auto_disabled_sources,
     }
 
 
@@ -921,7 +954,7 @@ async function load() {
   const autoChip = autoExp ? ` · <span style="color:#e8a849">auto-expired 24h: ${autoExp}</span>` : "";
   const streakChip = (streak1 || streak2) ? ` · <span style="color:#e07a5f" title="Published jobs missing from source feed. Streak 1 = missed 1 run (at risk). Streak 2+ = will expire next run.">⚠ streak-1: ${streak1} · streak-2+: ${streak2}</span>` : "";
   document.getElementById("banner").innerHTML =
-    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}${streakChip}`;
+    `<b>Queue:</b> ${counts.draft||0} draft · ${counts.published||0} published · ${counts.rejected||0} rejected · ${counts.expired||0} expired${autoChip}${streakChip} <span id="banner-throughput" style="color:#94a3b8"></span>`;
   document.getElementById("qf-expired-reason").style.display = (currentStatus === "expired") ? "" : "none";
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
   duplicateHashes = new Set(data.duplicate_hashes || []);
@@ -990,8 +1023,59 @@ async function loadSummaryStats() {
     const verRows = (data.versions || []).map(v =>
       `<tr><td style="font-family:'IBM Plex Mono',monospace">${esc(v.version)}</td><td>${v.count}</td></tr>`
     ).join("");
+    // KPI tiles: top-line throughput + guardrail health, visible without scrolling.
+    const gen7 = data.generated_last_7d || 0;
+    const pub7 = data.published_last_7d || 0;
+    const autoDis = data.auto_disabled_sources || [];
+    const autoDisColor = autoDis.length === 0 ? '#6db585' : '#d97757';
+    const kpiTile = (label, value, color) =>
+      `<div style="flex:1;min-width:140px;padding:10px 14px;background:#0f1419;border:1px solid #2a323d;border-radius:4px">
+         <div style="color:#94a3b8;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">${esc(label)}</div>
+         <div style="color:${color};font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">${value}</div>
+       </div>`;
+    const kpiRow = `
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px">
+        ${kpiTile('Generated 7d', gen7, '#e8a849')}
+        ${kpiTile('Published 7d', pub7, '#e8a849')}
+        ${kpiTile('Auto-disabled sources', autoDis.length, autoDisColor)}
+      </div>`;
+
+    // AI-intensity histogram (overall, last 30d of drafts). Bars below the
+    // threshold shade red — a growing red tail signals ingest drift.
+    const intd = data.ai_intensity_distribution || {};
+    const bins = intd.bins || [];
+    const overall = intd.overall || {};
+    const threshold = intd.threshold || 5;
+    const maxCount = Math.max(1, ...bins.map(b => overall[b] || 0));
+    const belowLabels = new Set(['0', '1-2', '3-4']);
+    const histoBars = bins.map(b => {
+      const n = overall[b] || 0;
+      const pct = Math.round(100 * n / maxCount);
+      const color = belowLabels.has(b) ? '#d97757' : '#6db585';
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;font-family:'IBM Plex Mono',monospace">
+        <span style="width:42px;color:#94a3b8;text-align:right">${esc(b)}</span>
+        <span style="flex:1;background:#0f1419;border-radius:2px;height:14px;position:relative">
+          <span style="display:block;height:100%;width:${pct}%;background:${color};border-radius:2px"></span>
+        </span>
+        <span style="width:48px;color:${color};text-align:right">${n}</span>
+      </div>`;
+    }).join("");
+
+    // Noisy sources: >=50% of drafts below threshold in last 30d. Empty = healthy.
+    const noisy = (intd.per_source || [])
+      .filter(s => s.total >= 10 && (s.below_threshold_pct || 0) >= 50)
+      .sort((a, b) => (b.below_threshold_pct || 0) - (a.below_threshold_pct || 0));
+    const noisyRows = noisy.map(s =>
+      `<tr><td>${esc(s.source)}</td><td>${s.total}</td>
+        <td style="color:#d97757;font-weight:600">${s.below_threshold_pct}%</td></tr>`
+    ).join("");
+    const noisyBlock = noisy.length
+      ? `<table style="margin-top:6px"><thead><tr><th>Source</th><th>Drafts 30d</th><th>Below ${threshold}</th></tr></thead><tbody>${noisyRows}</tbody></table>`
+      : `<div style="color:#6db585;font-size:12px;margin-top:6px">✓ No sources above 50% below-threshold (healthy)</div>`;
+
     document.getElementById("sumstats-body").innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+      ${kpiRow}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
           <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">COVERAGE BY STATUS</div>
           <table><thead><tr><th>Status</th><th>Total</th><th>With</th><th>Missing</th><th>%</th></tr></thead><tbody>${covRows}</tbody></table>
@@ -999,11 +1083,26 @@ async function loadSummaryStats() {
         <div>
           <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">PROMPT VERSION DISTRIBUTION</div>
           <table><thead><tr><th>Version</th><th>Count</th></tr></thead><tbody>${verRows || '<tr><td colspan=2>—</td></tr>'}</tbody></table>
-          <div style="margin-top:12px;color:#94a3b8;font-size:12px">Generated last 7 days: <b style="color:#e8a849;font-family:'IBM Plex Mono',monospace">${data.generated_last_7d || 0}</b></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">AI-INTENSITY (DRAFTS 30D · THRESHOLD ${threshold})</div>
+          <div style="display:flex;flex-direction:column;gap:4px">${histoBars || '<div style="color:#94a3b8;font-size:12px">No drafts in window</div>'}</div>
+        </div>
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">NOISY SOURCES (≥50% BELOW THRESHOLD)</div>
+          ${noisyBlock}
         </div>
       </div>`;
-    // Wave 4 #16d — Opus audit reminder badge
+
+    // Backfill 7d-published chip into the queue banner so ratio to draft backlog is legible.
+    const tp = document.getElementById('banner-throughput');
+    if (tp) tp.textContent = ` · 7d published: ${pub7}`;
+
+    // Wave 4 #16d — Opus audit reminder badge (now with last-audit staleness chip).
     const auditCount = data.audit_pending_count || 0;
+    const lastAudit = data.last_audit_at;
     const sumPanel = document.getElementById('sumstats-body');
     const existing = document.getElementById('opus-audit-banner');
     if (existing) existing.remove();
@@ -1011,7 +1110,10 @@ async function loadSummaryStats() {
       const banner = document.createElement('div');
       banner.id = 'opus-audit-banner';
       banner.style.cssText = 'margin-top:14px;padding:10px 14px;border:1px solid #e8a849;background:#1a1410;border-radius:6px;color:#e8a849;font-size:13px;display:flex;justify-content:space-between;align-items:center';
-      banner.innerHTML = `<span><b>${auditCount}</b> Tier-1 published job${auditCount===1?'':'s'} pending Opus audit. <span style="color:#94a3b8;font-size:12px">Run weekly via Claude Code (no API spend).</span></span><button onclick="copyAuditPrompt()" style="background:#e8a849;color:#0f1419;border:0;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px">COPY PROMPT</button>`;
+      const lastAuditChip = lastAudit
+        ? `<span style="color:#94a3b8;font-size:12px"> · last audit ${esc(String(lastAudit).slice(0,10))}</span>`
+        : `<span style="color:#d97757;font-size:12px"> · no prior audit on record</span>`;
+      banner.innerHTML = `<span><b>${auditCount}</b> Tier-1 published job${auditCount===1?'':'s'} pending Opus audit. <span style="color:#94a3b8;font-size:12px">Run weekly via Claude Code (no API spend).</span>${lastAuditChip}</span><button onclick="copyAuditPrompt()" style="background:#e8a849;color:#0f1419;border:0;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px">COPY PROMPT</button>`;
       sumPanel.parentNode.insertBefore(banner, sumPanel);
     }
   } catch(_) {}
