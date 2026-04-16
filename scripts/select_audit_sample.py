@@ -68,88 +68,105 @@ def _seconds_since(iso: str) -> float:
         return float("inf")
 
 
-async def select_sample(
+async def _select_sample_inner(
+    db,
     sample_size: int | None,
     cooldown_days: int,
     dry_run: bool,
 ) -> list[int]:
+    """Core selection logic. Caller owns the db session lifecycle.
+    Separated so tests can run inside their own DB fixture without the
+    init_db/close_db lifecycle of the CLI wrapper."""
+    tier1_keys = {
+        k for k, in (await db.execute(
+            select(JobSource.key).where(JobSource.tier == 1)
+        )).all()
+    }
+    if not tier1_keys:
+        logger.info("no tier-1 sources found — nothing to audit")
+        return []
+
+    all_pub = (await db.execute(
+        select(Job).where(
+            Job.status == "published",
+            Job.source.in_(tier1_keys),
+        )
+    )).scalars().all()
+
+    cooldown_secs = cooldown_days * 86400
+    eligible = []
+    already_pending = 0
+    for j in all_pub:
+        audit = (j.data or {}).get("audit") or {}
+        status = audit.get("status")
+        if status == "pending":
+            already_pending += 1
+            continue
+        reviewed_at = audit.get("reviewed_at")
+        if reviewed_at and _seconds_since(reviewed_at) < cooldown_secs:
+            continue
+        eligible.append(j)
+
+    if not eligible:
+        logger.info(
+            "no eligible jobs (tier1_published=%d, already_pending=%d, "
+            "rest within cooldown)",
+            len(all_pub), already_pending,
+        )
+        return []
+
+    if sample_size is None:
+        sample_size = max(MIN_SAMPLE, int(len(eligible) * DEFAULT_SAMPLE_PCT))
+    sample_size = min(MAX_SAMPLE, sample_size, len(eligible))
+
+    picked = random.sample(eligible, sample_size)
+    logger.info(
+        "selected %d jobs from pool of %d eligible "
+        "(tier1_published=%d, already_pending=%d, cooldown=%dd)",
+        len(picked), len(eligible), len(all_pub), already_pending, cooldown_days,
+    )
+
+    now_iso = datetime.utcnow().isoformat(timespec="seconds")
+    picked_ids = []
+    for j in picked:
+        logger.info("  [%d] %s — %s | topic=%s | designation=%s",
+                    j.id, j.source, j.title[:50], j.data.get("topic"), j.designation)
+        picked_ids.append(j.id)
+        if not dry_run:
+            new_data = dict(j.data or {})
+            new_data["audit"] = {
+                "selected_at": now_iso,
+                "status": "pending",
+            }
+            j.data = new_data
+
+    if not dry_run:
+        await db.commit()
+        logger.info("committed %d audit-pending stamps", len(picked))
+    else:
+        logger.info("dry-run — no DB writes")
+
+    return picked_ids
+
+
+async def select_sample(
+    sample_size: int | None,
+    cooldown_days: int,
+    dry_run: bool,
+    db=None,
+) -> list[int]:
+    """CLI wrapper: opens its own db session unless one is passed.
+
+    Tests pass `db=<existing session>` to avoid the init_db/close_db
+    lifecycle that would tear down the in-memory test DB.
+    """
+    if db is not None:
+        return await _select_sample_inner(db, sample_size, cooldown_days, dry_run)
+
     await init_db()
     try:
-        async with db_module.async_session_factory() as db:
-            # Find Tier-1 sources
-            tier1_keys = {
-                k for k, in (await db.execute(
-                    select(JobSource.key).where(JobSource.tier == 1)
-                )).all()
-            }
-            if not tier1_keys:
-                logger.info("no tier-1 sources found — nothing to audit")
-                return []
-
-            # Pull all published jobs from tier-1 sources
-            all_pub = (await db.execute(
-                select(Job).where(
-                    Job.status == "published",
-                    Job.source.in_(tier1_keys),
-                )
-            )).scalars().all()
-
-            cooldown_secs = cooldown_days * 86400
-            eligible = []
-            already_pending = 0
-            for j in all_pub:
-                audit = (j.data or {}).get("audit") or {}
-                status = audit.get("status")
-                if status == "pending":
-                    already_pending += 1
-                    continue
-                reviewed_at = audit.get("reviewed_at")
-                if reviewed_at and _seconds_since(reviewed_at) < cooldown_secs:
-                    continue
-                eligible.append(j)
-
-            if not eligible:
-                logger.info(
-                    "no eligible jobs (tier1_published=%d, already_pending=%d, "
-                    "rest within cooldown)",
-                    len(all_pub), already_pending,
-                )
-                return []
-
-            # Default sample = 1% of eligible (or pool — same for first run).
-            # Clamped to [MIN_SAMPLE, MAX_SAMPLE].
-            if sample_size is None:
-                sample_size = max(MIN_SAMPLE, int(len(eligible) * DEFAULT_SAMPLE_PCT))
-            sample_size = min(MAX_SAMPLE, sample_size, len(eligible))
-
-            picked = random.sample(eligible, sample_size)
-            logger.info(
-                "selected %d jobs from pool of %d eligible "
-                "(tier1_published=%d, already_pending=%d, cooldown=%dd)",
-                len(picked), len(eligible), len(all_pub), already_pending, cooldown_days,
-            )
-
-            now_iso = datetime.utcnow().isoformat(timespec="seconds")
-            picked_ids = []
-            for j in picked:
-                logger.info("  [%d] %s — %s | topic=%s | designation=%s",
-                            j.id, j.source, j.title[:50], j.data.get("topic"), j.designation)
-                picked_ids.append(j.id)
-                if not dry_run:
-                    new_data = dict(j.data or {})
-                    new_data["audit"] = {
-                        "selected_at": now_iso,
-                        "status": "pending",
-                    }
-                    j.data = new_data
-
-            if not dry_run:
-                await db.commit()
-                logger.info("committed %d audit-pending stamps", len(picked))
-            else:
-                logger.info("dry-run — no DB writes")
-
-            return picked_ids
+        async with db_module.async_session_factory() as session:
+            return await _select_sample_inner(session, sample_size, cooldown_days, dry_run)
     finally:
         await close_db()
 

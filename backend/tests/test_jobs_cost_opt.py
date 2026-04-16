@@ -807,10 +807,9 @@ async def test_audit_sample_picks_tier1_published_only():
                              status="published"))
         await db.commit()
 
-    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
-    # 1% of 50 = 0 → MIN_SAMPLE clamps to 1
+    async with db_module.async_session_factory() as db:
+        picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False, db=db)
     assert len(picked) >= 1
-    # Ensure only Tier-1 published got marked
     async with db_module.async_session_factory() as db:
         for jid in picked:
             j = (await db.execute(select(Job).where(Job.id == jid))).scalar_one()
@@ -836,7 +835,8 @@ async def test_audit_sample_skips_already_pending():
             db.add(j)
         await db.commit()
 
-    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+    async with db_module.async_session_factory() as db:
+        picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False, db=db)
     assert picked == []  # all 5 are pending — none eligible
     await close_db()
 
@@ -862,7 +862,8 @@ async def test_audit_sample_respects_cooldown():
 
     # Patch utcnow indirectly: we use datetime.utcnow() inside select_sample;
     # since recent was reviewed 5 days before "today", cooldown=90 still excludes it.
-    picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False)
+    async with db_module.async_session_factory() as db:
+        picked = await select_sample(sample_size=None, cooldown_days=90, dry_run=False, db=db)
     # Only 1 row total and it's within cooldown — picked must be empty
     assert picked == []
     await close_db()
@@ -881,7 +882,8 @@ async def test_audit_sample_dry_run_no_writes():
                              status="published"))
         await db.commit()
 
-    picked = await select_sample(sample_size=3, cooldown_days=90, dry_run=True)
+    async with db_module.async_session_factory() as db:
+        picked = await select_sample(sample_size=3, cooldown_days=90, dry_run=True, db=db)
     assert len(picked) == 3
     async with db_module.async_session_factory() as db:
         rows = (await db.execute(select(Job))).scalars().all()
