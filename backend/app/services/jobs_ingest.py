@@ -170,6 +170,33 @@ _NON_AI_JD_SIGNALS: tuple[str, ...] = (
     "payroll processing", "benefits administration", "kyc verification",
     "kyc analyst", "merchant onboarding", "onboarding specialist",
     "bookkeeping", "gst filing", "tds ",
+    # Wave 3 #11 — sales / GTM cluster
+    "sales quota", "quota-carrying", "pipeline generation", "close deals",
+    "sales cycle", "win rate", "commission plan", "annual recurring revenue",
+    "monthly recurring revenue", "sales target",
+    # Marketing / growth cluster (skip generic "campaign" — too overloaded)
+    "brand voice", "content calendar", "paid media", "demand generation",
+    "marketing funnel", "campaign performance", "go-to-market strategy",
+    "marketing qualified lead", "lifecycle marketing",
+    # Recruiting cluster
+    "candidate pipeline", "sourcing candidates", "linkedin recruiter",
+    "offer letter", "interview panel", "applicant tracking",
+    "headhunt", "talent pipeline",
+    # Design / UX cluster (Figma is the dead-giveaway tool)
+    "figma", "wireframes", "design system", "usability testing",
+    "user research", "design critique", "interaction design",
+    # Finance / accounting cluster
+    "gaap", "ifrs", "month-end close", "journal entries", "balance sheet",
+    "audit committee", "treasury management",
+    # IT / customer-support cluster
+    "ticket queue", "zendesk", "intercom", "jira service",
+    "sla response", "escalation path", "service desk",
+    # Creative / video cluster
+    "adobe premiere", "final cut pro", "storyboard", "video editing",
+    "podcast production", "brand identity", "motion graphics",
+    # Policy / governance cluster
+    "white paper", "regulatory sandbox", "policy brief",
+    "stakeholder engagement", "government affairs", "regulatory filing",
 )
 
 
@@ -385,6 +412,30 @@ def _strip_company_boilerplate(jd_text: str) -> str:
     return out
 
 
+# Wave 3 #12 — requirement-phrase neutralizer.
+# "Experience with ML", "Familiarity with LLMs", "Knowledge of PyTorch" —
+# these describe what the candidate must KNOW, not what they DO. A
+# recruiter sourcing ML candidates needs ML literacy as a requirement,
+# but the actual work is talent acquisition. Strip these spans before
+# scoring AI-intensity so requirement chatter doesn't elevate non-AI roles.
+#
+# Surgical strip: only the immediate clause (up to next sentence end /
+# semicolon / newline / 80 chars). A real ML Engineer JD has many AI
+# signals OUTSIDE requirement phrases (responsibilities, "you'll build...",
+# project descriptions) and stays well above threshold.
+_REQUIREMENT_PHRASE = re.compile(
+    r"\b(?:experience|familiarity|comfortable(?:\s+working)?|exposure"
+    r"|knowledge|background|understanding|proficien(?:cy|t))\s+"
+    r"(?:with|in|of|using)\s+[^.;\n]{0,80}",
+    re.IGNORECASE,
+)
+
+
+def _neutralize_requirement_phrases(text: str) -> str:
+    """Strip 'experience with X' style requirement phrases before AI scoring."""
+    return _REQUIREMENT_PHRASE.sub(" ", text)
+
+
 def compute_ai_intensity(jd_text: str) -> int:
     """Three-tier weighted AI-intensity score for a JD body.
 
@@ -395,6 +446,7 @@ def compute_ai_intensity(jd_text: str) -> int:
     Below threshold ⇒ JD is not concrete-AI work even if it mentions AI.
     """
     text = _strip_company_boilerplate(jd_text)
+    text = _neutralize_requirement_phrases(text)  # Wave 3 #12
     score = 0
     for r in _AI_STRONG_RE:
         if r.search(text):
@@ -406,6 +458,39 @@ def compute_ai_intensity(jd_text: str) -> int:
         if r.search(text):
             score += 1
     return score
+
+
+# Wave 3 #13 — bare-verb title gate.
+# Titles starting with Manager / Director / Lead / Head / VP / Chief that
+# contain NO AI anchor word are likely coordination/business roles. Many
+# of these slip past the substring-based _NON_AI_TITLE_PATTERNS list (e.g.,
+# "Manager, Sales Development" doesn't contain "sales manager"). Combined
+# with low JD intensity, they get auto-skipped as non-AI.
+_BARE_VERB_TITLE_RE = re.compile(
+    r"^(?:senior\s+|principal\s+|staff\s+|sr\.?\s+|jr\.?\s+|associate\s+"
+    r"|lead\s+|head\s+|deputy\s+|interim\s+)?"
+    r"(?:manager|director|lead|head\s+of|vp|vice\s+president|chief)\b",
+    re.IGNORECASE,
+)
+_AI_TITLE_ANCHOR_RE = re.compile(
+    r"\b(?:ai|ml|machine\s+learning|deep\s+learning|llm|nlp|cv"
+    r"|computer\s+vision|data|research|applied|model|robotics|safety"
+    r"|alignment|inference|mlops|generative|gen[- ]?ai|engineering)\b",
+    re.IGNORECASE,
+)
+
+
+def is_bare_verb_title(title: str) -> bool:
+    """Return True for titles like 'Manager, Sales Development' that start
+    with a leadership verb but contain no AI/ML/data/research anchor word.
+
+    Used in conjunction with low JD intensity to auto-skip coordination
+    roles that fall through the explicit title pattern list.
+    """
+    t = (title or "").strip()
+    if not _BARE_VERB_TITLE_RE.match(t):
+        return False
+    return not _AI_TITLE_ANCHOR_RE.search(t)
 
 
 def has_non_ai_jd_signals(jd_html: str) -> bool:
@@ -515,11 +600,20 @@ async def _stage_one(raw: RawJob, source_key: str, db) -> str:
         enrich_error = "auto-skipped: non-AI title"
         logger.debug("pre-filtered non-AI title: %s (%s)", raw["title_raw"], source_key)
     elif has_non_ai_jd_signals(raw["jd_html"]):
-        # JD body is saturated with non-AI cluster terms (legal/HR/finance) and
-        # has no AI signals. Title alone wouldn't have caught it. See RCA-026.
+        # JD body is saturated with non-AI cluster terms (legal/HR/finance/sales/
+        # marketing/design/recruiting/IT/creative/policy) and has low AI intensity.
+        # Title alone wouldn't have caught it. See RCA-026, Wave 3 #11.
         enriched = _minimal_enrichment(raw)
-        enrich_error = "auto-skipped: non-AI JD content (legal/HR/finance cluster)"
+        enrich_error = "auto-skipped: non-AI JD content (cluster + low intensity)"
         logger.debug("pre-filtered non-AI JD: %s (%s)", raw["title_raw"], source_key)
+    elif is_bare_verb_title(raw["title_raw"]) and compute_ai_intensity(raw["jd_html"]) < AI_INTENSITY_THRESHOLD:
+        # Wave 3 #13: bare leadership-verb title (Manager/Director/Lead/Head/VP)
+        # without AI anchor word AND JD has no concrete AI work content.
+        # Catches "Manager, Sales Development", "Director, Strategic Sourcing",
+        # etc. that escape the explicit title pattern list.
+        enriched = _minimal_enrichment(raw)
+        enrich_error = "auto-skipped: bare-verb title without AI work in JD"
+        logger.debug("pre-filtered bare-verb title: %s (%s)", raw["title_raw"], source_key)
     elif source_key in TIER2_SOURCES:
         # Tier-2 boards get lightweight enrichment — fewer fields, shorter JD,
         # smaller prompt. Full enrichment deferred to publish time.

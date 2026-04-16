@@ -533,6 +533,288 @@ class TestBoilerplateStripping:
         assert compute_ai_intensity(jd) < AI_INTENSITY_THRESHOLD
 
 
+# ===================================================================
+# Wave 3 #11 — non-AI cluster expansion (sales/marketing/design/recruiting/
+# IT/creative/policy clusters added to _NON_AI_JD_SIGNALS)
+# ===================================================================
+
+class TestNonAIClusterExpansion:
+    """Wave 3 #11 added 7 new cluster groups. Verify each catches a
+    representative JD that escaped Wave 1+2."""
+
+    def test_sales_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Drive pipeline generation and own quarterly sales quota. "
+              "Manage the entire sales cycle and close deals. "
+              "Familiarity with AI products is a plus.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_marketing_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Own brand voice and content calendar across paid media. "
+              "Drive demand generation and measure campaign performance. "
+              "Excited about AI-powered marketing.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_design_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Own the design system in Figma. Build wireframes and run "
+              "user research with usability testing. "
+              "Designing for AI-driven products.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_recruiting_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Manage the candidate pipeline and offer letter process. "
+              "Source candidates through LinkedIn Recruiter. "
+              "Familiarity with machine learning concepts.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_finance_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Lead month-end close, journal entries, and balance sheet "
+              "reconciliation. Ensure GAAP compliance. "
+              "Knowledge of AI accounting tools a plus.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_it_support_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Manage ticket queue in Zendesk and Jira Service. "
+              "Own SLA response times and the escalation path. "
+              "AI-powered support tools a plus.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_creative_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Edit videos in Adobe Premiere and Final Cut Pro. "
+              "Own storyboard development and motion graphics. "
+              "Working on AI storytelling.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_policy_cluster_flagged(self):
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Draft white papers and policy briefs on AI governance. "
+              "Manage stakeholder engagement with government affairs. "
+              "Familiarity with AI policy is required.")
+        assert has_non_ai_jd_signals(jd) is True
+
+    def test_real_ai_role_with_one_cluster_term_not_flagged(self):
+        """An AI Engineer JD that mentions 'design system' once shouldn't flag."""
+        from app.services.jobs_ingest import has_non_ai_jd_signals
+        jd = ("Build large language model inference pipelines with PyTorch. "
+              "Fine-tune transformer models for production deployment. "
+              "Use mlflow for the model registry and the design system.")
+        assert has_non_ai_jd_signals(jd) is False
+
+
+# ===================================================================
+# Wave 3 #12 — "experience with AI/ML" requirement-phrase neutralizer
+# ===================================================================
+
+class TestRequirementPhraseNeutralizer:
+    """Strips 'experience with X' / 'familiarity with X' / 'knowledge of X'
+    spans before AI-intensity scoring. These describe what the candidate
+    must KNOW (job requirement) rather than what they DO."""
+
+    def test_experience_with_ml_stripped(self):
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Source candidates. Experience with machine learning required."
+        out = _neutralize_requirement_phrases(text)
+        assert "machine learning" not in out.lower()
+
+    def test_familiarity_with_llms_stripped(self):
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Sales role. Familiarity with LLMs and PyTorch a plus."
+        out = _neutralize_requirement_phrases(text)
+        assert "llm" not in out.lower()
+        assert "pytorch" not in out.lower()
+
+    def test_knowledge_of_pytorch_stripped(self):
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Marketing manager. Knowledge of PyTorch helpful."
+        out = _neutralize_requirement_phrases(text)
+        assert "pytorch" not in out.lower()
+
+    def test_responsibilities_phrasing_not_stripped(self):
+        """Verbs like 'build', 'lead', 'train' (not requirement triggers) preserved."""
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Build deep learning models. Lead RLHF training. Train transformers."
+        out = _neutralize_requirement_phrases(text)
+        assert "deep learning" in out.lower()
+        assert "rlhf" in out.lower()
+        assert "transformers" in out.lower()
+
+    def test_recruiter_jd_score_drops_to_zero(self):
+        """Recruiter JD whose only AI signals are requirement phrases scores 0."""
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        jd = ("Source ML engineering candidates. Manage the hiring pipeline. "
+              "Experience with machine learning concepts. "
+              "Familiarity with LLMs and PyTorch.")
+        assert compute_ai_intensity(jd) < AI_INTENSITY_THRESHOLD
+
+    def test_real_ml_engineer_still_passes(self):
+        """ML Engineer JD with both responsibilities AND requirements stays above threshold."""
+        from app.services.jobs_ingest import compute_ai_intensity, AI_INTENSITY_THRESHOLD
+        jd = ("Train deep learning models in production. "
+              "Build PyTorch pipelines for fine-tuning large language models. "
+              "Run RLHF training loops and reward model evaluation. "
+              "Requirements: Experience with PyTorch, TensorFlow, JAX. "
+              "Familiarity with distributed training and MLOps.")
+        score = compute_ai_intensity(jd)
+        assert score >= AI_INTENSITY_THRESHOLD, f"score={score}"
+
+    def test_proficiency_in_stripped(self):
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Sales engineer. Proficiency in machine learning a plus."
+        out = _neutralize_requirement_phrases(text)
+        assert "machine learning" not in out.lower()
+
+    def test_background_in_stripped(self):
+        from app.services.jobs_ingest import _neutralize_requirement_phrases
+        text = "Policy analyst. Background in deep learning research helpful."
+        out = _neutralize_requirement_phrases(text)
+        assert "deep learning" not in out.lower()
+
+
+# ===================================================================
+# Wave 3 #13 — bare-verb title gate (Manager/Director/Lead/Head/VP/Chief
+# without AI anchor word)
+# ===================================================================
+
+class TestBareVerbTitleGate:
+    """Catches 'Manager, Sales Development', 'Director, Strategic Sourcing'
+    etc. — titles that start with a leadership verb but contain no AI/ML/
+    research/data anchor word."""
+
+    def test_manager_with_comma(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Manager, Sales Development") is True
+
+    def test_director_strategic_sourcing(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Director, Strategic Sourcing") is True
+
+    def test_senior_manager_operations(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Senior Manager, Operations") is True
+
+    def test_head_of_customer_success(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Head of Customer Success") is True
+
+    def test_vp_finance(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("VP, Finance") is True
+
+    def test_chief_of_staff(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Chief of Staff") is True
+
+    def test_principal_director(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Principal Director, Partnerships") is True
+
+    # ---- bare-verb titles WITH AI anchor → False (gate doesn't trigger) ----
+
+    def test_manager_ai_safety_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Manager, AI Safety") is False
+
+    def test_manager_ml_research_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Manager, ML Research") is False
+
+    def test_director_ai_engineering_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Director of AI Engineering") is False
+
+    def test_senior_manager_machine_learning_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Senior Manager, Machine Learning") is False
+
+    def test_head_of_research_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Head of Research") is False
+
+    def test_vp_engineering_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("VP, Engineering") is False
+
+    def test_director_alignment_passes(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Director, Alignment") is False
+
+    # ---- non-leadership titles → False (gate doesn't apply) ----
+
+    def test_ml_engineer_not_bare_verb(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Senior ML Engineer") is False
+
+    def test_engineer_manager_not_bare_verb(self):
+        """Title that doesn't START with Manager — e.g., 'Engineering Manager'."""
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Engineering Manager") is False
+
+    def test_software_engineer_not_bare_verb(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Software Engineer") is False
+
+    def test_research_scientist_not_bare_verb(self):
+        from app.services.jobs_ingest import is_bare_verb_title
+        assert is_bare_verb_title("Research Scientist") is False
+
+
+@pytest.mark.asyncio
+async def test_bare_verb_title_with_low_intensity_skipped():
+    """Wave 3 #13 integration: bare-verb title + low JD intensity ⇒ auto-skip."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m, \
+         patch("app.services.jobs_enrich.enrich_job_lite", new_callable=AsyncMock) as ml:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        ml.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        async with db_module.async_session_factory() as db:
+            r = _raw(
+                title_raw="Manager, Sales Development",
+                jd_html=(
+                    "<p>Drive pipeline. Close deals. Manage team of BDRs. "
+                    "Familiarity with AI products is a plus.</p>"
+                ),
+            )
+            result = await jobs_ingest._stage_one(r, "greenhouse:anthropic", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "auto-skipped" in (job.admin_notes or "")
+            assert "bare-verb" in (job.admin_notes or "")
+            m.assert_not_called()
+            ml.assert_not_called()
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_bare_verb_title_with_high_intensity_proceeds():
+    """Bare-verb title BUT the JD shows real AI work → enrichment proceeds."""
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        async with db_module.async_session_factory() as db:
+            r = _raw(
+                title_raw="Director, Engineering",
+                jd_html=(
+                    "<p>Lead the ML platform team. Build distributed training "
+                    "infrastructure for large language model fine-tuning. "
+                    "Own the model serving and inference engine.</p>"
+                ),
+            )
+            result = await jobs_ingest._stage_one(r, "greenhouse:anthropic", db)
+            assert result == "new"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert "bare-verb" not in (job.admin_notes or ""), \
+                f"should NOT be auto-skipped, notes={job.admin_notes!r}"
+    await close_db()
+
+
 class TestHasNonAIJDSignalsWithIntensity:
     """has_non_ai_jd_signals (Wave 2) uses intensity scoring instead of
     binary substring-AI-signal check. Must preserve all RCA-026 behaviors."""
