@@ -4,6 +4,126 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-16 (session 14b — AI Usage dashboard cleanup)
+
+**Last worked on:** Trimmed the admin AI Usage dashboard from 15 widgets to 8.
+**Branch:** master
+**Commit:** e1790c7
+**Live site:** https://automateedge.cloud
+**Tests:** 225 passed, 1 pre-existing failure (test_jobs_match), 0 new failures.
+
+### What shipped
+
+Removed 6 low-value sections from `/admin/pipeline/ai-usage`:
+
+| Removed | Reason |
+|---------|--------|
+| Provider Health (6 status cards) | Free-tier only, no cost impact, redundant with Usage by Provider |
+| All-Time Usage by Model | Vanity metric, not actionable |
+| Daily Usage by Model (30d) | Too granular, Cost Trend already captures signal |
+| Monthly Usage by Model (12mo) | Low value at current scale |
+| Reconciliation (30d) | Over-engineered, requires admin API keys |
+| Reliability / Failure Rate | Merged into Usage by Provider as "Fail %" column |
+
+Merged 2 sections:
+- **Usage by Task** → compact chip bar above Cost & Volume per Template
+- **Reliability** → "Fail %" column in Usage by Provider table
+
+Fixed stale data:
+- **Tokens this month** was server-rendered once at page load. Now fetched live via `/api/ai-usage` (`tokens_this_month` field added to API response).
+- Removed unused `db` dependency and `_get_settings()` from the page handler (page is now pure HTML shell, all data loaded by JS).
+
+Backend cleanup:
+- `/api/ai-usage/analytics` returns only `trend` + `top_tasks_by_cost` (removed `alltime`, `monthly`, `daily`, `fallback_rate`)
+- Recent calls query: 50 → 20
+
+**Final 8 widgets (all live, no stale data):**
+1. Alerts Banner (`/api/ai-usage/alerts`)
+2. Cost Summary — Today / 7d / 30d / Tokens this month (`/api/ai-usage`)
+3. Provider Caps & Balances — inline-editable (`/api/ai-usage`)
+4. Usage by Provider + Fail % (`/api/ai-usage`)
+5. Cost Trend — 7d vs prior 7d (`/api/ai-usage/analytics`)
+6. Top Tasks by Cost — 30d (`/api/ai-usage/analytics`)
+7. Cost & Volume per Template + task volume chips (`/api/ai-usage/cost-per-template` + task_stats)
+8. Recent Calls — last 20 (`/api/ai-usage`)
+
+### Files changed
+
+- `backend/app/routers/pipeline.py` — 396 lines removed, 45 added
+
+### Next priorities
+
+1. Rotate Gemini API key (leaked in prior session transcript)
+2. Admin to review + publish drafts at `/admin/jobs`
+3. Phase 14.6: Re-enrich stale `roadmap_modules_matched` on published jobs
+
+---
+
+## Prior state as of 2026-04-16 (session 14 — Jobs cost optimization)
+
+**Last worked on:** Phase 14 cost optimizations for the jobs enrichment pipeline.
+**Branch:** master
+**Live site:** https://automateedge.cloud
+**Alembic head:** unchanged (no new migrations)
+
+### Session 14 — what shipped (2026-04-16)
+
+**5 cost optimizations implemented, tested, documented.** Monthly enrichment cost: ~$2.80 → ~$0.22 (92% reduction).
+
+| # | Optimization | Files changed | Savings |
+|---|---|---|---|
+| 1 | Prompt caching via `systemInstruction` split | `jobs_enrich.py`, `provider.py`, new `jobs_extract_system.txt` | ~31% input tokens |
+| 2 | Pre-filter non-AI titles | `jobs_ingest.py` (`is_non_ai_title()`, 40+ patterns) | ~40% fewer calls on mixed boards |
+| 3 | Tier-2 lightweight enrichment | `jobs_enrich.py` (`enrich_job_lite()`), `jobs_ingest.py` (`TIER2_SOURCES`), new `jobs_extract_lite*.txt` | ~60% fewer tokens for 6 boards |
+| 4 | JD cap 6000→4000 chars | `jobs_enrich.py` (`JD_MAX_CHARS = 4000`) | ~30% input |
+| 5 | Drop summary from Flash | `jobs_extract_system.txt` (no summary schema) | ~25% output + Opus-only quality |
+
+**New files:**
+- `backend/app/prompts/jobs_extract_system.txt` — static system instruction (schema + rules, cached by Gemini)
+- `backend/app/prompts/jobs_extract_lite_system.txt` — lightweight system instruction for Tier-2
+- `backend/app/prompts/jobs_extract_lite.txt` — lightweight user prompt for Tier-2
+- `backend/tests/test_jobs_cost_opt.py` — 42 tests covering all optimizations
+
+**Updated files:**
+- `backend/app/services/jobs_enrich.py` — split prompt, JD cap, lite enrichment path
+- `backend/app/services/jobs_ingest.py` — pre-filter, tier-2 routing, TIER2_SOURCES set
+- `backend/app/ai/provider.py` — system_instruction passthrough
+- `backend/app/ai/pricing.py` — Flash-Lite pricing corrected
+- `backend/app/prompts/jobs_extract.txt` — dynamic-only (schema moved to system prompt)
+- `docs/TASKS.md` — Phase 14.1–14.5 marked done
+- `docs/JOBS.md` — §6 rewritten (model strategy, prompt architecture, cost summary), §10.8 + §10.13 updated
+- `docs/HANDOFF.md` — this section
+
+**Tests:** 262 passed, 1 skipped, 0 failed (42 new + 220 existing).
+
+**Admin impact:** See `docs/JOBS.md §10.13` for the admin guideline. Key changes:
+- Jobs with `admin_notes = "auto-skipped: non-AI title"` need manual check before publish
+- Jobs with `admin_notes = "tier2-lite: full enrichment on publish"` need `/summarize-jobs --id N` before publish
+- Flash no longer generates summary — run `/summarize-jobs` before any publish session
+
+### Deploy checklist
+
+No migrations. Standard rebuild:
+```bash
+ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose build backend && docker compose up -d --force-recreate backend"
+```
+
+After deploy: run one daily ingest to verify the cost optimizations work:
+```bash
+docker compose exec backend python -c "import asyncio; from app.services.jobs_ingest import run_daily_ingest; asyncio.run(run_daily_ingest())"
+```
+
+Check `/admin/ai-usage` for reduced token counts.
+
+### Next priorities
+
+1. Phase 14.6: Re-enrich stale `roadmap_modules_matched` on published jobs
+2. Phase 14.7: JD-hash dedup cache (nice-to-have, ~10-20% more savings)
+3. Rotate Gemini API key (leaked in prior session transcript)
+4. Admin to review + publish drafts at `/admin/jobs` — run `/summarize-jobs --status draft --limit 50` first
+
+---
+
 ## Current state as of 2026-04-13 (session 10 — security batch A)
 
 **Last worked on:** Security audit of `automateedge.cloud` + fixes for the 6 highest-severity defects.
