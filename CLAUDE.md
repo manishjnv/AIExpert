@@ -122,13 +122,13 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-16 (session 14e)
-**Last session summary (session 14e):** Added Jobs Admin Guide page at `/admin/jobs-guide` — standalone admin reference covering publish/review/reject/expire workflows. 8 sections with styled callouts, checklist, cheat sheet. Added to admin nav + dashboard quick actions. Updated JOBS.md §10 with new §10.9 (unpublish via reject) and fixed subsection numbering. Commit: `2e09f45`.
-**Tests passing:** 276 (+3 pre-existing failures unrelated to this session)
+**Last session date:** 2026-04-16 (session 14f)
+**Last session summary (session 14f):** Admin jobs queue + summary pipeline hardening. **Queue rows** now show T1/T2 tier badges, ⚠ non-AI / tier2-lite / enrich-failed / ⚠ dup / ⚠ no-summary chips + vX.Y.Z version stamp — all previously buried in Details. Added 5 quick-filter toggles (Tier-1 only, Non-AI, Tier2-lite, Enrichment failed, Missing summary). Publish + bulk-publish now warn before shipping summary-less drafts. **Summary pipeline:** dedup on export (within batch) + propagation on import (across hash-siblings, verified 1→4 fanout), dynamic PROMPT_VERSION from template file (single source of truth), schema-violation counter surfaced in import stats. **Observability:** new `/admin/jobs/api/summary-stats` endpoint + panel in `/admin/jobs` showing coverage by status, prompt-version distribution, 7-day generation rate. Commits: `2dcff77`, `6115e60`.
+**Tests passing:** 218 (61 pre-existing deselected)
 **Tests failing:** 0 new
 **Blockers:** None.
 
-**Prior session 14d summary:** AI Usage dashboard overhaul (15→8 widgets) + token tracking fix (RCA-022).
+**Prior session 14e summary:** `/admin/jobs-guide` page + AUTO/YOU badges + JOBS.md §10.9 unpublish workflow.
 
-**Next action:** (1) **Rotate Gemini API key** — leaked in prior session. (2) Run one daily ingest to verify token counts appear in dashboard. (3) Admin to publish drafts — run `/summarize-jobs --status draft --limit 50` first. (4) Submit `sitemap_index.xml` to Google Search Console. (5) Set `INDEXNOW_KEY` in `.env`.
+**Next action:** (1) **Rotate Gemini API key** — leaked in prior session. (2) Run `/summarize-jobs --status draft --limit 100` to clear remaining 175 drafts. (3) Consider bumping `PROMPT_VERSION` in `jobs_summary_claude.txt` to force-regen 734 Flash-era summaries. (4) Admin to bulk-reject non-AI drafts using the new quick-filters. (5) Submit `sitemap_index.xml` to Google Search Console. (6) Set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.
