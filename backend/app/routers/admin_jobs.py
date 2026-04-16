@@ -199,6 +199,31 @@ async def list_queue(
         )
         dup_hashes = {h for h, _ in (await db.execute(dup_stmt)).all()}
 
+    # Facet counts for the filter dropdowns. Scoped to the current status
+    # only (no other filters applied), so picking a country doesn't collapse
+    # the country dropdown to just that country — counts still reflect the
+    # full status bucket and the admin can switch.
+    facet_base = select(Job)
+    if status != "all":
+        facet_base = facet_base.where(Job.status == status)
+    facet_base_sub = facet_base.subquery()
+    city_expr = func.json_extract(facet_base_sub.c.data, "$.location.city")
+    countries = (await db.execute(
+        select(facet_base_sub.c.country, func.count())
+        .where(facet_base_sub.c.country.isnot(None))
+        .group_by(facet_base_sub.c.country)
+    )).all()
+    cities = (await db.execute(
+        select(city_expr, func.count())
+        .where(city_expr.isnot(None))
+        .group_by(city_expr)
+    )).all()
+    companies = (await db.execute(
+        select(facet_base_sub.c.company_slug, func.count())
+        .where(facet_base_sub.c.company_slug.isnot(None))
+        .group_by(facet_base_sub.c.company_slug)
+    )).all()
+
     return {
         "items": [_serialize(j) for j in rows],
         "counts": counts,
@@ -206,6 +231,11 @@ async def list_queue(
         "missing_streak_1": missing_streak_1,
         "missing_streak_2": missing_streak_2,
         "duplicate_hashes": list(dup_hashes),
+        "facets": {
+            "countries": sorted([[c, n] for c, n in countries], key=lambda x: -x[1]),
+            "cities": sorted([[c, n] for c, n in cities], key=lambda x: -x[1]),
+            "companies": sorted([[c, n] for c, n in companies], key=lambda x: -x[1]),
+        },
     }
 
 
@@ -690,22 +720,10 @@ async function load() {
   document.getElementById("qf-expired-reason").style.display = (currentStatus === "expired") ? "" : "none";
   document.getElementById("qf-count").textContent = `${data.items.length} shown`;
   duplicateHashes = new Set(data.duplicate_hashes || []);
-  populateCompanyDropdown(data.items);
-  populateLocationDropdowns(data.items);
+  populateFacetDropdowns(data.facets || {});
   renderList(data.items);
   loadStats();
   loadSummaryStats();
-}
-
-function populateCompanyDropdown(items) {
-  const sel = document.getElementById("qf-company");
-  if (sel.options.length > 1) return;   // only seed once from the first load
-  const slugs = [...new Set(items.map(j => j.company_slug).filter(Boolean))].sort();
-  for (const s of slugs) {
-    const opt = document.createElement("option");
-    opt.value = s; opt.textContent = s;
-    sel.appendChild(opt);
-  }
 }
 
 // ISO-2 → friendly name. Extend as new source boards are added.
@@ -717,26 +735,38 @@ const COUNTRY_NAMES = {
   BR:"Brazil", MX:"Mexico", AE:"UAE", KR:"South Korea", HK:"Hong Kong",
 };
 
-function populateLocationDropdowns(items) {
-  const selCountry = document.getElementById("qf-country");
-  const selCity = document.getElementById("qf-city");
-  if (selCountry.options.length <= 1) {
-    const codes = [...new Set(items.map(j => j.country).filter(Boolean))].sort();
-    for (const c of codes) {
-      const opt = document.createElement("option");
-      opt.value = c;
-      opt.textContent = COUNTRY_NAMES[c] ? `${COUNTRY_NAMES[c]} (${c})` : c;
-      selCountry.appendChild(opt);
-    }
+// Rebuild each dropdown from server-side facet counts (scoped to current
+// status tab only, so picking India doesn't collapse the country list).
+// Preserves the admin's current selection even if count drops to 0.
+function rebuildFacetSelect(selId, placeholder, pairs, labelFn) {
+  const sel = document.getElementById(selId);
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const blank = document.createElement("option");
+  blank.value = ""; blank.textContent = placeholder;
+  sel.appendChild(blank);
+  let prevStillPresent = false;
+  for (const [val, count] of pairs) {
+    if (!val) continue;
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = `${labelFn(val)} (${count})`;
+    if (val === prev) prevStillPresent = true;
+    sel.appendChild(opt);
   }
-  if (selCity.options.length <= 1) {
-    const cities = [...new Set(items.map(j => (j.data && j.data.location && j.data.location.city) || null).filter(Boolean))].sort();
-    for (const c of cities) {
-      const opt = document.createElement("option");
-      opt.value = c; opt.textContent = c;
-      selCity.appendChild(opt);
-    }
+  if (prev && !prevStillPresent) {
+    const opt = document.createElement("option");
+    opt.value = prev; opt.textContent = `${labelFn(prev)} (0)`;
+    sel.appendChild(opt);
   }
+  sel.value = prev;
+}
+
+function populateFacetDropdowns(facets) {
+  rebuildFacetSelect("qf-country", "Any country", facets.countries || [],
+    c => COUNTRY_NAMES[c] ? `${COUNTRY_NAMES[c]} (${c})` : c);
+  rebuildFacetSelect("qf-city", "Any city", facets.cities || [], c => c);
+  rebuildFacetSelect("qf-company", "Any company", facets.companies || [], c => c);
 }
 
 async function loadSummaryStats() {
