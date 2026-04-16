@@ -34,8 +34,27 @@ import asyncio
 import json
 import re
 import sys
+from pathlib import Path
 
-CURRENT_PROMPT_VERSION = "2026-04-16.1"
+# Prompt version lives in the template file (backend/app/prompts/jobs_summary_claude.txt)
+# so a version bump is a single edit — no code change needed.
+_PROMPT_CANDIDATES = [
+    Path(__file__).resolve().parent.parent / "app" / "prompts" / "jobs_summary_claude.txt",          # Docker layout
+    Path(__file__).resolve().parent.parent / "backend" / "app" / "prompts" / "jobs_summary_claude.txt",  # local repo
+]
+
+
+def _load_prompt_version() -> str:
+    for p in _PROMPT_CANDIDATES:
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                m = re.match(r"^\s*PROMPT_VERSION:\s*(\S+)", line)
+                if m:
+                    return m.group(1).strip()
+    return "unknown"
+
+
+CURRENT_PROMPT_VERSION = _load_prompt_version()
 JD_MAX_CHARS = 4000
 
 
@@ -84,9 +103,17 @@ async def _main() -> int:
             rows = (await db.execute(stmt)).scalars().all()
 
         out: list[dict] = []
+        # Hash-dedup within this batch: if two jobs share content hash
+        # (re-post, cross-source duplicate), we only ask Opus once and rely
+        # on import_jobs_summary to propagate the result to the siblings.
+        seen_hashes: set[str] = set()
         for j in rows:
             if not args.id and not _needs_regen(j.data):
                 continue
+            if not args.id and j.hash:
+                if j.hash in seen_hashes:
+                    continue
+                seen_hashes.add(j.hash)
             d = j.data or {}
             loc = d.get("location") or {}
             loc_str = ", ".join(filter(None, [

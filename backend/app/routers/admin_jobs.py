@@ -50,6 +50,17 @@ def _check_origin(request: Request) -> None:
 
 
 def _serialize(job: Job) -> dict[str, Any]:
+    # Derive "has_summary" + "summary_version" so the queue row can show a
+    # Missing-summary chip and a prompt-version stamp without the frontend
+    # having to peek into job.data.summary._meta itself.
+    summary = (job.data or {}).get("summary") or {}
+    has_summary = bool(
+        summary.get("headline_chips") or summary.get("responsibilities")
+        or summary.get("must_haves") or summary.get("benefits")
+    )
+    summary_version = None
+    if has_summary and isinstance(summary.get("_meta"), dict):
+        summary_version = summary["_meta"].get("prompt_version")
     return {
         "id": job.id,
         "slug": job.slug,
@@ -70,6 +81,8 @@ def _serialize(job: Job) -> dict[str, Any]:
         "verified": bool(job.verified),
         "admin_notes": job.admin_notes,
         "hash": job.hash,
+        "has_summary": has_summary,
+        "summary_version": summary_version,
         "data": job.data,
     }
 
@@ -122,6 +135,10 @@ async def list_queue(
         stmt = stmt.where(Job.admin_notes.like("tier2-lite%"))
     elif flag == "enrichment_failed":
         stmt = stmt.where(Job.admin_notes.like("enrichment failed%"))
+    elif flag == "no_summary":
+        # json_extract returns SQL NULL for a missing path, so IS NULL
+        # catches both "no summary key" and "summary: null".
+        stmt = stmt.where(func.json_extract(Job.data, "$.summary.headline_chips").is_(None))
     # Sub-filter on Expired tab: distinguish auto-expired (source_removed) from
     # date-based (posted_on+45d) and admin-rejected-as-expired.
     if expired_reason:
@@ -381,6 +398,72 @@ async def stats(
     return {"sources": out}
 
 
+@router.get("/api/summary-stats")
+async def summary_stats(
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Observability for the /summarize-jobs pipeline.
+    Reports per-status coverage, prompt-version distribution, and 7-day
+    generation rate so admins can spot drift before publishing.
+    """
+    summary_expr = func.json_extract(Job.data, "$.summary.headline_chips")
+    version_expr = func.json_extract(Job.data, "$.summary._meta.prompt_version")
+    generated_expr = func.json_extract(Job.data, "$.summary._meta.generated_at")
+
+    # Coverage by status: total vs has-summary.
+    total_by_status = {
+        s: n for s, n in (await db.execute(
+            select(Job.status, func.count(Job.id)).group_by(Job.status)
+        )).all()
+    }
+    with_summary_by_status = {
+        s: n for s, n in (await db.execute(
+            select(Job.status, func.count(Job.id))
+            .where(summary_expr.is_not(None))
+            .group_by(Job.status)
+        )).all()
+    }
+    coverage = []
+    for s in ("draft", "published", "rejected", "expired"):
+        total = total_by_status.get(s, 0)
+        with_s = with_summary_by_status.get(s, 0)
+        coverage.append({
+            "status": s,
+            "total": total,
+            "with_summary": with_s,
+            "missing": max(0, total - with_s),
+            "coverage_pct": round(100 * with_s / total) if total else None,
+        })
+
+    # Prompt-version distribution across every summarized job.
+    versions = [
+        {"version": v or "unknown", "count": n}
+        for v, n in (await db.execute(
+            select(version_expr, func.count(Job.id))
+            .where(summary_expr.is_not(None))
+            .group_by(version_expr)
+            .order_by(func.count(Job.id).desc())
+        )).all()
+    ]
+
+    # Generation rate: count summaries whose generated_at falls in the last 7d.
+    from datetime import datetime, timedelta
+    cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat(timespec="seconds")
+    generated_last_7d = (await db.execute(
+        select(func.count(Job.id)).where(
+            summary_expr.is_not(None),
+            generated_expr >= cutoff,
+        )
+    )).scalar() or 0
+
+    return {
+        "coverage": coverage,
+        "versions": versions,
+        "generated_last_7d": generated_last_7d,
+    }
+
+
 @router.post("/api/sources/probe")
 async def probe_sources(
     request: Request,
@@ -485,6 +568,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
   .chip.flag-lite{background:rgba(232,168,73,.1);color:#e8a849;border-color:rgba(232,168,73,.3)}
   .chip.flag-dup{background:rgba(217,119,87,.15);color:#d97757;border-color:rgba(217,119,87,.5);font-weight:600}
   .chip.flag-fail{background:rgba(195,51,51,.15);color:#d97757;border-color:rgba(195,51,51,.5)}
+  .chip.flag-nosummary{background:rgba(217,119,87,.15);color:#d97757;border-color:rgba(217,119,87,.5);font-weight:600}
+  .chip.version{background:transparent;color:#6a7280;border-color:#2a323d;font-size:9px;letter-spacing:.04em}
   .qtoggles{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0}
   .qtoggle{padding:5px 10px;border:1px solid #2a323d;background:transparent;color:#c0c4cc;cursor:pointer;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
   .qtoggle:hover{border-color:#e8a849;color:#e8a849}
@@ -511,6 +596,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
 <h1 class="page-title">Jobs Review Queue</h1>
 <div id="banner" class="banner">Loading…</div>
 <details class="stats" id="stats"><summary>Source stats (last 24h)</summary><div id="stats-body">Loading…</div></details>
+<details class="stats" id="sumstats"><summary>Summary-card pipeline (coverage · versions · 7d rate)</summary><div id="sumstats-body">Loading…</div></details>
 <div class="tabs">
   <button data-status="draft" class="active">Draft</button>
   <button data-status="published">Published</button>
@@ -553,6 +639,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
     <button class="qtoggle" data-flag="non_ai">⚠ Non-AI (auto-skipped)</button>
     <button class="qtoggle" data-flag="tier2_lite">Tier-2 lite</button>
     <button class="qtoggle" data-flag="enrichment_failed">Enrichment failed</button>
+    <button class="qtoggle" data-flag="no_summary">⚠ Missing summary</button>
   </div>
 </div>
 
@@ -606,6 +693,7 @@ async function load() {
   populateCompanyDropdown(data.items);
   renderList(data.items);
   loadStats();
+  loadSummaryStats();
 }
 
 function populateCompanyDropdown(items) {
@@ -617,6 +705,37 @@ function populateCompanyDropdown(items) {
     opt.value = s; opt.textContent = s;
     sel.appendChild(opt);
   }
+}
+
+async function loadSummaryStats() {
+  try {
+    const r = await fetch("/admin/jobs/api/summary-stats", {credentials:"include"});
+    if (!r.ok) return;
+    const data = await r.json();
+    const covRows = (data.coverage || []).map(c => {
+      const pct = c.coverage_pct;
+      const color = pct === null ? '#94a3b8' : pct >= 95 ? '#6db585' : pct >= 70 ? '#e8a849' : '#d97757';
+      const pctTxt = pct === null ? '—' : `${pct}%`;
+      return `<tr><td>${esc(c.status)}</td><td>${c.total}</td><td>${c.with_summary}</td>
+        <td style="color:${color};font-weight:600">${c.missing}</td>
+        <td style="color:${color};font-family:'IBM Plex Mono',monospace">${pctTxt}</td></tr>`;
+    }).join("");
+    const verRows = (data.versions || []).map(v =>
+      `<tr><td style="font-family:'IBM Plex Mono',monospace">${esc(v.version)}</td><td>${v.count}</td></tr>`
+    ).join("");
+    document.getElementById("sumstats-body").innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">COVERAGE BY STATUS</div>
+          <table><thead><tr><th>Status</th><th>Total</th><th>With</th><th>Missing</th><th>%</th></tr></thead><tbody>${covRows}</tbody></table>
+        </div>
+        <div>
+          <div style="color:#94a3b8;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-bottom:6px">PROMPT VERSION DISTRIBUTION</div>
+          <table><thead><tr><th>Version</th><th>Count</th></tr></thead><tbody>${verRows || '<tr><td colspan=2>—</td></tr>'}</tbody></table>
+          <div style="margin-top:12px;color:#94a3b8;font-size:12px">Generated last 7 days: <b style="color:#e8a849;font-family:'IBM Plex Mono',monospace">${data.generated_last_7d || 0}</b></div>
+        </div>
+      </div>`;
+  } catch(_) {}
 }
 
 async function loadStats() {
@@ -660,7 +779,7 @@ function renderList(items) {
     const emp = d.employment || {};
     const locStr = [loc.city, loc.country, loc.remote_policy].filter(Boolean).join(" · ");
     const actions = j.status === "draft"
-      ? `<button class="btn primary" onclick="pub(${j.id})">Publish</button>
+      ? `<button class="btn primary" onclick="pub(${j.id}, ${j.has_summary?1:0})">Publish</button>
          <button class="btn danger" onclick="rej(${j.id})">Reject</button>`
       : `<span>${esc(j.status)}${j.reject_reason?" ("+esc(j.reject_reason)+")":""}</span>`;
     const previewUrl = `/jobs/${encodeURIComponent(j.slug)}?preview=1`;
@@ -673,11 +792,15 @@ function renderList(items) {
     const tierChip = j.verified
       ? `<span class="chip tier1" title="Tier-1 verified AI-native company — bulk-approve eligible">T1</span>`
       : `<span class="chip tier2" title="Tier-2 aggregated source — individual review required">T2</span>`;
+    const noSummary = !j.has_summary;
+    const versionStamp = j.summary_version;
     const flagChips = [
       isNonAI ? `<span class="chip flag-nonai" title="Auto-skipped: title matched non-AI list (Sales/HR/Legal/etc). Reject off_topic unless false positive.">⚠ non-AI</span>` : "",
       isTier2Lite ? `<span class="chip flag-lite" title="Lightweight extraction — missing nice_to_have, modules, summary. Run /summarize-jobs --id ${j.id} before publish.">tier2-lite</span>` : "",
       isFailed ? `<span class="chip flag-fail" title="AI enrichment errored — minimal data only. Retry or reject low_quality.">enrich-failed</span>` : "",
       isDup ? `<span class="chip flag-dup" title="Another job has the same content hash (title+company+JD). Candidate for reject duplicate.">⚠ dup</span>` : "",
+      noSummary ? `<span class="chip flag-nosummary" title="No Opus summary card yet — public page will render degraded. Run /summarize-jobs --id ${j.id} before publishing.">⚠ no-summary</span>` : "",
+      versionStamp ? `<span class="chip version" title="Summary prompt version. Out-of-date summaries auto-surface when the prompt template is bumped.">v${esc(versionStamp)}</span>` : "",
     ].filter(Boolean).join("");
     return `<tr>
       <td><input type="checkbox" class="sel" value="${j.id}" ${j.status==='draft'?'':'disabled'}></td>
@@ -713,7 +836,15 @@ function renderList(items) {
     </table>`;
 }
 
-async function pub(id) {
+async function pub(id, hasSummary) {
+  // Guardrail: publishing without a summary renders a degraded public page
+  // (tldr + skills fallback, no card). Warn before proceeding.
+  if (!hasSummary && !confirm(
+    "This job has no Opus summary card yet.\n\n" +
+    "Publishing now will render a degraded public page (tldr + skills only, no summary card).\n\n" +
+    "Recommended: run /summarize-jobs --id " + id + " first.\n\n" +
+    "Publish anyway?"
+  )) return;
   const r = await fetch(`/admin/jobs/api/${id}/publish`, {method:"POST", credentials:"include"});
   if (!r.ok) { alert("Failed: " + r.status); return; }
   load();
@@ -732,9 +863,19 @@ async function rej(id) {
 }
 
 async function bulkPub() {
-  const ids = [...document.querySelectorAll(".sel:checked")].map(x=>+x.value);
+  const selected = [...document.querySelectorAll(".sel:checked")];
+  const ids = selected.map(x => +x.value);
   if (!ids.length) { alert("Select some rows."); return; }
-  if (!confirm(`Publish ${ids.length} jobs?`)) return;
+  // Count how many of the selected drafts are missing a summary. We read
+  // this off the row by walking up to the <tr> and looking for the
+  // no-summary chip we emitted during render.
+  const missing = selected.filter(cb =>
+    cb.closest("tr").querySelector(".chip.flag-nosummary")
+  ).length;
+  const warn = missing
+    ? `\n\n⚠  ${missing} of ${ids.length} jobs have no Opus summary — their public pages will render degraded.`
+    : "";
+  if (!confirm(`Publish ${ids.length} jobs?${warn}`)) return;
   const r = await fetch(`/admin/jobs/api/bulk-publish`, {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
