@@ -142,6 +142,15 @@
 - **Fix:** [health.py](backend/app/ai/health.py) — added `get_last_tokens(provider)` centralized helper. [provider.py](backend/app/ai/provider.py) — uses helper + includes response length in fallback estimate. [jobs_enrich.py](backend/app/services/jobs_enrich.py), [jobs_ingest.py](backend/app/services/jobs_ingest.py) — pass `db=` through. [quality_pipeline.py](backend/app/services/quality_pipeline.py) — reads `_last_usage` via helper. [evaluate.py](backend/app/services/evaluate.py), [content_refresh.py](backend/app/services/content_refresh.py), [topic_discovery.py](backend/app/services/topic_discovery.py) — pass `db=` and `task=`. Commits: `e3bfbaa`, `d060b88`.
 - **Prevention:** Every new AI call site MUST pass `db=` to `provider.complete()`, or manually call `log_usage()` with `tokens_estimated=get_last_tokens(provider)` after direct provider calls. Add to code-review checklist: "does this AI call log to `ai_usage_log` with non-zero tokens?"
 
+### 023 — Gemini API key leaked in chat transcript (2026-04-16) [Security / key hygiene]
+- **Symptom:** In a prior working session the live `GEMINI_API_KEY` value was pasted into a Claude Code chat transcript. Anyone with access to that transcript — or any future context snapshot that ingested it — would have had a valid production key with full quota.
+- **Root cause:** The key lived correctly in the VPS `.env` only (never committed), but was referenced by value in a troubleshooting exchange rather than by name. The host side of the transcript has no known-secret redaction hook, so once typed it persisted.
+- **Fix:** (1) User rotated the key in https://aistudio.google.com/app/apikey; the replacement used the newer Google format with prefix `AQ.` instead of the classic `AIzaSy...`. (2) On the VPS: backed up `/srv/roadmap/.env` as `.env.bak-<epoch>` and replaced the `GEMINI_API_KEY=` line via `sed -i`. (3) `docker compose up -d --force-recreate backend` — plain `restart` would not reload env (RCA-002). (4) Smoke test via `app.ai.provider.complete(prompt=..., json_response=True, task='smoke_test_new_key')` — `gemini-2.5-flash` returned valid JSON. (5) `docker compose logs backend` grep'd for 401/403/`invalid.*key` — none. (6) User revoked the old key in AI Studio.
+- **Prevention:**
+  - Never paste a secret *value* into a chat transcript. Reference it by variable name (`GEMINI_API_KEY`) and have the assistant SSH + `grep` on the host if the actual value is ever needed. Treat conversational context as quasi-public.
+  - CLAUDE.md §5 rule 1 already lists redaction prefixes for pre-commit grep. Update that list: Gemini keys may now start with either `AIzaSy` (classic, 39 chars) **or** `AQ.Ab` (newer format, variable length). Both must be redacted in `logging_redact.py` and in pre-commit diff grep.
+  - Rotation procedure is now codified in [docs/OPERATIONS.md §6.1](OPERATIONS.md#61-rotating-a-leaked-or-expired-ai-provider-key). Follow it verbatim for any future leak — it's an 8-step checklist that covers backup, replacement, force-recreate, smoke test, log scan, and revocation.
+
 ---
 
 ## Patterns to watch for

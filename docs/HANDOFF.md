@@ -72,9 +72,13 @@ New panel in `/admin/jobs`:
 - Backend logs clean after deploy ✓
 - Test suite: 218 passed, 0 new failures ✓
 
+### Post-session ops — Gemini key rotated (2026-04-16, same day)
+
+The leaked `GEMINI_API_KEY` was rotated before session close. New-format token (`AQ.Ab...` prefix — Google's newer API-key schema, replaces the classic `AIzaSy...`). Procedure: `.env` backup → `sed -i` replace → `docker compose up -d --force-recreate backend` → smoke test via `app.ai.provider.complete()` returned a valid `gemini-2.5-flash` response → log scan clean. Old key revoked in AI Studio by operator. Full 8-step procedure codified at [OPERATIONS.md §6.1](OPERATIONS.md) and incident logged as [RCA-023](RCA.md).
+
 ### Next priorities
 
-1. Rotate Gemini API key (leaked in prior session transcript)
+1. ~~Rotate Gemini API key~~ ✓ done
 2. Run another `/summarize-jobs --status draft --limit 100` to clear the remaining 175 drafts
 3. Consider bumping `PROMPT_VERSION` in `jobs_summary_claude.txt` to force-regen the 734 stale Flash-era summaries
 4. Admin to review + bulk-reject the ~1000 draft backlog using the new quick-filters

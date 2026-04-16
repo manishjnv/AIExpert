@@ -194,7 +194,50 @@ docker compose up -d --force-recreate backend   # Restart required to pick up ch
 ### Get API key
 1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 2. Create API key → select project
-3. Set in `.env` as `GEMINI_API_KEY=AIza...`
+3. Set in `.env` as `GEMINI_API_KEY=<value>`. Google issues keys in two formats today: classic `AIzaSy...` (39 chars) and the newer `AQ.Ab...` (variable length). Both authenticate against `generativelanguage.googleapis.com`; the backend treats them identically.
+
+### 6.1 Rotating a leaked or expired AI provider key
+
+Follow this exact sequence when you have a replacement token in hand. Applies to Gemini, Groq, Anthropic, OpenAI, and any other provider key stored in the VPS `.env`. See [RCA-023](RCA.md) for the incident that prompted this procedure.
+
+1. **Never paste the new key into the chat.** If you must share it with a teammate, use a password manager or encrypted channel. Secrets pasted into chat transcripts persist in context snapshots — a leak you can't undo.
+2. **Back up `.env` on the VPS** before mutating it:
+   ```bash
+   ssh a11yos-vps "cp /srv/roadmap/.env /srv/roadmap/.env.bak-$(date +%s)"
+   ```
+   Keeps a dated rollback target in case the new key is malformed.
+3. **Replace the value in place** with `sed -i` so you don't accidentally overwrite unrelated lines:
+   ```bash
+   ssh a11yos-vps "sed -i 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY=<new-value>|' /srv/roadmap/.env"
+   ```
+4. **Confirm the write** by echoing just the prefix (never the full value):
+   ```bash
+   ssh a11yos-vps "grep '^GEMINI_API_KEY=' /srv/roadmap/.env | cut -c1-30"
+   ```
+5. **Force-recreate the backend container** — `docker compose restart` does NOT reload env vars (see RCA-002):
+   ```bash
+   ssh a11yos-vps "cd /srv/roadmap && docker compose up -d --force-recreate backend"
+   ```
+6. **Smoke-test the provider** with a trivial call:
+   ```bash
+   ssh a11yos-vps "docker compose -f /srv/roadmap/docker-compose.yml exec -T backend python -c '
+   import asyncio
+   from app.ai.provider import complete
+   async def main():
+       r, m = await complete(prompt=\"Return JSON {\\\"ok\\\":true}\", json_response=True, task=\"smoke_test\")
+       print(f\"SUCCESS model={m} result={r}\")
+   asyncio.run(main())
+   '"
+   ```
+   Expected: `SUCCESS model=gemini-2.5-flash result={'ok': True}`. Any exception means the key is wrong — revert to the backup and investigate before proceeding.
+7. **Scan logs for auth errors** that may have fired from concurrent traffic while the new key was settling:
+   ```bash
+   ssh a11yos-vps "docker compose -f /srv/roadmap/docker-compose.yml logs --tail 100 backend | grep -iE '401|403|unauthorized|invalid.*key'"
+   ```
+   Zero matches = success.
+8. **Revoke the old key** in the provider dashboard (for Gemini: https://aistudio.google.com/app/apikey → delete). Only the human operator can do this — the backend has no way to invalidate a key upstream. Skipping this step leaves the leaked key usable.
+
+Cleanup: once the new key has been stable for a day, delete the `.env.bak-*` backup: `ssh a11yos-vps "rm /srv/roadmap/.env.bak-<timestamp>"`.
 
 ### Free tier limits
 - Model: `gemini-1.5-flash`
