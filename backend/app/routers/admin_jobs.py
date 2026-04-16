@@ -840,9 +840,9 @@ async function pub(id, hasSummary) {
   // Guardrail: publishing without a summary renders a degraded public page
   // (tldr + skills fallback, no card). Warn before proceeding.
   if (!hasSummary && !confirm(
-    "This job has no Opus summary card yet.\n\n" +
-    "Publishing now will render a degraded public page (tldr + skills only, no summary card).\n\n" +
-    "Recommended: run /summarize-jobs --id " + id + " first.\n\n" +
+    "This job has no Opus summary card yet.\\n\\n" +
+    "Publishing now will render a degraded public page (tldr + skills only, no summary card).\\n\\n" +
+    "Recommended: run /summarize-jobs --id " + id + " first.\\n\\n" +
     "Publish anyway?"
   )) return;
   const r = await fetch(`/admin/jobs/api/${id}/publish`, {method:"POST", credentials:"include"});
