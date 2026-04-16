@@ -2194,6 +2194,8 @@ _JOBS_GUIDE_HTML = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
 <li><a href="#reject">Rejecting &mdash; pick the right reason</a></li>
 <li><a href="#expire">Expiring &amp; Removing jobs</a></li>
 <li><a href="#other">Other actions (company, source, batch)</a></li>
+<li><a href="#classification">AI Classification &mdash; Defense Layers</a></li>
+<li><a href="#audit">Opus Audit &mdash; Weekly Workflow</a></li>
 <li><a href="#never">Never do this</a></li>
 </ol>
 </div>
@@ -2362,8 +2364,72 @@ If a job is missing one, run <code>/summarize-jobs --id &lt;ID&gt;</code> first.
 <tr><td>Monthly enrichment target</td><td>~$0.22/month</td></tr>
 </table>
 
+<!-- ========================= CLASSIFICATION DEFENSE ========================= -->
+<h2 id="classification">7. AI Classification &mdash; Defense Layers</h2>
+
+<p>The system uses 10 layers (RCA-026 + Waves 1&ndash;5) to defend against false positives like the PhonePe <em>"Manager, Legal"</em> incident, where Gemini confused <code>LLM</code> (Master of Laws degree) with <code>LLM</code> (Large Language Model). All filters bias toward rejection &mdash; better to surface a borderline job as no-topic for your review than to mislabel a non-AI role as AI.</p>
+
+<h3>Filter pipeline order</h3>
+<div class="flow">
+<div class="flow-step"><span class="step-num">1.</span><span class="step-text"><strong>Title pre-filter</strong> &mdash; ~120 patterns across 21 non-AI categories (sales engineer, recruiter, policy analyst, UX designer, etc.)</span></div>
+<div class="flow-step"><span class="step-num">2.</span><span class="step-text"><strong>JD body cluster scanner</strong> &mdash; flags JDs with &ge;2 hits from 9 non-AI clusters (legal/HR/finance/sales/marketing/design/recruiting/IT/creative/policy) when AI-intensity score &lt; 5</span></div>
+<div class="flow-step"><span class="step-num">3.</span><span class="step-text"><strong>Bare-verb title gate</strong> &mdash; "Manager, X" / "Director, Y" / "Head of Z" without AI anchor word AND low intensity = auto-skip</span></div>
+<div class="flow-step"><span class="step-num">4.</span><span class="step-text"><strong>AI-intensity scoring</strong> &mdash; weighted 3-tier (STRONG x3 + MEDIUM x2 + WEAK x1, deduped, boilerplate stripped, requirement-phrases neutralized). Threshold: 5</span></div>
+<div class="flow-step"><span class="step-num">5.</span><span class="step-text"><strong>Self-rejection prompts</strong> &mdash; Gemini instructed to return <code>topic:[]</code> for sales/marketing/legal/HR/etc. roles even at AI-first companies</span></div>
+<div class="flow-step"><span class="step-num">6.</span><span class="step-text"><strong>Evidence-span validation</strong> &mdash; Gemini must cite a JD substring for each topic; we verify the quote exists and check it against forbidden patterns (LLB/Master of Laws for "LLM", workplace safety for "Safety", user research for "Research")</span></div>
+<div class="flow-step"><span class="step-num">7.</span><span class="step-text"><strong>Topic-anchor check</strong> &mdash; each assigned topic must have an anchor phrase elsewhere in the JD body</span></div>
+<div class="flow-step"><span class="step-num">8.</span><span class="step-text"><strong>Designation&harr;topic consistency</strong> &mdash; <code>designation == "Other"</code> forces <code>topic = []</code>; AI-adjacent designations (AI PM, Solutions Architect, Developer Advocate, Prompt Engineer) capped at 1 topic</span></div>
+<div class="flow-step"><span class="step-num">9.</span><span class="step-text"><strong>Per-source rejection-rate alarm</strong> &mdash; auto-disables sources with &gt;40% admin reject rate over last 30d (min 20 reviewed rows)</span></div>
+<div class="flow-step"><span class="step-num">10.</span><span class="step-text"><strong>Weekly Opus audit</strong> &mdash; 1% of Tier-1 published jobs flagged for manual Claude Code review (no API spend &mdash; uses Claude Max in VS Code)</span></div>
+</div>
+
+<h3>What you'll see in the queue</h3>
+<table>
+<tr><th>Chip / Note</th><th>What it means</th><th>Your action</th></tr>
+<tr><td><code>auto-skipped: non-AI title</code></td><td>Layer 1 caught it (legal manager, recruiter, etc.)</td><td>Usually safe to bulk-reject; spot-check first</td></tr>
+<tr><td><code>auto-skipped: non-AI JD content</code></td><td>Layer 2 caught it (cluster + low intensity)</td><td>Same &mdash; bulk-reject after spot-check</td></tr>
+<tr><td><code>auto-skipped: bare-verb title without AI work</code></td><td>Layer 3 caught it (Manager/Director/Head w/o AI anchor + low intensity)</td><td>Same</td></tr>
+<tr><td><code>topic = []</code> (no chips)</td><td>Layers 4&ndash;8 stripped all topics; the role is AI-adjacent at best</td><td>Read the JD; if AI Solutions Architect / DevRel etc., manually assign 1 topic and publish; else reject</td></tr>
+<tr><td><code>OPUS-AUDIT mismatch</code></td><td>Layer 10 found Claude Max disagrees with the published classification</td><td>Read the audit notes; either revert to draft or accept Claude's verdict</td></tr>
+</table>
+
+<div class="warn">
+<strong>If you see false positives slipping through:</strong> log it. The next backfill (<code>scripts/backfill_rca026_non_ai.py --apply</code>) catches historical rows; the rejection-rate alarm and intensity histogram surface drifting sources before they become a problem.
+</div>
+
+<!-- ========================= OPUS AUDIT WORKFLOW ========================= -->
+<h2 id="audit">8. Opus Audit &mdash; Weekly Workflow</h2>
+
+<p>Every Monday 04:30 UTC the scheduler picks ~1% of Tier-1 published jobs (clamped 1&ndash;20) and stamps them as audit-pending. You see an amber banner at the top of <a href="/admin/jobs">/admin/jobs</a>: <strong>"N pending Opus audit [COPY PROMPT]"</strong>.</p>
+
+<h3>Step-by-step</h3>
+<div class="flow">
+<div class="flow-step"><span class="step-num">1.</span><span class="step-text">Click <strong>COPY PROMPT</strong> in the banner. The Claude Code prompt (with all pending jobs JSON-embedded) is copied to clipboard.</span></div>
+<div class="flow-step"><span class="step-num">2.</span><span class="step-text">Open Claude Code in VS Code (with your <strong>Claude Max</strong> subscription &mdash; no API spend).</span></div>
+<div class="flow-step"><span class="step-num">3.</span><span class="step-text">Paste the prompt. Claude returns a JSON array with one entry per job: <code>{job_id, agreed, opus_topic, opus_designation, notes}</code>.</span></div>
+<div class="flow-step"><span class="step-num">4.</span><span class="step-text">POST that JSON back as <code>{"results":[...]}</code> to <code>/admin/jobs/api/audit-submit</code> (curl from your shell or the VS Code REST extension).</span></div>
+<div class="flow-step"><span class="step-num">5.</span><span class="step-text">Disagreements stamp <code>OPUS-AUDIT mismatch (date): notes</code> on the job's admin_notes for follow-up review.</span></div>
+</div>
+
+<h3>Submission example</h3>
+<pre><code>curl -X POST https://your-domain/admin/jobs/api/audit-submit \\
+  -H "Cookie: session=..." -H "Content-Type: application/json" \\
+  -d '{"results":[
+    {"job_id":20,"agreed":true,"opus_topic":["RL","Safety","Research"],
+     "opus_designation":"Research Scientist","notes":""},
+    {"job_id":95,"agreed":false,"opus_topic":[],
+     "opus_designation":"Other","notes":"Customer support, not AI"}
+  ]}'</code></pre>
+
+<div class="warn">
+<strong>Why no API spend?</strong> Claude Max in VS Code is a fixed monthly subscription, not metered API. The audit prompt + ~10 jobs fits in one Opus context window with room to spare.
+</div>
+
+<h3>If you skip a week</h3>
+<p>Pending count accumulates. Cooldown is 90 days &mdash; once you submit a verdict, that job won't be re-audited for 90 days. So skipping a week just delays detection of any drift on those particular jobs by one week.</p>
+
 <!-- ========================= NEVER ========================= -->
-<h2 id="never">7. Never do this</h2>
+<h2 id="never">9. Never do this</h2>
 
 <div class="danger">
 <ol style="margin:0;padding-left:20px;color:#e0dbd2">
@@ -2374,6 +2440,8 @@ If a job is missing one, run <code>/summarize-jobs --id &lt;ID&gt;</code> first.
 <li>Manually re-enable a probe-disabled board without verifying the URL is back</li>
 <li>Approve a Tier-2 job without checking the company's own website</li>
 <li>Approve &gt; 20 jobs in one click without spot-checking</li>
+<li>Manually assign a topic to a role marked <code>topic = []</code> by the validator without reading the JD &mdash; the validator strips topics for a reason</li>
+<li>Submit Opus audit results without reading them &mdash; mismatches stamp <code>admin_notes</code>; pasting blindly poisons your own queue</li>
 </ol>
 </div>
 
