@@ -64,7 +64,7 @@ async def _process_one(job_id: int, sem: asyncio.Semaphore) -> str:
             )
 
         try:
-            enriched = await enrich_job(raw)
+            enriched = await enrich_job(raw, source_key=job.source)
         except Exception as exc:
             logger.warning("enrich failed for job %s: %s", job_id, exc)
             return "error"

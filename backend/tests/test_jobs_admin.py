@@ -202,6 +202,44 @@ async def test_queue_expired_reason_subfilter_and_24h_counter():
 
 
 @pytest.mark.asyncio
+async def test_stats_reports_publish_rate_and_top_reasons():
+    """#6 quality signal: 45d publish_rate + top_reject_reasons surface in /api/stats."""
+    await _setup()
+    _, token = await _mk_user("a@t.com", is_admin=True)
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:noisy", kind="greenhouse", label="Noisy",
+                         tier=1, enabled=1))
+        db.add(JobCompany(slug="noisy", name="Noisy Co"))
+        # 1 published, 4 rejected — 20% rate, off_topic dominates.
+        for ext, status, reason in [
+            ("p1", "published", None),
+            ("r1", "rejected", "off_topic"),
+            ("r2", "rejected", "off_topic"),
+            ("r3", "rejected", "off_topic"),
+            ("r4", "rejected", "low_quality"),
+        ]:
+            db.add(Job(
+                source="greenhouse:noisy", external_id=ext, source_url="u",
+                hash=ext, status=status, posted_on=date.today(),
+                valid_through=date.today() + timedelta(days=45),
+                slug=ext, title="T", company_slug="noisy", designation="ML Engineer",
+                country="US", remote_policy="Hybrid", verified=1,
+                reject_reason=reason, data={},
+            ))
+        await db.commit()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/admin/jobs/api/stats", cookies={"auth_token": token})
+        src = next(s for s in r.json()["sources"] if s["key"] == "greenhouse:noisy")
+        assert src["publish_rate_45d"] == 0.20
+        assert src["published_45d"] == 1
+        assert src["rejected_45d"] == 4
+        top = src["top_reject_reasons_45d"]
+        assert top[0]["reason"] == "off_topic" and top[0]["count"] == 3
+        assert top[1]["reason"] == "low_quality"
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_admin_queue_filters_by_city():
     """Admin city filter uses json_extract on data.location.city (case-insensitive)."""
     await _setup()

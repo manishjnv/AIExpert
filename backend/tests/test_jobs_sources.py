@@ -174,6 +174,33 @@ async def test_module_grounding_returns_published_template_keys():
 
 
 @pytest.mark.asyncio
+async def test_source_feedback_summarizes_recent_rejections():
+    """#5 feedback loop: recent reject_reasons per source surface in the prompt hint."""
+    from datetime import date, timedelta
+    from app.models import Job
+    from app.services.jobs_enrich import _get_source_feedback
+    await _setup()
+
+    async with db_module.async_session_factory() as db:
+        for i, reason in enumerate(["off_topic"] * 4 + ["low_quality"] * 2 + ["fake"]):
+            db.add(Job(
+                source="greenhouse:noisy", external_id=f"r{i}", source_url="u",
+                hash=f"h{i}", status="rejected", reject_reason=reason,
+                posted_on=date.today(), valid_through=date.today() + timedelta(days=45),
+                slug=f"r{i}", title="T", company_slug="noisy", designation="ML Engineer",
+                country="US", remote_policy="Hybrid", verified=1, data={},
+            ))
+        await db.commit()
+
+    hint = await _get_source_feedback("greenhouse:noisy")
+    assert "off_topic(4)" in hint
+    assert "low_quality(2)" in hint
+    # Empty when source has no rejections.
+    assert await _get_source_feedback("greenhouse:clean") == ""
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_module_grounding_returns_empty_on_loader_failure():
     """Enricher must still run if the template loader explodes."""
     from unittest.mock import patch

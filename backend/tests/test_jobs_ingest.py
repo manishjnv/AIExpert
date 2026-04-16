@@ -80,7 +80,7 @@ def test_slugify_safe():
 async def test_stage_new_then_unchanged_then_changed():
     await _setup()
     with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
-        m.side_effect = lambda raw: _fake_enrich(raw)
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
         async with db_module.async_session_factory() as db:
             r = _raw()
             assert await jobs_ingest._stage_one(r, "greenhouse:anthropic", db) == "new"
@@ -105,7 +105,7 @@ async def test_stage_blocked_company_skipped():
         db.add(JobCompany(slug="anthropic", name="Anthropic", blocklisted=1))
         await db.commit()
     with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
-        m.side_effect = lambda raw: _fake_enrich(raw)
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
         async with db_module.async_session_factory() as db:
             result = await jobs_ingest._stage_one(_raw(), "greenhouse:anthropic", db)
             assert result == "skipped_blocked"
@@ -137,7 +137,7 @@ async def test_enrichment_failure_falls_back():
 async def test_valid_through_is_posted_plus_45d():
     await _setup()
     with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
-        m.side_effect = lambda raw: _fake_enrich(raw)
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
         async with db_module.async_session_factory() as db:
             await jobs_ingest._stage_one(_raw(posted_on="2026-04-01"), "greenhouse:anthropic", db)
             await db.commit()

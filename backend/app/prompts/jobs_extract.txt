@@ -18,6 +18,9 @@ Job description (HTML stripped of boilerplate):
 Roadmap module inventory (valid slugs for `roadmap_modules_matched`):
 {{module_slugs}}
 
+Source-reviewer feedback (recent rejections for this board):
+{{source_feedback}}
+
 ---
 
 OUTPUT SCHEMA (return exactly these keys):

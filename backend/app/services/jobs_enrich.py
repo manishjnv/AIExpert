@@ -63,6 +63,49 @@ def _scrub_pii(html: str) -> str:
     return html
 
 
+async def _get_source_feedback(source_key: str) -> str:
+    """Summarize recent rejections for this source as a prompt-time hint.
+
+    Closes the feedback loop: when admin keeps rejecting "off_topic" roles
+    from `greenhouse:phonepe`, the next enrichment for that source sees
+    "past reviewers rejected 8 of the last 15 as off_topic — be strict
+    about AI/ML relevance." The extractor learns the local norm without
+    us hand-tuning per-source prompts.
+
+    Looks back 45 days. Returns a plain-English sentence (<=200 chars) or
+    empty string when there's no signal yet.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, select
+        from app.db import async_session_factory
+        from app.models import Job
+        cutoff = datetime.utcnow() - timedelta(days=45)
+        async with async_session_factory() as db:
+            stmt = (
+                select(Job.reject_reason, func.count(Job.id))
+                .where(Job.source == source_key,
+                       Job.status == "rejected",
+                       Job.reject_reason.is_not(None),
+                       Job.updated_at >= cutoff)
+                .group_by(Job.reject_reason)
+            )
+            rows = (await db.execute(stmt)).all()
+            if not rows:
+                return ""
+            total = sum(n for _, n in rows)
+            top = sorted(rows, key=lambda r: -r[1])[:3]
+            pretty = ", ".join(f"{r}({n})" for r, n in top)
+            return (
+                f"Past reviewers rejected {total} of the last batch of roles "
+                f"from this source. Top reasons: {pretty}. Apply the same "
+                f"strictness — these patterns repeat."
+            )[:500]
+    except Exception as exc:
+        logger.warning("could not load source feedback for %s: %s", source_key, exc)
+        return ""
+
+
 async def _get_module_slugs() -> list[str]:
     """Return published curriculum template keys so the prompt can ground
     `roadmap_modules_matched`. Template keys are the public identifiers
@@ -224,14 +267,17 @@ def _validate(raw_resp: dict, raw: RawJob, module_slugs: list[str]) -> dict[str,
     }
 
 
-async def enrich_job(raw: RawJob) -> dict[str, Any]:
+async def enrich_job(raw: RawJob, source_key: str | None = None) -> dict[str, Any]:
     """Call the AI provider chain, validate, and return the enriched payload.
 
     Raises on repeated provider failure — caller (jobs_ingest) catches and
-    falls back to `_minimal_enrichment`.
+    falls back to `_minimal_enrichment`. `source_key` (e.g. "ashby:sarvam")
+    powers the rejection-feedback hint in the prompt; omit it and the
+    feedback line is "(no recent feedback)".
     """
     jd_text = _strip_html(raw["jd_html"])[:JD_MAX_CHARS]
     module_slugs = await _get_module_slugs()
+    feedback = await _get_source_feedback(source_key) if source_key else ""
 
     prompt = PROMPT_PATH.read_text(encoding="utf-8")
     prompt = (prompt
@@ -239,6 +285,7 @@ async def enrich_job(raw: RawJob) -> dict[str, Any]:
               .replace("{{title_raw}}", raw["title_raw"])
               .replace("{{location_raw}}", raw["location_raw"])
               .replace("{{jd_text}}", jd_text)
+              .replace("{{source_feedback}}", feedback or "(no recent feedback)")
               .replace("{{module_slugs}}", ", ".join(module_slugs) if module_slugs else "(none available — return [])"))
 
     resp, _model = await complete(prompt, json_response=True, task="jobs_enrich")

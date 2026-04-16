@@ -120,7 +120,7 @@ async def _stage_one(raw: RawJob, source_key: str, db) -> str:
     # Enrich (best-effort; see jobs_enrich). Minimal fallback keeps row stageable.
     try:
         from app.services.jobs_enrich import enrich_job
-        enriched = await enrich_job(raw)
+        enriched = await enrich_job(raw, source_key=source_key)
         enrich_error = None
     except Exception as exc:  # never break ingest on enrichment failure
         logger.exception("enrichment failed for %s/%s: %s", source_key, raw["external_id"], exc)

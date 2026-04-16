@@ -151,7 +151,7 @@ async def list_queue(
     }
 
 
-@router.get("/api/{job_id}")
+@router.get("/api/{job_id:int}")
 async def get_one(
     job_id: int,
     _admin: User = Depends(get_current_admin),
@@ -267,26 +267,61 @@ async def stats(
     _admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Per-source stats for the admin banner: last 24h + cumulative."""
+    """Per-source stats: last 24h + 45d publish_rate + top reject reasons."""
     from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    cutoff_45d = datetime.utcnow() - timedelta(days=45)
 
     srcs = (await db.execute(select(JobSource).order_by(JobSource.tier, JobSource.key))).scalars().all()
 
-    # Count recent staged rows per source (anything updated in last 24h counts as "touched").
+    # 24h rolling bucket per status.
     recent_stmt = (
         select(Job.source, Job.status, func.count(Job.id))
-        .where(Job.updated_at >= cutoff)
+        .where(Job.updated_at >= cutoff_24h)
         .group_by(Job.source, Job.status)
     )
-    recent_rows = (await db.execute(recent_stmt)).all()
     recent: dict[str, dict[str, int]] = {}
-    for src, status, n in recent_rows:
+    for src, status, n in (await db.execute(recent_stmt)).all():
         recent.setdefault(src, {})[status] = n
+
+    # 45d publish-rate bucket — quality signal (#6). Low rate = extractor is
+    # emitting roles reviewers consistently reject. Publish_rate = pub / (pub + rej).
+    quality_stmt = (
+        select(Job.source, Job.status, func.count(Job.id))
+        .where(Job.updated_at >= cutoff_45d,
+               Job.status.in_(["published", "rejected"]))
+        .group_by(Job.source, Job.status)
+    )
+    quality: dict[str, dict[str, int]] = {}
+    for src, status, n in (await db.execute(quality_stmt)).all():
+        quality.setdefault(src, {})[status] = n
+
+    # Top 3 reject reasons per source over the same 45d window — feeds the
+    # admin "why is this source noisy" diagnosis without opening the DB.
+    reasons_stmt = (
+        select(Job.source, Job.reject_reason, func.count(Job.id))
+        .where(Job.updated_at >= cutoff_45d,
+               Job.status == "rejected",
+               Job.reject_reason.is_not(None))
+        .group_by(Job.source, Job.reject_reason)
+    )
+    reasons_raw: dict[str, list[tuple[str, int]]] = {}
+    for src, reason, n in (await db.execute(reasons_stmt)).all():
+        reasons_raw.setdefault(src, []).append((reason, n))
+    top_reasons: dict[str, list[dict]] = {
+        src: [{"reason": r, "count": n}
+              for r, n in sorted(rs, key=lambda x: -x[1])[:3]]
+        for src, rs in reasons_raw.items()
+    }
 
     out = []
     for s in srcs:
         r = recent.get(s.key, {})
+        q = quality.get(s.key, {})
+        pub_45 = q.get("published", 0)
+        rej_45 = q.get("rejected", 0)
+        total_45 = pub_45 + rej_45
+        publish_rate = round(pub_45 / total_45, 2) if total_45 else None
         out.append({
             "key": s.key, "label": s.label, "tier": s.tier,
             "enabled": bool(s.enabled),
@@ -294,6 +329,10 @@ async def stats(
             "recent_draft": r.get("draft", 0),
             "recent_published": r.get("published", 0),
             "recent_rejected": r.get("rejected", 0),
+            "publish_rate_45d": publish_rate,     # null when no reviewed rows yet
+            "published_45d": pub_45,
+            "rejected_45d": rej_45,
+            "top_reject_reasons_45d": top_reasons.get(s.key, []),
             "total_published": s.total_published,
             "total_rejected": s.total_rejected,
             "error": s.last_run_error,
@@ -526,15 +565,23 @@ async function loadStats() {
       const err = s.error ? `<span class="err">ERR</span>` : "";
       const stale = !s.last_run_at || (Date.now() - new Date(s.last_run_at).getTime() > 36*3600*1000);
       const staleTag = stale ? `<span class="err">stale</span>` : "";
+      // 45d publish-rate signal — green >=0.5, amber 0.2-0.5, red <0.2, grey if no data.
+      const pr = s.publish_rate_45d;
+      let prChip = '<span style="color:#94a3b8">—</span>';
+      if (pr !== null && pr !== undefined) {
+        const color = pr >= 0.5 ? '#6db585' : pr >= 0.2 ? '#e8a849' : '#d27d6e';
+        prChip = `<span style="color:${color};font-family:'IBM Plex Mono',monospace;font-size:11px" title="${s.published_45d} published / ${s.rejected_45d} rejected · top: ${(s.top_reject_reasons_45d||[]).map(r=>r.reason+'('+r.count+')').join(', ')||'none'}">${Math.round(pr*100)}%</span>`;
+      }
       return `<tr>
         <td>${esc(s.label)}</td><td>T${s.tier}</td>
         <td>${tot}</td><td>${s.recent_draft}</td><td>${s.recent_published}</td><td>${s.recent_rejected}</td>
+        <td>${prChip}</td>
         <td>${s.last_run_at ? esc(s.last_run_at.slice(0,16).replace('T',' ')) : '—'} ${staleTag}</td>
         <td>${err}</td>
       </tr>`;
     }).join("");
     document.getElementById("stats-body").innerHTML = rows
-      ? `<table><thead><tr><th>Source</th><th>Tier</th><th>24h</th><th>Draft</th><th>Pub</th><th>Rej</th><th>Last run (UTC)</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      ? `<table><thead><tr><th>Source</th><th>Tier</th><th>24h</th><th>Draft</th><th>Pub</th><th>Rej</th><th title="Published / (Published+Rejected) over last 45d — low = extractor emitting noise">Publish-rate 45d</th><th>Last run (UTC)</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
       : "<p>No sources configured yet.</p>";
   } catch(_) {}
 }
