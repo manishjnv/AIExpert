@@ -96,6 +96,8 @@ These are non-negotiable. If a rule conflicts with a user request, surface the c
 
 11. **Read `docs/RCA.md` at the START of every session** before writing any code. Scan the most recent 5 entries and the "Patterns to watch for" table at the bottom — they encode real mistakes this codebase has already paid for. After fixing any bug or security defect, add a new numbered entry with symptom / root cause / fix (with file+line link) / prevention rule, and update the pattern table if the failure mode is new.
 
+12. **Follow the orchestration playbook in §8** for any change touching 2+ files or any path flagged load-bearing (`backend/app/ai/`, `backend/app/auth/`, `jobs_ingest/`, `jobs_enrich/`, `backend/alembic/versions/`). Generic phases + routing live in the global `~/.claude/CLAUDE.md`; this repo's overlay is §8 below. Use `/orchestrate` to trigger Phase 0 explicitly.
+
 ## 6. Quick commands
 
 ```bash
@@ -118,7 +120,49 @@ ssh vps "cd /srv/roadmap && git pull && docker compose up -d --build backend"
 - **Prefer editing over rewriting.** If a file exists and works, extend it; don't replace it wholesale.
 - **When a spec doc is ambiguous, propose an interpretation, then update the doc.** Don't silently choose.
 
-## 8. Session state (update at end of each session)
+## 8. Orchestration playbook (project overlay)
+
+The generic playbook — routing table, Phase 0–6 flow, hard rules — lives in `~/.claude/CLAUDE.md` (global). This section is the repo-specific overlay. When a rule here conflicts with the global playbook, **this one wins**. Trigger the full flow explicitly with `/orchestrate`.
+
+### Phase 0 reads (exact paths for this repo)
+
+In the Phase 0 parallel-tool-call burst, read all four in one message:
+
+- `CLAUDE.md` (this file)
+- `docs/HANDOFF.md`
+- `docs/RCA.md` — first ~150 lines (recent entries + the "Patterns to watch for" table at the bottom)
+- `C:\Users\manis\.claude\projects\e--code-AIExpert\memory\MEMORY.md`
+
+### Load-bearing paths (require Opus diff review + worktree isolation)
+
+Any Sonnet/Haiku subagent editing these paths MUST be spawned with `isolation: "worktree"`, and you MUST review the diff line-by-line in Phase 3:
+
+- `backend/app/ai/` — provider clients, prompt construction, sanitizer (secrets-stripping before LLM send)
+- `backend/app/auth/` — Google OAuth, email OTP, JWT, session cookies, rate limiting
+- `jobs_ingest/` and `jobs_enrich/` — the 10-layer classifier defense (see [docs/JOBS_CLASSIFICATION.md](docs/JOBS_CLASSIFICATION.md))
+- `backend/alembic/versions/` — schema migrations (irreversible in prod)
+- Anything that constructs or edits an **AI enrichment / evaluation prompt** — never regenerate these from scratch without explicit user approval (prompts are tuned assets, not boilerplate)
+
+### Memory entries to actively consult (do not re-derive)
+
+Before proposing changes in the relevant area, pull the matching memory entry from `MEMORY.md`:
+
+- **Classifier work** → `feedback_classification_bias.md` (false-positives never acceptable; don't propose Wave 5 #19 without drift evidence)
+- **Long-running DB writes** → `feedback_sqlite_writer_sessions.md` (commit per row; WAL clash with live backend)
+- **New HTTP route** → `feedback_nginx_allowlist_on_new_routes.md` (update `nginx.conf` in same PR)
+- **Editorial AI output** → `feedback_opus_for_editorial.md` (Flash can't match Opus editorial quality; tiered strategy)
+- **Any new logger/httpx caller** → `feedback_redact_api_keys.md` (install `_redacting_filter` at entrypoints)
+- **Deployments** → `feedback_deploy_rebuild.md` (`restart` doesn't pick up code; build + force-recreate)
+- **Standalone scripts** → `feedback_scripts_need_init_db.md` (call `init_db()` / `close_db()` explicitly)
+
+### Phase 6 exit — this repo specifically
+
+- Rewrite the `## 9. Session state` section below (≤30 lines)
+- If a bug was fixed, append a numbered entry to `docs/RCA.md` and update its pattern table if the failure mode is new
+- Do **not** `git commit` without explicit user approval (per §5 rule on risky actions)
+- If AI enrichment prompts were touched, confirm with the user before overwriting — tuned prompts are never regenerated without approval
+
+## 9. Session state (update at end of each session)
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
