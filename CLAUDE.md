@@ -166,14 +166,14 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-17 (session 21 — admin bulk-reject)
-**Last session summary (session 21):** Added bulk-reject to the Jobs Review queue, mirroring the existing bulk-publish UX. Admins can now select multiple drafts and reject them in one action with a shared reason — parity with publish, no tier gate (unlike bulk-publish which is Tier-1 only).
+**Last session date:** 2026-04-17 (session 23 — week-row collapse UX)
+**Last session summary (session 23):** Roadmap week rows now collapse by default for all weeks (previously only completed weeks) and the per-row toggle is an obvious bordered pill reading `EXPAND` / `COLLAPSE` with a rotating chevron, not a bare grey glyph. Also shipped session 21's bulk-reject feature end-to-end (commit `2dece31`, deployed via `git pull + --build --force-recreate backend`; verified `POST /admin/jobs/api/bulk-reject` returns 401 unauth, 200 authed from the 16/16-green test suite).
 
-- **Backend:** new `POST /admin/jobs/api/bulk-reject` in [admin_jobs.py:365-395](backend/app/routers/admin_jobs.py#L365-L395) — validates `ids` (int list, ≤100) + `reason` (one of `VALID_REJECT_REASONS`), stamps `last_reviewed_by` + `last_reviewed_on`, increments `total_rejected` per source. No IndexNow ping (no published URLs changed).
-- **Frontend (same file, embedded HTML/JS):** "Bulk reject selected" button at [admin_jobs.py:1252](backend/app/routers/admin_jobs.py#L1252); `bulkRej()` at [admin_jobs.py:1308-1322](backend/app/routers/admin_jobs.py#L1308-L1322). Two-step UX: reason prompt (REJECT_REASONS list) then count-confirm dialog.
-- **Tests:** new `test_bulk_reject_accepts_any_tier_and_records_reason` covers invalid reason (400), empty ids (400), mixed-tier success (200 + DB rows flipped to rejected with correct reason + reviewer + date).
+- **Frontend (single file, per rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [line 904](frontend/index.html#L904) `collapsedByDefault = true`, (2) [lines 191-220](frontend/index.html#L191-L220) `.wk-toggle` redesigned (bordered mono-caps pill, accent-on-hover, chevron rotation on `::after` so the text doesn't invert), (3) [line 950](frontend/index.html#L950) markup wraps `.label-closed` / `.label-open` spans. Mobile ≤480px hides the text, chevron-only.
+- **Deploy:** frontend is volume-mounted (`./frontend:/usr/share/nginx/html:ro` per docker-compose); `git pull` on VPS is sufficient — no rebuild, no restart.
+- **Standalone guarantee preserved** (CLAUDE.md rule 8): pure CSS + JS edits to the existing single file, no new deps.
 
-**Tests passing:** 16/16 admin-jobs suite (full project suite ~432 — +1 new test vs session 20). **Blockers:** None.
+**Tests passing:** 432 (unchanged — frontend UX, no backend test changes).
 
-**Next action:** Deploy to VPS — per memory `feedback_deploy_rebuild.md`, requires `docker compose up -d --build --force-recreate backend` (plain `restart` won't pick up code). Editorial-summary burn-down continues in parallel; resume prompt lives in `docs/HANDOFF.md`. Tiny outstanding admin chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
+**Next action:** Editorial-summary burn-down continues — ~521 rows with no summary + ~105 stale; resume prompt in `docs/HANDOFF.md`. Tiny chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
 **Open questions for the user:** None.

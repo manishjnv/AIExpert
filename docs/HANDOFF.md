@@ -4,12 +4,30 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
-## Current state as of 2026-04-17 (session 21 — admin bulk-reject)
+## Current state as of 2026-04-17 (session 23 — roadmap week-row collapse UX)
 
-**Branch:** `master` (new commit this session — bulk-reject feature on top of `ddf6688`)
+**Branch:** `master` (frontend commit this session on top of session 21's `2dece31`; session 22 was data-plane only)
 **Live site:** [automateedge.cloud](https://automateedge.cloud)
-**VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy. **Deploy pending.**
-**Tests:** **432 passed** (+1 new: `test_bulk_reject_accepts_any_tier_and_records_reason`). Full admin-jobs suite 16/16 green.
+**VPS:** SSH alias `a11yos-vps` (72.61.227.64). Deploy root: `/srv/roadmap/`. Backend healthy.
+**Tests:** **432 passed** (no backend test changes this session — frontend UX only).
+
+### Session 23 — Roadmap week-row collapse UX (frontend)
+
+**Scope:** UX tweak on the public roadmap page. User reported that every week row rendered open by default (noisy wall of text) and the per-row toggle was a bare grey glyph users didn't recognize as a control.
+
+**Changes — all in [frontend/index.html](../frontend/index.html):**
+
+1. **Collapse all weeks by default** — [line 904](../frontend/index.html#L904) simplified from `const collapsedByDefault = isComplete && wTotal > 0;` to `const collapsedByDefault = true;`. Rendered DOM now omits the `open` attribute on `<details>` for every week, so a whole month is scannable at a glance; users click to expand the row they want.
+2. **Toggle redesigned as an obvious control** — [lines 191-220](../frontend/index.html#L191-L220). Old: bare `▾` glyph, `color: var(--ink-soft)`, 14px, no border, no hover. New: bordered pill, mono-caps `EXPAND` / `COLLAPSE` label, chevron on `::after`, hover/focus flip border + text to `var(--accent)`.
+3. **Chevron-only rotation** — [line 191](../frontend/index.html#L191). The old rule `.wk-toggle { transform: rotate(180deg); }` would flip the whole pill (including the new text) upside-down when the row opens. Rotated only the `::after` pseudo-element instead.
+4. **Mobile affordance** — `@media (max-width: 480px)` hides the text labels and keeps the chevron+border pill, so the toggle still reads as a button on phones without stealing the title's horizontal space.
+5. **Markup** — [line 950](../frontend/index.html#L950) wraps `.label-closed` / `.label-open` spans inside `.wk-toggle`. CSS swaps which is visible based on `[open]` state.
+
+**Rule-8 guarantee preserved:** frontend still runs standalone when opened from disk (pure CSS + inline JS edits, no new deps, no new files).
+
+**Deploy:** frontend is volume-mounted in `docker-compose.yml` (`./frontend:/usr/share/nginx/html:ro`), so `ssh a11yos-vps "cd /srv/roadmap && git pull"` is sufficient — no `--build`, no `--force-recreate`. Nginx serves the updated file immediately.
+
+**Verification plan post-deploy:** load `https://automateedge.cloud/`, scroll to Month 1, confirm every week row is collapsed; hover the EXPAND pill (border + text turn orange); click to open; the chevron rotates and the label flips to COLLAPSE. Repeat at viewport ≤480px and confirm only the chevron remains. Completed weeks (if any exist in saved state) still render the green ✓ badge and still default collapsed.
 
 ### Session 21 — admin Bulk-Reject in Jobs Review queue
 
@@ -45,6 +63,38 @@ ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose up -d --build --fo
 Plain `restart` won't pick up the code change.
 
 **Verification plan post-deploy:** load `/admin/jobs`, select a handful of tier-2 drafts, hit "Bulk reject selected", pick `off_topic` in the prompt, confirm. Confirm rows disappear from the draft tab and appear under the Rejected tab with the right reason. Also verify the existing single-row reject still works.
+
+### Session 22 — editorial summary refresh chunk 4 (Claude Max)
+
+**Scope:** data-plane only (parallel to session 21's admin bulk-reject code work). No repo files modified except this HANDOFF + CLAUDE.md §9. No git-level deploy required.
+
+**What ran:** 7 rounds of `/summarize-jobs --status draft --batch 10 --model sonnet-4.6` against `prompt_version 2026-04-16.2`. Same operator flow as session 20. **70 rows imported, 0 malformed, 0 rejected, 0 retries.**
+
+**Target & outcome:** +70 net draft-pool `sonnet-4.6` stamps. Result: **+70 net exactly** (151 → 221). Draft pool now:
+
+| model / prompt_version | count | Δ vs session 20 start | Δ vs session 22 start |
+|---|---:|---:|---:|
+| null (no summary) | 298 | — | −57 |
+| sonnet-4.6 @ 2026-04-16.2 (current) | 221 | +140 cumulative | **+70** |
+| opus-4.6 @ 2026-04-16.2 (current) | 79 | — | −1 (sibling propagation) |
+| opus-4.6 @ 2026-04-16.1 (stale) | 55 | — | −13 |
+| test-propagation | 5 | — | 0 |
+
+**Generator-side validator caught 1 chip-label cap pre-flight:** "dbt + Airflow + Snowflake" (R3, 25 chars) — trimmed to "dbt + Snowflake". **0 post-import schema violations** reported by the `_validate_summary` clamp.
+
+**IDs stamped this session:**
+
+- R1 (692, 646, 516, 505, 322, 118, 57, 47, 45, 693) — PhonePe HR + SRE, Together AI Commerce Eng, 3× Scale AI (DevOps Pub Sec, Head Finance Systems, Dir Enterprise ML), Cerebras Compute Platform Architect, 3× Anthropic (CSM Tokyo, Community Mktg, Inst Comms)
+- R2 (663, 661, 653, 651, 491, 480, 429, 428, 427, 417) — 4× Together AI ($160-275K band: Partnerships Mgr, Dir DC Ops, CSE GPU, Staff DW), 2× Anthropic (MM AE Industries, Intl Readiness), 4× Figure NASDAQ:FIGR (Head BD Figure Open, 2× CSA Reno+Charlotte, Staff PM Stablecoin)
+- R3 (381, 374, 371, 364, 358, 356, 172, 167, 61, 35) — 6× Together AI (Sr Network Eng Amsterdam, EA, Dir Tax, Sr TPM, Sr BE Commerce, Staff Analytics Eng), 4× Anthropic (Network Eng Capacity, Mgr Sales Dev, CSM Higher Ed, Capital Markets & IR)
+- R4 (10, 697, 465, 776, 451, 945, 779, 778, 766, 754) — Anthropic AE Pub Sec Sydney (**clearance required**), PhonePe PM Growth + Mgr PR, 3× Anthropic (Staff Infra Pre-training, IT Sys Eng, Cyber Harms PM), Mistral AI DevRel Singapore (**50% APAC travel**), 3× Anthropic (Research Lead Training Insights, Cyber Threat Investigator $230-290K, ML Eng Safeguards $350-500K)
+- R5 (489, 472, 160, 155, 106, 101, 99, 97, 96, 89) — all Anthropic: RE Agents + RE Virtual Collab ($500-850K each), CBRN-E Threat Investigator (**explicit content exposure**), SWE Account Abuse $320-405K, S&O Biz Partner, RE Societal Impacts (**SF-only + residency option**), Security Architect Applied AI NYC, RE Performance RL $350-850K, RS Frontier Red Team Emerging Risks $320-850K (**SF-only**), Safeguards Analyst Human Exploitation (**disturbing content + on-call**)
+- R6 (82, 77, 74, 71, 62, 51, 36, 29, 966, 821) — 7× Anthropic (RE Post-Training $350-500K, Dir Tech Acctg M&A, Dev Education Lead, Design Eng Education Labs, CSM Industries NYC, Contracts Mgr Pub Sec, Cert Dev Lead), Anthropic Bio Safety RS $300-320K, **Mindtickle Sr Graphic Designer (location blank — flagged)**, Scale AI Lead TPM Trust & Safety
+- R7 (786, 493, 94, 93, 42, 13, 790, 789, 788, 783) — all Anthropic: Strategic Deals Lead Compute, Partner Sales Mgr SI, IT Support Eng, Head Programmatic Outcomes Partners, Commercial Counsel EMEA Dublin €165-210K (**3 days in-office**), AE Startups, **Industry Principal Insurance (20+ yrs required)**, TPM Infra, Prompt Eng Claude Code $300-405K, TPM Marketing Technology
+
+**Anomalies flagged in watch_outs:** Sydney AE security-clearance required; Mistral Singapore 50% APAC travel + multilingual (KR/JP/CN) preferred; 3 Anthropic roles with explicit/disturbing content exposure (CBRN-E Inv, Cyber Threat Inv, Safeguards HE&A); 2 SF-exclusive Anthropic roles with relocation required (RE Societal Impacts, RS Frontier Red Team); Python-only interview format for RE Post-Training; Dublin Commercial Counsel 3-days-in-office (above 25% baseline); Insurance Industry Principal 20+ yrs + 8 yrs exec (unusually senior bar); Mindtickle location field blank.
+
+**No new operator gotchas** beyond session 20's four. Artifact prefix `s21_*` used on disk (session 21 by operator naming; this doc entry is session 22).
 
 ### Session 20 — editorial summary refresh chunk 3 (Claude Max)
 
@@ -155,37 +205,37 @@ Other admin f-strings (templates page 141 lines, users page 76 lines, dashboard 
 - Admin reports a false positive that slipped through all 10 layers → identify which layer should have caught it, add patterns/anchors per [docs/JOBS_CLASSIFICATION.md](./JOBS_CLASSIFICATION.md) "Adding a new defense layer" section
 - Drift detection (Layer 9 auto-disable or Layer 10 audit mismatch) reveals a systematic gap → may revisit Wave 5 #19 (two-stage classifier)
 
-**Outstanding (verified live state 2026-04-17 session 20 close):**
+**Outstanding (verified live state 2026-04-17 session 22 close):**
 
 1. Submit `sitemap_index.xml` to Google Search Console (manual one-time admin task)
 2. Set `INDEXNOW_KEY` in `.env` (currently empty — IndexNow notifications fail silently; minor SEO loss, not a bug)
-3. **Editorial uplift — burn-down continues.** Sessions 18+19+20 have stamped **169 rows** at `prompt_version 2026-04-16.2 / sonnet-4.6` (151 draft + 18 propagated to published). Remaining work at session 20 close:
-   - **521 rows with no summary** (355 draft + 166 published) — pure-null, untouched by Flash or Opus
-   - **105 rows with stale prompt_version summaries** (68 opus-4.6@old in draft + 32 in published + 5 test-propagation)
-   - **Total refreshable: 626 rows** → plan 6-10 more chunks of 70-100 each
+3. **Editorial uplift — burn-down continues.** Sessions 18+19+20+22 have stamped **239 rows** at `prompt_version 2026-04-16.2 / sonnet-4.6` (221 draft + ~18 propagated to published). Remaining work at session 22 close:
+   - **464 rows with no summary** (298 draft + 166 published) — pure-null, untouched by Flash or Opus
+   - **92 rows with stale prompt_version summaries** (55 opus-4.6@old in draft + 32 in published + 5 test-propagation)
+   - **Total refreshable: 556 rows** → plan 5-8 more chunks of 70-100 each
 
    $0 API spend (Claude Max in VS Code), only paste-cycle operator time. Goal: burn down to zero, then optionally sweep published-side prior-Opus rows for consistency.
 
 **Recently dropped (verified done):** Gemini API key (rotated prior session); `/summarize-jobs --status draft` full seed coverage (drafts all have *a* summary — now in prompt-version-refresh mode, not seed mode).
 
-### Next-session resume prompt (session 20 handoff)
+### Next-session resume prompt (session 22 handoff)
 
 Paste the following prompt verbatim into a fresh session to pick up a new chunk:
 
 ```text
 Continue the legacy-summary refresh on the AI Roadmap Platform VPS using the
-/summarize-jobs skill. Session 20 stamped 70 rows (all clean, +70 net
+/summarize-jobs skill. Session 22 stamped 70 rows (all clean, +70 net
 sonnet-4.6 stamps in draft pool). This session: run another 70-100 row chunk.
 
 CURRENT STATE AT SESSION START
 Draft-pool model distribution:
-  null (no summary)      : 355
-  opus-4.6 @ 2026-04-16.2: 80    (current version — SKIPPED by export filter)
-  opus-4.6 @ 2026-04-16.1: 68    (stale — WILL be re-exported)
-  sonnet-4.6 @ current   : 151   (SKIPPED by export filter)
+  null (no summary)      : 298
+  opus-4.6 @ 2026-04-16.2: 79    (current version — SKIPPED by export filter)
+  opus-4.6 @ 2026-04-16.1: 55    (stale — WILL be re-exported)
+  sonnet-4.6 @ current   : 221   (SKIPPED by export filter)
   test-propagation       : 5
 
-EXPORT-FILTER BEHAVIOR (verified session 20)
+EXPORT-FILTER BEHAVIOR (verified sessions 20 + 22)
 scripts/export_jobs_for_summary.py uses _needs_regen() which SKIPS rows whose
 summary._meta.prompt_version == current (2026-04-16.2). So rows already at
 current prompt_version + sonnet-4.6 will NOT be re-served. Each export of
@@ -233,14 +283,14 @@ QUALITY RULES
   Enforcement) — the /summarize-jobs skill template lives in the repo:
     ssh a11yos-vps "docker compose -f /srv/roadmap/docker-compose.yml exec -T backend cat /app/app/prompts/jobs_summary_claude.txt"
 
-KNOWN WORKAROUNDS (confirmed session 20)
+KNOWN WORKAROUNDS (confirmed sessions 20 + 22)
 - Heredocs break on apostrophes in JSON (e.g. "Bachelor's") — always use the
   `cat local | ssh VPS "docker compose exec -T backend ..."` one-chain pattern
 - Windows stdout codec is cp1252 — always write JSON to a file with
   encoding="utf-8" or reconfigure sys.stdout
 - Container `/tmp` ≠ host `/tmp` — DO NOT stage files between them, pipe stdin
-- Use session-prefixed artifact names (e.g. s21_r1.py) to avoid collision
-  with C:/tmp files left over from sessions 18/19/20
+- Use session-prefixed artifact names (e.g. s22_r1.py) to avoid collision
+  with C:/tmp files left over from sessions 18/19/20/21
 
 SETUP CONTEXT
 - Repo root: e:\code\AIExpert (Windows)

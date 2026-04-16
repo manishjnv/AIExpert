@@ -188,8 +188,36 @@
   .week-details > summary::-webkit-details-marker { display: none; }
   .week-details > summary .week-header { margin-bottom: 0; }
   .week-details[open] > summary { padding-bottom: 4px; }
-  .week-details[open] > summary .wk-toggle { transform: rotate(180deg); }
-  .wk-toggle { margin-left: auto; color: var(--ink-soft); font-size: 14px; transition: transform 0.2s; }
+  .week-details[open] > summary .wk-toggle::after { transform: rotate(180deg); }
+  .wk-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 11px;
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    background: transparent;
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .wk-toggle::after { content: '▾'; font-size: 13px; line-height: 1; display: inline-block; transition: transform 0.2s ease; }
+  .week-details > summary:hover .wk-toggle,
+  .week-details > summary:focus-visible .wk-toggle { border-color: var(--accent); color: var(--accent); }
+  .wk-toggle .label-open { display: none; }
+  .week-details[open] > summary .wk-toggle .label-closed { display: none; }
+  .week-details[open] > summary .wk-toggle .label-open { display: inline; }
+  @media (max-width: 480px) {
+    .wk-toggle { padding: 5px 9px; }
+    .wk-toggle .label-closed,
+    .week-details[open] > summary .wk-toggle .label-open { display: none; }
+  }
   .wk-pill { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 12px; flex-shrink: 0; }
   .wk-pill-done { background: rgba(109,181,133,0.18); color: #6db585; border: 1px solid rgba(109,181,133,0.35); }
   .wk-pill-active { background: rgba(232,168,73,0.15); color: var(--accent); border: 1px solid rgba(232,168,73,0.35); }
@@ -901,9 +929,7 @@ function render() {
         }
       }
 
-      // Collapse logic: completed weeks default collapsed (save scroll),
-      // in-progress and future weeks default open so current focus is visible.
-      const collapsedByDefault = isComplete && wTotal > 0;
+      const collapsedByDefault = true;
       const pctW = wTotal ? Math.round((wDone / wTotal) * 100) : 0;
       const statusPill = isComplete && wTotal > 0
         ? '<span class="wk-pill wk-pill-done">✓ Complete</span>'
@@ -919,7 +945,7 @@ function render() {
             <div class="week-title">${w.t.replace(/★/g, '<span style="color:var(--accent);font-size:14px;vertical-align:super;margin-left:4px">★</span>')}${newBadge}</div>
             ${statusPill}
             <span class="week-hours">⏱ <strong>${w.hours || 16}</strong> hrs</span>
-            <span class="wk-toggle" aria-hidden="true">▾</span>
+            <span class="wk-toggle" aria-hidden="true"><span class="label-closed">Expand</span><span class="label-open">Collapse</span></span>
           </div>
         </summary>
         <div class="week-body">
