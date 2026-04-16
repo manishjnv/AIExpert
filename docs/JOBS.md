@@ -365,20 +365,65 @@ Computed on-demand (cached 1h per `(user_id, job_id)`).
 `/admin/jobs/sources` — one row per source.
 - Toggle enabled/disabled.
 - Per-source stats: scraped today, published, rejected, rejection rate (high rate = source deteriorating).
+- **Publish-rate 45d** column: `published / (published + rejected)` over the last 45 days. Green ≥50%, amber 20–50%, red <20%. Hover shows top reject reasons with counts.
 - Bulk-approve toggle (Tier-1 only).
+- **On-demand probe:** `POST /admin/jobs/api/sources/probe` HEAD-checks every configured board slug. Sources failing 3 consecutive probes auto-disable.
 
-### 10.7 Escalation
+### 10.7 Preview before publish
 
-- Source returns 0 jobs 2 days running → email admin ("Greenhouse fetch failed").
-- Rejection rate > 50% for a source over 7 days → flag source as degraded.
+Every row in the admin queue has a clickable title + `Preview ↗` button. Opens `/jobs/<slug>?preview=1` in a new tab. Preview is admin-only (non-admins and anon see 404), carries `noindex`, and shows an amber `"⚠ ADMIN PREVIEW · status=draft"` banner.
+
+### 10.8 Summary cards
+
+Published jobs render a **structured summary card** (headline chips, compensation snapshot, "What you'll own", "Must-haves", "Benefits highlights", "Watch-outs") above the collapsible raw JD.
+
+**Two quality tiers:**
+
+- **Flash-generated** (automatic at ingest) — adequate for review but often too verbose.
+- **Opus-generated** (via `/summarize-jobs` in Claude Code) — editorial-tier quality, matching the design target.
+
+**To Opus-upgrade a published job's summary:**
+
+```bash
+/summarize-jobs --id <JOB_ID>         # single job
+/summarize-jobs --status published    # all published, batched in 10s
+/summarize-jobs --dry-run --limit 5   # preview 5, then inspect at /admin/jobs before bulk run
+```
+
+Each summary carries `_meta.prompt_version`; when the prompt is bumped, `scripts/export_jobs_for_summary.py` auto-surfaces stale rows in the next `/summarize-jobs` run.
+
+### 10.9 Expiry mechanisms
+
+Three auto-expire triggers protect public UX without admin action:
+
+| Trigger | How detected | Latency | `_meta.expired_reason` |
+|---|---|---|---|
+| Role filled (ATS removes listing) | `missing_streak ≥ 2` in daily ingest | ≤ 48h | `source_removed` |
+| Posting past `posted_on + 45d` | `valid_through < today` in daily ingest | < 24h | `date_based` |
+| Source board entirely down | `probe.py` auto-disables after 3 fails | 3 days | (source disabled, no job-level flip) |
+| Old expired posts | HTTP 410 after 90 days | 90d | — |
+
+**Admin visibility:** Expired tab has a sub-filter "Auto-expired (source removed)" vs "Date-based (45d)". Banner shows `auto-expired 24h: N` chip when any flip occurred in the last run.
+
+### 10.10 Rejection feedback loop
+
+Rejections aren't wasted. Every daily enrichment run injects the last 45 days of reject_reason counts from the same source into the prompt: *"Past reviewers rejected 12 of the last batch. Top reasons: off_topic(8), low_quality(4)."* The extractor adapts without manual prompt tuning.
+
+**How to maximise this:** always pick the correct reject reason (never "other" unless truly unclassifiable). The feedback loop only fires if `reject_reason IS NOT NULL` in the last 45 days for that source.
+
+### 10.11 Escalation
+
+- Source returns 0 jobs 2 days running → auto-expire logic does not fire for that source (treated as outage, not mass-fill). Admin should investigate if a board was replaced.
+- **Probe auto-disable** after 3 consecutive failures (see §10.6).
 - Any single admin action that affects > 20 jobs requires re-confirmation.
 
-### 10.8 Never do
+### 10.12 Never do
 
 - Publish a job you haven't read the JD for.
 - Approve a Tier-2 job without checking the company's own website.
 - Edit `posted_on` (it's the source's truth, not ours).
 - Bulk-reject without picking reasons (breaks the extractor feedback loop).
+- Manually disable a board the probe auto-disabled without first verifying the slug is truly dead (the probe re-enables it automatically on first OK).
 
 ---
 

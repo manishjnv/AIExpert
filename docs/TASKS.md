@@ -366,6 +366,57 @@ When a task is completed, mark it with ✅ and add the commit SHA that shipped i
 
 **Update JOBS.md §7.6** when merged to document the new auto-expiry mechanism alongside the date-based one.
 
+**Status:** All of Phase 13 shipped in session 13 (commits `cd82152`–`5d7ed0f`). JOBS.md §7.6 updated. §13.4 (apply-URL health check) remains deferred.
+
+---
+
+## Phase 14 — Jobs cost optimization + remaining quality work (target: 1 session)
+
+**Goal:** Reduce monthly enrichment cost from ~$18/mo to ~$3/mo while improving summary quality on published jobs. Addresses remaining items from the session-13 improvement audit.
+
+### 14.1 Gemini prompt caching (biggest single savings)
+
+- [ ] Enable Gemini explicit prompt caching on the static prefix (schema + rules + enums). The prefix is identical across all jobs; only `{{jd_text}}`, `{{company}}`, etc. vary. Cache saves ~60% of input tokens.
+- [ ] Verify cache hit rate via provider response headers after one daily ingest run.
+- **AC:** Gemini dashboard shows ≥80% cache hit rate on input tokens across a 24h ingest cycle.
+
+### 14.2 Pre-filter non-AI titles before enrichment
+
+- [ ] In `jobs_ingest._stage_one()`, before calling `enrich_job()`, check `raw["title_raw"]` against a short deny-list of known non-AI roles (`Sales Manager`, `Recruiter`, `Office Manager`, `Executive Assistant`, `Legal Counsel`, etc.).
+- [ ] If matched, stage the row with `admin_notes = "auto-skipped: non-AI title"` and skip enrichment. Admin can still manually trigger enrichment + publish from the queue.
+- **AC:** At least 20% fewer Gemini calls on boards like `phonepe` (126 roles) and `notion` (157 roles) where most listings are non-AI.
+
+### 14.3 Tier enrichment — lightweight for Tier-2
+
+- [ ] For Tier-2 (aggregated) sources, enrichment produces only `tldr + must_have_skills + designation + location` (no `summary`, no `nice_to_have`, no `roadmap_modules_matched`). Full enrichment deferred until admin publishes.
+- [ ] On publish, if `data.summary` is missing, trigger a one-shot full enrichment call (or prompt admin to run `/summarize-jobs --id N`).
+- **AC:** Enrichment call token count drops ~40% for Tier-2 rows.
+
+### 14.4 Cap JD at 4000 chars
+
+- [ ] Change `JD_MAX_CHARS` in `jobs_enrich.py` from 6000 to 4000. Session 13 export script already uses 4000; align the Flash enrichment to match.
+- **AC:** Per-job input token count drops ~30% with no measurable quality loss (median JD after strip is ~3500 chars).
+
+### 14.5 Drop Flash `summary` generation, rely on Opus via Max
+
+- [ ] Remove `summary` from the Gemini Flash extraction prompt (`jobs_extract.txt`). Flash still produces enum fields, skills, tldr, description_html.
+- [ ] Summary comes exclusively via `/summarize-jobs` (Opus 4.6 on Max plan) or `backfill_jobs_summary.py` (Gemini fallback for bulk).
+- [ ] This eliminates ~200 output tokens per Flash call and lets the reader see only Opus-quality cards on published jobs.
+- **AC:** Flash output shrinks ~25%. All published jobs have Opus-grade summary before going live.
+
+### 14.6 Re-enrich stale `roadmap_modules_matched`
+
+- [ ] Session 13 fixed `_get_module_slugs()` (was returning []). Historical enrichments all have `roadmap_modules_matched: []`. Build a one-shot backfill that re-runs only the module-matching logic (not full enrichment) on existing rows.
+- [ ] OR: accept the data stays stale on drafts and only re-enrich on publish.
+- **AC:** `roadmap_modules_matched` is populated on all published jobs; match-% works correctly for logged-in users.
+
+### 14.7 Cross-source JD-hash dedup cache (nice-to-have)
+
+- [ ] Near-identical JDs (e.g. fellowship series, duplicate reposts across boards) currently enrich independently. Add an in-memory LRU or DB table `enrichment_cache(jd_hash → enriched_json)` keyed on `compute_hash(raw)`. On cache hit, skip Gemini call entirely.
+- **AC:** ~10-20% fewer enrichment calls on heavy-overlap boards.
+
+**Estimated cost after 14.1–14.5:** ~$3/mo (from ~$18/mo). Summary quality decoupled from cost — always Opus-tier on published, always free via Max plan.
+
 ---
 
 ## Task status log
