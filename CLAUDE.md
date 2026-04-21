@@ -168,14 +168,24 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-17 (session 24 — roadmap resources + checkbox UX)
-**Last session summary (session 24):** Two small UX fixes on the public roadmap. (1) Widened video-vs-reference split so the 2-column TOP RESOURCES layout fires for more weeks: `isVid` now honours an explicit `type: 'video' | 'doc' | 'reference'` field on resource objects and URL-sniffs an expanded host list (udemy, linkedin.com/learning, educative, pluralsight, edX, MIT OCW, O'Reilly videos, Maven) in addition to the prior set. (2) Fixed "checking a checklist item collapses the week and jumps the page to top": the click handler now snapshots open-week ids + `window.scrollY` before calling `render()` and restores both after.
+**Last session date:** 2026-04-21 (session 25 — SEO-04 SSR scaffold)
+**Last session summary (session 25):** Shipped SEO-04 (✅) — the single highest-ROI SEO task. Crawlers (Googlebot / Bingbot / Twitter / LinkedIn / Slack preview bots) + no-JS users now see a 9.8 KB static scaffold of the 24-week roadmap in the initial HTML, not a JS-rendered shell. Unblocks SEO-05 (Course + ItemList + FAQPage JSON-LD anchoring, next session).
 
-- **Frontend (single file, per rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [line 905](frontend/index.html#L905) added `wEl.dataset.week = w.n` so weeks are re-findable after re-render, (2) [lines 910-914](frontend/index.html#L910-L914) `isVid` became a multi-line function with type-field short-circuit + expanded regex, (3) [lines 1012-1022](frontend/index.html#L1012-L1022) click handler captures `.week-details[open]` + scrollY pre-render and restores post-render.
-- **Deploy:** frontend is volume-mounted (`./frontend:/usr/share/nginx/html:ro`); `git pull` on VPS is sufficient — no rebuild, no restart.
-- **No data migration:** existing resource objects without a `type` field keep working via the URL regex; curation can *opt in* to explicit tagging.
+- **Generator:** new [scripts/generate_roadmap_scaffold.py](scripts/generate_roadmap_scaffold.py) — reads the inline `const DATA = [...]` source-of-truth, normalizes JS-object-literal → JSON (bracket-balanced extraction, unquoted-key quoting, trailing-comma strip), emits 1 intro + 6 month headers + 24 `<section id="week-N"><h2>Week N: topic</h2><p>deliv</p><ul>3-5 titles</ul></section>` blocks between `<!-- SCAFFOLD:START --> / <!-- SCAFFOLD:END -->` marker comments inside `<main id="content">`. Idempotent; `--check` flag for CI drift.
+- **Frontend (single file, rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [lines 24-27](frontend/index.html#L24-L27) anti-flash `<style>html.has-js [data-roadmap-scaffold]{display:none}</style>` + class-flip `<script>` in `<head>` (hides scaffold before first paint on JS clients, zero flash); (2) generator injected scaffold block at [lines 503-736](frontend/index.html#L503-L736) inside `<main id="content">`; (3) [line 2230](frontend/index.html#L2230) explicit `document.querySelectorAll('[data-roadmap-scaffold]').forEach(el => el.remove())` before the first `render()` (defense in depth — `render()` also clears `#content.innerHTML`).
+- **Constraints honored:** zero http(s) hrefs in the scaffold block (resources stay client-side, progressive-enhancement contract preserved); `file:///e:/code/AIExpert/frontend/index.html` renders identically from disk (rule 8); no backend changes; no new runtime deps (stdlib-only Python script).
+- **Acceptance verified locally:** `grep -c "<h2>Week"` = 24, `wc -c` = 141,700 (≥ 40,000), 24 scaffold titles content-match 24 interactive DATA titles, 0 http(s) refs in scaffold, generator `--check` passes after regenerate.
+- **Deploy:** volume-mounted — `ssh a11yos-vps "cd /srv/roadmap && git pull"` only, no rebuild/restart. NOT YET COMMITTED — pending user approval.
+- **Docs updated:** [docs/SEO.md](docs/SEO.md) §0.2 (SEO-04 ⬜ → ✅) + Change log entry appended.
 
-**Tests passing:** 432 (unchanged — frontend UX, no backend test changes).
+**Tests passing:** 432 (unchanged — frontend scaffold only, no backend test changes).
 
-**Next action:** Editorial-summary burn-down continues — after session 22's +70 chunk (draft sonnet-4.6 now 221), **~464 rows with no summary** (298 draft + 166 published) + **~92 stale** remain; resume prompt lives in `docs/HANDOFF.md` "Next-session resume prompt (session 22 handoff)". Tiny chores: submit sitemap to GSC, set `INDEXNOW_KEY` in `.env`.
+**Next action:** SEO-05 — `Course` + `ItemList` + `FAQPage` JSON-LD on `/`, now that there's crawlable content for the schema to describe. Editorial-summary burn-down remains available as a data-plane chore (resume prompt in [docs/HANDOFF.md](docs/HANDOFF.md)). Unblocked P0 parallels: SEO-06 (Article JSON-LD on blog posts), SEO-07 (activate IndexNow).
 **Open questions for the user:** None.
+
+**Agent-utilization footer:**
+
+- Opus: Phase 0 reads, SEO-04 data-flow analysis, JS-literal → JSON normalizer design, scaffold markup design, all edits, acceptance verification, docs. Scope = ~130 lines across 3 files (under the self-execute threshold; frontend/index.html was in hot cache post-Phase-0).
+- Sonnet: n/a — task was Opus-only per `docs/SEO.md` §0.3 (SEO-04 marked Opus-only; judgment + content).
+- Haiku: n/a — no bulk sweeps or multi-file grep needed this session.
+- codex:rescue: n/a — frontend scaffold, not security/auth/classifier-adjacent.
