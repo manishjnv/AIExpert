@@ -126,11 +126,12 @@ The generic playbook — routing table, Phase 0–6 flow, hard rules — lives i
 
 ### Phase 0 reads (exact paths for this repo)
 
-In the Phase 0 parallel-tool-call burst, read all four in one message:
+In the Phase 0 parallel-tool-call burst, read all five in one message:
 
 - `CLAUDE.md` (this file)
 - `docs/HANDOFF.md`
 - `docs/RCA.md` — first ~150 lines (recent entries + the "Patterns to watch for" table at the bottom)
+- `docs/SEO.md` — §0 only, first ~100 lines (trigger conditions + task status board + next action). Load deeper sections on-demand when §0.1 trigger conditions apply to the current session's work.
 - `C:\Users\manis\.claude\projects\e--code-AIExpert\memory\MEMORY.md`
 
 ### Load-bearing paths (require Opus diff review + worktree isolation)
@@ -154,6 +155,7 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 - **Any new logger/httpx caller** → `feedback_redact_api_keys.md` (install `_redacting_filter` at entrypoints)
 - **Deployments** → `feedback_deploy_rebuild.md` (`restart` doesn't pick up code; build + force-recreate)
 - **Standalone scripts** → `feedback_scripts_need_init_db.md` (call `init_db()` / `close_db()` explicitly)
+- **SEO work** (any `<head>` / sitemap / robots / JSON-LD / nginx SEO directive / new public route / blog publish / OG image) → `reference_seo_plan.md` → full plan at `docs/SEO.md`. Any task in the `SEO-00..SEO-26` set governed by that doc. Do not free-style schema or ship ad-hoc SEO changes — follow the sequenced tasks.
 
 ### Phase 6 exit — this repo specifically
 
