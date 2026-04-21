@@ -168,24 +168,27 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-21 (session 25 — SEO-04 SSR scaffold)
-**Last session summary (session 25):** Shipped SEO-04 (✅) — the single highest-ROI SEO task. Crawlers (Googlebot / Bingbot / Twitter / LinkedIn / Slack preview bots) + no-JS users now see a 9.8 KB static scaffold of the 24-week roadmap in the initial HTML, not a JS-rendered shell. Unblocks SEO-05 (Course + ItemList + FAQPage JSON-LD anchoring, next session).
+**Last session date:** 2026-04-21 (session 26 — SEO-05 Course + ItemList + FAQPage JSON-LD)
+**Last session summary (session 26):** Shipped SEO-05 (✅) — single biggest differentiation lever vs roadmap.sh, who ship zero Course schema. Three separate `<script type="application/ld+json">` blocks now emitted into `<head>` of [frontend/index.html](frontend/index.html) at [lines 364-939](frontend/index.html#L364-L939) between `<!-- JSONLD:START --> / <!-- JSONLD:END -->` markers.
 
-- **Generator:** new [scripts/generate_roadmap_scaffold.py](scripts/generate_roadmap_scaffold.py) — reads the inline `const DATA = [...]` source-of-truth, normalizes JS-object-literal → JSON (bracket-balanced extraction, unquoted-key quoting, trailing-comma strip), emits 1 intro + 6 month headers + 24 `<section id="week-N"><h2>Week N: topic</h2><p>deliv</p><ul>3-5 titles</ul></section>` blocks between `<!-- SCAFFOLD:START --> / <!-- SCAFFOLD:END -->` marker comments inside `<main id="content">`. Idempotent; `--check` flag for CI drift.
-- **Frontend (single file, rule 8):** 3 edits in [frontend/index.html](frontend/index.html) — (1) [lines 24-27](frontend/index.html#L24-L27) anti-flash `<style>html.has-js [data-roadmap-scaffold]{display:none}</style>` + class-flip `<script>` in `<head>` (hides scaffold before first paint on JS clients, zero flash); (2) generator injected scaffold block at [lines 503-736](frontend/index.html#L503-L736) inside `<main id="content">`; (3) [line 2230](frontend/index.html#L2230) explicit `document.querySelectorAll('[data-roadmap-scaffold]').forEach(el => el.remove())` before the first `render()` (defense in depth — `render()` also clears `#content.innerHTML`).
-- **Constraints honored:** zero http(s) hrefs in the scaffold block (resources stay client-side, progressive-enhancement contract preserved); `file:///e:/code/AIExpert/frontend/index.html` renders identically from disk (rule 8); no backend changes; no new runtime deps (stdlib-only Python script).
-- **Acceptance verified locally:** `grep -c "<h2>Week"` = 24, `wc -c` = 141,700 (≥ 40,000), 24 scaffold titles content-match 24 interactive DATA titles, 0 http(s) refs in scaffold, generator `--check` passes after regenerate.
-- **Deploy:** volume-mounted — `ssh a11yos-vps "cd /srv/roadmap && git pull"` only, no rebuild/restart. NOT YET COMMITTED — pending user approval.
-- **Docs updated:** [docs/SEO.md](docs/SEO.md) §0.2 (SEO-04 ⬜ → ✅) + Change log entry appended.
+- **Course block** — full Coursera-grade property set: `hasCourseInstance.courseWorkload = "PT200H"` (Google 2024-required), 24 `syllabusSections` (each `timeRequired="PT8H"`) harvested from the same DATA source of truth SEO-04 uses, 24 `hasPart` entries pointing to `#week-N` anchors, 8 `teaches` outcomes (all ≤120 chars) spanning Python/math → classical ML → PyTorch → LLMs → MLOps → responsible AI → capstone, `coursePrerequisites` = 72-char concrete sentence, `offers[0]={price:"0",priceCurrency:"USD",category:"Free"}`, `educationalLevel="Beginner to Intermediate"`, `provider` = AutomateEdge Organization with logo.
+- **ItemList block** — 24 `ListItem` entries pointing to `https://automateedge.cloud/#week-N` crawl targets.
+- **FAQPage block** — 12 Q&A pairs (88-98 words each, inside 40-120 target for rich-snippet eligibility) covering the SERP-recon queries: how long, is it free, CS degree, differentiation vs roadmap.sh/Coursera, currency, certificates, falling behind, math, GPU, prior Python, zero-ML start, job outcomes.
+- **Deferred to SEO-23** per plan: `aggregateRating`, `review[]`, `totalHistoricalEnrollment` — gated on ≥5 genuine testimonials (Google penalizes fabricated review schema).
+- **Generator:** extended [scripts/generate_roadmap_scaffold.py](scripts/generate_roadmap_scaffold.py) in place (not a new file per task spec). Added `_build_course`, `_build_itemlist`, `_build_faqpage`, `_jsonld_safe` (escapes `</` → `<\/` so no value can prematurely terminate `<script>`), and `_validate_jsonld` which raises at generation time if: syllabusSections/hasPart/ItemList count ≠ 24, any `teaches` string >120 chars, `coursePrerequisites` >200 chars, any FAQ answer outside 40-120 words. `_inject_jsonld` uses `html.replace("</head>", ..., 1)` so only the real `</head>` at line 940 is touched — the second `</head>` at ~line 1402 inside the inline PDF-template JS string stays intact.
+- **Rule 8 preserved:** JSON-LD `<script type="application/ld+json">` is inert for rendering and carries no `href`/`src` attributes, so `file:///e:/code/AIExpert/frontend/index.html` renders identically from disk.
+- **Acceptance verified locally:** 3 JSON-LD `<script>` elements (all in `<head>`), 24 syllabusSections, 24 ItemList items, 24 hasPart, `--check` idempotent, file size 163 KB (+21 KB vs post-SEO-04). **External validation pending user run before full-green:** Google Rich Results Test (<https://search.google.com/test/rich-results>) and Schema Markup Validator (<https://validator.schema.org/>) must report zero errors + zero warnings on all three block types against the deployed URL; Lighthouse Performance spot-check for ≤3-point regression vs post-SEO-04 baseline.
+- **Deploy:** volume-mounted — `ssh a11yos-vps "cd /srv/roadmap && git pull"` only, no rebuild. NOT YET COMMITTED — pending user approval.
+- **Docs updated:** [docs/SEO.md](docs/SEO.md) §0.2 (SEO-05 ⬜ → ✅) + Change log entry appended.
 
-**Tests passing:** 432 (unchanged — frontend scaffold only, no backend test changes).
+**Tests passing:** 432 (unchanged — frontend head/generator only, no backend test changes).
 
-**Next action:** SEO-05 — `Course` + `ItemList` + `FAQPage` JSON-LD on `/`, now that there's crawlable content for the schema to describe. Editorial-summary burn-down remains available as a data-plane chore (resume prompt in [docs/HANDOFF.md](docs/HANDOFF.md)). Unblocked P0 parallels: SEO-06 (Article JSON-LD on blog posts), SEO-07 (activate IndexNow).
+**Next action:** external validation (Rich Results Test + Schema Markup Validator) on the live URL after deploy. Parallel unblocked P0: SEO-06 (Article JSON-LD on blog posts), SEO-07 (activate IndexNow). Editorial-summary burn-down remains available as a data-plane chore (resume prompt in [docs/HANDOFF.md](docs/HANDOFF.md)).
 **Open questions for the user:** None.
 
 **Agent-utilization footer:**
 
-- Opus: Phase 0 reads, SEO-04 data-flow analysis, JS-literal → JSON normalizer design, scaffold markup design, all edits, acceptance verification, docs. Scope = ~130 lines across 3 files (under the self-execute threshold; frontend/index.html was in hot cache post-Phase-0).
-- Sonnet: n/a — task was Opus-only per `docs/SEO.md` §0.3 (SEO-04 marked Opus-only; judgment + content).
-- Haiku: n/a — no bulk sweeps or multi-file grep needed this session.
-- codex:rescue: n/a — frontend scaffold, not security/auth/classifier-adjacent.
+- Opus: Phase 0 reads, §3.5/§SEO-05 spec ingest, `teaches`/FAQ content authoring (12 Q&As at 88-98 words each, validator-enforced), generator extension (~200 lines in scripts/generate_roadmap_scaffold.py), acceptance verification, docs. Scope = ~250 lines across 3 files (Opus-only per `docs/SEO.md` §0.3 — SEO-05 marked Opus-only due to schema/content judgment).
+- Sonnet: n/a — task was Opus-only per plan.
+- Haiku: n/a — no bulk sweeps or multi-file grep needed.
+- codex:rescue: n/a — frontend schema content, not security/auth/classifier-adjacent.
