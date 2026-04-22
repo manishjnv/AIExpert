@@ -1,0 +1,90 @@
+{# Per-post blog template — migrated from f-string in routers/blog.py to
+   Jinja2 to prevent RCA-027 (literal { } in code samples / JSON / JS
+   crashing module import). Jinja2 inverts brace semantics: { is literal
+   by default, only {{ var }} is interpolation. See docs/RCA.md #027.
+
+   Context vars passed by _render_post():
+     title, description, url, og_image, published — escaped.
+     blog_css, body_html, sidebar_html, post_nav_html — pre-built HTML, raw.
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} — AutomateEdge</title>
+  <meta name="description" content="{{ description }}">
+  <meta name="author" content="Manish Kumar">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ title }}">
+  <meta property="og:description" content="{{ description }}">
+  <meta property="og:url" content="{{ url }}">
+  <meta property="og:site_name" content="AutomateEdge">
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="article:published_time" content="{{ published }}T00:00:00Z">
+  <meta property="article:author" content="Manish Kumar">
+  <meta property="article:section" content="Build in Public">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ title }}">
+  <meta name="twitter:description" content="{{ description }}">
+  <meta name="twitter:image" content="{{ og_image }}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/nav.css">
+  {{ blog_css | safe }}
+</head>
+<body>
+  <main>
+    <article class="post-article">
+      <nav class="post-breadcrumb" aria-label="Breadcrumb">
+        <a href="/blog">← Blog</a>
+        <span class="sep">·</span>
+        <span class="current">{{ title }}</span>
+      </nav>
+      <div class="meta-line">Published {{ published }} · Manish Kumar · Build in Public</div>
+      {{ body_html | safe }}
+      {{ post_nav_html | safe }}
+    </article>
+    <aside class="post-sidebar" aria-label="Sidebar">
+      {{ sidebar_html | safe }}
+    </aside>
+  </main>
+  <script src="/nav.js" defer></script>
+  <script>
+    // Auto-build Contents TOC from the article's H2s, and scroll-spy to
+    // highlight the active section in the sidebar.
+    (function() {
+      var tocList = document.getElementById('sbToc');
+      if (!tocList) return;
+      var headings = document.querySelectorAll('.post-article h2');
+      if (!headings.length) { tocList.parentElement.style.display = 'none'; return; }
+      headings.forEach(function(h, i) {
+        if (!h.id) h.id = 'section-' + i;
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = h.textContent;
+        li.appendChild(a); tocList.appendChild(li);
+      });
+      // Scroll spy — mark closest heading to top as .active
+      var tocLinks = tocList.querySelectorAll('a');
+      function onScroll() {
+        var y = window.scrollY + 120;
+        var current = null;
+        headings.forEach(function(h) { if (h.offsetTop <= y) current = h.id; });
+        tocLinks.forEach(function(a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        });
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+  </script>
+</body>
+</html>

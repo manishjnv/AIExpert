@@ -9,13 +9,31 @@ this out to a generic renderer.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import get_settings
 
 
 router = APIRouter()
+
+
+# ---- Jinja2 template env (RCA-027 prevention) ---------------------------------
+#
+# Migrated _render_post from a triple-quoted f-string to a Jinja2 template after
+# RCA-027 (literal { } in JSON / code samples crashed module import in admin.py
+# the same way). Jinja2 inverts brace semantics: { is literal by default, only
+# {{ var }} interpolates — so future schema/code/JSON additions can no longer
+# crash the import. See backend/app/templates/blog/post.html.
+
+_BLOG_TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
+_blog_template_env = Environment(
+    loader=FileSystemLoader(str(_BLOG_TEMPLATE_DIR)),
+    autoescape=select_autoescape(["html"]),
+)
 
 
 POST_01_TITLE = "Building AutomateEdge Solo — A Free, AI-Curated Learning Platform"
@@ -412,87 +430,17 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
     og_image = f"{base}/assets/og-default.png"
     post_nav_html = _render_post_nav(slug, base)
     sidebar_html = _render_post_sidebar(slug, title, url, base)
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title} — AutomateEdge</title>
-  <meta name="description" content="{description}">
-  <meta name="author" content="Manish Kumar">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="article">
-  <meta property="og:title" content="{title}">
-  <meta property="og:description" content="{description}">
-  <meta property="og:url" content="{url}">
-  <meta property="og:site_name" content="AutomateEdge">
-  <meta property="og:image" content="{og_image}">
-  <meta property="article:published_time" content="{published}T00:00:00Z">
-  <meta property="article:author" content="Manish Kumar">
-  <meta property="article:section" content="Build in Public">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{title}">
-  <meta name="twitter:description" content="{description}">
-  <meta name="twitter:image" content="{og_image}">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/nav.css">
-  {_BLOG_CSS}
-</head>
-<body>
-  <main>
-    <article class="post-article">
-      <nav class="post-breadcrumb" aria-label="Breadcrumb">
-        <a href="/blog">← Blog</a>
-        <span class="sep">·</span>
-        <span class="current">{title}</span>
-      </nav>
-      <div class="meta-line">Published {published} · Manish Kumar · Build in Public</div>
-      {body_html}
-      {post_nav_html}
-    </article>
-    <aside class="post-sidebar" aria-label="Sidebar">
-      {sidebar_html}
-    </aside>
-  </main>
-  <script src="/nav.js" defer></script>
-  <script>
-    // Auto-build Contents TOC from the article's H2s, and scroll-spy to
-    // highlight the active section in the sidebar.
-    (function() {{
-      var tocList = document.getElementById('sbToc');
-      if (!tocList) return;
-      var headings = document.querySelectorAll('.post-article h2');
-      if (!headings.length) {{ tocList.parentElement.style.display = 'none'; return; }}
-      headings.forEach(function(h, i) {{
-        if (!h.id) h.id = 'section-' + i;
-        var li = document.createElement('li');
-        var a = document.createElement('a');
-        a.href = '#' + h.id;
-        a.textContent = h.textContent;
-        li.appendChild(a); tocList.appendChild(li);
-      }});
-      // Scroll spy — mark closest heading to top as .active
-      var tocLinks = tocList.querySelectorAll('a');
-      function onScroll() {{
-        var y = window.scrollY + 120;
-        var current = null;
-        headings.forEach(function(h) {{ if (h.offsetTop <= y) current = h.id; }});
-        tocLinks.forEach(function(a) {{
-          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-        }});
-      }}
-      window.addEventListener('scroll', onScroll, {{ passive: true }});
-      onScroll();
-    }})();
-  </script>
-</body>
-</html>"""
+    return _blog_template_env.get_template("blog/post.html").render(
+        title=title,
+        description=description,
+        url=url,
+        og_image=og_image,
+        published=published,
+        blog_css=_BLOG_CSS,
+        body_html=body_html,
+        sidebar_html=sidebar_html,
+        post_nav_html=post_nav_html,
+    )
 
 
 def _render_post_sidebar(current_slug: str, current_title: str, current_url: str, base: str) -> str:
