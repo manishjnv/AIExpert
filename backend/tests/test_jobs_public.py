@@ -99,6 +99,38 @@ async def test_per_job_ssr_includes_jobposting_jsonld():
 
 
 @pytest.mark.asyncio
+async def test_per_job_ssr_includes_breadcrumblist_jsonld():
+    """SEO-08 — every published job page emits a BreadcrumbList JSON-LD
+    block matching the visual breadcrumb (Home → AI & ML Jobs → {title}).
+    The current page (last item) has no `item` URL per Google's spec."""
+    await _setup()
+    slug = await _seed()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get(f"/jobs/{slug}")
+        assert r.status_code == 200
+        body = r.text
+        # Page now carries TWO JSON-LD blocks: JobPosting + BreadcrumbList
+        blocks = re.findall(r'<script type="application/ld\+json">(.+?)</script>', body, re.S)
+        assert len(blocks) >= 2, f"expected ≥2 JSON-LD blocks, found {len(blocks)}"
+        parsed = [json.loads(b) for b in blocks]
+        bc = next((p for p in parsed if p.get("@type") == "BreadcrumbList"), None)
+        assert bc is not None, "BreadcrumbList JSON-LD missing"
+        assert bc["@context"] == "https://schema.org"
+        items = bc["itemListElement"]
+        assert len(items) == 3
+        assert items[0]["position"] == 1
+        assert items[0]["name"] == "Home"
+        assert items[0]["item"].endswith("/")
+        assert items[1]["position"] == 2
+        assert items[1]["name"] == "AI & ML Jobs"
+        assert items[1]["item"].endswith("/jobs")
+        assert items[2]["position"] == 3
+        assert items[2]["name"] == "Senior ML Engineer"
+        assert "item" not in items[2]
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_draft_job_404():
     await _setup()
     slug = await _seed(status="draft", slug="draft-only", external_id="d1")

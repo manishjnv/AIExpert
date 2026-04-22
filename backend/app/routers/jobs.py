@@ -566,6 +566,21 @@ async def job_detail(
         f'<a href="/login">Sign in</a> to see your match %.</p>' if modules else ""
     )
 
+    # BreadcrumbList JSON-LD (SEO-08). Mirrors the visual breadcrumb at line ~585
+    # ("AI & ML Jobs / {title}") with Home prepended per the schema spec. Built as
+    # a Python dict and serialized via json.dumps — same RCA-027-safe pattern as
+    # the JobPosting `ld` block above. The current page (last item) carries no
+    # `item` URL per Google's guideline.
+    breadcrumb_ld = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{base}/"},
+            {"@type": "ListItem", "position": 2, "name": "AI & ML Jobs", "item": f"{base}/jobs"},
+            {"@type": "ListItem", "position": 3, "name": job.title},
+        ],
+    }
+
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -578,6 +593,7 @@ async def job_detail(
 <meta property="og:type" content="article">
 <meta property="og:url" content="{esc(canonical)}">
 <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+<script type="application/ld+json">{json.dumps(breadcrumb_ld, ensure_ascii=False)}</script>
 {_BRAND_HEAD}
 {_BASE_CSS}
 </head><body>

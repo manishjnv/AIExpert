@@ -61,6 +61,22 @@
   }
   </script>
 
+  {# BreadcrumbList JSON-LD (SEO-08). Mirrors the visual breadcrumb at the
+     top of the article body: Home → Blog → {title}. The current page (last
+     item) carries no `item` URL per Google's spec — only the parent
+     trail items get URLs. #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+      {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://automateedge.cloud/blog"},
+      {"@type": "ListItem", "position": 3, "name": {{ title | tojson }}}
+    ]
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">

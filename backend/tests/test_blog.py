@@ -149,6 +149,12 @@ def test_blog_post_template_file_exists_and_uses_jinja2_syntax():
     assert "{{ title | tojson }}" in content
     assert "{{ author | tojson }}" in content
     assert "{{ description | tojson }}" in content
+    # SEO-08 — BreadcrumbList JSON-LD block present, current page (last
+    # item) has no `item` URL per Google's spec
+    assert '"@type": "BreadcrumbList"' in content
+    assert '"position": 1' in content
+    assert '"position": 2' in content
+    assert '"position": 3' in content
 
 
 # --- Article JSON-LD assertion tests (Commit B / SEO-06) ---------------------
@@ -167,6 +173,20 @@ def _extract_jsonld(html: str) -> dict:
     )
     assert m, "Article JSON-LD <script> block not found in rendered HTML"
     return json.loads(m.group(1))
+
+
+def _extract_all_jsonld(html: str) -> list[dict]:
+    """Pull EVERY JSON-LD block out of rendered HTML — pages can carry
+    multiple types (Article + BreadcrumbList in our case)."""
+    import json
+    import re
+    matches = re.findall(
+        r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>',
+        html,
+        re.DOTALL,
+    )
+    assert matches, "no JSON-LD <script> blocks found"
+    return [json.loads(m) for m in matches]
 
 
 @pytest.mark.asyncio
@@ -237,6 +257,39 @@ async def test_post_dynamic_article_json_ld_uses_payload_author(monkeypatch):
         assert data["description"] == "A description with a quote: \"foo\"."
         assert data["datePublished"] == "2026-05-01T00:00:00Z"
         assert data["dateModified"] == "2026-05-01T00:00:00Z"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_post_breadcrumb_list_json_ld_emitted(monkeypatch):
+    """SEO-08 — every blog post emits a BreadcrumbList JSON-LD block
+    matching the visual breadcrumb (Home → Blog → {title}). Last item
+    has no `item` URL per Google's spec."""
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/01")
+        assert r.status_code == 200
+        all_blocks = _extract_all_jsonld(r.text)
+        # Two blocks expected: Article + BreadcrumbList
+        types = [b.get("@type") for b in all_blocks]
+        assert "Article" in types
+        assert "BreadcrumbList" in types
+        bc = next(b for b in all_blocks if b["@type"] == "BreadcrumbList")
+        assert bc["@context"] == "https://schema.org"
+        items = bc["itemListElement"]
+        assert len(items) == 3
+        assert items[0] == {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"}
+        assert items[1] == {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://automateedge.cloud/blog"}
+        # Current page item: name only, no `item` URL (Google spec — last
+        # crumb is the page itself, doesn't link anywhere)
+        assert items[2]["@type"] == "ListItem"
+        assert items[2]["position"] == 3
+        assert items[2]["name"] == (
+            "Building AutomateEdge Solo — A Free, AI-Curated Learning Platform"
+        )
+        assert "item" not in items[2]
     await close_db()
 
 
