@@ -33,6 +33,34 @@
   <meta name="twitter:description" content="{{ description }}">
   <meta name="twitter:image" content="{{ og_image }}">
 
+  {# Article JSON-LD (SEO-06). Uses Jinja2's `tojson` filter on every value
+     so quotes / `</` / control chars are JSON-escaped — no value can break
+     the JSON or prematurely close the <script> tag.
+
+     dateModified falls back to datePublished: blog post payloads (both the
+     POST_01 constants and the dynamic JSON pipeline) don't track an
+     updated_at field today. TODO(SEO): when blog_publisher gains an
+     updated_at stamp, thread it through _render_post and replace the
+     fallback below. #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": {{ title | tojson }},
+    "datePublished": {{ (published ~ "T00:00:00Z") | tojson }},
+    "dateModified": {{ (published ~ "T00:00:00Z") | tojson }},
+    "author": {"@type": "Person", "name": {{ author | tojson }}},
+    "publisher": {
+      "@type": "Organization",
+      "name": "AutomateEdge",
+      "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+    },
+    "image": {{ og_image | tojson }},
+    "mainEntityOfPage": {{ url | tojson }},
+    "description": {{ description | tojson }}
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">

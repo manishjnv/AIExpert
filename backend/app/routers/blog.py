@@ -423,7 +423,14 @@ _BLOG_CSS = """
 """
 
 
-def _render_post(slug: str, title: str, description: str, body_html: str, published: str) -> str:
+def _render_post(
+    slug: str,
+    title: str,
+    description: str,
+    body_html: str,
+    published: str,
+    author: str = "Manish Kumar",
+) -> str:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
     url = f"{base}/blog/{slug}"
@@ -436,6 +443,7 @@ def _render_post(slug: str, title: str, description: str, body_html: str, publis
         url=url,
         og_image=og_image,
         published=published,
+        author=author,
         blog_css=_BLOG_CSS,
         body_html=body_html,
         sidebar_html=sidebar_html,
@@ -811,5 +819,6 @@ async def post_dynamic(slug: str) -> HTMLResponse:
         description=payload.get("og_description", ""),
         body_html=payload.get("body_html", ""),
         published=payload.get("published", ""),
+        author=payload.get("author", "Manish Kumar"),
     )
     return HTMLResponse(html)

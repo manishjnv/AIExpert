@@ -142,6 +142,143 @@ def test_blog_post_template_file_exists_and_uses_jinja2_syntax():
     # The inline JS must use SINGLE braces (Jinja2 treats { as literal)
     assert "(function() {" in content
     assert "{ passive: true }" in content
+    # SEO-06 — Article JSON-LD block present in <head>, every value
+    # routed through `tojson` so quotes/`</`/control chars can't break it
+    assert '<script type="application/ld+json">' in content
+    assert '"@type": "Article"' in content
+    assert "{{ title | tojson }}" in content
+    assert "{{ author | tojson }}" in content
+    assert "{{ description | tojson }}" in content
+
+
+# --- Article JSON-LD assertion tests (Commit B / SEO-06) ---------------------
+
+
+def _extract_jsonld(html: str) -> dict:
+    """Pull the Article JSON-LD block out of rendered HTML and parse it.
+    Asserts the script tag is present so tests fail with a clear message
+    if the template ever drops the block."""
+    import json
+    import re
+    m = re.search(
+        r'<script type="application/ld\+json">\s*(\{.*?\})\s*</script>',
+        html,
+        re.DOTALL,
+    )
+    assert m, "Article JSON-LD <script> block not found in rendered HTML"
+    return json.loads(m.group(1))
+
+
+@pytest.mark.asyncio
+async def test_post_01_article_json_ld_emitted(monkeypatch):
+    """SEO-06 acceptance — /blog/01 emits Article JSON-LD with the full
+    property set Google requires for rich-result eligibility."""
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/01")
+        assert r.status_code == 200
+        data = _extract_jsonld(r.text)
+        assert data["@context"] == "https://schema.org"
+        assert data["@type"] == "Article"
+        assert data["headline"] == (
+            "Building AutomateEdge Solo — A Free, AI-Curated Learning Platform"
+        )
+        # ISO 8601 — Z-suffixed UTC, matching the og article:published_time tag
+        assert data["datePublished"] == "2026-04-13T00:00:00Z"
+        # dateModified falls back to datePublished (TODO in template — payloads
+        # don't yet track updated_at; documented in template comment)
+        assert data["dateModified"] == "2026-04-13T00:00:00Z"
+        assert data["author"] == {"@type": "Person", "name": "Manish Kumar"}
+        assert data["publisher"]["@type"] == "Organization"
+        assert data["publisher"]["name"] == "AutomateEdge"
+        assert data["publisher"]["logo"]["url"] == (
+            "https://automateedge.cloud/assets/logo.png"
+        )
+        assert data["image"].endswith("/assets/og-default.png")
+        assert data["mainEntityOfPage"].endswith("/blog/01")
+        assert data["description"].startswith("Why AutomateEdge exists")
+        # Headline must stay ≤110 chars per Google guideline
+        assert len(data["headline"]) <= 110, f"headline too long: {len(data['headline'])}"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_post_dynamic_article_json_ld_uses_payload_author(monkeypatch):
+    """Dynamic posts surface the payload's `author` field in JSON-LD,
+    not the meta-tag hardcoded 'Manish Kumar'. Confirms the author
+    plumbing _render_post -> template was actually wired."""
+    fake_payload = {
+        "slug": "guest-post",
+        "title": "A Guest Post With Quotes \"Like This\" and < Special Chars",
+        "og_description": "A description with a quote: \"foo\".",
+        "body_html": "<p>Body</p>",
+        "published": "2026-05-01",
+        "author": "Guest Author",
+    }
+    monkeypatch.setattr(
+        "app.services.blog_publisher.load_published",
+        lambda s: fake_payload if s == "guest-post" else None,
+    )
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [fake_payload])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/guest-post")
+        assert r.status_code == 200
+        data = _extract_jsonld(r.text)
+        # Author from payload (not the meta-tag hardcoded "Manish Kumar")
+        assert data["author"]["name"] == "Guest Author"
+        # Quotes + special chars in headline survive JSON-encoding intact
+        assert data["headline"] == (
+            "A Guest Post With Quotes \"Like This\" and < Special Chars"
+        )
+        assert data["description"] == "A description with a quote: \"foo\"."
+        assert data["datePublished"] == "2026-05-01T00:00:00Z"
+        assert data["dateModified"] == "2026-05-01T00:00:00Z"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_post_article_json_ld_safe_against_script_injection(monkeypatch):
+    """Defensive: a malicious title containing </script> must not break
+    out of the JSON-LD <script> block. Jinja2's tojson encodes < as
+    \\u003c which neutralizes the tag-close attempt."""
+    fake_payload = {
+        "slug": "evil",
+        "title": "Sneaky </script><script>alert(1)</script>",
+        "og_description": "desc",
+        "body_html": "<p>body</p>",
+        "published": "2026-01-01",
+        "author": "evil",
+    }
+    monkeypatch.setattr(
+        "app.services.blog_publisher.load_published",
+        lambda s: fake_payload if s == "evil" else None,
+    )
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [fake_payload])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/evil")
+        assert r.status_code == 200
+        # The literal "</script>" sequence must NOT appear inside the
+        # JSON-LD block — Jinja2's tojson escapes < to <
+        import re
+        m = re.search(
+            r'<script type="application/ld\+json">(.*?)</script>',
+            r.text,
+            re.DOTALL,
+        )
+        assert m, "JSON-LD block missing"
+        jsonld_body = m.group(1)
+        assert "</script>" not in jsonld_body
+        assert "\\u003c" in jsonld_body or "\\u003C" in jsonld_body
+        # The JSON itself still parses cleanly even with the malicious payload
+        data = _extract_jsonld(r.text)
+        assert "Sneaky" in data["headline"]
+    await close_db()
 
 
 def test_blog_post_template_renders_with_dummies():
@@ -155,6 +292,7 @@ def test_blog_post_template_renders_with_dummies():
         url="https://example.com/blog/x",
         og_image="https://example.com/og.png",
         published="2026-01-01",
+        author="Test Author",
         blog_css=_BLOG_CSS,
         body_html="<p>body</p>",
         sidebar_html="<div>side</div>",
