@@ -9,6 +9,7 @@ but shows a red badge (tamper-evident, not a hard error).
 from __future__ import annotations
 
 import html as _html
+import json
 import logging
 import time
 from collections import defaultdict
@@ -331,6 +332,30 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
     og_title = f"{_esc(cert.display_name)} — {tier_label}"
     og_desc = f"{_esc(cert.course_title)} · {_esc(cert.duration_months)}-month {_esc(cert.level)} program · Verified at {_esc(settings.public_base_url)}"
 
+    # SEO-12 — EducationalOccupationalCredential JSON-LD. Emitted even when
+    # the signature/revoke badge is red: the schema describes the credential
+    # record, not its current validity state (which is conveyed visually).
+    credential_ld = {
+        "@context": "https://schema.org",
+        "@type": "EducationalOccupationalCredential",
+        "name": f"{tier_label} — {cert.course_title}",
+        "credentialCategory": "certificate",
+        "educationalLevel": cert.level.capitalize() if cert.level else None,
+        "recognizedBy": {"@type": "Organization",
+                         "name": "AutomateEdge",
+                         "url": base},
+        "dateCreated": cert.issued_at.isoformat() if cert.issued_at else None,
+        "about": {"@type": "Thing", "name": cert.course_title},
+        "url": verify_url,
+    }
+    # Drop keys with falsy values so we don't emit null in the JSON-LD
+    credential_ld = {k: v for k, v in credential_ld.items() if v}
+    credential_ld_script = (
+        '<script type="application/ld+json">'
+        + json.dumps(credential_ld, ensure_ascii=False)
+        + '</script>'
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -349,6 +374,7 @@ def _render(cert: Certificate, *, signature_ok: bool, is_revoked: bool) -> str:
 <meta name="twitter:title" content="{og_title}">
 <meta name="twitter:description" content="{og_desc}">
 <meta name="twitter:image" content="{og_image_url}">
+{credential_ld_script}
 <style>
   :root{{--amber:#b45309;--amber-light:#fffaf1;--ink:#1f1610}}
   *{{box-sizing:border-box}}
