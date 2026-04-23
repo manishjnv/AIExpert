@@ -9,10 +9,13 @@ this out to a generic renderer.
 
 from __future__ import annotations
 
+import email.utils as _email_utils
+from datetime import date as _date, datetime, timezone
 from pathlib import Path
+from xml.sax.saxutils import escape as _xml_escape
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import get_settings
@@ -703,6 +706,8 @@ async def blog_index() -> HTMLResponse:
   <meta property="og:url" content="{base}/blog">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AutomateEdge">
+  <link rel="canonical" href="{base}/blog">
+  <link rel="alternate" type="application/rss+xml" title="AutomateEdge Blog" href="{base}/blog/feed.xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
@@ -777,6 +782,76 @@ def _render_index_card(post: dict, base: str) -> str:
         f'<p class="post-summary">{_html.escape(summary)}</p>'
         f'<span class="read-more">Read the post →</span>'
         f'</a>'
+    )
+
+
+def _rfc822(published: str) -> str:
+    """Convert ISO date 'YYYY-MM-DD' to an RFC 2822 string at UTC midnight.
+    Falls back to today's date if the input is malformed — the feed would
+    rather misdate a single item than 500 on a bad payload."""
+    try:
+        d = _date.fromisoformat(published)
+    except Exception:
+        d = _date.today()
+    dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    return _email_utils.format_datetime(dt)
+
+
+@router.get("/blog/feed.xml")
+async def blog_rss_feed() -> Response:
+    """RSS 2.0 feed of every visible blog post (SEO-09). Newest-first.
+    Declared as `/blog/feed.xml` before the dynamic `/blog/{slug}` route
+    so FastAPI resolves it directly — the dynamic route would otherwise
+    treat 'feed.xml' as a slug and 404."""
+    settings = get_settings()
+    base = settings.public_base_url.rstrip("/")
+    posts = _list_visible_posts()
+
+    feed_url = f"{base}/blog/feed.xml"
+    channel_link = f"{base}/blog"
+    channel_title = "AutomateEdge Blog"
+    channel_desc = (
+        "Essays from AutomateEdge on building a free AI learning platform — "
+        "lessons, principles, and post-mortems."
+    )
+    build_date = _email_utils.format_datetime(datetime.now(timezone.utc))
+
+    item_blocks: list[str] = []
+    for p in posts:
+        slug = p.get("slug", "")
+        title = p.get("title", "")
+        summary = p.get("summary", "")
+        pub = p.get("published", "")
+        url = f"{base}/blog/{slug}"
+        item_blocks.append(
+            "    <item>\n"
+            f"      <title>{_xml_escape(title)}</title>\n"
+            f"      <link>{_xml_escape(url)}</link>\n"
+            f'      <guid isPermaLink="true">{_xml_escape(url)}</guid>\n'
+            f"      <pubDate>{_rfc822(pub)}</pubDate>\n"
+            f"      <description>{_xml_escape(summary)}</description>\n"
+            "    </item>"
+        )
+
+    items_xml = "\n".join(item_blocks)
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        "  <channel>\n"
+        f"    <title>{_xml_escape(channel_title)}</title>\n"
+        f"    <link>{_xml_escape(channel_link)}</link>\n"
+        f"    <description>{_xml_escape(channel_desc)}</description>\n"
+        "    <language>en</language>\n"
+        f'    <atom:link href="{_xml_escape(feed_url)}" rel="self" type="application/rss+xml" />\n'
+        f"    <lastBuildDate>{build_date}</lastBuildDate>\n"
+        f"{items_xml}\n"
+        "  </channel>\n"
+        "</rss>\n"
+    )
+    return Response(
+        content=xml,
+        media_type="application/rss+xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=600"},
     )
 
 

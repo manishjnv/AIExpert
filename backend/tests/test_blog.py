@@ -13,6 +13,7 @@ from httpx import ASGITransport, AsyncClient
 import app.db as db_module
 import app.models  # noqa: F401
 from app.db import Base, close_db, init_db
+from app.routers.blog import POST_01_TITLE
 
 
 async def _setup():
@@ -155,6 +156,11 @@ def test_blog_post_template_file_exists_and_uses_jinja2_syntax():
     assert '"position": 1' in content
     assert '"position": 2' in content
     assert '"position": 3' in content
+    # SEO-09 — per-post head advertises the RSS feed as an alternate
+    # representation, so browsers + feed readers auto-discover it
+    assert 'rel="alternate"' in content
+    assert 'type="application/rss+xml"' in content
+    assert '/blog/feed.xml' in content
 
 
 # --- Article JSON-LD assertion tests (Commit B / SEO-06) ---------------------
@@ -331,6 +337,133 @@ async def test_post_article_json_ld_safe_against_script_injection(monkeypatch):
         # The JSON itself still parses cleanly even with the malicious payload
         data = _extract_jsonld(r.text)
         assert "Sneaky" in data["headline"]
+    await close_db()
+
+
+# --- SEO-13 — canonical on /blog index -------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_blog_index_has_exactly_one_canonical(monkeypatch):
+    """SEO-13 acceptance — the /blog index head emits exactly one
+    <link rel="canonical"> pointing at itself. RSS alternate link is
+    a separate <link rel="alternate"> and must not satisfy the check."""
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog")
+        assert r.status_code == 200
+        import re
+        canonicals = re.findall(
+            r'<link\s+rel="canonical"\s+href="([^"]+)"', r.text
+        )
+        assert len(canonicals) == 1, f"expected 1 canonical, got {canonicals}"
+        assert canonicals[0].endswith("/blog")
+    await close_db()
+
+
+# --- SEO-09 — /blog/feed.xml RSS 2.0 ---------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_blog_feed_xml_returns_valid_rss_2_0(monkeypatch):
+    """SEO-09 acceptance — /blog/feed.xml serves application/rss+xml with
+    a parseable RSS 2.0 document containing every visible post."""
+    fake_payload = {
+        "slug": "02-fake-post",
+        "title": "Second Post",
+        "og_description": "A second test post description.",
+        "body_html": "<p>Body</p>",
+        "published": "2026-04-22",
+    }
+    monkeypatch.setattr(
+        "app.services.blog_publisher.list_published",
+        lambda: [fake_payload],
+    )
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/feed.xml")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/rss+xml")
+        body = r.text
+        # Parse as XML — any malformed output raises here
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(body)
+        assert root.tag == "rss"
+        assert root.attrib.get("version") == "2.0"
+        channel = root.find("channel")
+        assert channel is not None
+        assert channel.findtext("title") == "AutomateEdge Blog"
+        assert channel.findtext("link", "").endswith("/blog")
+        assert channel.findtext("language") == "en"
+        # atom:self link for feed self-reference
+        atom_ns = "{http://www.w3.org/2005/Atom}"
+        self_link = channel.find(f"{atom_ns}link")
+        assert self_link is not None
+        assert self_link.attrib["rel"] == "self"
+        assert self_link.attrib["href"].endswith("/blog/feed.xml")
+        # Items — both legacy POST_01 and the dynamic fake should appear
+        items = channel.findall("item")
+        titles = [it.findtext("title") for it in items]
+        assert "Second Post" in titles
+        assert POST_01_TITLE in titles
+        # Per-item required fields
+        for it in items:
+            assert it.findtext("title")
+            link = it.findtext("link")
+            assert link and "/blog/" in link
+            guid = it.find("guid")
+            assert guid is not None and guid.attrib.get("isPermaLink") == "true"
+            # RFC 822 pubDate — sanity that it contains a 4-digit year + GMT
+            pub = it.findtext("pubDate") or ""
+            assert "GMT" in pub or "+0000" in pub
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_blog_feed_xml_escapes_hostile_content(monkeypatch):
+    """Defensive — a malicious post title with '<' and '&' must not break
+    the XML document. ET.fromstring would raise on unescaped specials."""
+    fake_payload = {
+        "slug": "03-evil",
+        "title": "Title with <tags> & ampersand",
+        "og_description": "Desc with \"quotes\" and <b>tags</b>.",
+        "body_html": "<p>x</p>",
+        "published": "2026-05-01",
+    }
+    monkeypatch.setattr(
+        "app.services.blog_publisher.list_published",
+        lambda: [fake_payload],
+    )
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: True)
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/feed.xml")
+        assert r.status_code == 200
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(r.text)  # must parse cleanly
+        item = root.find("channel/item")
+        assert item is not None
+        # Title round-trips through escape -> parse back to the original
+        assert item.findtext("title") == "Title with <tags> & ampersand"
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_post_html_advertises_rss_alternate(monkeypatch):
+    """Rendered /blog/{slug} head carries the application/rss+xml
+    alternate link so browsers + feed readers discover the feed."""
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/01")
+        assert r.status_code == 200
+        assert 'rel="alternate"' in r.text
+        assert 'type="application/rss+xml"' in r.text
+        assert "/blog/feed.xml" in r.text
     await close_db()
 
 

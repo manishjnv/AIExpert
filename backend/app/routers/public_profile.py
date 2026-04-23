@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_db
 from app.utils.time_fmt import fmt_ist, FMT_MONTH_YEAR, FMT_FULL_MONTH_YEAR
 from app.models.certificate import Certificate
@@ -397,7 +398,8 @@ async def public_profile(user_id: int, db: AsyncSession = Depends(get_db)):
         li_href = user.linkedin_url if user.linkedin_url.startswith("http") else "https://" + user.linkedin_url
         badges_html += f'<a class="badge" href="{esc(li_href)}" target="_blank">LinkedIn</a>'
 
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+    base = get_settings().public_base_url.rstrip("/")
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><link rel="canonical" href="{base}/profile/{user.id}"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
 <script src="/nav.js"></script>
 <div class="container">
 <h1>{full_name}</h1>
@@ -581,7 +583,8 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     top_streak = max((e["streak"] for e in entries), default=0)
     completers = sum(1 for e in entries if e["pct"] >= 100)
 
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+    base = get_settings().public_base_url.rstrip("/")
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><link rel="canonical" href="{base}/leaderboard"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
 <script src="/nav.js"></script>
 <div class="container">
 <h1>Leaderboard</h1>

@@ -82,6 +82,7 @@ _INDEX_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verify a Credential — AutomateEdge</title>
 <meta name="description" content="Look up an AutomateEdge course completion certificate by credential ID.">
+<link rel="canonical" href="__BASE__/verify">
 <style>
   :root{--amber:#b45309;--ink:#1f1610}
   *{box-sizing:border-box}
