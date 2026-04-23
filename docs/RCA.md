@@ -220,6 +220,16 @@
   - Every DB session opened inside a scheduled cron job must be retry-wrapped. Bare `async with _db.async_session_factory()` in a cron context is a silent-failure trap.
   - Scheduler runs must escalate repeated failures to `CRITICAL` severity — an `ERROR` log per daily run blends into heartbeat noise and won't page anyone.
 
+### 030 — Leaderboard (and /u/{handle}) missing viewport meta, rendered at desktop width on phones (2026-04-24) [Mobile accessibility]
+
+- **Symptom:** Mobile review of the site (iPhone 320–430 px) revealed `/leaderboard` and `/u/{handle}` rendered as desktop-width pages with pinch-zoom required to read anything. The 9-column ranking table was several viewports wide; the stat row wrapped into a tall stack with huge 28 px stat numbers. Other pages (home, `/blog`, `/blog/{slug}`, `/jobs`) had viewport meta; only the public-profile router was missing it.
+- **Root cause:** `public_profile.py` was written before the rest of the SSR pages standardized on `<meta name="viewport" content="width=device-width, initial-scale=1">`. It shipped with only `<meta charset="UTF-8">` in the `<head>`. There's no project-wide enforcement: each SSR handler builds its own HTML string, and nothing checks for viewport meta at boot or test time. The shared `nav.css` only sets responsive rules on `.topnav` — it doesn't backfill viewport meta, so a page without the tag gets desktop layout regardless of nav styling.
+- **Fix:** [public_profile.py:415 and 600](backend/app/routers/public_profile.py) — added `<meta name="viewport" content="width=device-width, initial-scale=1">` to both HTML-returning handlers (profile + leaderboard). Wrapped the 9-col table in `<div class="table-wrap">` with `overflow-x: auto` + `min-width: 720px` on `table` so the table scrolls internally instead of forcing page-wide horizontal scroll. Added `@media (max-width: 480px)` block tightening stat grid, tier chip, badge pill, and help grid. Also shipped mobile CSS fixes to home / blog / jobs in the same commit: `img { max-width: 100% }` + `pre { overflow-x: auto }` on blog post body (uploaded images no longer overflow); `@media (max-width: 480px)` blocks on jobs hub + detail with WCAG-AA tap targets; modal overlay padding + narrow-viewport modal override on home. Commit `f3a2749`.
+- **Prevention:**
+  - Every new SSR handler returning `HTMLResponse` must include `<meta name="viewport" content="width=device-width, initial-scale=1">` in `<head>`. Grep rule for PR review: any `return f"""<!DOCTYPE html>` without a matching viewport meta in the same f-string is a bug.
+  - Any `<table>` SSR'd into a public page needs a `.table-wrap { overflow-x: auto }` wrapper if it has >4 columns — wrapping is cheap insurance, unwrapping is easy.
+  - Uploaded-content renderers (blog post body is the canonical case) must set `img { max-width: 100%; height: auto }` and `pre { overflow-x: auto }` globally — authors can't be relied on to size images to every viewport.
+
 ---
 
 ## Patterns to watch for
@@ -241,3 +251,6 @@
 | Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
 | AI call without `db=` or `log_usage` | High | Every AI call must log to `ai_usage_log` with `tokens > 0`. Use `get_last_tokens()` helper. |
 | Scraped HTML with surrogate characters | Medium | Sanitize at ingest time with `_strip_surrogates`; fallback sanitizer in `_serialize` is a safety net only. |
+| SSR HTMLResponse missing viewport meta | Medium | Every `return f"""<!DOCTYPE html>` must include `<meta name="viewport" content="width=device-width, initial-scale=1">`. Missing = mobile renders at desktop width. |
+| Public SSR `<table>` with >4 columns | Low | Wrap in `<div class="table-wrap">` with `overflow-x: auto` — protects against mobile horizontal-scroll the whole page. |
+| Uploaded-content rendering without overflow rules | Medium | Blog/post renderers must set `img { max-width: 100% }` and `pre { overflow-x: auto }` — authors can't size content for every viewport. |
