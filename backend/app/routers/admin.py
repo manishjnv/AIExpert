@@ -513,6 +513,8 @@ async def admin_blog_publish(request: Request, user: User = Depends(get_current_
     """Move a validated draft → published. Stamps reviewer + date."""
     _check_origin(request)
     from app.services.blog_publisher import publish_draft
+    from app.services.indexnow import ping_async
+    from app.config import get_settings
     body = await request.json()
     slug = (body.get("slug") or "").strip()
     if not slug:
@@ -523,6 +525,10 @@ async def admin_blog_publish(request: Request, user: User = Depends(get_current_
         raise HTTPException(status_code=404, detail=f"No draft with slug '{slug}'")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    # SEO-07 — ping IndexNow so Bing picks up the new post near-instantly.
+    base = (get_settings().public_base_url or "").rstrip("/")
+    if base:
+        ping_async([f"{base}/blog/{slug}"])
     return {
         "ok": True,
         "slug": slug,

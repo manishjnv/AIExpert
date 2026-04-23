@@ -243,6 +243,13 @@ async def check_and_issue(
             "Certificate issued: user=%s plan=%s tier=%s credential=%s",
             user.id, plan.id, tier, credential_id,
         )
+        # SEO-07 — ping IndexNow so the public /verify/{credential_id} URL
+        # indexes fast; powers the LinkedIn-share flywheel.
+        from app.config import get_settings
+        from app.services.indexnow import ping_async
+        base = (get_settings().public_base_url or "").rstrip("/")
+        if base:
+            ping_async([f"{base}/verify/{credential_id}"])
         return cert
 
     # Upgrade path — tier only moves up, never down.
