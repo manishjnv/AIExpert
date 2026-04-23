@@ -105,6 +105,11 @@ async def sitemap_pages(db: AsyncSession = Depends(get_db)) -> Response:
     total_pages = max(1, (total + JOBS_PAGE_SIZE - 1) // JOBS_PAGE_SIZE)
     for p in range(2, total_pages + 1):
         urls.append(_url(f"{base}/jobs?page={p}", today, 0.6))
+    # SEO-19: include /vs index + every /vs/{slug} comparison page.
+    from app.routers.compare import all_slugs as _vs_slugs
+    urls.append(_url(f"{base}/vs", today, 0.7))
+    for s in _vs_slugs():
+        urls.append(_url(f"{base}/vs/{s}", today, 0.8))
     return Response(content=_xml(urls), media_type="application/xml",
                     headers=_CACHE_1H)
 

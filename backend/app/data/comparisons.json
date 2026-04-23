@@ -1,0 +1,478 @@
+{
+  "_meta": {
+    "description": "SEO-19 role/concept comparison data. One entry per /vs/{slug} page. Each entry must carry enough visible text (tldr + two role defs + decision_factors + faqs + comparison_rows) to clear the 1500-word minimum in docs/SEO.md SEO-19. Salary ranges are US market aggregates from levels.fyi / Glassdoor / BLS 2025-2026; add ±15% for top-tier cities, -20% for mid-market.",
+    "last_updated": "2026-04-23"
+  },
+  "comparisons": [
+    {
+      "slug": "ai-engineer-vs-ml-engineer",
+      "title": "AI Engineer vs ML Engineer",
+      "target_query": "AI engineer vs ML engineer",
+      "tldr": "An AI Engineer builds products that use AI — wiring LLM APIs, retrieval systems, and inference pipelines into user-facing software. An ML Engineer builds and trains the models themselves, owning the data pipeline, training loop, evaluation, and production deployment. AI Engineer is a software-first role; ML Engineer is a model-first role. Pay is comparable at senior levels; ML Engineer leans higher at hyperscalers because the role owns training infrastructure.",
+      "a": {
+        "name": "AI Engineer",
+        "definition": "An AI Engineer is a software engineer who specializes in integrating artificial intelligence capabilities — typically LLMs, vision models, and retrieval systems — into production applications. The role is product-facing: you design the prompt strategy, build the retrieval or agent orchestration layer, handle latency and cost budgets, and own the user-visible output quality. You rarely train models from scratch. Strong Python, familiarity with FastAPI or equivalent, comfort with vector databases (pgvector, Pinecone, Weaviate), evals, and prompt engineering are non-negotiable. Most AI Engineers come from senior software engineering backgrounds and pick up ML fluency on the job. The hiring signal is shipped AI features, not published research."
+      },
+      "b": {
+        "name": "ML Engineer",
+        "definition": "An ML Engineer builds, trains, and productionizes machine learning models. The role spans dataset construction, feature engineering, training pipelines, hyperparameter tuning, offline evaluation, online A/B testing, and model serving. You write PyTorch or JAX daily, understand optimizer behavior, and can debug a loss curve that isn't converging. ML Engineers own the training-to-serving handoff — typically via TFX, Vertex AI Pipelines, Kubeflow, or a homegrown equivalent. Strong math foundations (linear algebra, probability, optimization), Python, Kubernetes, and distributed systems are standard. The hiring signal is shipped models with measurable business impact — reduced latency, improved recall, lower training cost."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "A deployed AI-powered product feature", "b": "A trained and versioned model"},
+        {"row": "Daily work", "a": "Prompt design, RAG pipelines, evals, cost optimization", "b": "Training loops, feature engineering, offline/online eval, serving"},
+        {"row": "Primary language", "a": "Python + TypeScript", "b": "Python (PyTorch / JAX), SQL"},
+        {"row": "Main frameworks", "a": "LangChain, LlamaIndex, FastAPI, vector DBs", "b": "PyTorch, TensorFlow, scikit-learn, Ray, Kubeflow"},
+        {"row": "Math depth required", "a": "Conceptual (embeddings, tokenization, attention)", "b": "Working (calculus, probability, optimization)"},
+        {"row": "Salary range (US, 2026, base)", "a": "$150k–$230k", "b": "$160k–$250k"},
+        {"row": "Total comp at FAANG L5", "a": "$350k–$500k", "b": "$380k–$550k"},
+        {"row": "Career background", "a": "Usually from senior SWE", "b": "Usually from ML/CS grad or research"},
+        {"row": "Hiring volume (2026, LinkedIn US)", "a": "Growing fastest of all AI roles", "b": "Stable, saturating at L3–L4"},
+        {"row": "Best-fit personality", "a": "Product-first, pragmatic, ship-oriented", "b": "Model-first, rigorous, detail-oriented"}
+      ],
+      "decision_factors": [
+        "Pick AI Engineer if you already have 3+ years of backend or full-stack experience and want to work on LLM products — you can be productive in 3-6 months with focused upskilling.",
+        "Pick ML Engineer if you enjoy the math, want to own training runs, and can commit 6-12 months to mastering PyTorch plus MLOps tooling. The learning curve is steeper but the role has more defensive moat.",
+        "Pick AI Engineer if your target companies are product-led startups (Notion, Linear, Vercel) or non-AI-native enterprises adopting AI. These hire AI Engineers 3:1 over ML Engineers.",
+        "Pick ML Engineer if your target companies are hyperscalers (Google, Meta, Amazon), AI labs (Anthropic, OpenAI, DeepMind), or quant finance. These lean heavily ML Engineer for infra roles.",
+        "Pick AI Engineer if you want faster feedback cycles — shipped features every 1-2 weeks. ML Engineer projects often run 3-6 months before deployment.",
+        "Both roles converge at senior levels. Staff-level AI/ML Engineers often do both depending on the project. The distinction matters most in the first 3-5 years.",
+        "Neither requires a PhD. ML Engineer roles at frontier labs sometimes do; ML Engineer roles at product companies almost never do. AI Engineer roles essentially never require one."
+      ],
+      "faqs": [
+        {"q": "Which pays more — AI Engineer or ML Engineer?", "a": "At the same level in the same company, pay is nearly identical. ML Engineer base salary tends to edge slightly higher at hyperscalers (Google, Meta, Amazon) because the role owns training infrastructure, which carries cost-optimization leverage. At product companies (Stripe, Shopify, Airbnb), AI Engineer compensation is often higher because the role has clearer revenue attribution. Total compensation over a 5-year window is within 10% for both."},
+        {"q": "Can I transition from software engineering to AI Engineer without a CS degree?", "a": "Yes. The AI Engineer role values shipped production code above formal credentials. A working developer who can build a RAG pipeline, optimize token costs, and set up evals is more hireable than a fresh graduate with an ML degree but no shipped product. Most AI Engineers are self-taught or bootcamp-trained with 3-5 years of prior software engineering experience."},
+        {"q": "Do I need to know how to train a neural network to be an AI Engineer?", "a": "No. Most AI Engineers use pretrained models via API (OpenAI, Anthropic, Gemini) or via hosted inference (Hugging Face, Replicate). You should understand what a model is — tokens, embeddings, context windows, inference cost — but you do not need to write a training loop. Learn the mechanics if it interests you; it is not on the critical path."},
+        {"q": "What's the job market difference between the two in 2026?", "a": "AI Engineer job postings grew roughly 4× year-over-year on LinkedIn, driven by non-AI-native companies adopting LLMs. ML Engineer postings grew more slowly (~1.5×) and concentration shifted toward infrastructure and training-platform roles at a small number of well-funded labs. AI Engineer has more open roles but also more competition from transitioning SWEs; ML Engineer has fewer roles but less competition if you have the math."},
+        {"q": "Is AI Engineer a real role or just rebranded SWE?", "a": "It is a real role with a distinct skill stack — prompt engineering, retrieval system design, eval methodology, AI-specific cost and latency tradeoffs. A generalist SWE without AI-specific experience typically needs 3-6 months of focused upskilling (building one real RAG system, running one real eval loop, shipping one LLM-powered feature) before matching a mid-level AI Engineer."},
+        {"q": "Which role is more AI-resistant long-term?", "a": "ML Engineer is more AI-resistant. Automating the automation is harder than automating the code that calls the automation. That said, both roles are likely to persist for at least a 10-year horizon because the model-training loop and the product-integration loop both need humans to set objectives and evaluate outcomes. The work will shift toward orchestration and evaluation in both cases."},
+        {"q": "Can I do both roles at the same company?", "a": "At seed-stage or early Series A startups, yes — often you wear both hats because headcount is limited. At Series B+ companies, the roles split cleanly. If you want the both-hats experience, target pre-Series-B teams; if you want role clarity, target Series C+ or public companies."}
+      ],
+      "roadmap_track": "ai-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["AI Engineer", "ML Engineer"]
+    },
+    {
+      "slug": "ai-engineer-vs-data-scientist",
+      "title": "AI Engineer vs Data Scientist",
+      "target_query": "AI engineer vs data scientist",
+      "tldr": "An AI Engineer builds AI-powered products — LLM features, retrieval pipelines, inference at scale. A Data Scientist turns data into decisions — hypotheses, experiments, dashboards, and predictive models that inform business strategy. The former is a software engineering role with ML integration; the latter is an analysis-and-modeling role with strong statistics and communication demands. Pay is comparable at mid-levels; AI Engineer scales higher at senior levels.",
+      "a": {
+        "name": "AI Engineer",
+        "definition": "An AI Engineer specializes in integrating AI capabilities — primarily LLMs, vision models, and retrieval systems — into user-facing software. You build prompt chains, RAG systems, agent loops, and inference pipelines. You measure latency, cost, and output quality as first-class concerns. Most AI Engineers come from a senior software engineering background and pick up ML fluency on the job; the role is closer to backend engineering than to statistical modeling. Shipped AI features are the primary hiring signal, not published research or Kaggle medals."
+      },
+      "b": {
+        "name": "Data Scientist",
+        "definition": "A Data Scientist extracts insight from data to drive business decisions. The role combines statistics, experimentation design, and communication: you frame questions, pull the right data, run A/B tests, build forecasting models, and present findings to stakeholders who are not technical. Strong SQL, Python (pandas, statsmodels, scikit-learn), statistics (confidence intervals, power analysis, causal inference), and data visualization (matplotlib, Tableau) are the core toolkit. The hiring signal is shipped analyses that changed a business decision, not code complexity."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "A deployed AI-powered product feature", "b": "An analysis, model, or dashboard informing a decision"},
+        {"row": "Daily work", "a": "Prompt design, RAG pipelines, evals, production debugging", "b": "SQL queries, experiment design, statistical modeling, stakeholder communication"},
+        {"row": "Primary stakeholders", "a": "PM, engineering, design", "b": "PM, marketing, finance, leadership"},
+        {"row": "Primary language", "a": "Python + TypeScript", "b": "SQL + Python (pandas-heavy)"},
+        {"row": "Math depth required", "a": "Conceptual", "b": "Working statistics and experimental design"},
+        {"row": "Salary range (US, 2026, base)", "a": "$150k–$230k", "b": "$130k–$200k"},
+        {"row": "Ownership of production code", "a": "Yes — 100% responsibility", "b": "Partial — often hands off to engineering"},
+        {"row": "Time-to-impact per project", "a": "1-4 weeks for small features, 2-3 months for major systems", "b": "2-6 weeks for most analyses, 3-6 months for models in production"},
+        {"row": "Hiring volume (2026)", "a": "Growing fastest", "b": "Stable-to-declining at junior levels (being absorbed by analytics engineers + AI tooling)"},
+        {"row": "Best-fit personality", "a": "Engineer first, pragmatic, ship-oriented", "b": "Analyst first, curious, communicative"}
+      ],
+      "decision_factors": [
+        "Pick AI Engineer if you enjoy owning production systems end-to-end and want direct attribution to product revenue or user-facing features.",
+        "Pick Data Scientist if you enjoy framing ambiguous business problems as statistical questions and presenting the answers persuasively to non-technical decision-makers.",
+        "Pick AI Engineer if you want a clearer progression to Staff and Principal engineering titles — the ladder is well-defined at most companies.",
+        "Pick Data Scientist if you want cross-functional exposure early — the role often interacts with marketing, finance, and ops in ways engineering roles do not.",
+        "Pick AI Engineer if you learn faster by shipping than by analyzing. The feedback loop is hours, not weeks.",
+        "Pick Data Scientist if statistics is your strongest muscle and you find writing production code tedious. The best Data Scientists use stats as a telescope, not a toy.",
+        "Junior Data Scientist roles are being squeezed by AI tools that can automate ad-hoc analysis. AI Engineer roles are growing faster at the junior level. If you are entering the field in 2026 with no specialization, AI Engineer has better supply-demand dynamics."
+      ],
+      "faqs": [
+        {"q": "Do Data Scientists build AI?", "a": "Sometimes. The term 'data scientist' covers a wide range in practice, from pure analysts to applied researchers. Some Data Scientists train predictive models that end up in production; most do not. If 'building AI' means training a model that ships to users, that is closer to ML Engineer. If it means doing analysis that informs product strategy, Data Scientist is the right role."},
+        {"q": "Is AI Engineer just a Data Scientist who codes?", "a": "No. The skill stacks diverge significantly. AI Engineer focuses on system design — prompt architecture, retrieval, inference optimization, evals. Data Scientist focuses on statistical rigor — experiment design, causal inference, hypothesis testing. A strong AI Engineer is not necessarily a strong Data Scientist, and vice versa. Both are valuable; they are different muscles."},
+        {"q": "Which role is more senior-leverage?", "a": "AI Engineer trends higher in total compensation at senior levels because the role has direct production ownership and revenue attribution. Data Scientist leverage peaks in roles that influence strategy — at a trillion-dollar company, a Senior Data Scientist who changes pricing by 2% moves billions. In practice, the two ladders converge around $300k-$400k TC at L5-L6 equivalent."},
+        {"q": "Can a Data Scientist transition to AI Engineer?", "a": "Yes, and it happens frequently in 2025-2026. The transition requires closing the software engineering gap — production code, deployment, monitoring, and async Python. A Data Scientist who has 2-3 years of experience and can code professionally can reach mid-level AI Engineer within 6 months of focused work."},
+        {"q": "What about Applied Scientist — is that AI Engineer or Data Scientist?", "a": "Applied Scientist is a research-adjacent role, closer to ML Engineer than to either AI Engineer or Data Scientist. Applied Scientists often have PhDs, publish, and own a specific capability (search relevance, ad ranking, computer vision). At Amazon the title is particularly common; it maps most closely to 'ML Engineer with a research mandate' elsewhere."},
+        {"q": "Which role has better job security in the age of AI?", "a": "AI Engineer is safer for the 2025-2030 horizon — you are building the tooling that is disrupting other jobs. Data Scientist is more exposed: ad-hoc analysis and dashboard creation are being automated by AI coding assistants and tools like Hex, Mode, and ThoughtSpot. Senior Data Scientists who do causal inference, experimentation design, and stakeholder management remain irreplaceable; junior-level ad-hoc work is shrinking."},
+        {"q": "What's the best entry point for someone with 2 years of software engineering?", "a": "AI Engineer, directly. Ship one serious production LLM feature — a RAG system with a clear eval loop, or an agent that handles a real customer workflow. Document the cost, latency, and quality tradeoffs. Open-source it if possible. That single artifact, paired with your SWE experience, clears most mid-level AI Engineer bars in 2026."}
+      ],
+      "roadmap_track": "ai-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["AI Engineer", "Data Scientist"]
+    },
+    {
+      "slug": "ml-engineer-vs-data-scientist",
+      "title": "ML Engineer vs Data Scientist",
+      "target_query": "ML engineer vs data scientist",
+      "tldr": "An ML Engineer builds and ships models — training pipelines, serving infrastructure, online monitoring. A Data Scientist uses data to inform decisions — experiments, analyses, sometimes models that stop at a notebook. ML Engineer is a production engineering role with strong ML depth; Data Scientist is an analysis-and-modeling role with strong statistics and business context. Pay favors ML Engineer by 10-20% at senior levels because of the production ownership.",
+      "a": {
+        "name": "ML Engineer",
+        "definition": "An ML Engineer owns the full lifecycle of a machine learning model in production — dataset construction, feature engineering, training pipelines, hyperparameter tuning, offline and online evaluation, model serving, and monitoring. The role sits at the intersection of machine learning and distributed systems. You write PyTorch or TensorFlow daily, understand optimizer behavior, and can debug a loss curve that isn't converging. You know when to reach for a transformer, when a gradient-boosted tree suffices, and when the right answer is a well-tuned logistic regression."
+      },
+      "b": {
+        "name": "Data Scientist",
+        "definition": "A Data Scientist extracts insight from data to drive business decisions. The role combines statistics, experimentation design, and communication: you frame ambiguous business questions, pull and clean the relevant data, run rigorous experiments, build predictive or explanatory models, and communicate findings to non-technical stakeholders. Production ownership is partial — Data Scientists often hand models to ML Engineers for deployment. The hiring signal is analyses that changed decisions, not code complexity or training pipeline depth."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "A trained, deployed, and monitored model", "b": "An analysis, dashboard, or notebook-stage model"},
+        {"row": "Owns production?", "a": "Yes — full lifecycle", "b": "Rarely — usually hands off"},
+        {"row": "Training pipelines", "a": "Builds + owns them", "b": "Uses scikit-learn in a notebook"},
+        {"row": "Primary language", "a": "Python (PyTorch/JAX), Go or C++ for infra", "b": "SQL + Python (pandas, statsmodels)"},
+        {"row": "Math depth required", "a": "Working calculus, probability, optimization", "b": "Working statistics, experiment design"},
+        {"row": "Salary range (US, 2026, base)", "a": "$160k–$250k", "b": "$130k–$200k"},
+        {"row": "Primary stakeholders", "a": "Eng, infra, product", "b": "PM, leadership, marketing, finance"},
+        {"row": "Typical team size", "a": "3-8 ML + platform engineers", "b": "1-3 per product area"},
+        {"row": "Time-to-impact per project", "a": "2-6 months (train, eval, ship)", "b": "2-6 weeks for analyses"},
+        {"row": "Best-fit personality", "a": "Model-first, rigorous, systems-thinking", "b": "Analyst-first, curious, communicative"}
+      ],
+      "decision_factors": [
+        "Pick ML Engineer if you want to own models in production and care about training cost, inference latency, and monitoring. The role has more defensive moat — fewer people can do it well.",
+        "Pick Data Scientist if you enjoy framing ambiguous business problems and communicating statistical findings clearly to non-technical people. The role has broader organizational exposure.",
+        "Pick ML Engineer if your target companies are hyperscalers, AI labs, or ML-first fintech. These pay top-of-market for production ML skills.",
+        "Pick Data Scientist if your target companies are consumer apps, marketplaces, or enterprises where experimentation and forecasting drive strategy. These companies hire 5-10 Data Scientists for every ML Engineer.",
+        "Pick ML Engineer if you have a strong math or systems background and enjoy debugging at a low level. Production ML has real systems complexity — sharding, distributed training, serialization, memory profiling.",
+        "Pick Data Scientist if you prefer weekly wins over quarterly projects. Data Scientist feedback loops are days to weeks; ML Engineer projects often run months.",
+        "Compensation favors ML Engineer by 10-20% on base and 15-30% on total comp at senior levels. If comp is the primary driver, ML Engineer wins. If role satisfaction and variety matter more, the answer depends on which muscles you want to develop."
+      ],
+      "faqs": [
+        {"q": "Is ML Engineer just a senior Data Scientist who codes better?", "a": "No. The skill overlap is maybe 30%. Both use Python, both understand ML models, but the daily work is very different. ML Engineer spends days on distributed training, CUDA memory errors, feature store architecture, and serving latency. Data Scientist spends days on SQL, experimental design, statistical significance, and stakeholder slides. A great Data Scientist is not automatically a competent ML Engineer, and vice versa."},
+        {"q": "Which role is better for career switchers?", "a": "Data Scientist has historically been more accessible because SQL + pandas + basic statistics is faster to learn than PyTorch + distributed systems + Kubernetes. However, junior Data Scientist hiring is compressing in 2026 as AI tooling absorbs ad-hoc analysis. ML Engineer remains accessible for career switchers with CS or quant backgrounds but takes longer to break into — plan for 12-18 months."},
+        {"q": "Do Data Scientists get promoted to ML Engineer?", "a": "Sometimes, but it is a lateral move with retraining, not a promotion. Some companies have a single 'ML/Data' ladder that accommodates both; most split the ladders cleanly. A Data Scientist who wants the ML Engineer path should spend 6-12 months intentionally building production ML skills — a shipped model with a proper training pipeline, feature store, and monitoring — before applying for ML Engineer roles."},
+        {"q": "Which role is more AI-resistant?", "a": "ML Engineer is significantly more AI-resistant. Automating the tool that builds automation is a harder problem than automating the downstream consumer of automation. Data Scientist work at the junior-to-mid level is heavily exposed to tools like Hex, Mode, and ChatGPT-style analytics assistants. Senior Data Scientist work — causal inference, experimental design, stakeholder alignment — remains safe."},
+        {"q": "Can I do both at a startup?", "a": "Yes — at seed to early Series A, one person often covers both roles. The title depends on whether the company is ML-product-led (ML Engineer) or analytics-led (Data Scientist). At Series B and beyond, the roles split. If you value role clarity, target later-stage companies; if you value range, target earlier-stage."},
+        {"q": "What about the 'Machine Learning Scientist' title?", "a": "ML Scientist is typically a research-leaning title — closer to a Research Scientist than either ML Engineer or Data Scientist. At labs (Anthropic, OpenAI, DeepMind) it often requires a PhD and publication record. At product companies the title is used loosely; sometimes it means 'ML Engineer with a research mandate,' sometimes it means 'senior Data Scientist who trains deep models.' Ask for the JD."},
+        {"q": "Which pays more over a 10-year career?", "a": "ML Engineer, by approximately 20-40% in total compensation. The gap is driven by ML Engineer concentration at top-paying hyperscalers and labs, by stronger equity grants in ML-first startups, and by ML Engineer's resistance to AI-tooling compression. Data Scientist compensation is more bimodal: median is lower, but top-end strategic Data Scientists at hedge funds and FAANG can exceed ML Engineer comp."}
+      ],
+      "roadmap_track": "ml-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["ML Engineer", "Data Scientist"]
+    },
+    {
+      "slug": "ai-engineer-vs-prompt-engineer",
+      "title": "AI Engineer vs Prompt Engineer",
+      "target_query": "AI engineer vs prompt engineer",
+      "tldr": "An AI Engineer is a software engineer who builds AI-powered systems — prompts are one tool among many. A Prompt Engineer specializes narrowly in crafting and iterating prompts for LLMs, often with minimal software engineering depth. The Prompt Engineer role exists at a small number of forward-thinking labs and content companies; elsewhere it has been absorbed into AI Engineer. Pay favors AI Engineer at all levels because the role has more production ownership.",
+      "a": {
+        "name": "AI Engineer",
+        "definition": "An AI Engineer is a software engineer who specializes in integrating AI capabilities into production applications. Prompt design is one of many responsibilities — alongside retrieval system design, agent orchestration, evals, cost optimization, monitoring, and error handling. Strong Python, backend frameworks (FastAPI), vector databases, and shipped production experience are expected. Most AI Engineers come from senior software engineering backgrounds with 3-5 years of prior experience, then add AI-specific skills on the job."
+      },
+      "b": {
+        "name": "Prompt Engineer",
+        "definition": "A Prompt Engineer focuses specifically on designing, testing, and iterating prompts to get reliable behavior from large language models. The role often includes prompt library maintenance, evaluation methodology, red-teaming for jailbreaks, and educating internal teams on prompt best practices. Software engineering depth is typically lower — a Prompt Engineer may not own production deployment. The role emerged at Anthropic and OpenAI around 2022-2023 and has since been either absorbed into AI Engineer or renamed (e.g., 'AI Interaction Designer,' 'LLM Specialist') at most companies."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "A deployed AI-powered feature", "b": "A library of production-grade prompts and evals"},
+        {"row": "Writes production code?", "a": "Yes — primary job", "b": "Sometimes — often hands off"},
+        {"row": "Daily work", "a": "Architecture, prompt design, eval loops, deployment", "b": "Prompt iteration, eval design, model behavior analysis"},
+        {"row": "Primary language", "a": "Python + TypeScript", "b": "Plain English + prompt DSLs"},
+        {"row": "Background", "a": "Senior software engineer", "b": "Mixed — writers, linguists, researchers, engineers"},
+        {"row": "Salary range (US, 2026, base)", "a": "$150k–$230k", "b": "$100k–$180k (huge variance by company)"},
+        {"row": "Hiring volume (2026)", "a": "Growing rapidly", "b": "Flat or declining — role being absorbed"},
+        {"row": "Career stability", "a": "Strong — core role in every AI-adopting company", "b": "Uncertain — narrow skillset, tooling absorbs it"},
+        {"row": "Ships on", "a": "1-2 week cadence", "b": "Continuous — prompts iterate with every model release"},
+        {"row": "Best-fit personality", "a": "Product-first engineer", "b": "Meticulous, linguistically precise, patient"}
+      ],
+      "decision_factors": [
+        "Pick AI Engineer. In 2026 the Prompt Engineer title is narrowing — most companies hire AI Engineers who do prompt engineering as part of the job.",
+        "Pick Prompt Engineer only if you are specifically hired by Anthropic, OpenAI, Google DeepMind, or a similar lab where the role remains distinct and well-compensated.",
+        "If you cannot code professionally but want to work with LLMs, 'Prompt Engineer' is the wrong target. Focus on content strategy, AI policy, or AI-adjacent product management — roles that value communication and LLM literacy without requiring engineering depth.",
+        "If you can code and want to work on AI products, go AI Engineer. The career trajectory is longer, the pay ceiling is higher, and the skill set compounds across roles and companies.",
+        "Do not treat Prompt Engineer as a stepping stone to AI Engineer. It teaches prompt craft but skips the software engineering foundation needed for the senior role. Directly build the AI Engineer skills instead.",
+        "Most 'Prompt Engineer' job postings in 2026 pay less than comparable AI Engineer roles and offer weaker career progression. Read the JD carefully — if it looks like AI Engineer work at AI Engineer pay, just apply for AI Engineer roles.",
+        "The AI Engineer role will require prompt engineering fluency for the foreseeable future. You do not have to choose — the AI Engineer role already includes the valuable 80% of Prompt Engineer skills."
+      ],
+      "faqs": [
+        {"q": "Is Prompt Engineer still a real job in 2026?", "a": "Yes, but narrowly. Anthropic, OpenAI, Google DeepMind, and a handful of content-focused startups (Jasper, Copy.ai's enterprise arm) still hire for the dedicated title. Most other companies have either absorbed it into AI Engineer or renamed it to titles like 'AI Product Specialist' or 'LLM Applied Scientist.' The dedicated-title role counts in the low thousands of postings globally — AI Engineer counts in the tens of thousands."},
+        {"q": "Can I become a Prompt Engineer without coding?", "a": "At a few companies, yes — typically those hiring linguists, writers, or domain experts for red-teaming and prompt refinement. But you are stepping into a narrow labor market with shrinking openings. A better 2026 bet for non-coders interested in AI is AI policy, AI ethics, content strategy, or product management. These roles leverage LLM fluency and grow faster than Prompt Engineer."},
+        {"q": "Do Prompt Engineers make $300k like the headlines said?", "a": "The 2023 headlines about $300-400k Prompt Engineer salaries referred to a small number of specialized roles at Anthropic and a few well-funded startups. The median Prompt Engineer in 2026 earns $100-180k — below median AI Engineer. The headline salaries still exist but are for roles that require the skills of a Staff AI Engineer plus deep prompt craft."},
+        {"q": "What's the best skill path if I love working with LLMs but hate writing code?", "a": "AI product management or AI policy. Both value deep LLM understanding without requiring you to ship production systems. AI PMs make $150-250k at mid-level and grow to $300k+ at senior. AI policy is often government- or think-tank-adjacent, lower pay but high mission. Prompt Engineer is a narrower and shrinking bet."},
+        {"q": "Is the AI Engineer role going to absorb Prompt Engineer entirely?", "a": "Largely yes. The historical reason Prompt Engineer was a separate role was that early LLMs were unpredictable and required specialized crafting. As models improve and tooling matures (prompt libraries, eval frameworks, AI-native IDEs), the prompt-craft skill becomes one tool in the AI Engineer toolkit rather than a standalone specialty. The absorption started around 2024 and is nearly complete at non-frontier companies in 2026."},
+        {"q": "What's the overlap between the two skill sets?", "a": "About 30%. Both need deep LLM intuition — what tokens mean, how context windows work, why temperature matters, how to write effective system prompts. AI Engineer additionally needs software engineering, systems design, deployment, and observability. Prompt Engineer additionally needs linguistic rigor, evaluation methodology, and patience for fine-grained iteration."},
+        {"q": "If I'm already an AI Engineer, do I need to study prompt engineering separately?", "a": "Yes, but not as a dedicated path. Every AI Engineer should read the Anthropic prompt engineering guide, the OpenAI cookbook, and one or two good books (e.g., 'Prompt Engineering for Generative AI' by James Phoenix). Budget 20-40 hours of deep study plus ongoing practice. It pays back in better-performing production systems without adding a separate career track."}
+      ],
+      "roadmap_track": "ai-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["AI Engineer", "Prompt Engineer"]
+    },
+    {
+      "slug": "ai-engineer-vs-mlops-engineer",
+      "title": "AI Engineer vs MLOps Engineer",
+      "target_query": "AI engineer vs MLOps engineer",
+      "tldr": "An AI Engineer builds AI-powered product features — prompts, retrieval, inference pipelines. An MLOps Engineer builds and operates the infrastructure that lets ML and AI models run reliably in production — training platforms, feature stores, deployment systems, monitoring. AI Engineer is closer to feature development; MLOps Engineer is closer to platform engineering. Both are essential in any serious AI company; the roles are complementary, not alternatives.",
+      "a": {
+        "name": "AI Engineer",
+        "definition": "An AI Engineer builds AI-powered product features. The role is product-facing — you design prompts, build retrieval pipelines, orchestrate agents, measure output quality, and own user-visible behavior. You consume the platform that MLOps Engineers build. Strong Python, backend frameworks (FastAPI), vector databases, and shipped production features are the core competencies. Most AI Engineers come from 3-5 years of software engineering experience."
+      },
+      "b": {
+        "name": "MLOps Engineer",
+        "definition": "An MLOps Engineer builds and operates the infrastructure that enables machine learning at scale. Responsibilities include training platform design (Kubeflow, Ray, SageMaker), feature store architecture, CI/CD for models, model serving (Triton, TorchServe, Vertex AI Endpoints), A/B testing infrastructure, drift monitoring, and incident response. The role sits at the intersection of DevOps, distributed systems, and machine learning. Strong Kubernetes, Terraform, Python, and at least one cloud platform (AWS, GCP, Azure) are non-negotiable."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "A deployed product feature", "b": "A reusable platform that other engineers consume"},
+        {"row": "Role type", "a": "Feature engineer", "b": "Platform engineer"},
+        {"row": "Daily work", "a": "Prompt design, retrieval, agents, product metrics", "b": "Infrastructure as code, pipeline orchestration, monitoring"},
+        {"row": "Primary languages", "a": "Python + TypeScript", "b": "Python + Go + YAML + HCL"},
+        {"row": "Kubernetes depth", "a": "Consumer-level", "b": "Expert-level"},
+        {"row": "On-call burden", "a": "Low — owns features", "b": "High — owns the platform"},
+        {"row": "Salary range (US, 2026, base)", "a": "$150k–$230k", "b": "$160k–$240k"},
+        {"row": "Background", "a": "Software engineer", "b": "DevOps or SRE with ML exposure"},
+        {"row": "Typical team size", "a": "Embedded in product teams", "b": "Central platform team (3-10 eng)"},
+        {"row": "Best-fit personality", "a": "Ship-oriented, user-focused", "b": "Systems-thinking, reliability-first"}
+      ],
+      "decision_factors": [
+        "Pick AI Engineer if you enjoy building user-facing features and directly measuring their impact. The feedback loop is days to weeks; users interact with your work directly.",
+        "Pick MLOps Engineer if you enjoy building systems that other engineers depend on. The work is less visible but has organizational leverage — a good feature store accelerates a dozen product teams.",
+        "Pick AI Engineer if you came from general software engineering and want to specialize in the AI product layer. The learning curve from SWE to AI Engineer is 3-6 months of focused upskilling.",
+        "Pick MLOps Engineer if you came from SRE, DevOps, or platform engineering and want to deepen into ML. Existing Kubernetes and observability skills transfer directly; you layer ML-specific concerns (model versioning, training orchestration, feature drift) on top.",
+        "Pick AI Engineer if you prefer product code over infrastructure code. If staring at Terraform or Kubernetes manifests excites you, MLOps is the better fit.",
+        "Pick MLOps Engineer if on-call bothers you less than unclear product requirements. MLOps work has high reliability burden but clear success criteria; AI Engineer has the reverse.",
+        "Pay is comparable; MLOps Engineer trends slightly higher at senior levels because of the on-call responsibility and the scarcer skill mix."
+      ],
+      "faqs": [
+        {"q": "Do I need ML experience to become an MLOps Engineer?", "a": "Less than you might think. Strong DevOps, Kubernetes, and distributed systems fundamentals are the bigger prerequisite. You can learn enough ML to do the job well — understanding what a training job is, what a feature store does, why model drift matters — in 3-6 months of focused study. SREs and platform engineers transition into MLOps more often than data scientists do."},
+        {"q": "Which role has better job security?", "a": "Roughly equal for the next 5 years. AI Engineer demand is growing faster, but competition is also growing faster. MLOps Engineer demand grows more slowly but the supply of qualified candidates is tighter. Both roles are safer than junior Data Scientist or traditional software engineering positions because they sit on critical infrastructure."},
+        {"q": "Can MLOps Engineer transition to AI Engineer?", "a": "Yes, and it is increasingly common. The MLOps Engineer already understands production ML, cloud infrastructure, and system reliability. Adding AI Engineer skills — prompt design, retrieval systems, eval methodology — takes 3-6 months. The reverse transition (AI Engineer to MLOps) is harder because the infrastructure depth takes longer to build."},
+        {"q": "What tools do MLOps Engineers actually use?", "a": "Kubernetes (everywhere), Terraform for infrastructure, Airflow or Dagster or Prefect for orchestration, MLflow or Weights & Biases for experiment tracking, Feast or Tecton for feature stores, Triton or TorchServe for serving, Prometheus and Grafana for monitoring, and at least one cloud provider's ML platform (Vertex AI, SageMaker, Azure ML). A typical week touches six to ten of these."},
+        {"q": "Is MLOps dying because of LLM APIs?", "a": "No. LLM APIs reduce the need for training infrastructure at small companies, but they create new MLOps challenges — prompt versioning, eval pipelines at scale, cost monitoring across API providers, fallback routing. Large companies training their own models still have massive MLOps teams. The role is evolving, not shrinking."},
+        {"q": "Which role works more closely with data scientists?", "a": "MLOps Engineer. Data scientists rely on MLOps infrastructure to move from notebook to production — feature stores, training pipelines, batch inference, A/B testing frameworks. AI Engineers work more closely with product managers, designers, and general software engineers; the data scientist dependency is lower because AI Engineers typically consume pretrained models via API."},
+        {"q": "Should a new grad pick AI Engineer or MLOps?", "a": "AI Engineer, usually. The role is more accessible with a fresh CS or ML degree, ships features that are easier to talk about in interviews, and has a clearer career progression in the first 3-5 years. MLOps Engineer benefits from 2-3 years of general platform or DevOps experience first — not impossible as a new grad, but the ramp is steeper."}
+      ],
+      "roadmap_track": "ai-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["AI Engineer", "MLOps Engineer"]
+    },
+    {
+      "slug": "data-scientist-vs-data-analyst",
+      "title": "Data Scientist vs Data Analyst",
+      "target_query": "data scientist vs data analyst",
+      "tldr": "A Data Analyst answers specific business questions with SQL, spreadsheets, and dashboards — turning data into reports. A Data Scientist does the same at higher statistical depth, plus builds predictive models, designs experiments, and does causal inference. Data Analyst is the entry-level role; Data Scientist is the senior version of the same career arc, with a wider analytical toolkit. Pay roughly doubles across the transition.",
+      "a": {
+        "name": "Data Scientist",
+        "definition": "A Data Scientist turns data into insight that drives business decisions, using the full statistical toolkit — hypothesis testing, A/B experiments, causal inference, forecasting, and predictive modeling. The role combines strong SQL, Python (pandas, statsmodels, scikit-learn), statistics, and the ability to communicate technical findings to non-technical stakeholders. Data Scientists usually own higher-stakes decisions than Data Analysts — pricing experiments, feature launches, strategic forecasts — and spend more time on experimental design."
+      },
+      "b": {
+        "name": "Data Analyst",
+        "definition": "A Data Analyst answers specific, typically recurring business questions using SQL, spreadsheets, and BI tools (Tableau, Looker, Power BI, Metabase). The role is reporting-centric: you own dashboards, ad-hoc query requests, and the data definitions underneath key business metrics. Strong SQL, Excel, and one BI tool are mandatory; basic Python and statistics help. Data Analysts are the entry point into the data org for most junior hires; promotion typically goes to Analytics Engineer or Data Scientist."
+      },
+      "comparison_rows": [
+        {"row": "Core artifact", "a": "Experiments, models, and strategic recommendations", "b": "Dashboards, recurring reports, and ad-hoc analyses"},
+        {"row": "Typical question scope", "a": "What should we do next quarter?", "b": "What happened last quarter?"},
+        {"row": "Statistical depth", "a": "Working — causal inference, experiment design", "b": "Basic — correlation, averages, simple tests"},
+        {"row": "Primary tools", "a": "SQL + Python + Jupyter + causal libraries", "b": "SQL + BI tool + Excel"},
+        {"row": "Builds models?", "a": "Yes — predictive and explanatory", "b": "Rarely"},
+        {"row": "Salary range (US, 2026, base)", "a": "$130k–$200k", "b": "$65k–$120k"},
+        {"row": "Education bar", "a": "Bachelor's + strong portfolio, often MS/PhD", "b": "Bachelor's; sometimes no degree"},
+        {"row": "Career ceiling", "a": "Principal Data Scientist / Head of Data Science", "b": "Senior Analyst / Analytics Manager"},
+        {"row": "Hiring volume (2026)", "a": "Stable at senior, compressing at junior", "b": "High — especially in BI-tool-driven orgs"},
+        {"row": "Typical background", "a": "Math, CS, statistics, economics", "b": "Business, finance, marketing, operations"}
+      ],
+      "decision_factors": [
+        "Start as a Data Analyst if you're new to data work, have strong SQL and spreadsheet skills, and want to break into the field within 3-6 months. The Analyst role is the most accessible entry point in tech outside of customer-facing roles.",
+        "Aim for Data Scientist directly if you have a quantitative degree (math, CS, stats, economics, physics) and can demonstrate a 3-6 month portfolio with real analyses and at least one predictive model.",
+        "Pick Data Analyst if you prefer questions that can be answered definitively — 'what happened' is easier to resolve than 'what should we do.'",
+        "Pick Data Scientist if you enjoy ambiguity and framing the right question is half the job. You will often decide whether the question is worth answering before running the analysis.",
+        "Pick Data Analyst if you love BI tools and dashboards. It is a core skill that will be valued for a decade even as AI automates more analysis.",
+        "Pick Data Scientist if you enjoy Python and want to eventually build models that ship to production (note: production ML is typically owned by ML Engineers; Data Scientists usually stop at a notebook or experiment result).",
+        "The Data Analyst → Data Scientist transition is real and common. Expect 2-3 years in the Analyst role, then a focused 6-12 month upskilling in Python, statistics, and causal inference. Many Data Scientists started as Analysts."
+      ],
+      "faqs": [
+        {"q": "Is Data Analyst a dead-end career?", "a": "No. Senior Analyst and Analytics Manager are well-paid roles at FAANG and growth-stage companies ($150-200k at senior level). Analytics Engineer (dbt + modeling layer ownership) is another promotion path. But the Analyst ceiling is lower than Data Scientist's — if you want to top out at $300k+, plan the transition."},
+        {"q": "Can I become a Data Scientist without a master's degree?", "a": "Yes. The market increasingly values portfolio and demonstrated skill over credentials. A Data Analyst with 2-3 years of experience, three shipped end-to-end analyses (one with a predictive model, one with an experiment, one with causal inference), and strong Python can clear most mid-level Data Scientist bars without a master's. PhD helps at research-leaning roles and nowhere else."},
+        {"q": "How long does the Analyst-to-Scientist transition take?", "a": "Typically 18-30 months of combined experience plus focused upskilling. Spend the first 12 months mastering SQL and BI on the job, then the next 6-12 months building Python, statistics, and modeling skills through side projects and online courses (Andrew Ng ML Specialization, Inferential Statistics on Coursera, fast.ai). Apply for Data Scientist roles with a portfolio, not a cover letter."},
+        {"q": "Which role is more AI-resistant?", "a": "Neither is fully safe, but Data Scientist has the edge. Tools like ChatGPT-for-analytics, Hex, and ThoughtSpot are compressing junior Data Analyst work — ad-hoc 'pull me the numbers for Q3' requests are increasingly self-served. Senior Data Scientist work (experimental design, causal inference, stakeholder alignment) is harder to automate because it requires organizational context."},
+        {"q": "Do Data Scientists know machine learning?", "a": "Most Data Scientists can use scikit-learn comfortably — regression, classification, clustering, time series — but few train deep neural networks. The 'train a model' work in Data Scientist roles is usually gradient-boosted trees or logistic regression for forecasting and segmentation. Deep learning at scale is ML Engineer territory."},
+        {"q": "What's the difference in day-to-day work?", "a": "A Data Analyst's day is 60% SQL, 20% BI tool or Excel, 10% meetings, 10% documentation. A Data Scientist's day is 30% Python and Jupyter, 25% SQL, 20% meetings and writing, 15% reading or learning, 10% whiteboarding with PMs. Scientists spend more time figuring out the right question; Analysts spend more time answering pre-set questions."},
+        {"q": "Should a career switcher aim for Analyst first or Scientist directly?", "a": "If you have a quantitative background (math, CS, stats, economics, engineering), aim for Data Scientist directly and fall back to Analyst if you don't land Scientist roles. If you have a business background (marketing, finance, operations), aim for Analyst first — the path is faster and you can transition to Scientist from there."}
+      ],
+      "roadmap_track": "data-scientist",
+      "related_blog_slugs": [],
+      "related_job_designations": ["Data Scientist", "Data Analyst"]
+    },
+    {
+      "slug": "ai-vs-machine-learning",
+      "title": "AI vs Machine Learning",
+      "target_query": "AI vs machine learning",
+      "tldr": "Artificial Intelligence is the broad field of building systems that exhibit intelligent behavior — reasoning, planning, learning, perception. Machine Learning is a subset of AI that learns patterns from data rather than being explicitly programmed. Every ML system is an AI system; many AI approaches (rule-based reasoning, search, symbolic logic) are not ML. In practice in 2026, most commercially-deployed AI is ML, and most ML is deep learning or LLM-based.",
+      "a": {
+        "name": "Artificial Intelligence",
+        "definition": "Artificial Intelligence is the field of building computer systems that perform tasks traditionally requiring human intelligence — reasoning, planning, understanding language, recognizing images, making decisions under uncertainty. AI includes many approaches: rule-based expert systems, search algorithms (like A*), symbolic logic, evolutionary computation, and machine learning. The field dates to the 1950s and has gone through multiple 'winters' where progress stalled. Modern AI is overwhelmingly driven by machine learning and particularly deep learning, but the broader AI umbrella covers more than just learned models."
+      },
+      "b": {
+        "name": "Machine Learning",
+        "definition": "Machine Learning is a subset of AI focused on building systems that learn from data rather than being explicitly programmed. An ML system is given examples — labeled inputs and expected outputs, or unlabeled data with structural objectives — and it fits a model that generalizes to new data. ML includes classical statistical methods (linear regression, decision trees, SVMs), neural networks and deep learning, reinforcement learning, and self-supervised learning of foundation models. Since roughly 2012 deep learning has been the dominant approach for hard problems; since 2020 large language models have been the dominant approach for language and reasoning."
+      },
+      "comparison_rows": [
+        {"row": "Relationship", "a": "The parent field", "b": "A subset of AI"},
+        {"row": "Approach", "a": "Any method that produces intelligent behavior", "b": "Learn from data"},
+        {"row": "Age of the field", "a": "1950s onward", "b": "1960s onward, explosive from 2012"},
+        {"row": "Core paradigm", "a": "Many — logic, search, learning, planning", "b": "One — statistical learning from examples"},
+        {"row": "Includes rule-based systems?", "a": "Yes", "b": "No"},
+        {"row": "Includes neural networks?", "a": "Yes (as part of ML)", "b": "Yes — the dominant approach since 2012"},
+        {"row": "Includes LLMs?", "a": "Yes (as part of ML)", "b": "Yes — a specific neural architecture"},
+        {"row": "Typical course labels", "a": "Introduction to AI (Russell & Norvig)", "b": "Introduction to ML (Hastie, Tibshirani, Friedman)"},
+        {"row": "Academic departments", "a": "Often AI labs or broader CS", "b": "Often ML groups or statistics departments"},
+        {"row": "In 2026 practice", "a": "Almost synonymous with ML or LLMs", "b": "Dominated by deep learning and LLMs"}
+      ],
+      "decision_factors": [
+        "Use 'AI' when talking to non-technical audiences. It communicates the intent of the system without requiring knowledge of the approach.",
+        "Use 'machine learning' when you need to distinguish from rule-based or symbolic approaches, or when the technical detail matters.",
+        "Use 'deep learning' when the technique specifically involves deep neural networks.",
+        "Use 'LLM' or 'generative AI' when the system specifically produces content (text, images, audio, video) from a pretrained model.",
+        "In a job description, 'AI Engineer' typically means someone integrating LLMs and pretrained models into applications. 'ML Engineer' means someone training and deploying models, often deep neural networks. The titles are not synonyms.",
+        "In academic writing, precision matters. AI is the superset; ML is a subset; deep learning is a subset of ML; LLMs are a subset of deep learning. Use the narrowest term that is accurate.",
+        "Do not waste time on the taxonomy if your audience does not care. Most business readers conflate AI and ML; correcting them when it does not affect the decision is pedantry, not clarity."
+      ],
+      "faqs": [
+        {"q": "Are AI and ML the same thing?", "a": "No, though the terms are used interchangeably in casual usage. ML is a subset of AI — a specific approach to achieving AI that learns from data rather than being explicitly programmed. Historically, AI also includes rule-based systems, search algorithms, and symbolic reasoning. In 2026 practice, most commercial 'AI' is ML, which is why the terms often feel synonymous. The distinction matters when discussing non-ML AI (like chess engines using search, or SAT solvers) or when discussing ML theory."},
+        {"q": "Is ChatGPT AI or ML?", "a": "Both. ChatGPT is an AI system built using machine learning — specifically, a large transformer-based neural network trained on a huge text corpus via self-supervised learning, then fine-tuned with reinforcement learning from human feedback. It is simultaneously an AI system, a machine learning system, a deep learning system, and a large language model. Each label is correct at different levels of specificity."},
+        {"q": "If I want to work in AI, should I learn ML?", "a": "Yes, almost certainly. In 2026, nearly every commercial AI role involves ML. Even 'AI Engineer' roles that primarily integrate pretrained models require ML literacy — understanding what a model is, how training works conceptually, why evaluation matters. The exception is narrow rule-based or symbolic AI, which exists in some industrial and safety-critical applications but is not a large job market."},
+        {"q": "Is traditional AI (rule-based systems) still used?", "a": "Yes, in specific domains. Medical diagnosis engines, air traffic control, game AI for older-style games, formal verification tools, and many compliance systems still use rule-based or symbolic approaches because they are more interpretable and auditable than ML. But the total share of rule-based AI in the economy has been steadily shrinking since roughly 2015."},
+        {"q": "What came first, AI or ML?", "a": "AI, as a named field. The term 'artificial intelligence' was coined at the 1956 Dartmouth Conference. The term 'machine learning' was coined shortly after by Arthur Samuel in 1959. Statistical learning — the mathematical foundation of ML — predates both, with roots in 19th-century statistics. In that sense ML is simultaneously a subset of AI and an independent tradition."},
+        {"q": "Is AGI the same as AI?", "a": "No. AGI (Artificial General Intelligence) refers specifically to an AI system with broad cognitive abilities matching or exceeding a human across most tasks. Current AI systems — including frontier LLMs — are narrow AI: exceptional at specific tasks, limited or unreliable outside their training domain. AGI is a long-term research goal; experts disagree on how far away it is and what exactly would qualify."},
+        {"q": "Can you have AI without ML?", "a": "Yes. Classical AI systems — expert systems, rule engines, planning algorithms (like those in logistics software), chess engines using search rather than learning — are all AI without being ML. These systems were the dominant form of commercial AI through roughly the 1990s. Some still exist and are actively developed, especially where interpretability, auditability, or safety-critical behavior matters."}
+      ],
+      "roadmap_track": "generalist",
+      "related_blog_slugs": [],
+      "related_job_designations": []
+    },
+    {
+      "slug": "generative-ai-vs-traditional-ai",
+      "title": "Generative AI vs Traditional AI",
+      "target_query": "generative AI vs traditional AI",
+      "tldr": "Traditional AI makes predictions or decisions from input data — classifying emails as spam, recommending products, detecting fraud. Generative AI produces new content — text, images, code, audio, video — from a prompt. Traditional AI answers 'what is this?' or 'what should happen next?' Generative AI answers 'create something new that satisfies this description.' Both are valuable; generative AI has seen explosive growth since 2022 and now commands roughly 60% of new AI investment.",
+      "a": {
+        "name": "Generative AI",
+        "definition": "Generative AI is machine learning that produces new content — text, images, code, audio, video — from a learned distribution. The dominant generative AI systems in 2026 are large language models (ChatGPT, Claude, Gemini) for text and code, diffusion models (Stable Diffusion, Flux, Imagen) for images, and multimodal models that handle more than one modality at once. Generative AI models are typically pretrained on huge unlabeled datasets using self-supervised objectives, then adapted to specific tasks via fine-tuning, RLHF, or prompt engineering."
+      },
+      "b": {
+        "name": "Traditional AI",
+        "definition": "Traditional AI, sometimes called discriminative or predictive AI, makes decisions, predictions, or classifications from input data. Examples include spam detection, credit scoring, recommendation systems, fraud detection, demand forecasting, object detection, and medical diagnosis from imaging. The models are usually trained on labeled datasets (supervised learning) or optimized against reward signals (reinforcement learning). Traditional AI has been in commercial production for decades and runs quietly behind most internet services you use."
+      },
+      "comparison_rows": [
+        {"row": "Primary output", "a": "New content (text, image, code, audio, video)", "b": "A label, score, or decision"},
+        {"row": "Primary question", "a": "Create something that satisfies this description", "b": "Classify, score, or predict this input"},
+        {"row": "Dominant models 2026", "a": "LLMs (GPT-4, Claude, Gemini), diffusion models", "b": "Gradient boosting, neural nets for classification, recommender systems"},
+        {"row": "Training paradigm", "a": "Self-supervised pretraining + fine-tuning + RLHF", "b": "Supervised learning on labeled data"},
+        {"row": "Data hunger", "a": "Enormous — internet-scale pretraining", "b": "Modest — often thousands to millions of labeled examples"},
+        {"row": "Compute cost", "a": "Pretraining costs $10M–$1B+; inference is expensive", "b": "Training and inference are typically cheap"},
+        {"row": "Output evaluation", "a": "Hard — subjective, requires human or LLM judges", "b": "Easier — well-defined metrics (accuracy, F1, AUC)"},
+        {"row": "Hallucination / fabrication risk", "a": "High — models confidently produce false content", "b": "Lower — outputs are bounded by the label space"},
+        {"row": "Mainstream since", "a": "2022 (ChatGPT)", "b": "Early 2000s (spam filters, recommenders)"},
+        {"row": "Share of new AI investment 2026", "a": "~60%", "b": "~40%"}
+      ],
+      "decision_factors": [
+        "Pick generative AI if your application creates content — drafts, summaries, images, code, responses to open-ended questions. Nothing else competes on quality for open-ended generation.",
+        "Pick traditional AI if your application classifies, scores, or predicts from structured data. Fraud detection, recommendation, pricing, forecasting — generative AI is overkill and often worse than a well-tuned gradient-boosted tree.",
+        "Combine both when you need generation grounded in structured information — for example, a customer service agent that uses traditional classification to route tickets and generative AI to draft responses.",
+        "Use generative AI when the cost of occasional fabrication is tolerable — drafting, ideation, summarization. Avoid it when factual accuracy is critical without grounding (medical diagnosis, legal advice, financial decisions).",
+        "Use traditional AI when you need interpretability. Gradient-boosted trees and logistic regression have well-established explainability tools; LLMs do not.",
+        "Use traditional AI when you have plenty of labeled data and well-defined evaluation metrics. It will train faster, infer cheaper, and deliver better-calibrated confidence scores.",
+        "Use generative AI when you do not have training data for your specific task but you have good natural-language task descriptions. Prompting a foundation model is often better than training from scratch when training data is thin."
+      ],
+      "faqs": [
+        {"q": "Is generative AI replacing traditional AI?", "a": "No, but it is displacing it in some use cases. Open-ended text generation, creative work, and natural language interfaces were never well-served by traditional AI; those are now dominated by generative AI. Classification, recommendation, forecasting, and fraud detection still run on traditional AI and typically outperform generative AI on structured tasks. The fields are coexisting, with generative AI taking the 'content creation' space and traditional AI holding the 'predict and classify' space."},
+        {"q": "Why is generative AI so expensive compared to traditional AI?", "a": "Scale. A typical traditional AI model has millions to tens of millions of parameters and trains on hundreds of megabytes of labeled data. A frontier generative AI model has hundreds of billions of parameters and trains on terabytes of internet text. Training cost scales roughly with parameters × tokens, which is why pretraining a frontier LLM costs $50M-$1B, whereas training a traditional AI model for a real business problem often costs under $10k."},
+        {"q": "Can generative AI do classification?", "a": "Yes, via prompting. You can ask an LLM to classify an email as spam, or to rate a review's sentiment, and it will often perform competently. But for high-volume production classification, traditional AI is faster (milliseconds vs seconds), cheaper (orders of magnitude less compute), better-calibrated (actual probability estimates), and often more accurate. Use generative AI for classification only when the task requires natural language understanding that traditional models cannot capture."},
+        {"q": "What about reinforcement learning — is that traditional or generative?", "a": "Traditionally classified as traditional AI, but modern generative AI systems heavily use RL in training — specifically RLHF (Reinforcement Learning from Human Feedback) to align LLMs to human preferences. The boundary is blurring. A safer framing: RL is a training paradigm; what you use it for can be traditional (game-playing, robotics) or generative (aligning an LLM)."},
+        {"q": "Should a new AI developer learn generative or traditional AI first?", "a": "Traditional AI, because the fundamentals are the fundamentals. Learn supervised learning, cross-validation, evaluation metrics, and feature engineering first — these apply to both worlds. Then layer generative AI on top. An engineer who knows only generative AI but not traditional ML is likely to misuse LLMs on problems better solved by a decision tree, wasting budget and getting worse results."},
+        {"q": "Where is traditional AI still dominant in 2026?", "a": "Recommender systems at scale (YouTube, Netflix, TikTok), search ranking (Google, Amazon), fraud detection at banks, programmatic advertising, demand forecasting, inventory management, and credit scoring. These systems handle billions of decisions per day at millisecond latency — generative AI cannot compete on economics or reliability in these domains."},
+        {"q": "What's next after generative AI?", "a": "Agentic AI — systems that plan multi-step actions, call tools, and accomplish goals rather than just producing content. Agents build on generative AI (LLMs are usually the reasoning core) but add planning, tool use, and self-correction. Early agentic systems are becoming commercially viable in 2026 for tasks like software development, research, and customer operations. Fully autonomous agents remain an open research problem."}
+      ],
+      "roadmap_track": "generalist",
+      "related_blog_slugs": [],
+      "related_job_designations": []
+    },
+    {
+      "slug": "rag-vs-fine-tuning",
+      "title": "RAG vs Fine-tuning",
+      "target_query": "RAG vs fine-tuning",
+      "tldr": "RAG (Retrieval-Augmented Generation) gives an LLM external knowledge at query time by retrieving relevant documents and passing them in the prompt. Fine-tuning updates the model's weights to embed new knowledge or change behavior. RAG is cheaper, faster to iterate, easier to update, and better for fact-heavy applications. Fine-tuning is better for style, tone, format, and deeply embedded domain knowledge. Most production AI features use RAG; fine-tuning is reserved for narrow high-value cases.",
+      "a": {
+        "name": "RAG",
+        "definition": "Retrieval-Augmented Generation (RAG) is a pattern where an LLM answers a question by first retrieving relevant documents from an external knowledge base, then generating the response with those documents in the prompt. The retrieval step typically uses semantic similarity via embeddings stored in a vector database (pgvector, Pinecone, Weaviate, Qdrant). RAG is the default pattern for grounding LLM responses in proprietary or frequently-updated information — documentation, knowledge bases, product catalogs, legal documents, medical literature. It trades latency (one extra network hop) and context-window cost (documents in the prompt) for factual grounding and easy knowledge updates."
+      },
+      "b": {
+        "name": "Fine-tuning",
+        "definition": "Fine-tuning updates a pretrained model's weights on your specific dataset to change its behavior. Techniques range from full fine-tuning (all weights updated) to parameter-efficient methods like LoRA and adapters (a small number of new parameters added and trained). Fine-tuning is best for teaching a model a specific style, tone, output format, or narrow task where the input distribution is well-defined. It is a larger upfront investment — data preparation, training cost, evaluation, and re-training when the source data changes — but once complete, inference is fast and does not require additional context."
+      },
+      "comparison_rows": [
+        {"row": "Where new info lives", "a": "In an external knowledge base (vector DB)", "b": "Inside the model's weights"},
+        {"row": "Update cost", "a": "Near-zero — re-index new documents", "b": "High — re-train or re-apply LoRA"},
+        {"row": "Time to set up", "a": "Hours to days", "b": "Days to weeks"},
+        {"row": "Inference latency", "a": "Higher — retrieval adds 50-200ms", "b": "Lower — just the generation step"},
+        {"row": "Inference cost", "a": "Higher — documents fill the context window", "b": "Lower — context stays small"},
+        {"row": "Works for fact-heavy content", "a": "Yes — core use case", "b": "Partially — facts must be re-encoded at training"},
+        {"row": "Works for style / tone", "a": "Weakly — prompt can steer", "b": "Strongly — weights directly encode style"},
+        {"row": "Auditable sources", "a": "Yes — retrieved docs are the citation", "b": "No — opaque reasoning from weights"},
+        {"row": "Best for hallucination control", "a": "Strong — grounded in retrieved text", "b": "Weak — no explicit grounding"},
+        {"row": "Iteration speed", "a": "Fast — update the index", "b": "Slow — retrain"}
+      ],
+      "decision_factors": [
+        "Default to RAG. It is faster to set up, cheaper to update, easier to audit, and covers 80% of real-world LLM applications.",
+        "Pick fine-tuning when you need a specific output format that is hard to reliably prompt — structured JSON with rare schema, domain-specific writing style (legal, medical), or a tone that your customer service team must match.",
+        "Pick fine-tuning when your knowledge base is stable and small enough that keeping it in model weights is acceptable — static training data, narrow vocabulary, well-defined task.",
+        "Pick RAG when your knowledge updates frequently — product docs that change weekly, a knowledge base you want to keep current without re-training, customer data that must stay current.",
+        "Pick RAG when you need source citations — legal research, medical information, journalism-adjacent use cases. RAG gives you the retrieved documents as the citation; fine-tuning does not.",
+        "Pick RAG when your budget is limited. The setup is cheaper, operations are cheaper, and you can use a smaller, cheaper base model because the retrieved context carries the knowledge.",
+        "Combine both when justified — fine-tune for style and format, then add RAG for knowledge. This hybrid is expensive but delivers the best of both worlds and is increasingly common in high-stakes production systems."
+      ],
+      "faqs": [
+        {"q": "Is RAG better than fine-tuning?", "a": "Usually, for most tasks. RAG is cheaper, faster to iterate, and keeps knowledge updatable. Fine-tuning wins only in specific cases: strict output formats, strong style requirements, or latency-critical applications where skipping the retrieval hop matters. A good default heuristic: try RAG first, fine-tune only if RAG cannot achieve the quality bar."},
+        {"q": "Can I do both?", "a": "Yes. Fine-tune for style and task-specific behavior, then use RAG to bring in fresh or private knowledge. This hybrid is common in regulated industries (healthcare, finance, legal) where both specific output format and current factual grounding matter. It is more expensive to build and maintain but delivers higher quality than either approach alone."},
+        {"q": "How much does fine-tuning actually cost?", "a": "Parameter-efficient fine-tuning (LoRA on a 7B-13B parameter model) costs $50-$500 per training run on a single GPU or cloud API. Full fine-tuning of a frontier model is in the five-to-six-figure range and requires specialized infrastructure. Ongoing cost includes re-fine-tuning as your data changes. For most teams, LoRA-scale fine-tuning is the realistic option."},
+        {"q": "Does RAG work with private data?", "a": "Yes — that is one of its main use cases. Your vector database runs in your infrastructure (or a trusted vendor's), documents are embedded locally or via an API, and retrieval happens server-side. Many enterprise deployments use RAG specifically because it keeps proprietary data out of the LLM's training set entirely."},
+        {"q": "What's the latency overhead of RAG?", "a": "Typically 50-200ms for the retrieval step — vector database query, reranking if used, document fetching. If your base LLM response takes 2-4 seconds, the RAG overhead is a modest fraction. Optimize by caching frequent queries, pre-computing embeddings at write time, and using a fast reranker only when necessary."},
+        {"q": "When does fine-tuning beat RAG?", "a": "Three clear cases. First, strict output format requirements — fine-tuning reliably produces JSON with the exact schema, whereas RAG with prompting is brittle. Second, a specific writing style or tone that must match a brand voice. Third, latency-critical real-time applications where the 50-200ms retrieval hop is intolerable. Outside these cases, RAG is usually the right default."},
+        {"q": "What about agents and tool use — where do they fit?", "a": "Agents are a different axis. An agent uses an LLM to plan multi-step actions, often calling tools (search, database queries, APIs) to accomplish a goal. RAG is one of the tools an agent might use; fine-tuning can improve an agent's reliability at following tool-use protocols. Agents, RAG, and fine-tuning are complementary, not competing, design patterns."}
+      ],
+      "roadmap_track": "ai-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["AI Engineer"]
+    },
+    {
+      "slug": "pytorch-vs-tensorflow",
+      "title": "PyTorch vs TensorFlow",
+      "target_query": "PyTorch vs TensorFlow",
+      "tldr": "PyTorch is the dominant framework for AI research and increasingly for production — dynamic, Pythonic, preferred by frontier AI labs (Meta, OpenAI, Anthropic). TensorFlow still leads in large-scale Google production deployments and on-device ML (TensorFlow Lite). For new projects in 2026, PyTorch is the default choice for 80% of use cases. TensorFlow matters in Google-stack production and mobile ML. Both frameworks are mature, stable, and production-capable.",
+      "a": {
+        "name": "PyTorch",
+        "definition": "PyTorch is a deep learning framework developed at Meta (formerly Facebook) and released in 2017. It features dynamic computation graphs (eager execution by default), a Pythonic API that feels natural to NumPy users, and strong debugging support. PyTorch dominates AI research — almost every frontier paper in 2024-2026 uses it — and has steadily caught up to TensorFlow in production deployment. The ecosystem includes TorchServe for serving, PyTorch Lightning for training orchestration, and tight integration with Hugging Face transformers, Ray, and ONNX. It is the default framework for new AI projects in 2026."
+      },
+      "b": {
+        "name": "TensorFlow",
+        "definition": "TensorFlow is a deep learning framework developed by Google and released in 2015. The original TensorFlow used static computation graphs defined before execution — powerful but cumbersome. TensorFlow 2 (2019) adopted eager execution by default and is now Pythonic, but the framework still carries design decisions from its earlier era. TensorFlow leads in Google-stack production (tight TPU integration, Vertex AI), on-device ML (TensorFlow Lite for mobile and embedded), and JavaScript deployment (TensorFlow.js). The Keras API, originally a separate project, is now the recommended high-level interface."
+      },
+      "comparison_rows": [
+        {"row": "Developer", "a": "Meta (Facebook)", "b": "Google"},
+        {"row": "Released", "a": "2017", "b": "2015"},
+        {"row": "Default execution", "a": "Eager (dynamic)", "b": "Eager by default in TF 2, graph for serving"},
+        {"row": "Research adoption", "a": "~80% of new papers use PyTorch", "b": "~15% of new papers"},
+        {"row": "Production adoption", "a": "Strong and growing — Meta, Anthropic, OpenAI, most startups", "b": "Strong at Google, Spotify, Airbnb, many enterprises"},
+        {"row": "TPU support", "a": "Via PyTorch/XLA (functional, not seamless)", "b": "Native (excellent)"},
+        {"row": "Mobile / embedded", "a": "PyTorch Mobile (newer, smaller ecosystem)", "b": "TensorFlow Lite (mature, widely deployed)"},
+        {"row": "Model serving", "a": "TorchServe, Triton, Ray Serve", "b": "TensorFlow Serving (mature)"},
+        {"row": "LLM ecosystem fit", "a": "First-class — Hugging Face, DeepSpeed, vLLM all PyTorch-first", "b": "Secondary — most LLM tooling is PyTorch"},
+        {"row": "Learning curve", "a": "Gentler — feels like NumPy", "b": "Steeper for TF 1 legacy code; TF 2 is similar to PyTorch"}
+      ],
+      "decision_factors": [
+        "Pick PyTorch for any new deep learning project in 2026 unless you have a specific reason to pick TensorFlow. It is the default in research and increasingly the default in production.",
+        "Pick PyTorch if you work with LLMs or transformers. Every major library — Hugging Face transformers, DeepSpeed, vLLM, PyTorch Lightning — is PyTorch-first.",
+        "Pick PyTorch if your team prefers Pythonic, debuggable code. PyTorch errors are usually immediately actionable; TensorFlow errors often involve inscrutable graph-execution traces.",
+        "Pick TensorFlow if you deploy to Google Cloud and want tight Vertex AI and TPU integration. TensorFlow remains the first-class citizen in that stack.",
+        "Pick TensorFlow if you deploy to mobile or embedded devices. TensorFlow Lite has a more mature on-device story than PyTorch Mobile, especially for Android and iOS production apps.",
+        "Pick TensorFlow if you have a TensorFlow-native codebase and strong internal expertise. The cost of migration outweighs the benefits unless you are starting fresh or rewriting anyway.",
+        "Both are excellent frameworks. The correct tactical advice in 2026 is 'use PyTorch unless there's a specific TensorFlow reason.' The correct strategic advice is 'learn one well, then add the other if you need it.'"
+      ],
+      "faqs": [
+        {"q": "Is PyTorch really winning over TensorFlow?", "a": "In research, yes — decisively. Papers-with-Code statistics show PyTorch adoption in roughly 75-80% of new research papers in 2025, versus 10-15% for TensorFlow. In production, the gap is narrower but still in PyTorch's favor. Most AI-native startups founded since 2020 are PyTorch shops. Established enterprises often still run TensorFlow because of legacy systems; new projects at those enterprises frequently default to PyTorch."},
+        {"q": "Should I still learn TensorFlow in 2026?", "a": "Only if you have a specific reason. Those reasons include: you work at Google or in the Google Cloud ecosystem, you deploy to mobile via TensorFlow Lite, you work in an organization with an established TensorFlow codebase, or you want a fuller understanding of the field by knowing both. For a general AI engineer path, PyTorch first is the right call."},
+        {"q": "Is TensorFlow dying?", "a": "No. Google continues active development, and TensorFlow holds dominant positions in several niches (TPU training at Google scale, mobile inference, JavaScript runtime deployment). 'Dying' would be the wrong word; 'losing research mindshare' is more accurate. TensorFlow will remain a major framework for at least another decade because of the massive installed base in enterprise and Google's continued investment."},
+        {"q": "What about JAX — is it a third option?", "a": "JAX is a research framework from Google that combines NumPy-style APIs with automatic differentiation and XLA compilation. It has strong adoption at DeepMind, Anthropic, and academic labs because of its functional programming model and TPU performance. It is not a PyTorch or TensorFlow replacement for most production work — ecosystem maturity lags. Worth learning if you work in research or at a JAX-using lab; not necessary for general production work."},
+        {"q": "Can I use Hugging Face with TensorFlow?", "a": "Yes, but worse than with PyTorch. Hugging Face supports both, but the PyTorch path is the primary focus — newer features ship there first, the TensorFlow path sometimes lags by months, and some advanced features (certain quantization methods, some distributed training options) are PyTorch-only. If Hugging Face is central to your work, choose PyTorch."},
+        {"q": "Which framework has better distributed training?", "a": "Both are mature, but the patterns differ. PyTorch uses DistributedDataParallel and torch.distributed; the Hugging Face Accelerate library and DeepSpeed build on top. TensorFlow uses tf.distribute.Strategy. For very large training runs (frontier LLMs), both frameworks require significant custom infrastructure work; Meta and Google have published their own stacks (FSDP, Megatron-LM for PyTorch; TF Mesh for TensorFlow)."},
+        {"q": "How hard is it to switch between them?", "a": "Moderate. The conceptual overlap is large — tensors, autograd, layers, optimizers, training loops. The API differences take a few weeks to internalize. A production migration of a large codebase is a multi-month project not because of API differences but because of tooling, training scripts, model artifacts, deployment configurations, and team expertise. For learning, switching is fast; for migrating a running system, it is not."}
+      ],
+      "roadmap_track": "ml-engineer",
+      "related_blog_slugs": [],
+      "related_job_designations": ["ML Engineer"]
+    }
+  ]
+}

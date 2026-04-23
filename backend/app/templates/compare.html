@@ -1,0 +1,219 @@
+{# SEO-19 comparison page template. One /vs/{slug} URL per entry in
+   backend/data/comparisons.json. Renders visible content (TL;DR, two role
+   definitions, comparison table, decision factors, FAQs) plus Article +
+   FAQPage + DefinedTerm × 2 + BreadcrumbList JSON-LD blocks.
+
+   Context:
+     comp      — one comparison dict from comparisons.json (safe to trust;
+                 data file is source-controlled)
+     canonical — absolute URL for this /vs/{slug} page
+     base      — e.g. "https://automateedge.cloud"
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ comp.title }}: Complete 2026 Comparison — AutomateEdge</title>
+  <meta name="description" content="{{ comp.tldr }}">
+  <meta name="author" content="AutomateEdge">
+  <link rel="canonical" href="{{ canonical }}">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ comp.title }}: Complete 2026 Comparison">
+  <meta property="og:description" content="{{ comp.tldr }}">
+  <meta property="og:url" content="{{ canonical }}">
+  <meta property="og:site_name" content="AutomateEdge">
+  <meta property="og:image" content="{{ base }}/og/course/generalist.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ base }}/og/course/generalist.png">
+
+  {# Article JSON-LD — primary schema #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": {{ (comp.title ~ ": Complete 2026 Comparison") | tojson }},
+    "datePublished": "2026-04-23T00:00:00Z",
+    "dateModified": "2026-04-23T00:00:00Z",
+    "author": {"@type": "Organization", "name": "AutomateEdge"},
+    "publisher": {
+      "@type": "Organization",
+      "name": "AutomateEdge",
+      "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+    },
+    "image": {{ (base ~ "/og/course/generalist.png") | tojson }},
+    "mainEntityOfPage": {{ canonical | tojson }},
+    "description": {{ comp.tldr | tojson }}
+  }
+  </script>
+
+  {# DefinedTerm JSON-LD, one per role — helps Google surface role definitions
+     in panel / direct-answer results. #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": {{ comp.a.name | tojson }},
+    "description": {{ comp.a.definition | tojson }},
+    "inDefinedTermSet": {"@type": "DefinedTermSet", "name": "AutomateEdge AI Career Glossary"}
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": {{ comp.b.name | tojson }},
+    "description": {{ comp.b.definition | tojson }},
+    "inDefinedTermSet": {"@type": "DefinedTermSet", "name": "AutomateEdge AI Career Glossary"}
+  }
+  </script>
+
+  {# BreadcrumbList — Home → vs → {A} vs {B} #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+      {"@type": "ListItem", "position": 2, "name": "Comparisons", "item": "https://automateedge.cloud/vs"},
+      {"@type": "ListItem", "position": 3, "name": {{ comp.title | tojson }}}
+    ]
+  }
+  </script>
+
+  {# FAQPage — 6-8 Q&As matching the visible FAQ section below #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {% for qa in comp.faqs %}
+      {
+        "@type": "Question",
+        "name": {{ qa.q | tojson }},
+        "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}
+      }{{ "," if not loop.last else "" }}
+      {% endfor %}
+    ]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/nav.css">
+  <style>
+    :root { color-scheme: dark }
+    html, body { margin: 0; background: #0f1419; color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.65 }
+    main.compare { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #e8a849; margin-bottom: 10px }
+    h1 { font-family: 'Fraunces', Georgia, serif; font-size: clamp(30px, 4.5vw, 44px); line-height: 1.15; color: #f5f1e8; font-weight: 500; margin: 0 0 14px; letter-spacing: -0.01em }
+    .tldr { background: #1a2029; border-left: 3px solid #e8a849; padding: 18px 22px; border-radius: 4px; color: #e8e4d8; margin: 28px 0; font-size: 16px }
+    h2 { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 500; color: #f5f1e8; margin: 48px 0 16px; letter-spacing: -0.01em }
+    h3 { font-family: 'IBM Plex Sans', sans-serif; font-size: 18px; font-weight: 600; color: #f5f1e8; margin: 22px 0 10px }
+    p { color: #d0cbc2; font-size: 15.5px; margin: 0 0 14px }
+    .role-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0 }
+    .role-card { background: #161c24; border: 1px solid #2a323d; border-radius: 6px; padding: 20px 22px }
+    .role-card h3 { margin-top: 0; color: #e8a849 }
+    .role-card p { margin-bottom: 0; font-size: 14.5px }
+    table.compare { width: 100%; border-collapse: collapse; margin: 20px 0 28px; font-size: 14.5px; background: #141a21; border: 1px solid #2a323d; border-radius: 6px; overflow: hidden }
+    table.compare th, table.compare td { padding: 11px 14px; border-bottom: 1px solid #2a323d; text-align: left; vertical-align: top }
+    table.compare thead th { background: #1a2029; color: #e8a849; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500 }
+    table.compare tr:last-child td { border-bottom: 0 }
+    table.compare td:first-child { color: #94a3b8; font-weight: 500; white-space: nowrap }
+    table.compare td:nth-child(2), table.compare td:nth-child(3) { color: #e8e4d8 }
+    ul.factors { padding-left: 22px; color: #d0cbc2 }
+    ul.factors li { margin: 10px 0; font-size: 15.5px; line-height: 1.65 }
+    .faq { margin-top: 12px }
+    .faq details { background: #161c24; border: 1px solid #2a323d; border-radius: 6px; padding: 14px 18px; margin-bottom: 10px }
+    .faq details[open] { border-color: rgba(232,168,73,0.4) }
+    .faq summary { cursor: pointer; list-style: none; font-weight: 500; color: #f5f1e8; font-size: 15px }
+    .faq summary::-webkit-details-marker { display: none }
+    .faq summary::before { content: "+ "; color: #e8a849; margin-right: 6px; font-weight: 600 }
+    .faq details[open] summary::before { content: "– " }
+    .faq p { margin: 10px 0 0; color: #b8b2a4; font-size: 14.5px }
+    .cross-links { margin-top: 48px; padding: 22px 24px; background: #161c24; border: 1px solid #2a323d; border-radius: 6px }
+    .cross-links h3 { margin: 0 0 10px; color: #e8a849; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500 }
+    .cross-links a { color: #e8a849; text-decoration: none; border-bottom: 1px solid transparent }
+    .cross-links a:hover { border-bottom-color: #e8a849 }
+    .cross-links ul { padding: 0; list-style: none; margin: 8px 0 0 }
+    .cross-links li { padding: 4px 0; font-size: 14.5px; color: #d0cbc2 }
+    @media (max-width: 720px) { .role-pair { grid-template-columns: 1fr } table.compare { font-size: 13px } }
+  </style>
+</head>
+<body>
+  <main class="compare">
+    <nav aria-label="Breadcrumb" style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;margin-bottom:10px">
+      <a href="/" style="color:#94a3b8;text-decoration:none">Home</a>
+      <span style="margin:0 6px;color:#5a6473">/</span>
+      <a href="/vs" style="color:#94a3b8;text-decoration:none">Comparisons</a>
+      <span style="margin:0 6px;color:#5a6473">/</span>
+      <span style="color:#e8a849">{{ comp.title }}</span>
+    </nav>
+
+    <div class="eyebrow">AutomateEdge · AI Career Comparison</div>
+    <h1>{{ comp.title }}: Complete 2026 Comparison</h1>
+
+    <div class="tldr"><strong>TL;DR —</strong> {{ comp.tldr }}</div>
+
+    <h2>What is {{ comp.a.name }}?</h2>
+    <p>{{ comp.a.definition }}</p>
+
+    <h2>What is {{ comp.b.name }}?</h2>
+    <p>{{ comp.b.definition }}</p>
+
+    <h2>Side-by-side comparison</h2>
+    <table class="compare">
+      <thead>
+        <tr>
+          <th>Aspect</th>
+          <th>{{ comp.a.name }}</th>
+          <th>{{ comp.b.name }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comp.comparison_rows %}
+        <tr>
+          <td>{{ row.row }}</td>
+          <td>{{ row.a }}</td>
+          <td>{{ row.b }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Which should you choose?</h2>
+    <ul class="factors">
+      {% for factor in comp.decision_factors %}
+      <li>{{ factor }}</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Frequently asked questions</h2>
+    <div class="faq">
+      {% for qa in comp.faqs %}
+      <details>
+        <summary>{{ qa.q }}</summary>
+        <p>{{ qa.a }}</p>
+      </details>
+      {% endfor %}
+    </div>
+
+    <div class="cross-links">
+      <h3>Keep learning</h3>
+      <ul>
+        <li><a href="/">Start the 24-week AI Generalist Roadmap</a> — free, AI-curated study plan</li>
+        {% if comp.roadmap_track %}
+        <li><a href="/roadmap/{{ comp.roadmap_track }}">Deep-dive: {{ comp.roadmap_track | replace("-", " ") | title }} track</a> <span style="color:#5a6473">(coming soon)</span></li>
+        {% endif %}
+        <li><a href="/jobs">Open AI/ML jobs from verified companies</a> — daily-refreshed, match-scored</li>
+        <li><a href="/blog">Essays on building AutomateEdge</a></li>
+      </ul>
+    </div>
+  </main>
+  <script src="/nav.js" defer></script>
+</body>
+</html>

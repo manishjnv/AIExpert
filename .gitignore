@@ -50,7 +50,11 @@ yarn-error.log*
 # ============================================================
 # Data and runtime artifacts
 # ============================================================
-data/
+# Anchor to repo root — the runtime data volume is /data (mounted on VPS)
+# and a sibling ./data/ from scripts. In-tree source-controlled JSON data
+# (e.g. backend/app/data/comparisons.json for SEO-19) stays tracked.
+/data/
+/.tmp/
 logs/
 *.log
 *.db
