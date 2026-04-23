@@ -35,7 +35,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-04 | P0 | SSR content scaffold for landing page (preserves rule 8) | ✅ done |
 | SEO-05 | P0 | Course + ItemList + FAQPage JSON-LD on landing (full property set) | ✅ done |
 | SEO-06 | P0 | Article JSON-LD on every blog post | ✅ done |
-| SEO-07 | P0 | Activate IndexNow (set key, wire publish events) | ⬜ pending |
+| SEO-07 | P0 | Activate IndexNow (set key, wire publish events) | ✅ done (2026-04-23) — key provisioned on VPS; pings on blog/jobs/cert publish |
 | SEO-08 | P1 | BreadcrumbList JSON-LD everywhere breadcrumbs render | ✅ done (/blog + /jobs); /profile + /verify out of scope after audit |
 | SEO-09 | P1 | Blog RSS feed at /blog/feed.xml | ✅ done |
 | SEO-10 | P1 | Server-rendered jobs hub pagination + rel=prev/next | ⬜ pending |
