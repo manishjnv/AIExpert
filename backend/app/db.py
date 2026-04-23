@@ -52,11 +52,15 @@ def _build_engine(url: str | None = None):
     engine = create_async_engine(db_url, **kwargs)
 
     # Set WAL mode and enable foreign keys on every raw DBAPI connection.
+    # busy_timeout waits up to 30s on lock contention instead of failing — the
+    # cron container and live backend can otherwise race on WAL writes and
+    # surface "unable to open database file" during aiosqlite connection open.
     @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragmas(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=30000")
         cursor.close()
 
     return engine

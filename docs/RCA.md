@@ -204,6 +204,24 @@
 
 ---
 
+### 029 — daily_jobs_sync silently dead for 8 days: retry helper missed "unable to open database file" (2026-04-23) [Silent cron failure]
+
+- **Symptom:** Zero jobs had ever been auto-expired in production. 195 published jobs were past `valid_through` but still status='published' — showing in `/api/jobs` and the sitemap as "live". Only 1 of 784 published rows had a `missing_streak` counter tracked. `job_sources.last_run_at` frozen at 2026-04-14 23:09:58 for every source with `last_run_fetched=0`. Cron log showed `daily_jobs_sync` failing nightly with `sqlite3.OperationalError: unable to open database file` inside `_set_sqlite_pragmas` → stack trace traceable to `_auto_expire_missing`, `_auto_expire_past_valid_through`, `ensure_source_rows`, and the final `stamp last_run_at` transaction.
+- **Root cause:** Two-part. (a) `_stage_with_retry` in [backend/app/services/jobs_ingest.py:723](backend/app/services/jobs_ingest.py#L723) only retried on `"database is locked"` / `"database table is locked"` — both real SQLite concurrency conditions. But under heavy parallel aiosqlite connection opens from the cron container while the live backend was also writing, SQLite sometimes surfaces the race as `"unable to open database file"` instead (a separate error string — fired inside the `PRAGMA journal_mode=WAL` event listener at [backend/app/db.py:57](backend/app/db.py#L57) when the WAL/journal file couldn't be acquired). That string fell through the retry check and was re-raised. (b) `ensure_source_rows`, both `_auto_expire_*` helpers, and the final stamp session had NO retry at all — a single transient failure killed the operation. The outer `try/except Exception` only logged the failure; the next daily run hit the same condition and same fate. 8 days of silent failure because one ERROR line per day blended into the scheduler's hourly heartbeat INFO logs.
+- **Fix:**
+  - Extracted `_is_transient_db_error()` classifier at [jobs_ingest.py:723](backend/app/services/jobs_ingest.py#L723) — now catches all three strings: `"database is locked"`, `"database table is locked"`, `"unable to open database file"`.
+  - New `_retry_db(op, label, max_attempts=4)` helper wraps any async DB op with exponential backoff (0.2s, 0.4s, 0.8s + jitter).
+  - Wrapped `ensure_source_rows`, each per-source iteration of `_auto_expire_missing`, `_auto_expire_past_valid_through`, and the final `stamp_last_run_at` session with `_retry_db`.
+  - Added `PRAGMA busy_timeout=30000` to [backend/app/db.py:60](backend/app/db.py#L60) — SQLite waits up to 30s on lock contention instead of failing, attacking the concurrency race at the connection layer too.
+  - Added consecutive-failure alerting in [scripts/scheduler.py:72](scripts/scheduler.py#L72) — `_run_guarded` tracks per-label streak, logs `CRITICAL ALERT: N consecutive failed runs` after ≥2 in a row, so a future silent outage surfaces on day 2 instead of day 8.
+  - Backfill script [scripts/backfill_expire_stale_jobs.py](scripts/backfill_expire_stale_jobs.py) to flip the 195 accumulated past-valid_through rows without waiting for the next scheduled run.
+- **Prevention:**
+  - Any SQLite error-string allowlist must include `"unable to open database file"` alongside the lock variants — all three are transient under aiosqlite + multi-process concurrency.
+  - Every DB session opened inside a scheduled cron job must be retry-wrapped. Bare `async with _db.async_session_factory()` in a cron context is a silent-failure trap.
+  - Scheduler runs must escalate repeated failures to `CRITICAL` severity — an `ERROR` log per daily run blends into heartbeat noise and won't page anyone.
+
+---
+
 ## Patterns to watch for
 
 | Pattern | Risk | Prevention |

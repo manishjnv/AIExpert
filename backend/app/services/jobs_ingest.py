@@ -17,7 +17,7 @@ import random
 import re
 import secrets
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
@@ -555,24 +555,28 @@ async def ensure_source_rows() -> None:
         ("lever", "Lever", LEVER_BOARDS),
         ("ashby", "Ashby", ASHBY_BOARDS),
     ]
-    async with _db.async_session_factory() as db:
-        for kind, label_suffix, boards in registry:
-            for board_slug, company_name in boards:
-                key = f"{kind}:{board_slug}"
-                is_tier2 = key in TIER2_SOURCES
-                existing = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
-                if not existing:
-                    db.add(JobSource(
-                        key=key, kind=kind,
-                        label=f"{company_name} ({label_suffix})",
-                        tier=2 if is_tier2 else 1,
-                        enabled=1,
-                        bulk_approve=0 if is_tier2 else 1,
-                    ))
-                has_co = (await db.execute(select(JobCompany).where(JobCompany.slug == board_slug))).scalar_one_or_none()
-                if not has_co:
-                    db.add(JobCompany(slug=board_slug, name=company_name, verified=0 if is_tier2 else 1))
-        await db.commit()
+
+    async def _op() -> None:
+        async with _db.async_session_factory() as db:
+            for kind, label_suffix, boards in registry:
+                for board_slug, company_name in boards:
+                    key = f"{kind}:{board_slug}"
+                    is_tier2 = key in TIER2_SOURCES
+                    existing = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
+                    if not existing:
+                        db.add(JobSource(
+                            key=key, kind=kind,
+                            label=f"{company_name} ({label_suffix})",
+                            tier=2 if is_tier2 else 1,
+                            enabled=1,
+                            bulk_approve=0 if is_tier2 else 1,
+                        ))
+                    has_co = (await db.execute(select(JobCompany).where(JobCompany.slug == board_slug))).scalar_one_or_none()
+                    if not has_co:
+                        db.add(JobCompany(slug=board_slug, name=company_name, verified=0 if is_tier2 else 1))
+            await db.commit()
+
+    await _retry_db(_op, "ensure_source_rows")
 
 
 # ---------------------------------------------------------------- core ingest
@@ -720,13 +724,53 @@ def _minimal_enrichment(raw: RawJob) -> dict[str, Any]:
     }
 
 
+def _is_transient_db_error(exc: OperationalError) -> bool:
+    """True for SQLite errors that typically clear on a short backoff.
+
+    'database is locked' / 'database table is locked' — another writer holds
+    the WAL reserved-writer slot. 'unable to open database file' — a fresh
+    connection raced with concurrent WAL/journal file creation (the cron
+    container vs. live backend, per the 2026-04-21 daily_jobs_sync outage).
+    All three clear within milliseconds; none indicate a persistent failure.
+    """
+    msg = str(exc).lower()
+    return (
+        "database is locked" in msg
+        or "database table is locked" in msg
+        or "unable to open database file" in msg
+    )
+
+
+async def _retry_db(
+    op: Callable[[], Awaitable[Any]],
+    label: str,
+    max_attempts: int = 4,
+) -> Any:
+    """Call ``op()`` with exponential backoff on transient SQLite errors."""
+    for attempt in range(max_attempts):
+        try:
+            return await op()
+        except OperationalError as exc:
+            if not _is_transient_db_error(exc):
+                raise
+            if attempt == max_attempts - 1:
+                logger.warning("db op %r failed after %d attempts: %s",
+                               label, max_attempts, str(exc)[:200])
+                raise
+            delay = 0.2 * (2 ** attempt) + random.uniform(0, 0.1)
+            logger.info("db op %r transient error, retrying in %.2fs (attempt %d/%d)",
+                        label, delay, attempt + 1, max_attempts)
+            await asyncio.sleep(delay)
+    raise RuntimeError("unreachable")
+
+
 async def _stage_with_retry(raw: RawJob, source_key: str, max_attempts: int = 4) -> str:
-    """Stage one row with retry+backoff on SQLite 'database is locked'.
+    """Stage one row with retry+backoff on transient SQLite errors.
 
     SQLite WAL allows concurrent reads but only one writer at a time. The live
-    backend writing session cookies / progress can briefly hold the lock. A
-    short exponential backoff (0.2s, 0.4s, 0.8s) clears almost all real-world
-    cases without needing server-side locking.
+    backend writing session cookies / progress can briefly hold the lock, and
+    aiosqlite connection open can race with WAL creation. A short exponential
+    backoff (0.2s, 0.4s, 0.8s) clears both classes of error.
     """
     for attempt in range(max_attempts):
         try:
@@ -735,15 +779,14 @@ async def _stage_with_retry(raw: RawJob, source_key: str, max_attempts: int = 4)
                 await db.commit()
                 return result
         except OperationalError as exc:
-            msg = str(exc).lower()
-            if "database is locked" not in msg and "database table is locked" not in msg:
+            if not _is_transient_db_error(exc):
                 raise
             if attempt == max_attempts - 1:
-                logger.warning("db locked after %d attempts for %s/%s — giving up",
+                logger.warning("db transient error after %d attempts for %s/%s — giving up",
                                max_attempts, source_key, raw.get("external_id"))
                 raise
             delay = 0.2 * (2 ** attempt) + random.uniform(0, 0.1)
-            logger.info("db locked, retrying %s/%s in %.2fs (attempt %d/%d)",
+            logger.info("db transient error, retrying %s/%s in %.2fs (attempt %d/%d)",
                         source_key, raw.get("external_id"), delay, attempt + 1, max_attempts)
             await asyncio.sleep(delay)
     return "errors"  # unreachable — raised above
@@ -759,7 +802,7 @@ async def _auto_expire_past_valid_through(stats: dict) -> None:
     is_expired check at render time — but it kept appearing in /api/jobs
     and the sitemap. This pass fixes the underlying status.
     """
-    try:
+    async def _op() -> None:
         async with _db.async_session_factory() as db:
             today = date.today()
             stmt = select(Job).where(
@@ -780,6 +823,9 @@ async def _auto_expire_past_valid_through(stats: dict) -> None:
             if rows:
                 logger.info("date-expired %d jobs (valid_through past)", len(rows))
             await db.commit()
+
+    try:
+        await _retry_db(_op, "auto_expire_past_valid_through")
     except Exception as exc:
         logger.exception("date-based auto-expire failed: %s", exc)
 
@@ -800,14 +846,15 @@ async def _auto_expire_missing(by_source: dict[str, list[RawJob]], stats: dict) 
             logger.warning("source %s returned 0 rows — skipping auto-expire", source_key)
             continue
         seen_ids = {r["external_id"] for r in rows}
-        try:
+
+        async def _op(sk: str = source_key, ids: set[str] = seen_ids) -> None:
             async with _db.async_session_factory() as db:
-                stmt = select(Job).where(Job.source == source_key, Job.status == "published")
+                stmt = select(Job).where(Job.source == sk, Job.status == "published")
                 published = (await db.execute(stmt)).scalars().all()
                 for job in published:
                     data = dict(job.data or {})
                     meta = dict(data.get("_meta") or {})
-                    if job.external_id in seen_ids:
+                    if job.external_id in ids:
                         if meta.get("missing_streak"):
                             meta["missing_streak"] = 0
                             data["_meta"] = meta
@@ -821,10 +868,13 @@ async def _auto_expire_missing(by_source: dict[str, list[RawJob]], stats: dict) 
                         meta["expired_on"] = date.today().isoformat()
                         stats["auto_expired"] = stats.get("auto_expired", 0) + 1
                         logger.info("auto-expired %s/%s after %d missed runs",
-                                    source_key, job.external_id, streak)
+                                    sk, job.external_id, streak)
                     data["_meta"] = meta
                     job.data = data
                 await db.commit()
+
+        try:
+            await _retry_db(_op, f"auto_expire_missing[{source_key}]")
         except Exception as exc:
             logger.exception("auto-expire failed for %s: %s", source_key, exc)
 
@@ -916,7 +966,7 @@ async def run_daily_ingest() -> dict[str, int]:
     await _auto_expire_past_valid_through(stats)
 
     # Stamp JobSource.last_run_* in a short final transaction.
-    try:
+    async def _stamp_op() -> None:
         async with _db.async_session_factory() as db:
             now = datetime.utcnow()
             for kind, boards, _ in fetchers:
@@ -926,6 +976,9 @@ async def run_daily_ingest() -> dict[str, int]:
                     if src:
                         src.last_run_at = now
             await db.commit()
+
+    try:
+        await _retry_db(_stamp_op, "stamp_last_run_at")
     except Exception as exc:
         logger.warning("failed to stamp JobSource.last_run_at: %s", exc)
 

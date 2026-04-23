@@ -69,12 +69,30 @@ async def _sleep_until(target: datetime, label: str) -> None:
         await asyncio.sleep(min(3600, delta))
 
 
+_consecutive_failures: dict[str, int] = {}
+
+# Two back-to-back failures is the threshold — one miss is often a transient
+# upstream hiccup, two in a row means the job isn't self-healing. The cron
+# container's 2026-04-15→04-23 daily_jobs_sync outage ran 8 days silently
+# because a single ERROR line per run blended into the hourly heartbeat noise;
+# this surfaces it as CRITICAL so ops sees it.
+_ALERT_AFTER_CONSECUTIVE = 2
+
+
 async def _run_guarded(fn: Callable[[], Awaitable], label: str) -> None:
     try:
         await fn()
         logger.info("[%s] run complete", label)
+        _consecutive_failures[label] = 0
     except Exception:
         logger.exception("[%s] run failed — will retry at next window", label)
+        _consecutive_failures[label] = _consecutive_failures.get(label, 0) + 1
+        streak = _consecutive_failures[label]
+        if streak >= _ALERT_AFTER_CONSECUTIVE:
+            logger.critical(
+                "[%s] ALERT: %d consecutive failed runs — scheduled job is not self-healing",
+                label, streak,
+            )
 
 
 # ---------- per-job loops ----------
