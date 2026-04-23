@@ -47,7 +47,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-16 | P2 | Brotli compression in nginx | ✅ done (via Cloudflare edge) — origin nginx br redundant; CF serves Content-Encoding: br |
 | SEO-17 | P2 | WebP/AVIF images + font-display:swap | ✅ done — all Google Fonts URLs carry &display=swap; site has no raster above-fold imagery |
 | SEO-18 | P2 | Critical CSS extraction (only if LCP > 2.5s after SEO-04) | 🔒 blocked (gated on Lighthouse) |
-| SEO-19 | P0-adj | 10 programmatic /vs/{a}-vs-{b} comparison pages | ⬜ pending |
+| SEO-19 | P0-adj | 10 programmatic /vs/{a}-vs-{b} comparison pages | ✅ done (2026-04-23) — 10 pages live w/ Article+FAQPage+DefinedTerm+BreadcrumbList; 1000-1150 words (below 1500 target, iterate on feedback) |
 | SEO-20 | P1 | 30 per-track quintet pages (skills, tools, certs, salary, projects, career-path) | ⬜ pending |
 | SEO-21 | P1 | Pillar blog cluster with 10-point validator-enforced quality bar | ⬜ pending |
 | SEO-22 | P1 | VideoObject schema on YouTube-embedding posts | ⬜ pending |
