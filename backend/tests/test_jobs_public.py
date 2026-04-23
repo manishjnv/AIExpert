@@ -164,6 +164,29 @@ async def test_sitemap_jobs_includes_published_only():
 
 
 @pytest.mark.asyncio
+async def test_sitemap_index_accepts_head():
+    """SEO validators (Bing, W3C) probe with HEAD before GET. Routes must
+    answer 200 on HEAD, not 405."""
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.head("/sitemap_index.xml")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/xml")
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_sitemap_jobs_accepts_head():
+    await _setup()
+    await _seed(status="published", slug="pub-h", external_id="sh")
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.head("/sitemap-jobs.xml")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/xml")
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_indexnow_key_verify_404_when_unconfigured():
     await _setup()
     async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:

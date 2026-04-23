@@ -797,7 +797,7 @@ def _rfc822(published: str) -> str:
     return _email_utils.format_datetime(dt)
 
 
-@router.get("/blog/feed.xml")
+@router.api_route("/blog/feed.xml", methods=["GET", "HEAD"])
 async def blog_rss_feed() -> Response:
     """RSS 2.0 feed of every visible blog post (SEO-09). Newest-first.
     Declared as `/blog/feed.xml` before the dynamic `/blog/{slug}` route

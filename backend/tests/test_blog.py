@@ -467,6 +467,20 @@ async def test_post_html_advertises_rss_alternate(monkeypatch):
     await close_db()
 
 
+@pytest.mark.asyncio
+async def test_blog_feed_accepts_head(monkeypatch):
+    """Feed readers + SEO validators probe with HEAD; route must answer
+    200 without body, not 405."""
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: False)
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.head("/blog/feed.xml")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/rss+xml")
+    await close_db()
+
+
 def test_blog_post_template_renders_with_dummies():
     """Direct render bypassing FastAPI — catches template-syntax bugs
     before they become 500s in prod (mirrors the admin/jobs_guide

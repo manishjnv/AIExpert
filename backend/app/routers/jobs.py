@@ -701,7 +701,7 @@ async def job_detail(
 
 # ---- Sitemap ---------------------------------------------------------------
 
-@router.get("/sitemap-jobs.xml")
+@router.api_route("/sitemap-jobs.xml", methods=["GET", "HEAD"])
 async def sitemap_jobs(db: AsyncSession = Depends(get_db)) -> Response:
     settings = get_settings()
     base = (getattr(settings, "public_base_url", "") or "").rstrip("/")
@@ -723,7 +723,7 @@ async def sitemap_jobs(db: AsyncSession = Depends(get_db)) -> Response:
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
-@router.get("/sitemap_index.xml")
+@router.api_route("/sitemap_index.xml", methods=["GET", "HEAD"])
 async def sitemap_index() -> Response:
     """Minimal sitemap-index referencing the jobs sitemap. Submit this URL to GSC."""
     settings = get_settings()
