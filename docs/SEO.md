@@ -38,7 +38,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-07 | P0 | Activate IndexNow (set key, wire publish events) | ✅ done (2026-04-23) — key provisioned on VPS; pings on blog/jobs/cert publish |
 | SEO-08 | P1 | BreadcrumbList JSON-LD everywhere breadcrumbs render | ✅ done (/blog + /jobs); /profile + /verify out of scope after audit |
 | SEO-09 | P1 | Blog RSS feed at /blog/feed.xml | ✅ done |
-| SEO-10 | P1 | Server-rendered jobs hub pagination + rel=prev/next | ⬜ pending |
+| SEO-10 | P1 | Server-rendered jobs hub pagination + rel=prev/next | ✅ done (2026-04-23) — /jobs?page=N SSR, canonical + rel=prev/next, footer UI, sitemap-pages enumerated |
 | SEO-11 | P0-adj | Dynamic OG image generator /og/{type}/{slug}.png | ✅ done (course/roadmap/blog/jobs shipped; week/vs/cert deferred per spec) |
 | SEO-12 | P1 | EducationalOccupationalCredential on /verify/{id} | ⬜ pending |
 | SEO-13 | P1 | Missing canonicals on blog index / profile / leaderboard / verify / account | ✅ done |
