@@ -28,10 +28,10 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 
 | ID | Priority | Task | Status |
 |---|---|---|---|
-| SEO-00 | P0 | GSC + Bing connect, baseline metrics | ⬜ pending |
+| SEO-00 | P0 | GSC + Bing connect, baseline metrics | 🟡 partial — GSC + Bing properties verified, sitemap submitted to both (2026-04-23); 7-day baseline recording pending data accumulation |
 | SEO-01 | P0 | robots.txt (Disallow /admin /api /account /share/ /og/) | 🟡 partial — origin file + nginx block deployed; Cloudflare Managed robots.txt overrides at edge (user action required in CF dashboard to merge our Disallows + Sitemap directive into the CF-managed version, OR disable the CF managed-robots feature to let origin serve) |
-| SEO-02 | P0 | Expand sitemap: sub-sitemaps by resource type + image extensions | ⬜ pending |
-| SEO-03 | P0 | Complete `<head>` on `/` (canonical, og:*, twitter:*, author) | 🟡 partial — og:image + summary_large_image deferred to SEO-11 |
+| SEO-02 | P0 | Expand sitemap: sub-sitemaps by resource type + image extensions | ✅ done |
+| SEO-03 | P0 | Complete `<head>` on `/` (canonical, og:*, twitter:*, author) | ✅ done — og:image + summary_large_image landed with SEO-11 |
 | SEO-04 | P0 | SSR content scaffold for landing page (preserves rule 8) | ✅ done |
 | SEO-05 | P0 | Course + ItemList + FAQPage JSON-LD on landing (full property set) | ✅ done |
 | SEO-06 | P0 | Article JSON-LD on every blog post | ✅ done |
@@ -39,7 +39,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-08 | P1 | BreadcrumbList JSON-LD everywhere breadcrumbs render | ✅ done (/blog + /jobs); /profile + /verify out of scope after audit |
 | SEO-09 | P1 | Blog RSS feed at /blog/feed.xml | ✅ done |
 | SEO-10 | P1 | Server-rendered jobs hub pagination + rel=prev/next | ⬜ pending |
-| SEO-11 | P0-adj | Dynamic OG image generator /og/{type}/{slug}.png | ⬜ pending |
+| SEO-11 | P0-adj | Dynamic OG image generator /og/{type}/{slug}.png | ✅ done (course/roadmap/blog/jobs shipped; week/vs/cert deferred per spec) |
 | SEO-12 | P1 | EducationalOccupationalCredential on /verify/{id} | ⬜ pending |
 | SEO-13 | P1 | Missing canonicals on blog index / profile / leaderboard / verify / account | ✅ done |
 | SEO-14 | P1 | WebSite + SearchAction (deferred — needs /search endpoint) | 🔒 blocked (no /search) |
