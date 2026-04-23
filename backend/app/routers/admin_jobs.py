@@ -895,6 +895,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
   .chip.flag-fail{background:rgba(195,51,51,.15);color:#d97757;border-color:rgba(195,51,51,.5)}
   .chip.flag-nosummary{background:rgba(217,119,87,.15);color:#d97757;border-color:rgba(217,119,87,.5);font-weight:600}
   .chip.version{background:transparent;color:#6a7280;border-color:#2a323d;font-size:9px;letter-spacing:.04em}
+  .chip.chip-id{font-family:'IBM Plex Mono',monospace;color:#94a3b8;cursor:pointer;user-select:all}
+  .chip.chip-id:hover{border-color:#e8a849;color:#e8a849}
   .qtoggles{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0}
   .qtoggle{padding:5px 10px;border:1px solid #2a323d;background:transparent;color:#c0c4cc;cursor:pointer;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
   .qtoggle:hover{border-color:#e8a849;color:#e8a849}
@@ -932,7 +934,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
 </div>
 
 <div class="qfilters">
-  <input id="qf-q" type="search" placeholder="Search title or company…" style="min-width:220px">
+  <input id="qf-q" type="search" placeholder="Search title, company, or ID (e.g. 953)…" style="min-width:260px">
   <select id="qf-company"><option value="">Any company</option></select>
   <select id="qf-designation">
     <option value="">Any designation</option>
@@ -1261,7 +1263,7 @@ function renderList(items) {
       <td>
         <a href="${previewUrl}" target="_blank" rel="noopener" style="color:#e8a849;text-decoration:none"><b>${esc(j.title)}</b></a>
         <a href="${previewUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;font-size:10px;padding:2px 8px">Preview ↗</a>
-        <span class="chip" style="font-family:'IBM Plex Mono',monospace;color:#94a3b8" title="Job ID — searchable via the filter box above">#${j.id}</span>
+        <span class="chip chip-id" onclick="filterById(${j.id})" title="Click to isolate this job · shareable link: /admin/jobs?id=${j.id}">#${j.id}</span>
         ${tierChip}
         <span class="chip ${j.verified?'verified':''}">${esc(d.company?.name||j.company_slug)}</span>
         ${flagChips}<br>
@@ -1358,6 +1360,25 @@ async function bulkRej() {
 
 function toggleAll(el) { document.querySelectorAll(".sel:not(:disabled)").forEach(x=>x.checked=el.checked); }
 
+// Called from the #<id> chip on each row. Filters the queue to that single job.
+// Auto-switches to the "all" tab so the job is visible regardless of its current
+// lifecycle status (draft / published / rejected / expired).
+function filterById(id) {
+  const idStr = String(id);
+  document.getElementById("qf-q").value = idStr;
+  document.querySelectorAll(".tabs button[data-status]").forEach(x => x.classList.remove("active"));
+  const allTab = document.querySelector('.tabs button[data-status="all"]');
+  if (allTab) allTab.classList.add("active");
+  currentStatus = "all";
+  // Reflect in URL so admin can copy the browser address and share.
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("id", idStr);
+    window.history.replaceState({}, "", url.toString());
+  } catch (e) { /* non-blocking */ }
+  load();
+}
+
 document.querySelectorAll(".tabs button[data-status]").forEach(b => {
   b.onclick = () => {
     document.querySelectorAll(".tabs button[data-status]").forEach(x=>x.classList.remove("active"));
@@ -1383,6 +1404,11 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
     document.getElementById("qf-verified").checked = false;
     currentFlag = "";
     document.querySelectorAll(".qtoggle").forEach(b => b.classList.remove("active"));
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("id");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* non-blocking */ }
     load();
   });
 
@@ -1413,7 +1439,18 @@ document.getElementById("run-ingest").onclick = async () => {
   load();
 };
 
-load();
+// Deep-link: /admin/jobs?id=<n> on page load → isolate that job (status=all + search).
+(function applyDeepLink() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (id && /^\\d+$/.test(id)) {
+      filterById(id);
+      return;
+    }
+  } catch (e) { /* non-blocking */ }
+  load();
+})();
 </script>
 </main>
 <script src="/nav.js" defer></script>
