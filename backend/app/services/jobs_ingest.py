@@ -578,7 +578,7 @@ async def ensure_source_rows() -> None:
 # ---------------------------------------------------------------- core ingest
 
 async def _stage_one(raw: RawJob, source_key: str, db) -> str:
-    """Stage one RawJob. Returns one of: 'new', 'unchanged', 'changed', 'skipped_blocked'."""
+    """Stage one RawJob. Returns one of: 'new', 'unchanged', 'changed', 'skipped_blocked', 'rejected_sticky'."""
     job_hash = compute_hash(raw)
 
     # Blocklist check.
@@ -592,6 +592,17 @@ async def _stage_one(raw: RawJob, source_key: str, db) -> str:
 
     if existing and existing.hash == job_hash:
         return "unchanged"
+
+    # Sticky off_topic tombstone: the classifier already decided this is non-AI
+    # and admin confirmed by not overriding. Absorb the hash change so we don't
+    # re-evaluate every run, but DON'T re-enrich (waste Gemini tokens on a
+    # rejected row) or flip to draft (re-queues admin work). Manual rejects
+    # (reject_reason IS NULL) still flow through the normal path so admin gets
+    # another look if the JD changes meaningfully.
+    if existing and existing.status == "rejected" and existing.reject_reason == "off_topic":
+        existing.hash = job_hash
+        existing.source_url = raw["source_url"]
+        return "rejected_sticky"
 
     # Pre-filter: skip enrichment for titles that are obviously non-AI.
     # Row is still staged (admin can override), but no Gemini call is made.

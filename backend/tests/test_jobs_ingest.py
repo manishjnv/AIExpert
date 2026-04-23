@@ -134,6 +134,80 @@ async def test_enrichment_failure_falls_back():
 
 
 @pytest.mark.asyncio
+async def test_stage_off_topic_reject_is_sticky_on_hash_change():
+    """Once classifier-rejected as off_topic, a row stays rejected even when the
+    source JD changes. Absorbs the new hash so we don't re-evaluate every run,
+    but skips re-enrichment and keeps status='rejected'. Tombstone prevents
+    re-ingestion if row is ever deleted (via (source, external_id) dedup).
+    """
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        # Stage once + mark as classifier-rejected (simulates prior admin/auto rejection).
+        async with db_module.async_session_factory() as db:
+            await jobs_ingest._stage_one(_raw(), "greenhouse:anthropic", db)
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            original_hash = job.hash
+            original_data = dict(job.data)
+            job.status = "rejected"
+            job.reject_reason = "off_topic"
+            job.admin_notes = "auto-skipped: non-AI title"
+            await db.commit()
+
+        # Source JD changes → new hash, but we must NOT flip back to draft or
+        # re-enrich. enrich_job mock should never be called.
+        m.reset_mock()
+        async with db_module.async_session_factory() as db:
+            result = await jobs_ingest._stage_one(
+                _raw(jd_html="<p>Updated salary range and perks.</p>"),
+                "greenhouse:anthropic",
+                db,
+            )
+            assert result == "rejected_sticky"
+            await db.commit()
+
+        assert m.call_count == 0, "sticky reject must not trigger enrichment"
+
+        async with db_module.async_session_factory() as db:
+            job = (await db.execute(select(Job))).scalar_one()
+            assert job.status == "rejected"
+            assert job.reject_reason == "off_topic"
+            assert job.hash != original_hash  # absorbed new hash
+            assert job.data == original_data  # tombstone data untouched
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_stage_manual_reject_still_flips_to_draft_on_hash_change():
+    """Manual rejects (reject_reason IS NULL) are NOT sticky — admin wants another
+    look when the JD changes. Only off_topic (classifier) rejects are sticky.
+    """
+    await _setup()
+    with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
+        m.side_effect = lambda raw, **kw: _fake_enrich(raw)
+        async with db_module.async_session_factory() as db:
+            await jobs_ingest._stage_one(_raw(), "greenhouse:anthropic", db)
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            job.status = "rejected"
+            job.reject_reason = None  # manual reject, no auto-reason
+            await db.commit()
+
+        async with db_module.async_session_factory() as db:
+            result = await jobs_ingest._stage_one(
+                _raw(jd_html="<p>Updated JD copy.</p>"),
+                "greenhouse:anthropic",
+                db,
+            )
+            assert result == "changed"
+            await db.commit()
+            job = (await db.execute(select(Job))).scalar_one()
+            assert job.status == "draft"  # flipped back for re-review
+    await close_db()
+
+
+@pytest.mark.asyncio
 async def test_valid_through_is_posted_plus_45d():
     await _setup()
     with patch("app.services.jobs_enrich.enrich_job", new_callable=AsyncMock) as m:
