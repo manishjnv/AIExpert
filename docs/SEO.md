@@ -40,12 +40,12 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-09 | P1 | Blog RSS feed at /blog/feed.xml | ✅ done |
 | SEO-10 | P1 | Server-rendered jobs hub pagination + rel=prev/next | ✅ done (2026-04-23) — /jobs?page=N SSR, canonical + rel=prev/next, footer UI, sitemap-pages enumerated |
 | SEO-11 | P0-adj | Dynamic OG image generator /og/{type}/{slug}.png | ✅ done (course/roadmap/blog/jobs shipped; week/vs/cert deferred per spec) |
-| SEO-12 | P1 | EducationalOccupationalCredential on /verify/{id} | ⬜ pending |
+| SEO-12 | P1 | EducationalOccupationalCredential on /verify/{id} | ✅ done (2026-04-23) |
 | SEO-13 | P1 | Missing canonicals on blog index / profile / leaderboard / verify / account | ✅ done |
 | SEO-14 | P1 | WebSite + SearchAction (deferred — needs /search endpoint) | 🔒 blocked (no /search) |
-| SEO-15 | P2 | FAQPage on roadmap landing | ⬜ pending |
-| SEO-16 | P2 | Brotli compression in nginx | ⬜ pending |
-| SEO-17 | P2 | WebP/AVIF images + font-display:swap | ⬜ pending |
+| SEO-15 | P2 | FAQPage on roadmap landing | ✅ done (2026-04-23) — visible FAQ section mirrors existing JSON-LD |
+| SEO-16 | P2 | Brotli compression in nginx | ✅ done (via Cloudflare edge) — origin nginx br redundant; CF serves Content-Encoding: br |
+| SEO-17 | P2 | WebP/AVIF images + font-display:swap | ✅ done — all Google Fonts URLs carry &display=swap; site has no raster above-fold imagery |
 | SEO-18 | P2 | Critical CSS extraction (only if LCP > 2.5s after SEO-04) | 🔒 blocked (gated on Lighthouse) |
 | SEO-19 | P0-adj | 10 programmatic /vs/{a}-vs-{b} comparison pages | ⬜ pending |
 | SEO-20 | P1 | 30 per-track quintet pages (skills, tools, certs, salary, projects, career-path) | ⬜ pending |
