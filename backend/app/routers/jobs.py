@@ -722,12 +722,16 @@ async def sitemap_jobs(db: AsyncSession = Depends(get_db)) -> Response:
     urls = []
     for r in rows:
         lastmod = (r.updated_at or datetime.utcnow()).date().isoformat()
+        og = f"{base}/og/jobs/{r.slug}.png"
         urls.append(
             f"<url><loc>{esc(f'{base}/jobs/{r.slug}')}</loc>"
-            f"<lastmod>{lastmod}</lastmod><priority>0.8</priority></url>"
+            f"<lastmod>{lastmod}</lastmod><priority>0.8</priority>"
+            f"<image:image><image:loc>{esc(og)}</image:loc></image:image>"
+            f"</url>"
         )
     xml = ('<?xml version="1.0" encoding="UTF-8"?>'
-           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+           ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'
            + "".join(urls) + "</urlset>")
     return Response(content=xml, media_type="application/xml",
                     headers={"Cache-Control": "public, max-age=3600"})
@@ -735,13 +739,29 @@ async def sitemap_jobs(db: AsyncSession = Depends(get_db)) -> Response:
 
 @router.api_route("/sitemap_index.xml", methods=["GET", "HEAD"])
 async def sitemap_index() -> Response:
-    """Minimal sitemap-index referencing the jobs sitemap. Submit this URL to GSC."""
+    """Sitemap index referencing all child sitemaps (SEO-02).
+
+    Child sitemap URLs carry <lastmod> = today so Google re-checks at most
+    once per day (child sitemaps themselves are 1h-cached)."""
     settings = get_settings()
     base = (settings.public_base_url or "").rstrip("/")
-    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>{esc(base)}/sitemap-jobs.xml</loc></sitemap>
-</sitemapindex>"""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    children = [
+        "sitemap-jobs.xml",
+        "sitemap-blog.xml",
+        "sitemap-pages.xml",
+        "sitemap-certs.xml",
+        "sitemap-profiles.xml",
+    ]
+    entries = "".join(
+        f"<sitemap><loc>{esc(f'{base}/{c}')}</loc>"
+        f"<lastmod>{today}</lastmod></sitemap>"
+        for c in children
+    )
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?>'
+           f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+           f'{entries}</sitemapindex>')
     return Response(content=xml, media_type="application/xml",
                     headers={"Cache-Control": "public, max-age=3600"})
 
