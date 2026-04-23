@@ -84,7 +84,7 @@
   /* CROSS-CUTTING HABITS */
   .habits { padding: 32px 48px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
   .habits-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 16px; }
-  .habits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+  .habits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 18px; }
   .habit { display: flex; gap: 12px; align-items: flex-start; }
   .habit-icon { color: var(--accent); font-family: var(--serif); font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 2px; }
   .habit-text { font-size: 13px; color: var(--paper-dim); line-height: 1.5; }
@@ -115,7 +115,7 @@
   .sync-badge.error { background: rgba(217,119,87,0.15); color: var(--danger); }
 
   /* Modals */
-  .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:center;justify-content:center; }
+  .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px; }
   .modal { background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:24px;width:90%;max-width:400px;color:var(--paper); }
   .modal-field { margin-bottom:12px; }
   .modal-field label { display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px; }
@@ -357,12 +357,17 @@
     .week-header { gap: 4px; }
     .week-hours { font-size: 10px; padding: 3px 8px; }
     .week-num { font-size: 9px; padding: 3px 6px; }
-    .btn { font-size: 9px; padding: 6px 8px; letter-spacing: 0.05em; }
+    /* Tap targets: ensure minimum 40 px touch height on micro-buttons */
+    .btn { font-size: 9px; padding: 8px 12px; letter-spacing: 0.05em; }
     /* topnav in nav.css */
     .conn-badge { font-size: 8px; padding: 2px 5px; }
     .check-text { font-size: 12px; }
     .subtitle { font-size: 14px; }
     header { padding: 24px 16px 20px; }
+    /* Modal: prevent inline max-width from overflowing narrow viewports */
+    .modal { width: 100% !important; max-width: calc(100vw - 24px) !important; padding: 16px; }
+    /* Progress ring: smaller size at narrowest breakpoint */
+    .progress-overall { width: 80px; height: 80px; }
   }
 
   /* SEO-15 — FAQ section on the roadmap landing. Visible Q/A that mirrors
@@ -1071,7 +1076,7 @@
     <!-- Step 3: Level -->
     <div id="planStep3" class="plan-step-content" style="display:none">
       <p style="font-size:12px;color:var(--ink-soft);margin-bottom:12px">What's your experience level?</p>
-      <div id="levelGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"></div>
+      <div id="levelGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:8px"></div>
       <button class="btn" onclick="planPickerBack(2)" style="margin-top:12px;font-size:10px">&#x2190; Back</button>
     </div>
 

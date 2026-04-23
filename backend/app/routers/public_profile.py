@@ -67,7 +67,6 @@ h2 { font-family: 'Fraunces', Georgia, serif; color: #e8a849; font-size: 18px; m
 .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 12px; background: rgba(109,181,133,0.2); color: #6db585; margin-right: 6px; }
 .progress-bar { background: #2a323d; border-radius: 4px; height: 6px; }
 .progress-bar > div { height: 6px; border-radius: 4px; }
-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
 th { text-align: left; padding: 10px 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #8a92a0; border-bottom: 1px solid #2a323d; }
 td { padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #1d242e; }
 .rank { font-weight: bold; color: #e8a849; }
@@ -106,8 +105,25 @@ details.help[open] summary::before { content: '×'; }
 .help-tile { padding: 10px 12px; background: #0f1419; border: 1px solid #2a323d; border-radius: 6px; font-size: 12px; }
 .help-tile .big { font-size: 18px; margin-right: 6px; vertical-align: middle; }
 .help-tile .thr { color: #8a92a0; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; margin-top: 4px; }
+/* Table horizontal scroll wrapper */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; min-width: 720px; }
+
 /* nav styles in /nav.css */
 @media (max-width: 768px) { .stat-row { gap: 8px; } .stat { padding: 12px 14px; } .stat .n { font-size: 22px; } }
+@media (max-width: 480px) {
+  .container { padding: 20px 16px; }
+  h1 { font-size: 24px; }
+  .subtitle { font-size: 12px; margin-bottom: 16px; }
+  .stat { min-width: 72px; padding: 10px 12px; }
+  .stat .n { font-size: 20px; }
+  .stat-row { gap: 8px; margin: 12px 0 16px; }
+  .xp-cell { min-width: 100px; }
+  .tier-chip { font-size: 11px; padding: 6px 10px; gap: 6px; }
+  .tier-chip .tier-icon { font-size: 16px; }
+  .badge-pill { font-size: 10px; padding: 2px 6px; }
+  .help-grid { grid-template-columns: 1fr; }
+}
 """
 
 
@@ -399,7 +415,7 @@ async def public_profile(user_id: int, db: AsyncSession = Depends(get_db)):
         badges_html += f'<a class="badge" href="{esc(li_href)}" target="_blank">LinkedIn</a>'
 
     base = get_settings().public_base_url.rstrip("/")
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{full_name} — AI Learning Roadmap</title><link rel="canonical" href="{base}/profile/{user.id}"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{full_name} — AI Learning Roadmap</title><link rel="canonical" href="{base}/profile/{user.id}"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
 <script src="/nav.js"></script>
 <div class="container">
 <h1>{full_name}</h1>
@@ -584,7 +600,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
     completers = sum(1 for e in entries if e["pct"] >= 100)
 
     base = get_settings().public_base_url.rstrip("/")
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Leaderboard — AI Learning Roadmap</title><link rel="canonical" href="{base}/leaderboard"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Leaderboard — AI Learning Roadmap</title><link rel="canonical" href="{base}/leaderboard"><style>{CSS}</style><link rel="stylesheet" href="/nav.css"></head><body>
 <script src="/nav.js"></script>
 <div class="container">
 <h1>Leaderboard</h1>
@@ -637,7 +653,7 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
   </div>
 </details>
 
-<table>
+<div class="table-wrap"><table>
 <tr>
   <th style="text-align:center">#</th>
   <th>Learner</th>
@@ -650,5 +666,5 @@ async def leaderboard(db: AsyncSession = Depends(get_db)):
   <th style="text-align:center">Links</th>
 </tr>
 {rows}
-</table>
+</table></div>
 </div></body></html>"""

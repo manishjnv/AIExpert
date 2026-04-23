@@ -223,6 +223,12 @@ _BASE_CSS = """
   .breadcrumb{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px}
   .breadcrumb a{color:#94a3b8;text-decoration:none}
   .breadcrumb a:hover{color:#e8a849}
+  @media (max-width:480px){
+    main{padding:24px 16px 60px}
+    .hl-grid{grid-template-columns:1fr}
+    .skills-label{min-width:auto}
+    .sc-comp-grid{grid-template-columns:1fr}
+  }
 </style>
 """
 
@@ -920,6 +926,12 @@ _HUB_CSS = """
   .pagination strong{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:600}
   .pagination span.ellipsis{border-color:transparent;background:transparent;color:#94a3b8}
   @media (max-width:720px){ .layout{grid-template-columns:1fr} }
+  @media (max-width:480px){
+    .layout{gap:12px}
+    .apply-btn,.clear-btn{min-height:44px;padding:12px 10px}
+    .filters input[type=text],.filters select{min-height:40px;padding:10px}
+    .pagination a,.pagination strong,.pagination span{padding:10px 12px}
+  }
 </style>
 """
 

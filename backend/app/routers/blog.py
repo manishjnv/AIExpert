@@ -309,7 +309,12 @@ _BLOG_CSS = """
     background: #1d242e; padding: 1px 6px; border-radius: 3px;
     font-size: 0.9em; color: #e8a849;
     font-family: ui-monospace, SFMono-Regular, 'Cascadia Mono', monospace;
+    word-break: break-word;
   }
+  pre {
+    overflow-x: auto; overflow-y: hidden; max-width: 100%;
+  }
+  img { max-width: 100%; height: auto; display: block; }
   a { color: #e8a849; text-decoration: underline; text-underline-offset: 3px; }
   a:hover { color: #f5c06a; }
   ul { padding-left: 22px; margin: 0 0 16px; }
@@ -354,6 +359,7 @@ _BLOG_CSS = """
   }
   @media (max-width: 640px) {
     .nav-pair { grid-template-columns: 1fr; }
+    .post-breadcrumb .current { max-width: 30ch; }
   }
   .nav-card {
     display: block; text-decoration: none;
@@ -421,6 +427,14 @@ _BLOG_CSS = """
   }
   .post-nav-empty p {
     font-style: italic; margin: 0 0 14px; font-size: 14px;
+  }
+  @media (max-width: 480px) {
+    main { padding: 32px 16px 72px; }
+    h1 { margin: 0 0 16px; }
+    h2 { margin: 32px 0 8px; font-size: 22px; }
+    body { font-size: 16px; }
+    .lede { font-size: 17px; }
+    .post-breadcrumb { font-size: 10px; gap: 6px; margin-bottom: 16px; }
   }
 </style>
 """
@@ -758,6 +772,9 @@ async def blog_index() -> HTMLResponse:
       border: 1px solid rgba(232,168,73,0.4); border-radius: 4px;
       transition: all 0.2s; }}
     .back-home:hover {{ background: rgba(232,168,73,0.1); border-color: #e8a849; }}
+    @media (max-width: 480px) {{
+      .post-card {{ padding: 16px 20px; }}
+    }}
   </style>
 </head>
 <body>
