@@ -1259,7 +1259,7 @@ function renderList(items) {
       versionStamp ? `<span class="chip version" title="Summary prompt version. Out-of-date summaries auto-surface when the prompt template is bumped.">v${esc(versionStamp)}</span>` : "",
     ].filter(Boolean).join("");
     return `<tr>
-      <td><input type="checkbox" class="sel" value="${j.id}" ${j.status==='draft'?'':'disabled'}></td>
+      <td><input type="checkbox" class="sel" value="${j.id}" ${j.status==='draft'?'':'disabled'} onchange="updateBulkCapNote()"></td>
       <td>
         <a href="${previewUrl}" target="_blank" rel="noopener" style="color:#e8a849;text-decoration:none"><b>${esc(j.title)}</b></a>
         <a href="${previewUrl}" target="_blank" rel="noopener" class="btn" style="margin-left:8px;font-size:10px;padding:2px 8px">Preview ↗</a>
@@ -1284,9 +1284,10 @@ function renderList(items) {
     </tr>`;
   }).join("");
   document.getElementById("list").innerHTML = `
-    <div style="margin:.5rem 0">
+    <div style="margin:.5rem 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button class="btn primary" onclick="bulkPub()">Bulk publish selected (Tier-1 only)</button>
       <button class="btn" onclick="bulkRej()">Bulk reject selected</button>
+      <span id="bulk-cap-note" style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em"></span>
     </div>
     <table>
       <thead><tr><th><input type="checkbox" onchange="toggleAll(this)"></th><th>Job</th><th>Posted</th><th></th></tr></thead>
@@ -1320,10 +1321,34 @@ async function rej(id) {
   load();
 }
 
+// Server caps every bulk action at 100 ids (admin_jobs.py:337). Keep the
+// client cap in lockstep or admin hits a 400 after hand-selecting >100.
+const BULK_LIMIT = 100;
+
+function updateBulkCapNote() {
+  const note = document.getElementById("bulk-cap-note");
+  if (!note) return;
+  const checked = document.querySelectorAll(".sel:checked").length;
+  const eligible = document.querySelectorAll(".sel:not(:disabled)").length;
+  if (checked >= BULK_LIMIT && eligible > BULK_LIMIT) {
+    note.textContent = `${checked} selected · server caps bulk actions at ${BULK_LIMIT}. Publish/reject this batch, then select the next.`;
+    note.style.color = "#e8a849";
+  } else if (checked > 0) {
+    note.textContent = `${checked} of ${eligible} eligible selected`;
+    note.style.color = "#94a3b8";
+  } else {
+    note.textContent = "";
+  }
+}
+
 async function bulkPub() {
   const selected = [...document.querySelectorAll(".sel:checked")];
   const ids = selected.map(x => +x.value);
   if (!ids.length) { alert("Select some rows."); return; }
+  if (ids.length > BULK_LIMIT) {
+    alert(`Selected ${ids.length} rows but server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`);
+    return;
+  }
   // Count how many of the selected drafts are missing a summary. We read
   // this off the row by walking up to the <tr> and looking for the
   // no-summary chip we emitted during render.
@@ -1346,9 +1371,13 @@ async function bulkPub() {
 async function bulkRej() {
   const ids = [...document.querySelectorAll(".sel:checked")].map(x => +x.value);
   if (!ids.length) { alert("Select some rows."); return; }
+  if (ids.length > BULK_LIMIT) {
+    alert(`Selected ${ids.length} rows but server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`);
+    return;
+  }
   const reason = prompt(`Reject ${ids.length} jobs.\nReason (` + REJECT_REASONS.join(" / ") + "):");
   if (!reason || !REJECT_REASONS.includes(reason)) { alert("Invalid reason."); return; }
-  if (!confirm(`Reject ${ids.length} jobs as "${reason}"? This can be undone via the Rejected tab.`)) return;
+  if (!confirm(`Reject ${ids.length} jobs as "${reason}"?`)) return;
   const r = await fetch(`/admin/jobs/api/bulk-reject`, {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
@@ -1358,7 +1387,17 @@ async function bulkRej() {
   load();
 }
 
-function toggleAll(el) { document.querySelectorAll(".sel:not(:disabled)").forEach(x=>x.checked=el.checked); }
+function toggleAll(el) {
+  const boxes = [...document.querySelectorAll(".sel:not(:disabled)")];
+  if (el.checked) {
+    // Cap select-all at the server's bulk limit so admin never hits the 400.
+    boxes.slice(0, BULK_LIMIT).forEach(x => x.checked = true);
+    boxes.slice(BULK_LIMIT).forEach(x => x.checked = false);
+  } else {
+    boxes.forEach(x => x.checked = false);
+  }
+  updateBulkCapNote();
+}
 
 // Called from the #<id> chip on each row. Filters the queue to that single job.
 // Auto-switches to the "all" tab so the job is visible regardless of its current
