@@ -83,7 +83,7 @@ async def sitemap_blog() -> Response:
 
 
 @router.api_route("/sitemap-pages.xml", methods=["GET", "HEAD"])
-async def sitemap_pages() -> Response:
+async def sitemap_pages(db: AsyncSession = Depends(get_db)) -> Response:
     settings = get_settings()
     base = (settings.public_base_url or "").rstrip("/")
     today = date.today().isoformat()
@@ -94,6 +94,17 @@ async def sitemap_pages() -> Response:
         _url(f"{base}/leaderboard", today, 0.6),
         _url(f"{base}/verify", today, 0.5),
     ]
+    # SEO-10: include paginated /jobs?page=N for Googlebot discovery.
+    # Single count query → same page-size constant the hub uses.
+    from sqlalchemy import func as _func
+    from app.models.job import Job as _Job
+    from app.routers.jobs import JOBS_PAGE_SIZE
+    total = (await db.execute(
+        select(_func.count(_Job.id)).where(_Job.status == "published")
+    )).scalar_one()
+    total_pages = max(1, (total + JOBS_PAGE_SIZE - 1) // JOBS_PAGE_SIZE)
+    for p in range(2, total_pages + 1):
+        urls.append(_url(f"{base}/jobs?page={p}", today, 0.6))
     return Response(content=_xml(urls), media_type="application/xml",
                     headers=_CACHE_1H)
 

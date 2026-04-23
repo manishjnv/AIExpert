@@ -227,25 +227,109 @@ _BASE_CSS = """
 """
 
 
+JOBS_PAGE_SIZE = 50
+
+
+def _paginate_numbers(page: int, total: int, window: int = 2) -> list[int | None]:
+    """Return the page-number sequence for the pagination footer.
+
+    For small totals (≤ 2*window + 5), return every number. For larger,
+    show 1 · [window around current] · total, with None as ellipsis.
+    """
+    if total <= 2 * window + 5:
+        return list(range(1, total + 1))
+    nums: list[int | None] = [1]
+    if page - window > 2:
+        nums.append(None)
+    for p in range(max(2, page - window), min(total, page + window) + 1):
+        if p != 1 and p != total:
+            nums.append(p)
+    if page + window < total - 1:
+        nums.append(None)
+    if total != 1:
+        nums.append(total)
+    return nums
+
+
+def _page_href(page: int) -> str:
+    return "/jobs" if page == 1 else f"/jobs?page={page}"
+
+
+def _render_pagination(page: int, total_pages: int) -> str:
+    if total_pages <= 1:
+        return ""
+    parts = ['<nav class="pagination" aria-label="Jobs pagination">']
+    if page > 1:
+        parts.append(f'<a rel="prev" href="{_page_href(page - 1)}">← Prev</a>')
+    for p in _paginate_numbers(page, total_pages):
+        if p is None:
+            parts.append('<span class="ellipsis">…</span>')
+        elif p == page:
+            parts.append(f'<strong aria-current="page">{p}</strong>')
+        else:
+            parts.append(f'<a href="{_page_href(p)}">{p}</a>')
+    if page < total_pages:
+        parts.append(f'<a rel="next" href="{_page_href(page + 1)}">Next →</a>')
+    parts.append('</nav>')
+    return "\n".join(parts)
+
+
 @router.get("/jobs", response_class=HTMLResponse)
 @router.get("/jobs/", response_class=HTMLResponse)
-async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
-    # Server-render the first page so the crawler sees real content; the
-    # client JS then hydrates with filters + match ring against /api/jobs.
+async def jobs_index(
+    page: int = Query(1, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """SSR paginated jobs hub (SEO-10).
+
+    Page 1 canonicals to /jobs (no query); pages 2+ canonical to
+    /jobs?page=N. rel=prev/next links emitted in <head> where applicable.
+    Footer pagination gives Googlebot a deterministic crawl path — no
+    reliance on client-side infinite scroll.
+    """
+    from sqlalchemy import func
+    total = (await db.execute(
+        select(func.count(Job.id)).where(Job.status == "published")
+    )).scalar_one()
+    total_pages = max(1, (total + JOBS_PAGE_SIZE - 1) // JOBS_PAGE_SIZE)
+    if page > total_pages:
+        raise HTTPException(404, "page out of range")
+
     stmt = (select(Job).where(Job.status == "published")
-            .order_by(Job.posted_on.desc(), Job.id.desc()).limit(50))
+            .order_by(Job.posted_on.desc(), Job.id.desc())
+            .offset((page - 1) * JOBS_PAGE_SIZE)
+            .limit(JOBS_PAGE_SIZE))
     rows = (await db.execute(stmt)).scalars().all()
 
     initial_cards = "\n".join(_card_html(r) for r in rows) or "<p>No jobs published yet.</p>"
     settings = get_settings()
     base = getattr(settings, "public_base_url", "") or ""
 
+    canonical = f"{base}/jobs" if page == 1 else f"{base}/jobs?page={page}"
+    prev_link = ""
+    next_link = ""
+    if page > 1:
+        prev_link = f'<link rel="prev" href="{esc(base + _page_href(page - 1))}">'
+    if page < total_pages:
+        next_link = f'<link rel="next" href="{esc(base + _page_href(page + 1))}">'
+
+    title = "AI &amp; ML Jobs — AutomateEdge"
+    if page > 1:
+        title = f"AI &amp; ML Jobs — Page {page} of {total_pages} — AutomateEdge"
+    desc = "Curated AI and ML job openings from verified companies. See your match %% against your AutomateEdge learning plan."
+    if page > 1:
+        desc = f"Page {page} of {total_pages} — curated AI and ML job openings from verified companies."
+
+    pagination_html = _render_pagination(page, total_pages)
+
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI &amp; ML Jobs — AutomateEdge</title>
-<meta name="description" content="Curated AI and ML job openings from verified companies. See your match %% against your AutomateEdge learning plan.">
-<link rel="canonical" href="{esc(base)}/jobs">
+<title>{title}</title>
+<meta name="description" content="{desc}">
+<link rel="canonical" href="{esc(canonical)}">
+{prev_link}
+{next_link}
 <meta property="og:title" content="AI &amp; ML Jobs — AutomateEdge">
 <meta property="og:description" content="Curated AI and ML job openings from verified companies.">
 <meta property="og:type" content="website">
@@ -317,6 +401,7 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
   <div class="results">
     <div id="chips" class="chips-row"></div>
     <div id="list">{initial_cards}</div>
+    {pagination_html}
   </div>
 </div>
 
@@ -829,6 +914,11 @@ _HUB_CSS = """
   .match-ring.mid{background:#e8a849}
   .match-ring.low{background:#4a5560;color:#c0c4cc}
   .empty{padding:48px 24px;text-align:center;color:#94a3b8;background:#1a2029;border:1px dashed #2a323d;border-radius:8px}
+  .pagination{display:flex;gap:6px;align-items:center;justify-content:center;margin:40px 0 16px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:13px}
+  .pagination a,.pagination strong,.pagination span{padding:8px 14px;border-radius:4px;border:1px solid #2a323d;color:#c0c4cc;text-decoration:none;background:#141a21}
+  .pagination a:hover{background:#1a2029;color:#e8a849;border-color:rgba(232,168,73,.4)}
+  .pagination strong{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:600}
+  .pagination span.ellipsis{border-color:transparent;background:transparent;color:#94a3b8}
   @media (max-width:720px){ .layout{grid-template-columns:1fr} }
 </style>
 """
@@ -980,6 +1070,10 @@ $('f-q').addEventListener('input', () => {
 document.querySelectorAll('input[name=posted]').forEach(x => x.addEventListener('change', loadJobs));
 
 loadLocations();
-loadJobs();
+// SEO-10: when the URL already selects a paginated page (e.g. /jobs?page=3),
+// skip the auto-hydrate so the SSR-rendered page-N cards remain visible
+// until the user applies a filter. Filter interaction still calls loadJobs()
+// as before.
+if (!new URLSearchParams(location.search).has('page')) loadJobs();
 </script>
 """
