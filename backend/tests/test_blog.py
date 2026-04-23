@@ -222,7 +222,7 @@ async def test_post_01_article_json_ld_emitted(monkeypatch):
         assert data["publisher"]["logo"]["url"] == (
             "https://automateedge.cloud/assets/logo.png"
         )
-        assert data["image"].endswith("/assets/og-default.png")
+        assert data["image"].endswith("/og/blog/01.png")
         assert data["mainEntityOfPage"].endswith("/blog/01")
         assert data["description"].startswith("Why AutomateEdge exists")
         # Headline must stay ≤110 chars per Google guideline

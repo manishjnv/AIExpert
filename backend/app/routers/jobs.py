@@ -249,6 +249,11 @@ async def jobs_index(db: AsyncSession = Depends(get_db)) -> HTMLResponse:
 <meta property="og:title" content="AI &amp; ML Jobs — AutomateEdge">
 <meta property="og:description" content="Curated AI and ML job openings from verified companies.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="{esc(base)}/og/course/generalist.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{esc(base)}/og/course/generalist.png">
 {_BRAND_HEAD}
 {_BASE_CSS}
 {_HUB_CSS}
@@ -592,6 +597,11 @@ async def job_detail(
 <meta property="og:description" content="{desc_tag}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="{esc(canonical)}">
+<meta property="og:image" content="{esc(base)}/og/jobs/{esc(job.slug)}.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{esc(base)}/og/jobs/{esc(job.slug)}.png">
 <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 <script type="application/ld+json">{json.dumps(breadcrumb_ld, ensure_ascii=False)}</script>
 {_BRAND_HEAD}

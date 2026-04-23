@@ -437,7 +437,7 @@ def _render_post(
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
     url = f"{base}/blog/{slug}"
-    og_image = f"{base}/assets/og-default.png"
+    og_image = f"{base}/og/blog/{slug}.png"
     post_nav_html = _render_post_nav(slug, base)
     sidebar_html = _render_post_sidebar(slug, title, url, base)
     return _blog_template_env.get_template("blog/post.html").render(
@@ -706,6 +706,11 @@ async def blog_index() -> HTMLResponse:
   <meta property="og:url" content="{base}/blog">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AutomateEdge">
+  <meta property="og:image" content="{base}/og/course/generalist.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{base}/og/course/generalist.png">
   <link rel="canonical" href="{base}/blog">
   <link rel="alternate" type="application/rss+xml" title="AutomateEdge Blog" href="{base}/blog/feed.xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">

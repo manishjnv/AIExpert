@@ -47,6 +47,11 @@ weasyprint==63.1
 pydyf==0.11.0
 qrcode[pil]==7.4.2
 
+# ----- Image rendering (OG social cards — SEO-11) -----
+# Explicit pin; qrcode[pil] already pulls Pillow in transitively, but declaring
+# it here makes the dependency load-bearing and survives qrcode removing [pil].
+Pillow==11.0.0
+
 # ----- Utilities -----
 python-dateutil==2.9.0
 orjson==3.10.7                # faster JSON for responses
