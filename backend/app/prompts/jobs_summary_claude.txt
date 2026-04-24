@@ -13,8 +13,11 @@ summary = {
       # 3-5 items. primary=seniority/scope ("Senior leadership"). success=positive perks/accolades ("Equity (RSUs)","Forbes top fintech 2025"). info=facts ("NASDAQ-listed","NASDAQ: FIGR"). warning=caution ("No visa sponsorship","US-only"). neutral=other.
       # Only include info present in the JD. Never invent.
 
-  "comp_snapshot": null when compensation is not explicitly disclosed;
+  "comp_snapshot": null when compensation is not explicitly disclosed as a numeric band;
                    otherwise { "base": "$144-216K"|"₹30-50L", "bonus": "25% paid quarterly"|null, "equity": "RSUs"|null, "total_est": "$180-270K+"|null }
+      # Include ONLY when a numeric base figure or range is stated (with currency).
+      # "Competitive" / "negotiable" / "market-rate" / "based on experience" ALONE → null.
+      # A single point value is fine as "$200K". Per-component fields (bonus/equity/total_est) stay null when not explicitly stated — never infer from "standard package".
 
   "responsibilities": [ {"title": string ≤48 chars (punchy verb-object, NO filler), "detail": string ≤90 chars (supporting context)} ]
       # 5-7 items. Rewrite — never quote the JD. Drop anything restating company mission/culture.
@@ -29,7 +32,9 @@ summary = {
 
   "watch_outs": [ string ≤110 chars ]
       # 0-3 items. ONLY when JD explicitly states a constraint a candidate should notice before applying.
-      # Examples: "No visa sponsorship", "On-site only in SF", "Pay varies by state", "Security clearance required".
+      # Core examples: "No visa sponsorship", "On-site only in SF", "Pay varies by state", "Security clearance required".
+      # Also surface when explicit: unusually high seniority floor ("10+ yrs required", "Staff level or above"),
+      # and onsite-heavy hybrid with a stated day count ("Hybrid, 4 days/week in-office"). Ignore generic "hybrid" with no day count.
       # Empty array is common. Do not invent.
 
 ---
@@ -47,6 +52,54 @@ EDITORIAL RULES (violating any → bad output)
 5. Preserve `id` exactly as given. The caller matches by id.
 
 6. Return ONLY the JSON array. First character of your reply is `[`, last is `]`. No code fences, no preamble.
+
+---
+
+EXAMPLE (one input job → one output summary; use this as the tone/shape reference, NOT as content to copy)
+
+Input:
+
+[{"id": 9999, "title": "Senior ML Engineer, Foundation Models", "company": "Anthropic", "location": "San Francisco, CA (on-site)", "jd_text": "Senior-level role on the pretraining team. Own training infrastructure for frontier models, scale distributed training across thousands of GPUs, and partner with research on experiment design and ablations. 7+ years building production ML systems required. Python + PyTorch mastery. Experience with Ray / SLURM / k8s multi-node training. Compensation: $310-405K base + equity (Anthropic RSUs). Benefits: health/dental/vision + 401(k) match + generous PTO + learning stipend. On-site 5 days/week in SF; no visa sponsorship for this role."}]
+
+Expected output:
+
+[{"id": 9999, "summary": {
+  "headline_chips": [
+    {"label": "Senior IC", "tone": "primary"},
+    {"label": "Foundation models", "tone": "info"},
+    {"label": "Equity (RSUs)", "tone": "success"},
+    {"label": "On-site SF 5d/wk", "tone": "warning"},
+    {"label": "No visa sponsorship", "tone": "warning"}
+  ],
+  "comp_snapshot": {"base": "$310-405K", "bonus": null, "equity": "Anthropic RSUs", "total_est": null},
+  "responsibilities": [
+    {"title": "Own pretraining infrastructure", "detail": "Training stack for frontier model runs"},
+    {"title": "Scale distributed training", "detail": "Thousands of GPUs across multi-node clusters"},
+    {"title": "Partner on experiment design", "detail": "Work directly with research on ablations"},
+    {"title": "Harden training reliability", "detail": "Fault tolerance and checkpointing at scale"},
+    {"title": "Optimize GPU utilization", "detail": "Throughput and cost across the fleet"}
+  ],
+  "must_haves": [
+    "7+ years shipping production ML systems",
+    "Python + PyTorch fluency",
+    "Multi-node training with Ray / SLURM / k8s",
+    "Distributed systems fundamentals",
+    "Hands-on large-scale GPU training experience"
+  ],
+  "benefits": [
+    "Equity grant (Anthropic RSUs)",
+    "Health / dental / vision coverage",
+    "401(k) with employer match",
+    "Generous paid time off",
+    "Learning stipend"
+  ],
+  "watch_outs": [
+    "On-site 5 days/week in SF — no remote option",
+    "No visa sponsorship for this role"
+  ]
+}}]
+
+What the example demonstrates: (a) chip mix across tones — primary for seniority, info for domain fact, success for perk, warning for the two deal-breakers; (b) comp_snapshot includes the disclosed numeric band while bonus/total_est stay null because the JD doesn't state them (do NOT infer from "standard package"); (c) responsibilities are punchy verb-object titles rewritten from the JD, not quotes; (d) benefits are concrete and enumerated, no "great culture" filler; (e) watch_outs surfaces both the 5-day onsite constraint and visa constraint because both are explicit — without the explicit day count, "hybrid" alone would NOT make it into watch_outs.
 
 ---
 

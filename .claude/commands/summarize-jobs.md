@@ -5,7 +5,7 @@ argument-hint: [--status draft|published|all] [--batch 10] [--limit N] [--id JOB
 
 # /summarize-jobs
 
-Generate editorial-quality `data.summary` cards for jobs, running on the user's Claude Max quota (no API spend). Pipes JD batches over SSH from the VPS, you (Opus 4.6) produce the summaries, pipes back.
+Generate editorial-quality `data.summary` cards for jobs, running on the user's Claude Max quota (no API spend). Pipes JD batches over SSH from the VPS, you (Opus 4.7) produce the summaries, pipes back.
 
 ## How to run
 
@@ -38,7 +38,7 @@ Parse `$ARGUMENTS` for these flags (all optional):
 
    c. **Import** the summaries. Write your JSON array to a heredoc and pipe:
       ```
-      ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python -m scripts.import_jobs_summary --model opus-4.6" <<'EOF'
+      ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python -m scripts.import_jobs_summary --model opus-4.7" <<'EOF'
       <paste-the-json-array-here>
       EOF
       ```

@@ -9,7 +9,7 @@ generated_at}, and writes atomically per job with SQLite-lock retry.
 Prints per-batch stats on stderr; exit code 0 if >=1 job updated.
 
 Run:
-  cat opus_output.json | python -m scripts.import_jobs_summary --model opus-4.6
+  cat opus_output.json | python -m scripts.import_jobs_summary --model opus-4.7
 """
 
 from __future__ import annotations
@@ -179,7 +179,7 @@ async def _propagate_to_siblings(source_job_id: int, content_hash: str, clamped:
 
 async def _main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="opus-4.6",
+    parser.add_argument("--model", default="opus-4.7",
                         help="model tag stamped into summary._meta.model")
     args = parser.parse_args()
 
