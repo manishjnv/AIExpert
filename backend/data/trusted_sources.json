@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "updated": "2026-04-24",
+  "purpose": "E-E-A-T citation allowlist for pillar blog posts (SEO-25). Pillar posts must include >= 5 outbound links matching a domain in this list before blog_validator.validate_pillar() allows publish. Quarterly review: add emerging authoritative sources, prune any that become spammy.",
+  "match_rule": "suffix — a link's hostname matches a domain iff it equals the domain or ends with '.' + the domain (so 'ai.meta.com' matches 'meta.com' but 'fakemeta.com' does not).",
+  "allowlist": [
+    {"domain": "arxiv.org", "category": "papers"},
+    {"domain": "paperswithcode.com", "category": "papers"},
+    {"domain": "openreview.net", "category": "papers"},
+    {"domain": "jmlr.org", "category": "papers"},
+    {"domain": "semanticscholar.org", "category": "papers"},
+
+    {"domain": "openai.com", "category": "lab-docs"},
+    {"domain": "anthropic.com", "category": "lab-docs"},
+    {"domain": "deepmind.google", "category": "lab-docs"},
+    {"domain": "deepmind.com", "category": "lab-docs"},
+    {"domain": "ai.google", "category": "lab-docs"},
+    {"domain": "research.google", "category": "lab-docs"},
+    {"domain": "ai.meta.com", "category": "lab-docs"},
+    {"domain": "ai.facebook.com", "category": "lab-docs"},
+    {"domain": "huggingface.co", "category": "lab-docs"},
+    {"domain": "mistral.ai", "category": "lab-docs"},
+    {"domain": "cohere.com", "category": "lab-docs"},
+
+    {"domain": "pytorch.org", "category": "framework-docs"},
+    {"domain": "tensorflow.org", "category": "framework-docs"},
+    {"domain": "scikit-learn.org", "category": "framework-docs"},
+    {"domain": "numpy.org", "category": "framework-docs"},
+    {"domain": "scipy.org", "category": "framework-docs"},
+    {"domain": "pandas.pydata.org", "category": "framework-docs"},
+    {"domain": "jupyter.org", "category": "framework-docs"},
+    {"domain": "python.org", "category": "framework-docs"},
+
+    {"domain": "bls.gov", "category": "statistics"},
+    {"domain": "weforum.org", "category": "statistics"},
+    {"domain": "economicgraph.linkedin.com", "category": "statistics"},
+    {"domain": "octoverse.github.com", "category": "statistics"},
+    {"domain": "github.blog", "category": "statistics"},
+    {"domain": "stackoverflow.blog", "category": "statistics"},
+
+    {"domain": "aiindex.stanford.edu", "category": "academic"},
+    {"domain": "stanford.edu", "category": "academic"},
+    {"domain": "mit.edu", "category": "academic"},
+    {"domain": "berkeley.edu", "category": "academic"},
+    {"domain": "cmu.edu", "category": "academic"},
+    {"domain": "ox.ac.uk", "category": "academic"},
+    {"domain": "cam.ac.uk", "category": "academic"},
+    {"domain": "nature.com", "category": "academic"},
+    {"domain": "science.org", "category": "academic"},
+
+    {"domain": "d2l.ai", "category": "textbook"},
+    {"domain": "deeplearningbook.org", "category": "textbook"},
+    {"domain": "distill.pub", "category": "textbook"},
+
+    {"domain": "nist.gov", "category": "standards"},
+    {"domain": "ieee.org", "category": "standards"},
+    {"domain": "acm.org", "category": "standards"}
+  ]
+}

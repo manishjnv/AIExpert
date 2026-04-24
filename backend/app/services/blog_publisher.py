@@ -45,10 +45,21 @@ REQUIRED_FIELDS = (
 )
 REQUIRED_IMAGE_FIELDS = ("hero_prompt", "hero_alt", "hero_filename")
 
-# Banned terms — same list as the Claude prompt. Case-insensitive
-# whole-word-ish match. Scans title / lede / body_html / og_description
-# / tags. A single hit flags the post.
-_BANNED_TERMS = [
+# Banned terms split into two tiers.
+#
+# _OPERATIONAL_LEAKS — repo paths, session/commit references. These are
+# privacy/branding hazards that apply to EVERY post regardless of tier.
+#
+# _VOICE_TERMS — tech-stack + AI-provider names. These break the
+# build-in-public voice but are legitimate (often required) in pillar
+# SEO posts targeting queries like "AI engineer vs ML engineer" or
+# "PyTorch vs TensorFlow". When payload["pillar_tier"] is set, the
+# voice check is skipped. Operational-leak checks always run.
+_OPERATIONAL_LEAKS = [
+    r"github\.com/\S+", r"source\s+code", r"manishjnv/AIExpert",
+    r"\bsession\s+\d+\b", r"\bcommit\s+[0-9a-f]{6,}\b",
+]
+_VOICE_TERMS = [
     # Stack
     r"\bFastAPI\b", r"\bFlask\b", r"\bDjango\b", r"\bSQLAlchemy\b",
     r"\bSQLite\b", r"\bPostgres(?:QL)?\b", r"\bnginx\b", r"\bDocker\b",
@@ -64,12 +75,9 @@ _BANNED_TERMS = [
     # Impl details
     r"\bHMAC(?:-SHA\d+)?\b", r"\bSHA-?256\b", r"\bSHA-?512\b", r"\bJWT\b",
     r"\bbcrypt\b", r"\bJSON\s+Schema\b",
-    # Repo / source
-    r"github\.com/\S+", r"source\s+code", r"manishjnv/AIExpert",
-    # Operational leaks
-    r"\bsession\s+\d+\b", r"\bcommit\s+[0-9a-f]{6,}\b",
 ]
-_BANNED_RE = re.compile("|".join(_BANNED_TERMS), re.IGNORECASE)
+_OPERATIONAL_RE = re.compile("|".join(_OPERATIONAL_LEAKS), re.IGNORECASE)
+_BANNED_RE = re.compile("|".join(_OPERATIONAL_LEAKS + _VOICE_TERMS), re.IGNORECASE)
 
 # Safe HTML tags allowed in body_html. Anything else triggers a warning.
 _ALLOWED_TAGS = {
@@ -194,9 +202,15 @@ def validate_payload(payload: dict) -> dict:
         errors.append("lede should be plain text, no HTML tags.")
 
     # --- Body checks ---
+    pillar_tier = str(payload.get("pillar_tier") or "").strip().lower()
     stripped = _strip_tags(body_html)
     actual_wc = _count_words(stripped)
-    if actual_wc < 800:
+    if pillar_tier:
+        # Pillar SEO posts have their own stricter tier floor enforced by
+        # blog_validator.validate_pillar (3000 / 4500). The build-in-public
+        # 800-1500 band does not apply.
+        pass
+    elif actual_wc < 800:
         errors.append(f"body is {actual_wc} words — below the 800 minimum.")
     elif actual_wc > 1500:
         warnings.append(f"body is {actual_wc} words — over the 1500 target (may lose recruiter readers).")
@@ -244,13 +258,18 @@ def validate_payload(payload: dict) -> dict:
         errors.append("body_html must not contain <script> or <style> blocks.")
 
     # --- Banned-terms / branding scan ---
+    # Pillar SEO posts skip the tech-stack/AI-provider voice check — they
+    # must be free to mention PyTorch, GPT-4, Anthropic etc. to compete
+    # on intent-matched queries. Operational-leak terms (repo paths,
+    # session numbers, commit hashes) are banned in every tier.
+    scan_re = _OPERATIONAL_RE if pillar_tier else _BANNED_RE
     scan_targets = {
         "title": title, "lede": lede, "og_description": og,
         "body_html": body_html,
         "tags": " ".join(tags) if isinstance(tags, list) else "",
     }
     for field, text in scan_targets.items():
-        hits = _BANNED_RE.findall(text)
+        hits = scan_re.findall(text)
         if hits:
             # Dedup case-insensitively
             uniq = sorted({h if isinstance(h, str) else h[0] for h in hits}, key=str.lower)
@@ -272,20 +291,34 @@ def validate_payload(payload: dict) -> dict:
     if hf and not hf.startswith(slug.split("-", 1)[0] if slug else ""):
         warnings.append("hero_filename prefix doesn't match slug number.")
 
+    stats = {
+        "word_count": actual_wc,
+        "paragraphs": len(paragraphs),
+        "h2_count": h2_count,
+        "long_paragraphs": long_paras,
+        "long_sentences": long_sentences,
+        "quotable_lines": len(quotable) if isinstance(quotable, list) else 0,
+        "tags_count": len(tags) if isinstance(tags, list) else 0,
+        "og_length": len(og),
+    }
+
+    # --- SEO-22: VideoObject metadata integrity (all tiers) ---
+    from app.services.blog_validator import validate_pillar, validate_videos_metadata
+    video_violations = validate_videos_metadata(payload)
+    errors.extend(video_violations)
+
+    # --- SEO-21: pillar quality bar (tier-gated; no-op for standard posts) ---
+    if pillar_tier:
+        pillar_report = validate_pillar(payload)
+        errors.extend(pillar_report["errors"])
+        warnings.extend(pillar_report["warnings"])
+        stats["pillar"] = pillar_report["stats"]
+
     return {
         "ok": not errors,
         "errors": errors,
         "warnings": warnings,
-        "stats": {
-            "word_count": actual_wc,
-            "paragraphs": len(paragraphs),
-            "h2_count": h2_count,
-            "long_paragraphs": long_paras,
-            "long_sentences": long_sentences,
-            "quotable_lines": len(quotable) if isinstance(quotable, list) else 0,
-            "tags_count": len(tags) if isinstance(tags, list) else 0,
-            "og_length": len(og),
-        },
+        "stats": stats,
     }
 
 
