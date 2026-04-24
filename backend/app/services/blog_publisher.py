@@ -80,9 +80,13 @@ _OPERATIONAL_RE = re.compile("|".join(_OPERATIONAL_LEAKS), re.IGNORECASE)
 _BANNED_RE = re.compile("|".join(_OPERATIONAL_LEAKS + _VOICE_TERMS), re.IGNORECASE)
 
 # Safe HTML tags allowed in body_html. Anything else triggers a warning.
+# Table family added for SEO-21 pillar posts (comparative=true requires
+# at least one <table>) — browser-native, no XSS risk when body is
+# author-controlled via the admin publish flow.
 _ALLOWED_TAGS = {
     "p", "h2", "h3", "strong", "em", "a", "ul", "ol", "li",
     "hr", "br", "blockquote", "code", "figure", "img", "span", "div",
+    "table", "thead", "tbody", "tr", "th", "td",
 }
 _TAG_RE = re.compile(r"<(/?[a-zA-Z][a-zA-Z0-9]*)", re.IGNORECASE)
 

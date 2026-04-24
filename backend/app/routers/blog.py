@@ -447,6 +447,8 @@ def _render_post(
     body_html: str,
     published: str,
     author: str = "Manish Kumar",
+    faqs: list | None = None,
+    defined_terms: list | None = None,
 ) -> str:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
@@ -465,6 +467,8 @@ def _render_post(
         body_html=body_html,
         sidebar_html=sidebar_html,
         post_nav_html=post_nav_html,
+        faqs=faqs or [],
+        defined_terms=defined_terms or [],
     )
 
 
@@ -917,5 +921,7 @@ async def post_dynamic(slug: str) -> HTMLResponse:
         body_html=payload.get("body_html", ""),
         published=payload.get("published", ""),
         author=payload.get("author", "Manish Kumar"),
+        faqs=payload.get("faqs") or None,
+        defined_terms=payload.get("defined_terms") or None,
     )
     return HTMLResponse(html)

@@ -4,6 +4,62 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-24 (session 39 — SEO-21 first pillar post + template wire-up)
+
+**Branch:** `master` · One commit sitting local on top of session 38's `5c81c21` (which is live on VPS).
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — at commit `5c81c21`; session 39 not yet deployed.
+**Tests:** 65 blog tests pass (blog-adjacent slice only; full suite not re-run, changes are additive).
+
+### Session 39 — first pillar post + SEO-21 template closure
+
+**Deliverable:** the first pillar blog post in the SEO-21 cluster — `/blog/ai-engineer-vs-ml-engineer`, targeting q6 ("AI engineer vs ML engineer"), the most beatable SERP per [docs/SEO.md §5.1](./SEO.md#51). Authored as `docs/blog/03-ai-engineer-vs-ml-engineer.json`; still an authoring archive — publish is a manual admin action via `/admin/blog` once deployed.
+
+**Post stats (validator: `ok=True, 0 errors`):**
+
+| Gate | Required | Actual |
+|---|---|---|
+| Word count | ≥3000 | **3134** |
+| First non-lede paragraph | 40–60 words | **50** |
+| H2 sections | 8–12 | **10** |
+| Internal links | ≥40 | **46** (all 12 AI/ML track-section pages + /jobs + /blog/01-02 + /vs/ai-engineer-vs-ml-engineer + /roadmap + /) |
+| Trusted citations | ≥5 | **7** (Stanford AI Index, BLS, arXiv, Hugging Face, OpenAI platform docs, PyTorch, Papers with Code) |
+| FAQs | 8–15 | **10** (drawn from PAA) |
+| Comparison table | ≥1 | **1** — seven-dimension side-by-side |
+| Schemas | Article + FAQPage + one of {HowTo, DefinedTerm, VideoObject, ItemList} | **Article + FAQPage + DefinedTerm** (4 defined terms) |
+
+Two remaining validator warnings (non-blocking): 8 paragraphs >4 sentences, 10 sentences >30 words. Both are editorial judgment calls in an information-dense pillar; optional split pass can land with session 40 if zero-warning compliance becomes a priority.
+
+**Template infrastructure that shipped in the same commit (plugs SEO-21 foundation gaps):**
+
+- [backend/app/templates/blog/post.html](../backend/app/templates/blog/post.html) — adds `FAQPage` + `DefinedTermSet` JSON-LD `<script>` blocks, emitted conditionally when `payload.faqs` / `payload.defined_terms` are present. Without this, the pillar validator's schema *declaration* was a claim with no actual emission — Google would see Article + BreadcrumbList only, and the rich-result assertion would fail.
+- [backend/app/routers/blog.py:443](../backend/app/routers/blog.py#L443) — `_render_post` signature extended with `faqs` and `defined_terms` kwargs, threaded from the published-post payload.
+- [backend/app/services/blog_publisher.py:87](../backend/app/services/blog_publisher.py#L87) — `_ALLOWED_TAGS` gains `table/thead/tbody/tr/th/td`. Pillar posts with `comparative: true` require a `<table>`; pre-fix every such post threw a non-standard-tag warning. Browser-native tags, zero XSS risk under admin-controlled `body_html`.
+
+**Render verification:** rendered the template with the session-39 payload and confirmed all four JSON-LD blocks parse as valid JSON: `Article` + `BreadcrumbList` + `FAQPage` (10 Question entities) + `DefinedTermSet` (4 DefinedTerm entities).
+
+**Session 38 deploy status (correction landed in CLAUDE.md §9):** both session-38 commits (`b491ca7` + `5c81c21`) are live on VPS and have been since shortly after they were pushed. Routes `/roadmap` (ItemList), `/roadmap/ai-engineer/skills`, `/roadmap/generalist/career-path` all return 200 with expected schema. The earlier §9 note claiming "NOT yet deployed" was stale and was corrected in this session.
+
+**Deploy + publish (pending user decision):**
+
+```bash
+# VPS (after pushing the session-39 commit)
+ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose up -d --build --force-recreate backend"
+```
+
+Template + router + validator changes all need the rebuild. Frontend files are volume-mounted and would not normally require `--build`, but backend changes do — use the full command.
+
+Once deployed, the pillar post goes live via the admin publish flow:
+
+1. Open `/admin/blog`.
+2. Paste the contents of `docs/blog/03-ai-engineer-vs-ml-engineer.json` into the draft editor.
+3. Save draft → review → publish. IndexNow ping fires automatically on publish (SEO-07 wiring).
+
+Until the admin publish step runs, `/blog/03-ai-engineer-vs-ml-engineer` will 404 even after the backend deploy — this is intentional: no auto-publish from repo files.
+
+**Next session (40):** second pillar post `/blog/learn-ai-without-cs-degree-2026` (q7). Schema stack: Article + FAQPage + HowTo (Review still blocked on ≥5 real testimonials per SEO-23).
+
+---
+
 ## Current state as of 2026-04-17 (session 23 — roadmap week-row collapse UX)
 
 **Branch:** `master` (frontend commit this session on top of session 21's `2dece31`; session 22 was data-plane only)

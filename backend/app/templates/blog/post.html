@@ -77,6 +77,58 @@
   }
   </script>
 
+  {# FAQPage JSON-LD (SEO-21). Emitted only when the payload declares `faqs`.
+     Each Question's `name` is the literal PAA query; `acceptedAnswer.text`
+     is a short answer (2-4 sentences) sourced from the visible FAQ section
+     at the bottom of the article. Google dedupes against the visible copy,
+     so the JSON-LD and HTML must match in meaning. #}
+  {%- if faqs %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {%- for faq in faqs %}
+      {
+        "@type": "Question",
+        "name": {{ faq.question | tojson }},
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": {{ faq.answer | tojson }}
+        }
+      }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ]
+  }
+  </script>
+  {%- endif %}
+
+  {# DefinedTermSet JSON-LD (SEO-21). Emitted only when payload declares
+     `defined_terms`. Used on comparison pillar posts to give Google a
+     structured glossary of the concepts the post defines (e.g.
+     "AI Engineer", "ML Engineer"). Validator accepts the "DefinedTerm"
+     schema declaration; schema.org permits a DefinedTermSet wrapping
+     multiple DefinedTerm entries. #}
+  {%- if defined_terms %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DefinedTermSet",
+    "name": {{ title | tojson }},
+    "url": {{ url | tojson }},
+    "hasDefinedTerm": [
+      {%- for term in defined_terms %}
+      {
+        "@type": "DefinedTerm",
+        "name": {{ term.name | tojson }},
+        "description": {{ term.description | tojson }}
+      }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ]
+  }
+  </script>
+  {%- endif %}
+
   <link rel="alternate" type="application/rss+xml" title="AutomateEdge Blog" href="https://automateedge.cloud/blog/feed.xml">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
