@@ -442,6 +442,7 @@ def list_drafts() -> list[dict]:
                 "slug": d.get("slug", f.stem),
                 "title": d.get("title", ""),
                 "published": d.get("published", ""),
+                "pillar_tier": str(d.get("pillar_tier") or "").strip().lower(),
                 "saved_by": d.get("_saved_by", "—"),
                 "saved_at": d.get("_saved_at", ""),
             })
@@ -493,6 +494,7 @@ def list_published() -> list[dict]:
                 "slug": d.get("slug", f.stem),
                 "title": d.get("title", ""),
                 "published": d.get("published", ""),
+                "pillar_tier": str(d.get("pillar_tier") or "").strip().lower(),
                 "last_reviewed_by": d.get("last_reviewed_by", "—"),
                 "last_reviewed_on": d.get("last_reviewed_on", ""),
             })

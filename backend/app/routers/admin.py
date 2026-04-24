@@ -439,22 +439,118 @@ def _slugify_title(title: str) -> str:
     return s[:60]
 
 
+def _build_internal_url_manifest() -> str:
+    """Bulleted list of every internal URL a pillar post may link to.
+    Injected into the pillar prompt so Claude hits the >=40 internal-link
+    gate without hallucinating routes. Anything not in this manifest will
+    404 on visitors and fail the validator's internal-link count."""
+    from app.routers.track_pages import all_track_slugs, all_section_slugs
+    from app.routers.compare import all_slugs as _vs_slugs
+    from app.services.blog_publisher import list_published
+
+    tracks = all_track_slugs()
+    sections = all_section_slugs()
+    vs_slugs = _vs_slugs()
+    published_posts = list_published()
+
+    lines: list[str] = []
+    lines.append("HOME + HUBS")
+    lines.append("  /                  (home)")
+    lines.append("  /roadmap           (roadmap hub — 5 tracks)")
+    lines.append("  /jobs              (AI jobs board)")
+    lines.append("  /leaderboard       (learner leaderboard)")
+    lines.append("  /blog              (blog index)")
+    lines.append("  /vs                (comparison index)")
+    lines.append("  /verify            (credential verification)")
+    lines.append("")
+
+    lines.append(f"TRACK HUBS ({len(tracks)} tracks)")
+    for t in tracks:
+        lines.append(f"  /roadmap/{t}")
+    lines.append("")
+
+    lines.append(
+        f"TRACK QUINTET PAGES ({len(tracks)} tracks x {len(sections)} sections "
+        f"= {len(tracks) * len(sections)} pages — use these liberally, they target long-tail queries)"
+    )
+    for t in tracks:
+        for s in sections:
+            lines.append(f"  /roadmap/{t}/{s}")
+    lines.append("")
+
+    if vs_slugs:
+        lines.append(f"COMPARISON PAGES ({len(vs_slugs)})")
+        for s in vs_slugs:
+            lines.append(f"  /vs/{s}")
+        lines.append("")
+
+    lines.append("EXISTING BLOG POSTS")
+    lines.append("  /blog/01           (Building AutomateEdge Solo — build-in-public retrospective)")
+    for p in published_posts:
+        slug = str(p.get("slug") or "").strip()
+        if not slug or slug == "01":
+            continue
+        title = str(p.get("title") or "").strip()[:70]
+        lines.append(f"  /blog/{slug:<18} ({title})")
+
+    return "\n".join(lines)
+
+
+def _build_trusted_sources_digest() -> str:
+    """Grouped list of trusted citation domains (SEO-25 allowlist),
+    rendered compactly for the pillar prompt. Claude must pick >=5
+    distinct URLs across >=3 categories from this list."""
+    from app.services.blog_validator import load_trusted_sources
+    trusted = load_trusted_sources()
+    by_cat = trusted.get("by_category", {})
+    if not by_cat:
+        return "(trusted_sources.json missing — pillar validation will fail)"
+
+    cat_order = ["papers", "lab-docs", "framework-docs", "statistics",
+                 "academic", "textbook", "standards"]
+    seen: set[str] = set()
+    ordered: list[str] = [c for c in cat_order if c in by_cat] + \
+                        [c for c in sorted(by_cat) if c not in cat_order]
+
+    lines: list[str] = []
+    for cat in ordered:
+        if cat in seen:
+            continue
+        seen.add(cat)
+        domains = sorted(by_cat.get(cat, set()))
+        if not domains:
+            continue
+        lines.append(f"{cat.upper()} ({len(domains)})")
+        for d in domains:
+            lines.append(f"  {d}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
 @router.post("/api/render-blog-prompt")
 async def render_blog_prompt(
     request: Request,
     user: User = Depends(get_current_admin),
 ):
-    """Render the Claude Opus blog prompt with the admin's title + angle
-    substituted. Returns the prompt text + derived slug so the admin
-    can copy straight into Claude.ai."""
+    """Render a blog prompt (standard or pillar) with the admin's inputs
+    substituted. Returns prompt text + derived slug so the admin can
+    paste straight into Claude.ai. Tier determines the template + gates:
+      - standard  → claude_blog_manual.txt (800-1500 word essay)
+      - pillar    → claude_blog_pillar.txt, SEO-21 bar, >=3000 words
+      - flagship  → claude_blog_pillar.txt, SEO-21 bar, >=4500 words
+    """
     _check_origin(request)
     from pathlib import Path as _Path
     from datetime import date as _date
+    import json as _json
 
     body = await request.json()
     title = (body.get("title") or "").strip()
     angle = (body.get("angle") or "").strip()
+    tier = (body.get("tier") or "standard").strip().lower()
 
+    if tier not in {"standard", "pillar", "flagship"}:
+        raise HTTPException(status_code=400, detail="tier must be 'standard', 'pillar', or 'flagship'")
     if not title:
         raise HTTPException(status_code=400, detail="title required")
     if len(title) > 150:
@@ -464,17 +560,63 @@ async def render_blog_prompt(
     slug_body = _slugify_title(title)
     slug = f"{prefix}-{slug_body}" if slug_body else prefix
 
-    prompt_path = _Path(__file__).parent.parent / "prompts" / "claude_blog_manual.txt"
-    template = prompt_path.read_text(encoding="utf-8")
+    prompts_dir = _Path(__file__).parent.parent / "prompts"
+
+    if tier == "standard":
+        template = (prompts_dir / "claude_blog_manual.txt").read_text(encoding="utf-8")
+        rendered = (
+            template
+            .replace("{{TITLE}}", title)
+            .replace("{{ANGLE}}", angle or "(none — use your judgement, but stay on-topic)")
+            .replace("{{SLUG}}", slug)
+            .replace("{{PUBLISHED_DATE}}", _date.today().isoformat())
+            .replace("{{AUTHOR}}", user.name or "AutomateEdge team")
+        )
+        return {"prompt": rendered, "slug": slug, "title": title, "tier": tier}
+
+    target_query = (body.get("target_query") or "").strip()
+    if not target_query:
+        raise HTTPException(status_code=400, detail="target_query required for pillar/flagship tier")
+    if len(target_query) > 150:
+        raise HTTPException(status_code=400, detail="target_query too long (max 150 chars)")
+
+    comparative = bool(body.get("comparative"))
+    requested_stack = body.get("schema_stack")
+    if isinstance(requested_stack, list) and requested_stack:
+        stack = [str(s).strip() for s in requested_stack if str(s).strip()]
+    else:
+        stack = ["Article", "FAQPage", "DefinedTerm"]
+    if "Article" not in stack:
+        stack = ["Article"] + stack
+    if "FAQPage" not in stack:
+        stack = stack + ["FAQPage"]
+    valid_satisfiers = {"HowTo", "DefinedTerm", "VideoObject", "ItemList"}
+    if not (set(stack) & valid_satisfiers):
+        raise HTTPException(
+            status_code=400,
+            detail=f"schema_stack must include one of {sorted(valid_satisfiers)}",
+        )
+
+    min_words = 4500 if tier == "flagship" else 3000
+
+    template = (prompts_dir / "claude_blog_pillar.txt").read_text(encoding="utf-8")
     rendered = (
         template
         .replace("{{TITLE}}", title)
-        .replace("{{ANGLE}}", angle or "(none — use your judgement, but stay on-topic)")
+        .replace("{{ANGLE}}", angle or "(none — default to the most beatable angle on this query)")
         .replace("{{SLUG}}", slug)
         .replace("{{PUBLISHED_DATE}}", _date.today().isoformat())
         .replace("{{AUTHOR}}", user.name or "AutomateEdge team")
+        .replace("{{TARGET_QUERY}}", target_query)
+        .replace("{{PILLAR_TIER}}", tier)
+        .replace("{{MIN_WORDS}}", str(min_words))
+        .replace("{{SCHEMA_STACK}}", ", ".join(stack))
+        .replace("{{SCHEMA_STACK_JSON}}", _json.dumps(stack))
+        .replace("{{COMPARATIVE}}", "true" if comparative else "false")
+        .replace("{{INTERNAL_URL_MANIFEST}}", _build_internal_url_manifest())
+        .replace("{{TRUSTED_SOURCES}}", _build_trusted_sources_digest())
     )
-    return {"prompt": rendered, "slug": slug, "title": title}
+    return {"prompt": rendered, "slug": slug, "title": title, "tier": tier}
 
 
 @router.post("/api/blog/validate")
@@ -616,10 +758,44 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
 
     rows.sort(key=lambda r: r["data"].get("slug", ""), reverse=True)
 
+    def _tier_pill(tier: str, post_type: str) -> str:
+        """Colour-coded tier pill for the admin Section-3 Type column.
+        Standard = muted amber, Pillar = solid amber, Flagship = red-amber,
+        Legacy = slate grey (hardcoded posts pre-date the tier concept)."""
+        if post_type == "legacy":
+            return (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.35)" '
+                'title="Legacy hardcoded post — predates the tier system">Legacy</span>'
+            )
+        t = (tier or "").strip().lower()
+        if t == "pillar":
+            return (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(232,168,73,0.22);color:#f5c06a;border:1px solid rgba(232,168,73,0.55)" '
+                'title="SEO-21 pillar post — ≥3000 words, 40+ internal links, 5+ trusted citations">Pillar</span>'
+            )
+        if t == "flagship":
+            return (
+                '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+                'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+                'background:rgba(217,119,87,0.22);color:#f5a58a;border:1px solid rgba(217,119,87,0.55)" '
+                'title="Flagship pillar post — ≥4500 words, same SEO-21 bar">Flagship</span>'
+            )
+        return (
+            '<span style="display:inline-block;font-family:\'IBM Plex Mono\',ui-monospace,monospace;'
+            'font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;'
+            'background:rgba(192,196,204,0.08);color:#c0c4cc;border:1px solid rgba(192,196,204,0.28)" '
+            'title="Standard build-in-public essay — 800–1500 words, no SEO gates">Standard</span>'
+        )
+
     def _row_html(r):
         d = r["data"]
         slug = esc(d.get("slug", ""))
         title = esc(d.get("title", ""))
+        tier_pill = _tier_pill(d.get("pillar_tier", ""), r["type"])
         if r["type"] == "legacy":
             hidden = bool(d.get("_hidden"))
             if hidden:
@@ -656,6 +832,7 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
             return (
                 f'<tr>'
                 f'<td>{title_link}<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-top:2px">{slug}</div></td>'
+                f'<td>{tier_pill}</td>'
                 f'<td>{status_pill}</td>'
                 f'<td style="font-size:12px;color:#94a3b8">{meta}</td>'
                 f'<td style="text-align:right;white-space:nowrap">{actions}</td>'
@@ -702,6 +879,7 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
         return (
             f'<tr>'
             f'<td>{title_link}<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-top:2px">{slug}</div></td>'
+            f'<td>{tier_pill}</td>'
             f'<td>{status_pill}</td>'
             f'<td style="font-size:12px;color:#94a3b8">{meta}</td>'
             f'<td style="text-align:right;white-space:nowrap">{actions}</td>'
@@ -712,7 +890,7 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
         posts_html = "".join(_row_html(r) for r in rows)
     else:
         posts_html = (
-            '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:22px">'
+            '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:22px">'
             "No posts yet. Generate a prompt above, paste Claude's JSON, save as draft, then publish."
             '</td></tr>'
         )
@@ -765,6 +943,15 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
   .btn.primary:hover { background:#c98e2f; border-color:#c98e2f; color:#0f1419; }
   .btn.success { border-color:#6db585; color:#6db585; }
   .btn.danger { border-color:#d97757; color:#d97757; }
+  .type-picker { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .type-picker .type-opt { flex:1 1 210px; min-width:210px; background:#0f1419; border:1px solid #2a323d; border-radius:4px; padding:10px 14px; cursor:pointer; transition:all 0.15s; position:relative; }
+  .type-picker .type-opt:hover { border-color:#e8a849; }
+  .type-picker .type-opt.active { background:rgba(232,168,73,0.08); border-color:#e8a849; }
+  .type-picker .type-opt input { position:absolute; opacity:0; pointer-events:none; }
+  .type-picker .tpl strong { display:block; color:#f5f1e8; font-size:13px; margin-bottom:3px; }
+  .type-picker .tpl small { display:block; color:#94a3b8; font-size:11px; font-family:'IBM Plex Mono',ui-monospace,monospace; letter-spacing:0.02em; line-height:1.45; }
+  #bpPillarFields { margin-top:12px; padding-top:14px; border-top:1px dashed #2a323d; }
+  #bpPillarFields select { width:100%; padding:9px 11px; background:#0f1419; border:1px solid #2a323d; color:#f5f1e8; border-radius:3px; font-family:inherit; font-size:14px; }
 </style>
 </head>
 <body>
@@ -783,13 +970,14 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
   <details class="how-to">
     <summary>End-to-end steps (click to expand)</summary>
     <ol>
-      <li>Enter a <strong>Title</strong> + optional <strong>Angle</strong>. Click <strong>Generate prompt</strong>.</li>
-      <li><strong>Copy prompt</strong> → <strong>Open Claude.ai ↗</strong> → fresh chat, Opus 4.6, paste, send. Wait 45-90s.</li>
-      <li>Claude returns raw JSON starting with <code>{</code>. Copy the whole response.</li>
-      <li>Scroll to <strong>Upload Claude's JSON</strong> below, paste, click <strong>Validate</strong>.</li>
-      <li>Validator scans schema, banned terms (stack / providers / repo), length targets, structure. Fix red items, warnings are judgement calls.</li>
+      <li>Pick <strong>Post type</strong>: <em>Standard</em> for build-in-public essays, <em>Pillar</em> for SEO authority posts (SEO-21), <em>Flagship</em> for 4500+ word deep-dives.</li>
+      <li>Enter a <strong>Title</strong> + optional <strong>Angle</strong>. Pillar/flagship also need a <strong>Target query</strong> + schema stack. Click <strong>Generate prompt</strong>.</li>
+      <li><strong>Copy prompt</strong> → <strong>Open Claude.ai ↗</strong> → fresh chat, Opus, paste, send. Pillar posts take 2-4 minutes.</li>
+      <li>Claude returns a JSON artifact. Download or copy the content.</li>
+      <li>Scroll to <strong>Upload Claude's JSON</strong> below, paste or upload, click <strong>Validate</strong>.</li>
+      <li>Validator scans schema, banned terms, length, structure. For pillar posts it also enforces ≥40 internal links, ≥5 trusted citations, 8-12 H2s, 8-15 FAQs, comparison table (if comparative).</li>
       <li>Click <strong>Save as draft</strong> when errors clear. Draft appears in the list.</li>
-      <li>Generate the hero image using the <code>image_brief.hero_prompt</code> field. Drop PNG at <code>docs/blog/assets/&lt;slug&gt;-hero.png</code> (via git commit for now).</li>
+      <li>Generate the hero image using the <code>image_brief.hero_prompt</code> field. Drop PNG at <code>docs/blog/assets/&lt;slug&gt;-hero.png</code>.</li>
       <li>Click <strong>Publish</strong> on the draft row. Reviewer + date get stamped; post goes live at <code>/blog/&lt;slug&gt;</code>.</li>
     </ol>
     <div style="margin-top:8px;color:#94a3b8;font-size:12px">
@@ -801,6 +989,21 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
 
   <section class="section-card">
     <h2>1 · Generate Claude prompt</h2>
+    <label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;display:block;margin-bottom:6px;">Post type</label>
+    <div class="type-picker">
+      <label class="type-opt active" data-tier="standard">
+        <input type="radio" name="bpTier" value="standard" checked onchange="onTierChange()">
+        <span class="tpl"><strong>Standard</strong><small>build-in-public essay · 800–1500 words · no SEO gates</small></span>
+      </label>
+      <label class="type-opt" data-tier="pillar">
+        <input type="radio" name="bpTier" value="pillar" onchange="onTierChange()">
+        <span class="tpl"><strong>Pillar (SEO-21)</strong><small>authority post · ≥3000 words · 40+ internal · 5+ trusted citations · 8–15 FAQs</small></span>
+      </label>
+      <label class="type-opt" data-tier="flagship">
+        <input type="radio" name="bpTier" value="flagship" onchange="onTierChange()">
+        <span class="tpl"><strong>Flagship</strong><small>deep-dive pillar · ≥4500 words · same SEO-21 bar</small></span>
+      </label>
+    </div>
     <div class="form-grid">
       <div>
         <label>Title</label>
@@ -810,6 +1013,29 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
       <div style="grid-column:1 / -1">
         <label>Angle / thesis <span style="color:#64748b;text-transform:none;letter-spacing:0">(optional — one or two sentences on the message)</span></label>
         <textarea id="bpAngle" placeholder="e.g. Policy beats tools. Every AI pipeline needs a human button."></textarea>
+      </div>
+    </div>
+    <div id="bpPillarFields" style="display:none">
+      <div class="form-grid">
+        <div style="grid-column:1 / -1">
+          <label>Target query <span style="color:#fca5a5">*</span> <span style="color:#64748b;text-transform:none;letter-spacing:0">(the SERP query this pillar targets — drives FAQ sourcing + intent)</span></label>
+          <input id="bpTargetQuery" placeholder='e.g. AI engineer vs ML engineer' maxlength="150">
+        </div>
+        <div>
+          <label>Schema stack</label>
+          <select id="bpSchemaStack">
+            <option value="DefinedTerm">Article + FAQPage + DefinedTerm  (role / concept / comparison)</option>
+            <option value="HowTo">Article + FAQPage + HowTo  (step-by-step learning guides)</option>
+            <option value="VideoObject">Article + FAQPage + VideoObject  (video-embedded posts)</option>
+            <option value="ItemList">Article + FAQPage + ItemList  (curated cert / tool lists)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;padding-top:22px;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="bpComparative">
+            <span style="font-size:13px;color:#e8e2d3;">Comparative (body must include a &lt;table&gt;)</span>
+          </label>
+        </div>
       </div>
     </div>
     <div id="bpMeta" class="meta-line"></div>
@@ -857,6 +1083,7 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
       <thead>
         <tr>
           <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Post</th>
+          <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Type</th>
           <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Status</th>
           <th style="text-align:left;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Reviewer / Save</th>
           <th style="text-align:right;padding:8px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Actions</th>
@@ -871,17 +1098,44 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
 
 <script>
 // --------------- Prompt generator ---------------
+function onTierChange() {
+  const tier = (document.querySelector('input[name="bpTier"]:checked') || {}).value || 'standard';
+  document.querySelectorAll('.type-picker .type-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.tier === tier);
+  });
+  const isPillar = (tier === 'pillar' || tier === 'flagship');
+  document.getElementById('bpPillarFields').style.display = isPillar ? 'block' : 'none';
+  const titleEl = document.getElementById('bpTitle');
+  if (tier === 'pillar') {
+    titleEl.placeholder = 'e.g. AI Engineer vs ML Engineer: The 2026 Role Split';
+  } else if (tier === 'flagship') {
+    titleEl.placeholder = 'e.g. How to Learn AI From Scratch — The 2026 Roadmap';
+  } else {
+    titleEl.placeholder = 'e.g. Why AutomateEdge stopped auto-publishing curricula';
+  }
+}
+
 async function generateBlogPrompt() {
   const title = document.getElementById('bpTitle').value.trim();
   const angle = document.getElementById('bpAngle').value.trim();
+  const tier = (document.querySelector('input[name="bpTier"]:checked') || {}).value || 'standard';
   const meta = document.getElementById('bpMeta');
   if (!title) { meta.textContent = 'Title is required.'; meta.style.color = '#fca5a5'; return; }
+  const payload = { title: title, angle: angle, tier: tier };
+  if (tier === 'pillar' || tier === 'flagship') {
+    const tq = document.getElementById('bpTargetQuery').value.trim();
+    if (!tq) { meta.textContent = 'Target query is required for pillar posts.'; meta.style.color = '#fca5a5'; return; }
+    const satisfier = document.getElementById('bpSchemaStack').value;
+    payload.target_query = tq;
+    payload.schema_stack = ['Article', 'FAQPage', satisfier];
+    payload.comparative = document.getElementById('bpComparative').checked;
+  }
   meta.style.color = '#94a3b8'; meta.textContent = 'Rendering prompt…';
   try {
     const resp = await fetch('/admin/api/render-blog-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title, angle: angle }),
+      body: JSON.stringify(payload),
       credentials: 'same-origin',
     });
     if (!resp.ok) {
@@ -893,7 +1147,7 @@ async function generateBlogPrompt() {
     const data = await resp.json();
     document.getElementById('blogPromptOutput').value = data.prompt;
     meta.style.color = '#8fd0a5';
-    meta.textContent = '✓ Slug: ' + data.slug + '  ·  ' + data.prompt.length.toLocaleString() + ' chars. Copy and paste into Claude.ai.';
+    meta.textContent = '✓ Slug: ' + data.slug + '  ·  tier: ' + data.tier + '  ·  ' + data.prompt.length.toLocaleString() + ' chars. Copy → paste into Claude.ai.';
   } catch (e) { meta.style.color = '#fca5a5'; meta.textContent = 'Network error.'; }
 }
 function copyBlogPromptToClipboard() {
@@ -911,6 +1165,8 @@ function clearBlogPrompt() {
   document.getElementById('bpAngle').value = '';
   document.getElementById('blogPromptOutput').value = '';
   document.getElementById('bpMeta').textContent = '';
+  const tq = document.getElementById('bpTargetQuery'); if (tq) tq.value = '';
+  const cmp = document.getElementById('bpComparative'); if (cmp) cmp.checked = false;
 }
 
 // --------------- Upload / validate / save draft ---------------
