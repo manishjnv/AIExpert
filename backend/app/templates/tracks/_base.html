@@ -1,0 +1,99 @@
+{# SEO-20 shared base skeleton for roadmap track pages.
+
+   Blocks:
+     page_title    — used in <title>
+     description   — meta description
+     canonical     — absolute URL for this page
+     og_image      — absolute URL to og image (defaults to course/<track>)
+     schemas       — JSON-LD script blocks (Article + BreadcrumbList + page-specific)
+     breadcrumb    — visible breadcrumb row
+     content       — main content
+
+   Context always provided:
+     track         — track dict (slug, name, tagline, ...)
+     base          — "https://automateedge.cloud" (no trailing slash)
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block page_title %}{{ track.name }} Roadmap — AutomateEdge{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ track.tagline }}{% endblock %}">
+  <meta name="author" content="AutomateEdge">
+  <link rel="canonical" href="{% block canonical %}{{ base }}/roadmap/{{ track.slug }}{% endblock %}">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ self.page_title() }}">
+  <meta property="og:description" content="{{ self.description() }}">
+  <meta property="og:url" content="{{ self.canonical() }}">
+  <meta property="og:site_name" content="AutomateEdge">
+  <meta property="og:image" content="{% block og_image %}{{ base }}/og/course/{{ track.slug }}.png{% endblock %}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ self.og_image() }}">
+
+  {% block schemas %}{% endblock %}
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/nav.css">
+  <style>
+    :root { color-scheme: dark }
+    html, body { margin: 0; background: #0f1419; color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.65 }
+    main.track { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #e8a849; margin-bottom: 10px }
+    h1 { font-family: 'Fraunces', Georgia, serif; font-size: clamp(30px, 4.5vw, 44px); line-height: 1.15; color: #f5f1e8; font-weight: 500; margin: 0 0 14px; letter-spacing: -0.01em }
+    h2 { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 500; color: #f5f1e8; margin: 48px 0 14px; letter-spacing: -0.01em }
+    h3 { font-family: 'IBM Plex Sans', sans-serif; font-size: 18px; font-weight: 600; color: #f5f1e8; margin: 26px 0 10px }
+    p { color: #d0cbc2; font-size: 15.5px; margin: 0 0 14px }
+    p.lede { color: #c0c4cc; font-size: 16px; margin: 0 0 32px; max-width: 700px }
+    .callout { background: #1a2029; border-left: 3px solid #e8a849; padding: 18px 22px; border-radius: 4px; color: #e8e4d8; margin: 28px 0; font-size: 15.5px }
+    nav.crumbs { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px }
+    nav.crumbs a { color: #94a3b8; text-decoration: none }
+    nav.crumbs span.sep { margin: 0 6px; color: #5a6473 }
+    nav.crumbs span.here { color: #e8a849 }
+    .card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 }
+    .card { background: #161c24; border: 1px solid #2a323d; border-radius: 6px; padding: 16px 18px }
+    .card h3 { margin-top: 0; color: #e8a849; font-size: 15px }
+    .card p { margin: 0; font-size: 14px; color: #b8b2a4 }
+    table.grid { width: 100%; border-collapse: collapse; margin: 16px 0 28px; font-size: 14.5px; background: #141a21; border: 1px solid #2a323d; border-radius: 6px; overflow: hidden }
+    table.grid th, table.grid td { padding: 11px 14px; border-bottom: 1px solid #2a323d; text-align: left; vertical-align: top }
+    table.grid thead th { background: #1a2029; color: #e8a849; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500 }
+    table.grid tr:last-child td { border-bottom: 0 }
+    table.grid td:first-child { color: #94a3b8; font-weight: 500 }
+    ul.list { padding-left: 22px; color: #d0cbc2 }
+    ul.list li { margin: 8px 0; font-size: 15px; line-height: 1.65 }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 }
+    .chips span { background: #1a2029; border: 1px solid #2a323d; color: #b8b2a4; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-family: 'IBM Plex Mono', monospace }
+    .faq details { background: #161c24; border: 1px solid #2a323d; border-radius: 6px; padding: 14px 18px; margin-bottom: 10px }
+    .faq details[open] { border-color: rgba(232, 168, 73, 0.4) }
+    .faq summary { cursor: pointer; list-style: none; font-weight: 500; color: #f5f1e8; font-size: 15px }
+    .faq summary::-webkit-details-marker { display: none }
+    .faq summary::before { content: "+ "; color: #e8a849; margin-right: 6px; font-weight: 600 }
+    .faq details[open] summary::before { content: "– " }
+    .faq p { margin: 10px 0 0; color: #b8b2a4; font-size: 14.5px }
+    .cross { margin-top: 48px; padding: 22px 24px; background: #161c24; border: 1px solid #2a323d; border-radius: 6px }
+    .cross h3 { margin: 0 0 10px; color: #e8a849; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500 }
+    .cross a { color: #e8a849; text-decoration: none; border-bottom: 1px solid transparent }
+    .cross a:hover { border-bottom-color: #e8a849 }
+    .cross ul { padding: 0; list-style: none; margin: 8px 0 0 }
+    .cross li { padding: 4px 0; font-size: 14.5px; color: #d0cbc2 }
+    .level { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-left: 6px }
+    .level.Beginner { background: rgba(95, 160, 115, 0.18); color: #8fcfa5 }
+    .level.Intermediate { background: rgba(232, 168, 73, 0.18); color: #e8a849 }
+    .level.Advanced { background: rgba(214, 117, 93, 0.18); color: #ec947e }
+    .level.Expert { background: rgba(200, 120, 190, 0.2); color: #d08fc4 }
+    @media (max-width: 720px) { .card-row { grid-template-columns: 1fr } table.grid { font-size: 13px } }
+  </style>
+</head>
+<body>
+  <main class="track">
+    {% block breadcrumb %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/nav.js" defer></script>
+</body>
+</html>

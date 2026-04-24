@@ -1,0 +1,699 @@
+{
+  "_meta": {
+    "description": "SEO-20 per-track quintet data for the 'data-scientist' track. Feeds six pages at /roadmap/data-scientist/{skills,tools,projects,certifications,salary,career-path}. Salary bands use US market figures from levels.fyi / Glassdoor / BLS 2025-2026; regional multipliers are aggregated estimates. Renewable yearly — bump last_updated + regenerate velocity snapshot from the jobs pipeline.",
+    "last_updated": "2026-04-24"
+  },
+  "slug": "data-scientist",
+  "name": "Data Scientist",
+  "tagline": "Own the full analytical workflow — from formulating the question and designing the experiment to communicating findings and turning model outputs into business decisions.",
+  "hero_blurb": "The Data Scientist track is for people who want to be the team's analytical engine: the person who designs the A/B test, builds the causal study, writes the SQL that answers questions no dashboard was prepared to answer, and explains the result to a VP in one slide. In 2026, as ML infrastructure commoditised, the Data Scientist role sharpened into applied analytics and experimentation rather than raw model-building. You will graduate this track with a portfolio demonstrating statistical rigor, causal thinking, and the communication skills to make data actually change decisions.",
+  "weeks_total": 24,
+  "hours_per_week": 8,
+  "skills": {
+    "intro": "The Data Scientist skill map below is calibrated against 2026 hiring signals from the AutomateEdge jobs pipeline — specifically, skills appearing in ≥30% of data-scientist postings over the trailing 90 days. The role sits closer to applied statistics + experimentation than to ML engineering. Proficiency follows a four-step ladder: Beginner (can follow tutorials), Intermediate (can solve novel problems), Advanced (can debug and extend production-grade work), Expert (can design the system from first principles). A working Data Scientist clears Advanced in SQL, statistics, and communication; Intermediate across ML and causal inference.",
+    "categories": [
+      {
+        "name": "Statistics + probability",
+        "blurb": "Statistics is the daily language of a Data Scientist. Not in an academic sense — but in the sense that every A/B test, every model evaluation, every 'is this uplift real?' question lives or dies on statistical reasoning. The 2026 data org expects you to run power analyses before experiments, not post-hoc excuses after. Bayesian thinking has moved from niche to mainstream in experimentation platforms and causal inference work.",
+        "items": [
+          {"skill": "Hypothesis testing — t-tests, chi-square, Mann-Whitney", "level": "Advanced", "note": "Know when each applies. p-values are not the goal; effect size + confidence intervals are. Multiple-testing corrections (Bonferroni, Benjamini-Hochberg) are non-optional in large-scale experimentation."},
+          {"skill": "Confidence intervals + bootstrap", "level": "Advanced", "note": "Bootstrap CIs for non-parametric quantities. The delta method for ratio metrics (click-through rate, revenue-per-user). Know why Clopper-Pearson exists."},
+          {"skill": "Statistical power + sample-size calculation", "level": "Advanced", "note": "Running an underpowered experiment is not a mistake — it is a career event. You should size every test before launch. Know two-proportion z-test sizing, variance reduction via CUPED, and minimum detectable effect."},
+          {"skill": "Bayesian inference + Bayesian A/B testing", "level": "Intermediate", "note": "Prior-posterior-update cycle. Beta-binomial model for conversion tests. When Bayesian multi-armed bandits beat frequentist A/B. Credible intervals vs confidence intervals — the conceptual difference matters to stakeholders."},
+          {"skill": "Regression — OLS, GLMs, mixed models", "level": "Intermediate", "note": "Ordinary least squares from matrix form. Logistic, Poisson, negative-binomial. When to use a mixed model (repeated measures, panel data). Residual diagnostics — you can spot heteroskedasticity from a plot."},
+          {"skill": "Time-series statistics — stationarity, autocorrelation", "level": "Intermediate", "note": "ADF test, ACF/PACF, Dickey-Fuller. ARIMA components without autoML black-boxing. Seasonal decomposition (STL). Enough to hand off correctly to a specialist or to run a forecasting model yourself."},
+          {"skill": "Probability distributions — hands-on fluency", "level": "Intermediate", "note": "Bernoulli, binomial, Poisson, exponential, normal, lognormal. Match a distribution to a business metric: session durations are lognormal, purchase counts are Poisson. Moment generation, expected value, variance."},
+          {"skill": "Survival analysis basics", "level": "Beginner", "note": "Kaplan-Meier curves, log-rank test, Cox proportional hazards. Customer lifetime / churn modelling, time-to-event in medical or subscription data. Non-negotiable for growth teams at subscription businesses."}
+        ]
+      },
+      {
+        "name": "Causal inference + experimental design",
+        "blurb": "Causal inference moved from academic econometrics into data-science mainstream between 2020 and 2025. Product teams at every tier-1 tech company now expect DS to frame questions causally, not just correlationally. Understanding when a randomised experiment is and is not feasible — and what to do when it is not — distinguishes a senior DS from a data analyst.",
+        "items": [
+          {"skill": "Randomised controlled trials + A/B test design", "level": "Advanced", "note": "Randomisation unit (user vs. session vs. device). Novelty effects. Network interference (Switchback designs, cluster randomisation). Hold-back vs. holdout. When to stop early: sequential testing, always-valid p-values (SPRT)."},
+          {"skill": "Quasi-experimental methods — DiD, RD, ITS", "level": "Intermediate", "note": "Difference-in-differences assumptions (parallel trends, SUTVA). Regression discontinuity around a threshold. Interrupted time-series for policy or feature changes without a control group. These are the everyday tools when you cannot randomise."},
+          {"skill": "Propensity score methods + matching", "level": "Intermediate", "note": "Propensity score estimation (logistic regression, gradient boosting). Nearest-neighbour matching, IPW, doubly robust estimators. Covariate balance checking before and after. Using MatchIt or WeightIt equivalents in Python (CausalML)."},
+          {"skill": "Instrumental variables + front-door criterion", "level": "Beginner", "note": "Two-stage least squares intuition. When IVs are valid (relevance, exclusion, independence). Classic examples: lottery as IV for education, geographic variation as IV for treatment. Front-door criterion for DAG-driven identification."},
+          {"skill": "Causal graphs + DAG reasoning", "level": "Intermediate", "note": "Directed acyclic graphs for reading off confounders, colliders, mediators. d-separation. Backdoor criterion for covariate selection. DoWhy's causal identification API for systematic confounding checks."},
+          {"skill": "Multi-armed bandits + online experimentation", "level": "Intermediate", "note": "Epsilon-greedy, Thompson sampling, UCB. When MABs beat A/B (short decision windows, high regret cost). Contextual bandits for personalised assignment. Statsig / GrowthBook implementation patterns."},
+          {"skill": "Uplift modelling (heterogeneous treatment effects)", "level": "Beginner", "note": "T-learner, S-learner, X-learner, R-learner. CATE estimation with CausalML or EconML. Targeting high-uplift users rather than high-probability users — the distinction that justifies the model to the business."}
+        ]
+      },
+      {
+        "name": "SQL + data wrangling",
+        "blurb": "SQL is the lingua franca of the data organisation. A Data Scientist who cannot write fluent SQL — not just SELECT * but window functions, CTEs, incremental aggregations, and query-plan reading — is a bottleneck on their own work. In 2026, SQL is no longer a 'nice-to-have' for DS; it is the primary language for data access at most product companies, ahead of Python for day-to-day analysis.",
+        "items": [
+          {"skill": "Advanced SQL — window functions, CTEs, lateral joins", "level": "Advanced", "note": "ROW_NUMBER, RANK, LAG/LEAD, FIRST_VALUE, running totals, moving averages. Recursive CTEs for hierarchy traversal. LATERAL / CROSS APPLY for per-row subqueries. These are the patterns that separate DS from analysts in interviews."},
+          {"skill": "Query optimisation + EXPLAIN plans", "level": "Intermediate", "note": "Read EXPLAIN / EXPLAIN ANALYZE output. Understand index selectivity, hash join vs. sort-merge join, partition pruning. Know when a materialised CTE hurts vs. helps. This matters because bad queries are a direct tax on your analysis cadence."},
+          {"skill": "Data modelling — star schema, fact + dimension tables", "level": "Intermediate", "note": "You do not need to build the warehouse, but you need to navigate it. Star schema, snowflake, slowly changing dimensions, grain definition. Metric-layer concepts (dbt metrics, Looker PDTs). Enough to collaborate with analytics engineers."},
+          {"skill": "pandas for messy real-world data", "level": "Advanced", "note": "The data you get is never the data you expected. Missing-value strategies (MCAR vs. MAR vs. MNAR), type coercion, date-parsing hell, encoding problems, duplicate detection by fuzzy matching. MultiIndex, memory-efficient dtypes, chunked reads for large files."},
+          {"skill": "Data cleaning + validation — great_expectations, pandera", "level": "Intermediate", "note": "Codify data expectations so failures surface before analysis, not in the conclusions. Column dtype assertions, value-range checks, null rate monitors, referential integrity. Reproducible cleaning pipelines rather than one-off notebook cells."},
+          {"skill": "Python ETL patterns — Airflow basics, dbt awareness", "level": "Beginner", "note": "DAG-based scheduling, idempotent transforms, incremental loads. Not deep operational ownership — that belongs to data engineers — but enough to write a dbt model or diagnose a failing Airflow task without escalating immediately."}
+        ]
+      },
+      {
+        "name": "Machine learning — applied classical",
+        "blurb": "In 2026, the Data Scientist's ML toolkit is dominated by scikit-learn, tree ensembles, and model-interpretation tooling, not deep learning. The emphasis is on using models to generate insights and predictions that answer business questions, not on architecting training pipelines. Deep learning appears in specialised contexts (NLP enrichment, image features) but is rarely the core job.",
+        "items": [
+          {"skill": "scikit-learn pipelines + preprocessing", "level": "Advanced", "note": "ColumnTransformer, Pipeline, FunctionTransformer, custom transformers. Feature unions. Train-on-train, transform-on-test — the leakage discipline that distinguishes rigorous work. Cross-val with StratifiedKFold, GroupKFold, TimeSeriesSplit."},
+          {"skill": "Tree ensembles — XGBoost, LightGBM, RandomForest", "level": "Advanced", "note": "Hyperparameter tuning strategy: max_depth, min_child_weight, learning rate vs. n_estimators. Monotonicity constraints for business-safe predictions. Calibration for probability outputs. SHAP values for feature attribution — mandatory for stakeholder discussions."},
+          {"skill": "Clustering — k-means, DBSCAN, hierarchical", "level": "Intermediate", "note": "Silhouette scores, elbow method (and why it's unreliable), stability analysis across random seeds. Cluster profiling: what makes each cluster different. UMAP for visualisation. Agglomerative hierarchical for dendrogram-driven decisions."},
+          {"skill": "Dimensionality reduction — PCA, UMAP, t-SNE", "level": "Intermediate", "note": "PCA: explained variance, loading plots, when to whitten. UMAP vs. t-SNE: UMAP preserves global structure, t-SNE preserves local clusters. Use for EDA + for feature reduction before distance-based models."},
+          {"skill": "Model evaluation + calibration", "level": "Advanced", "note": "Beyond accuracy: precision, recall, F1, PR-AUC, ROC-AUC, lift/gain curves, cost matrices. Calibration curves + Platt scaling + isotonic regression. Expected Calibration Error. These matter when your model's probability outputs drive business decisions."},
+          {"skill": "Feature engineering for tabular data", "level": "Advanced", "note": "Target encoding (with regularisation), weight of evidence, interaction features, feature crosses, date decomposition (cyclical encoding for hour/day-of-week), embedding for high-cardinality categoricals. Feature selection: permutation importance, recursive elimination, boruta."},
+          {"skill": "Survival + event-based models", "level": "Intermediate", "note": "Cox PH model in Python (lifelines), Kaplan-Meier, parametric AFT models. Censored data handling. Concordance index (C-statistic) for evaluation. Critical for subscription churn, time-to-purchase, healthcare outcomes."}
+        ]
+      },
+      {
+        "name": "Business communication + decision science",
+        "blurb": "The data scientist who cannot communicate findings effectively is a data scientist whose work does not change anything. This skill category is consistently underrated in curricula and consistently overrated by hiring managers — which is to say, it is both important and rare. The expected output is not a notebook; it is a decision, a change in product behaviour, or a re-prioritisation of resources.",
+        "items": [
+          {"skill": "Executive communication — one-slide summaries", "level": "Advanced", "note": "Structure: question → answer → evidence → action → confidence. Never lead with methodology. Know the pyramid principle. A 10-page analysis and a one-slide summary must coexist; your audience chooses their depth."},
+          {"skill": "Storytelling with data — chart selection + annotation", "level": "Advanced", "note": "Bar charts for comparison, line charts for change over time, scatter for correlation, heatmaps for cross-tab density. Every chart needs a title that states the finding, not the variables. Avoid 3D charts. Colour conventions for business audiences."},
+          {"skill": "Uncertainty communication — conveying confidence to non-statisticians", "level": "Advanced", "note": "Error bars vs. confidence bands vs. probability distributions — pick the right one for the audience. Communicate 'what we don't know' without undermining the result. The question is not just 'what did we find' but 'how sure are we and what would change our mind?'"},
+          {"skill": "Experiment design communication — experiment memos + post-mortems", "level": "Intermediate", "note": "Write the experiment memo before launch (hypothesis, metric, guard rails, duration, success criteria). Write the post-mortem after (what happened, why, what we learned, what we will do differently). These are artefacts that outlast the individuals who ran the experiment."},
+          {"skill": "SQL-based reporting + self-serve dashboards", "level": "Intermediate", "note": "Translate a business question into a repeatable query. Build a Looker/Tableau/Streamlit dashboard that a PM can reload without calling you. Documentation for every dashboard: what's in it, what's not, when it refreshes, who to contact."},
+          {"skill": "Translating business questions into analytical frames", "level": "Advanced", "note": "The most valuable soft skill in data science. 'How do we grow?' is not an analytical question. 'Do users who complete onboarding in < 5 minutes have 30-day retention ≥ 10% higher than those who take > 15 minutes, controlling for acquisition channel?' is. Teach yourself to convert one into the other, repeatedly."}
+        ]
+      },
+      {
+        "name": "Bayesian + probabilistic methods",
+        "blurb": "Bayesian reasoning has moved from niche to increasingly mainstream in data science, especially in experimentation (Bayesian A/B testing is now default at Booking.com, Spotify, Netflix), in causal inference, and in decision-making under uncertainty. You do not need to be a fully-fledged Bayesian statistician, but fluency in the prior-posterior update cycle, MCMC basics, and probabilistic programming is a differentiator in senior DS roles.",
+        "items": [
+          {"skill": "PyMC for hierarchical Bayesian models", "level": "Intermediate", "note": "Model definition, sampling (NUTS), trace analysis, posterior predictive checks, prior sensitivity. Key use cases: hierarchical regression for small-group estimates, Bayesian A/B testing, marketing mix modelling."},
+          {"skill": "MCMC diagnostics — R-hat, effective sample size", "level": "Intermediate", "note": "R-hat < 1.01, ESS > 400 per chain as rule-of-thumb gates. Divergences as a debugging signal. Trace plot reading. ArviZ for visualisation and model comparison (WAIC, LOO-CV)."},
+          {"skill": "Bayesian decision analysis + expected utility", "level": "Beginner", "note": "Decision trees under uncertainty. Expected utility maximisation. Loss functions tied to business value (not just model metrics). The connection between posterior predictive distribution and optimal business decision."},
+          {"skill": "Probabilistic forecasting — prediction intervals vs. point estimates", "level": "Intermediate", "note": "Quantile regression, conformal prediction, Prophet's uncertainty intervals. For every forecast, report a range — not just the central estimate. Calibration: does your 90% interval actually contain the truth 90% of the time?"}
+        ]
+      }
+    ],
+    "learning_sequence": [
+      "Weeks 1-3 — SQL deep dive. Window functions, CTEs, query plans. Ship a SQL analysis project on a public dataset (BigQuery public data or DuckDB on a CSV).",
+      "Weeks 4-6 — Statistics foundations: hypothesis testing, power analysis, confidence intervals, bootstrap. Build an A/B test analyser tool in Python.",
+      "Weeks 7-9 — pandas + data wrangling on messy data. Feature engineering. scikit-learn pipelines end-to-end. Train a tree ensemble, evaluate it properly, explain it with SHAP.",
+      "Weeks 10-12 — Causal inference: DiD, propensity matching, RDD. Work through Brady Neal's 'Introduction to Causal Inference' alongside a real dataset.",
+      "Weeks 13-16 — Experimentation depth: sample sizing, CUPED, sequential testing. Bayesian A/B testing with PyMC. Simulate and analyse 3 experiments on historical data.",
+      "Weeks 17-20 — Visualisation + communication. Build a full analysis deck on a dataset of your choice. Ship a Streamlit dashboard to a public URL.",
+      "Weeks 21-24 — Capstone: design and analyse a causal study end-to-end — question, data, method, communication artifact. Publish publicly."
+    ],
+    "time_to_proficient": "Full-time learner: 5-6 months to reach Advanced in SQL and statistics, Intermediate across causal inference and ML. Part-time (8h/week): 10-14 months. The bottleneck is not curriculum completion — it is accumulating the practical judgment that comes only from analysing real, messy datasets where the answer is not in the answer key.",
+    "faqs": [
+      {"q": "How much deep learning do Data Scientists need in 2026?", "a": "Less than most curricula imply. A working DS should understand what a neural network is and be able to use a pretrained model via an API for text classification or embedding generation. Training neural nets from scratch is ML Engineer territory. Focus your learning time on statistics and causal inference — those compound directly in this role."},
+      {"q": "Is Python or R better for this track?", "a": "Python. In 2026, the tooling gap has closed almost entirely — you can do everything in Python that you could in R, and Python connects cleanly to production systems, APIs, and dashboards. R remains strong in academic statistics and certain pharma/biotech environments. Pick Python unless a specific employer or community requires R."},
+      {"q": "Do I need to know machine learning?", "a": "Yes, but at Applied depth, not Research depth. You need to train, evaluate, and interpret models with scikit-learn-level tooling. You do not need to implement a transformer from scratch, tune GPU memory layouts, or understand distributed training. The emphasis is on model interpretation and feature engineering, not architectural novelty."},
+      {"q": "How important is causal inference for getting a job?", "a": "Increasingly critical at product and growth companies. As of 2026, roughly 35% of senior DS postings in the AutomateEdge pipeline mention causal inference, DoWhy, DiD, or propensity matching by name. It is not a universal requirement at entry level, but it is a near-universal requirement to move from mid to senior DS at a product company."},
+      {"q": "What is CUPED and why does it keep appearing in DS interviews?", "a": "CUPED (Controlled-experiment Using Pre-Experiment Data) reduces variance in A/B tests by using pre-experiment covariate data to explain away noise. It can reduce required sample size by 30-60% and is standard at Booking.com, Uber, Microsoft, and Netflix. If you are interviewing at a product company and cannot explain CUPED, that is a gap to close."},
+      {"q": "How do I distinguish myself from a Data Analyst?", "a": "Three vectors: (1) statistical rigour — you design and analyse experiments, not just describe data; (2) causal thinking — you frame questions in terms of interventions, not correlations; (3) model-building — you go beyond dashboards to predictive and prescriptive outputs. The job title lines blur in practice, but the skills distinction is clear in interviews."},
+      {"q": "Is Bayesian statistics required or nice-to-have?", "a": "Nice-to-have at entry, increasingly expected at senior. Bayesian A/B testing is now default at major experimentation platforms. Hierarchical models are the right tool for sparse-data problems common in product analytics (small geographic segments, rare event types). Invest in it after you are solid on frequentist methods."},
+      {"q": "Can a Data Scientist move into ML Engineering later?", "a": "Yes, and it is a common transition. The skill gaps to bridge are productionisation (Docker, serving infrastructure, latency budgets) and deep learning depth. Many DS-to-MLE moves happen at company transitions — you join a newer company at a level where the roles overlap more, and specialise from there."}
+    ]
+  },
+  "tools": {
+    "intro": "This inventory covers the tools a 2026 Data Scientist reaches for daily, weekly, and occasionally. It skews toward the analysis and experimentation stack — not the ML-infrastructure stack. Every item is free to get started with (open-source or a usable free tier). Hours-to-learn estimates represent the time until you can solve a novel problem unaided; mastery takes 3-5x that.",
+    "categories": [
+      {
+        "name": "Core Python data stack",
+        "blurb": "The bedrock of every data workflow in Python. These libraries are decade-stable — they have not had a breaking API change in years and will not. Investing deeply here has the highest ROI of any tool choice in data science.",
+        "items": [
+          {"tool": "pandas", "purpose": "Primary dataframe library — the workhorse for every analysis, data wrangling task, and feature-engineering pipeline", "hours_to_learn": 20, "url": "https://pandas.pydata.org/docs/"},
+          {"tool": "NumPy", "purpose": "N-dimensional arrays, linear algebra, random number generation; the foundation pandas and scikit-learn are built on", "hours_to_learn": 10, "url": "https://numpy.org/doc/"},
+          {"tool": "SciPy", "purpose": "Statistical tests, distributions, signal processing, optimisation routines — the statistical computing engine", "hours_to_learn": 15, "url": "https://docs.scipy.org/doc/scipy/"},
+          {"tool": "statsmodels", "purpose": "Classical statistical models: OLS, GLMs, ARIMA, mixed models, survival analysis, discrete-choice — the R-style statistics in Python", "hours_to_learn": 20, "url": "https://www.statsmodels.org/stable/"},
+          {"tool": "scikit-learn", "purpose": "ML pipeline framework — preprocessing, model training, cross-validation, model selection", "hours_to_learn": 25, "url": "https://scikit-learn.org/stable/"},
+          {"tool": "Jupyter Lab", "purpose": "Interactive notebook IDE for exploration, analysis, and communicating results; the daily driver for DS work", "hours_to_learn": 3, "url": "https://jupyter.org/"}
+        ]
+      },
+      {
+        "name": "SQL + data warehousing",
+        "blurb": "SQL is the primary data-access language at most product companies. A DS who relies on a data engineer to write queries is a DS who cannot move fast. DuckDB dramatically lowers the barrier to SQL-on-local-files; knowing Postgres, BigQuery, and Snowflake positions you for any data stack.",
+        "items": [
+          {"tool": "PostgreSQL", "purpose": "Open-source RDBMS; the default choice for new analytics stacks; learn window functions and EXPLAIN plans here", "hours_to_learn": 20, "url": "https://www.postgresql.org/docs/"},
+          {"tool": "DuckDB", "purpose": "Columnar analytics engine — run complex SQL on CSVs, Parquet, and Arrow data in a single binary with no server setup; the new default for local DS work", "hours_to_learn": 4, "url": "https://duckdb.org/"},
+          {"tool": "BigQuery (SQL dialect)", "purpose": "Cloud-native columnar warehouse; syntax nuances (STRUCT, ARRAY, unnesting), partitioning, clustering — mandatory if you work at a Google-stack company", "hours_to_learn": 10, "url": "https://cloud.google.com/bigquery/docs"},
+          {"tool": "Snowflake (SQL dialect)", "purpose": "Enterprise warehouse SQL; TIME_SLICE, FLATTEN for semi-structured JSON, QUALIFY for window-function filtering — widely used in fintech, healthcare, and media", "hours_to_learn": 8, "url": "https://docs.snowflake.com/"},
+          {"tool": "dbt Core (free)", "purpose": "SQL-based transformation layer; write SELECT statements, dbt handles materialisation, lineage, and documentation — the analytics engineering standard", "hours_to_learn": 12, "url": "https://docs.getdbt.com/"}
+        ]
+      },
+      {
+        "name": "Visualisation + dashboarding",
+        "blurb": "Data scientists who cannot make a clear chart are at a structural disadvantage in every stakeholder conversation. The 2026 stack layers interactive (plotly, Altair) on top of static (matplotlib, seaborn) on top of business-BI (Tableau, Looker). Streamlit and Dash lower the barrier to self-serve dashboards to hours.",
+        "items": [
+          {"tool": "matplotlib", "purpose": "Precision static charts; the low-level substrate under seaborn; reach for it when seaborn's defaults are wrong", "hours_to_learn": 10, "url": "https://matplotlib.org/"},
+          {"tool": "seaborn", "purpose": "High-level statistical charting on top of matplotlib — distribution plots, pair plots, regression plots, heatmaps in one line", "hours_to_learn": 6, "url": "https://seaborn.pydata.org/"},
+          {"tool": "plotly", "purpose": "Interactive charts for Jupyter and web dashboards; the right choice whenever a stakeholder needs to hover, zoom, or filter", "hours_to_learn": 8, "url": "https://plotly.com/python/"},
+          {"tool": "Streamlit", "purpose": "Turn a Python script into a shareable web app in hours — the fastest path from analysis to self-serve product for DS", "hours_to_learn": 6, "url": "https://docs.streamlit.io/"},
+          {"tool": "Tableau Public (free)", "purpose": "Business BI standard; knowing it unlocks communication with non-technical stakeholders who already live in Tableau; the free tier is fully functional for portfolio work", "hours_to_learn": 15, "url": "https://public.tableau.com/"}
+        ]
+      },
+      {
+        "name": "Causal inference + experimentation",
+        "blurb": "This category separates the 2026 Data Scientist from both the data analyst and the ML engineer. These tools encode the causal reasoning machinery — from experiment setup through counterfactual estimation — that drives decisions at every product-first tech company.",
+        "items": [
+          {"tool": "DoWhy", "purpose": "Causal model identification, estimation, and refutation using DAG-based reasoning; Microsoft Research library, production-grade", "hours_to_learn": 15, "url": "https://py-why.github.io/dowhy/"},
+          {"tool": "EconML", "purpose": "Heterogeneous treatment effect estimation (X-Learner, DML, Causal Forest); Microsoft Research; used for uplift modelling and CATE estimation", "hours_to_learn": 15, "url": "https://econml.azurewebsites.net/"},
+          {"tool": "CausalML (Uber)", "purpose": "Uplift modelling framework (T/S/X/R-learners, tree-based uplift); production-tested at Uber for marketing interventions", "hours_to_learn": 10, "url": "https://causalml.readthedocs.io/"},
+          {"tool": "GrowthBook (free self-hosted)", "purpose": "Open-source experimentation platform — feature flags, A/B test orchestration, Bayesian and frequentist stat engines; the real-world system a DS plugs their analysis into", "hours_to_learn": 8, "url": "https://www.growthbook.io/"},
+          {"tool": "Statsig (free tier)", "purpose": "Commercial experimentation platform with CUPED-variance-reduction, sequential testing, and a generous free tier; widely used at mid-stage startups", "hours_to_learn": 4, "url": "https://www.statsig.com/"},
+          {"tool": "lifelines", "purpose": "Survival analysis in Python — Kaplan-Meier, Cox PH, AFT models, cumulative hazard; the right tool for time-to-event modelling", "hours_to_learn": 10, "url": "https://lifelines.readthedocs.io/"}
+        ]
+      },
+      {
+        "name": "Bayesian + probabilistic programming",
+        "blurb": "Bayesian tooling has reached production quality in Python. PyMC and NumPyro give you full Bayesian modelling — hierarchical models, custom likelihoods, posterior predictive checks — without leaving the Python data stack. Use these for experimentation, attribution, and any problem where quantified uncertainty is more useful than a point estimate.",
+        "items": [
+          {"tool": "PyMC", "purpose": "Full probabilistic programming language — define any model in Python syntax, sample with NUTS, inspect posteriors with ArviZ", "hours_to_learn": 20, "url": "https://www.pymc.io/"},
+          {"tool": "ArviZ", "purpose": "Bayesian model diagnostics and visualisation — trace plots, R-hat, LOO-CV, posterior predictive checks; works with PyMC, Stan, NumPyro", "hours_to_learn": 6, "url": "https://python.arviz.org/"},
+          {"tool": "NumPyro", "purpose": "JAX-backed probabilistic programming; faster inference for large models; preferred when sampling speed is a bottleneck", "hours_to_learn": 15, "url": "https://num.pyro.ai/"}
+        ]
+      },
+      {
+        "name": "ML tooling — applied DS context",
+        "blurb": "The ML tools a Data Scientist actually touches in day-to-day work. Lighter on deep-learning infrastructure than the ML Engineer or AI Engineer tracks; heavier on interpretability, feature stores, and model monitoring. PyTorch appears but is not the daily driver.",
+        "items": [
+          {"tool": "XGBoost", "purpose": "Gradient-boosted trees — still the best-performing algorithm on most tabular business problems in 2026", "hours_to_learn": 8, "url": "https://xgboost.readthedocs.io/"},
+          {"tool": "LightGBM", "purpose": "Faster, lower-memory gradient boosting with native categorical encoding; preferred over XGBoost when datasets exceed 1M rows", "hours_to_learn": 6, "url": "https://lightgbm.readthedocs.io/"},
+          {"tool": "SHAP", "purpose": "Shapley-value feature attribution — the industry standard for explaining ML model predictions to stakeholders and auditors", "hours_to_learn": 8, "url": "https://shap.readthedocs.io/"},
+          {"tool": "Optuna", "purpose": "Hyperparameter optimisation framework — Bayesian search, pruning, parallelism; far better than GridSearchCV for serious tuning", "hours_to_learn": 6, "url": "https://optuna.org/"},
+          {"tool": "PyTorch (awareness level)", "purpose": "Deep learning framework — present for embedding generation, NLP feature extraction, and autoencoder-based anomaly detection; not the daily driver for DS", "hours_to_learn": 20, "url": "https://pytorch.org/docs/stable/"},
+          {"tool": "Apache Spark / PySpark (awareness level)", "purpose": "Distributed data processing for very large datasets (10B+ rows); know enough to read PySpark code and write a basic aggregation — detailed ownership belongs to data engineers", "hours_to_learn": 12, "url": "https://spark.apache.org/docs/latest/api/python/"}
+        ]
+      }
+    ],
+    "install_path": [
+      "Install Python 3.11+ via pyenv (macOS/Linux) or python.org installer (Windows). Verify with `python --version`.",
+      "Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`. Create a project: `uv init my-ds-project && uv add pandas numpy scipy statsmodels scikit-learn jupyterlab matplotlib seaborn plotly`.",
+      "Install DuckDB: `uv add duckdb`. Test with `python -c \"import duckdb; print(duckdb.sql('SELECT 42').fetchall())\"`.",
+      "Add tree models and SHAP: `uv add xgboost lightgbm shap optuna`.",
+      "Add causal inference stack: `uv add dowhy econml causalml lifelines`.",
+      "Add PyMC for Bayesian work: `uv add pymc arviz`. Note: PyMC pulls PyTensor as a dependency — this can be slow to install on first run.",
+      "Install Streamlit: `uv add streamlit`. Run `streamlit hello` to confirm.",
+      "Sign up for GrowthBook (free self-hosted) or Statsig (free tier) — these are the experimentation platforms you will wire your analysis into.",
+      "Set up a free Tableau Public account. Download the Desktop app (free for public workbooks). Connect to a CSV from your first project."
+    ],
+    "faqs": [
+      {"q": "Do I need a feature store?", "a": "Not at first. Feature stores (Feast, Hopsworks, Tecton) solve the online/offline consistency problem in production ML systems. As a DS, you should understand what they do and why they exist. Actually operating one is usually an ML Engineering responsibility. Learn the concept; don't build one for portfolio work."},
+      {"q": "Should I learn Polars instead of pandas?", "a": "Add Polars after you are fluent in pandas — not instead of it. Polars is 5-20x faster on large datasets and has a cleaner lazy-evaluation API. But the ecosystem still assumes pandas: most tutorials, scikit-learn integrations, and ML libraries consume pandas DataFrames. Learn pandas to Advanced, then add Polars as a performance tool."},
+      {"q": "Is SQL in Python (via pandas) or in a database?", "a": "Both. DuckDB lets you run SQL directly on pandas DataFrames and Parquet files locally — this is the fastest exploratory tool in 2026. For production analysis, you write SQL in BigQuery, Snowflake, or Postgres. Both skills are mandatory; neither replaces the other."},
+      {"q": "Should I use R for statistics?", "a": "Only if your team or field already uses it. The Python stack for statistics (scipy, statsmodels, PyMC, lifelines) now covers everything the average DS needs. R has advantages in biostatistics and academic econometrics. If you are starting fresh and targeting tech-company DS roles, Python is the right call."},
+      {"q": "What is the fastest path to working with real experiment data?", "a": "GrowthBook self-hosted (free, runs in Docker in 5 minutes) lets you define feature flags, run experiments, and see a real stats engine. Alternatively, use the Statsig free tier with their sandbox. Both give you the experience of operating an experimentation platform that most DS curricula skip entirely."},
+      {"q": "Do I need Tableau or can I use just Python visualisations?", "a": "For your own analysis, Python is sufficient. For working in organisations where PMs and executives expect Tableau or Looker, not knowing it is a communication barrier. Learn one BI tool to working proficiency — Tableau Public is free and the most widely expected."},
+      {"q": "How much Spark do Data Scientists actually need?", "a": "Awareness-level is sufficient for most DS roles. You should be able to read a PySpark script, understand that it is building a lazy DAG of transformations, and know when you need it (datasets > ~10B rows or multi-hour pandas jobs). Detailed Spark operation ownership typically belongs to data engineers or ML engineers."}
+    ]
+  },
+  "projects": {
+    "intro": "These projects are ordered by dependency — each earlier one teaches skills the later ones assume. Every project is designed to be reproducible, explainable, and ideally deployable. A Data Scientist portfolio that impresses is not a collection of notebooks; it is a collection of demonstrated decisions under uncertainty. Pick ten to complete; the capstone (project 15) is what you lead with in interviews.",
+    "projects": [
+      {
+        "title": "A/B test analysis engine with proper statistical rigor",
+        "difficulty": "Beginner",
+        "hours": "20-30",
+        "description": "Build a reusable Python tool that takes two samples (control vs. treatment) and returns a complete statistical analysis: sample sizes, observed uplift, confidence interval, p-value, power curve, minimum detectable effect, and a recommendation to ship or not. Apply it to three public datasets (e-commerce conversion, email click-through, app retention). The goal is to automate statistical discipline, not to run a one-off test. This is the first artifact every DS interview will probe.",
+        "tech_stack": ["Python", "scipy", "statsmodels", "pandas", "matplotlib"],
+        "rubric": [
+          "Configurable alpha and power targets — not hardcoded 0.05",
+          "Multiple-test correction applied and documented when comparing more than one metric",
+          "Pre-experiment sample size calculation output — not just post-hoc analysis",
+          "Three real datasets, three documented conclusions, confidence levels stated explicitly",
+          "README explains every statistical term used — written for a PM audience"
+        ]
+      },
+      {
+        "title": "Causal inference study — difference-in-differences on public policy data",
+        "difficulty": "Intermediate",
+        "hours": "30-45",
+        "description": "Select a natural experiment from public data — a minimum wage change across US states, a school policy introduction, a regional tax incentive. Frame the causal question, test the parallel trends assumption, run DiD with OLS and clustered standard errors, check robustness with placebo tests and event-study plots. Write a 1500-word analysis as if presenting to a policy team. This project demonstrates causal thinking in the wild rather than in a textbook.",
+        "tech_stack": ["Python", "pandas", "statsmodels", "matplotlib", "DoWhy"],
+        "rubric": [
+          "Parallel-trends assumption visualised and discussed — not assumed away",
+          "Placebo test included (pre-period falsification)",
+          "Clustered standard errors used and justified",
+          "Written summary accessible to a non-statistician",
+          "Data source linked; all code runs from a clean clone"
+        ]
+      },
+      {
+        "title": "Customer segmentation — unsupervised clustering with business action",
+        "difficulty": "Beginner",
+        "hours": "25-35",
+        "description": "Take an e-commerce, streaming, or banking public dataset. Run k-means, DBSCAN, and hierarchical clustering. Use silhouette scores and stability analysis to pick a cluster count. Profile each cluster with business language (not just 'cluster 3 has high feature-7'). Recommend a concrete action for each segment. Produce a Streamlit dashboard stakeholders can explore. This project tests whether you can connect model output to business decision.",
+        "tech_stack": ["pandas", "scikit-learn", "matplotlib", "seaborn", "Streamlit"],
+        "rubric": [
+          "Cluster count justified with silhouette curve and stability analysis — not just elbow method alone",
+          "Each cluster described in a language a marketing manager would recognise",
+          "Feature scaling and encoding decisions documented explicitly",
+          "Streamlit app deployed publicly — a stakeholder can filter and explore",
+          "Actionable recommendation section: one paragraph per segment"
+        ]
+      },
+      {
+        "title": "Churn prediction with feature engineering + business framing",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Use a telecom, SaaS, or subscription e-commerce churn dataset. Engineer features from raw event logs — recency, frequency, monetary, engagement trend, tenure. Train XGBoost with SHAP explainability. Calibrate probabilities. Frame the output as a business tool: segment users into intervention tiers (high uplift, low uplift, already churned). Build the ROI case for an interventionist strategy using the model's outputs. This is the project that proves you connect modelling to revenue.",
+        "tech_stack": ["pandas", "XGBoost", "scikit-learn", "SHAP", "matplotlib"],
+        "rubric": [
+          "Feature engineering section discusses every feature with business rationale",
+          "SHAP beeswarm and dependency plots present for top-10 features",
+          "Calibration curve confirms probability outputs are well-calibrated",
+          "Business framing: cost-of-intervention vs. expected-revenue-saved analysis present",
+          "Train/val/test split with temporal ordering — not random split on a churn dataset"
+        ]
+      },
+      {
+        "title": "Time-series anomaly detection on business metrics",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Pull a public business metric time series — website traffic (Wikipedia pageview data, freely available), retail sales, energy consumption, financial metrics. Implement three anomaly detectors: STL + z-score residual, Isolation Forest on sliding windows, and a simple Prophet + prediction-interval approach. Compare false-positive rates across a labelled anomaly set. Build a minimal Streamlit alert dashboard. This is the project that maps directly to 'monitoring business metrics' in every DS job description.",
+        "tech_stack": ["pandas", "statsmodels", "scikit-learn", "Prophet", "Streamlit"],
+        "rubric": [
+          "All three methods compared on the same labelled dataset",
+          "False-positive rate explicitly reported — not just 'it found the anomalies'",
+          "Streamlit dashboard deployed publicly with time-range selector",
+          "Discussion of which method wins in which scenario",
+          "Wikipedia pageview data or another free data source linked in README"
+        ]
+      },
+      {
+        "title": "Propensity score matching study — observational causal inference",
+        "difficulty": "Intermediate",
+        "hours": "30-45",
+        "description": "Use an observational dataset where treatment was not randomised — job training program enrollment, insurance participation, medication adherence. Estimate the propensity score via logistic regression and a gradient boosted model. Match treated and control units. Check covariate balance before and after. Estimate ATT with matched OLS. Compare to the naive estimate and discuss the gap. This is the project that demonstrates you understand confounding in practice.",
+        "tech_stack": ["pandas", "scikit-learn", "statsmodels", "CausalML or DoWhy", "matplotlib"],
+        "rubric": [
+          "Propensity score estimated with both logistic regression and LightGBM — results compared",
+          "Love plot (standardised mean differences) showing covariate balance improvement",
+          "ATT estimated with confidence intervals; naive estimate compared and explained",
+          "Discussion of unobserved confounders — Rosenbaum sensitivity analysis or Oster's bounding",
+          "All code runs reproducibly; random seeds fixed throughout"
+        ]
+      },
+      {
+        "title": "Executive dashboard built from raw data",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Take a raw, multi-table public dataset (Stack Overflow annual survey, NYC taxi data, UK government open data). Write the SQL or pandas pipeline to construct a clean analytical mart. Build a Streamlit or Dash dashboard targeting an executive audience: four KPIs at the top, two trend charts, one cross-segment comparison, one forward-looking indicator. Document the data dictionary and refresh cadence. This tests whether your communication output is self-contained.",
+        "tech_stack": ["DuckDB or PostgreSQL", "pandas", "Streamlit or Dash", "plotly"],
+        "rubric": [
+          "SQL or pandas pipeline is fully reproducible from raw source",
+          "Dashboard deployed publicly with a public URL",
+          "Each chart has a title stating the finding — not the variables",
+          "Data dictionary written; null-handling and filtering decisions documented",
+          "One 'What this does not tell you' section — intellectual honesty about limitations"
+        ]
+      },
+      {
+        "title": "Marketing attribution analysis — multi-touch models",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Use a synthetic or public marketing funnel dataset with multi-touch journeys. Implement first-touch, last-touch, linear, time-decay, and Markov chain attribution. Compare channel ROI under each model. Run a bootstrapped uncertainty estimate on the Markov chain results. Write the analysis as a memo for a CMO. This project demonstrates the messiness of real attribution work and the ability to communicate ambiguity.",
+        "tech_stack": ["pandas", "scipy", "matplotlib", "Python Markov chain library or custom implementation"],
+        "rubric": [
+          "All five attribution models implemented and compared on the same funnel data",
+          "Bootstrapped confidence intervals on channel ROI figures",
+          "CMO-style memo included: lead with the business recommendation, not the model",
+          "Discussion of the shortcomings of all approaches — no pretending Markov solves attribution",
+          "Synthetic data generator included so the project is reproducible without proprietary data"
+        ]
+      },
+      {
+        "title": "Survival analysis — customer lifetime and churn timing",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Use a subscription SaaS or e-commerce dataset with cohort-level retention data. Fit Kaplan-Meier curves stratified by acquisition channel, plan type, and cohort month. Fit a Cox PH model with covariates. Test the proportional hazards assumption. Estimate expected lifetime value from the survival function. Produce a one-page board-level summary. Survival analysis is a DS skill that is dramatically underrepresented in portfolios.",
+        "tech_stack": ["pandas", "lifelines", "matplotlib", "statsmodels"],
+        "rubric": [
+          "Kaplan-Meier curves stratified by at least two business-meaningful dimensions",
+          "Log-rank test performed and reported for each stratum comparison",
+          "Cox PH assumption tested (Schoenfeld residuals or log-log plot)",
+          "LTV estimate derived from survival function and documented",
+          "Board-level summary: one chart, one sentence per finding, one recommendation"
+        ]
+      },
+      {
+        "title": "Bayesian decision-making project — multi-armed bandit vs. A/B test",
+        "difficulty": "Intermediate",
+        "hours": "30-45",
+        "description": "Simulate a real product decision (ad creative selection, email subject line, landing page variant) under both a frequentist A/B framework and a Bayesian Thompson-sampling bandit. Compare regret curves. Quantify the cost (in lost conversions) of committing to A/B testing when the bandit would have converged earlier. Build the simulation in PyMC. Write the recommendation memo: when should your team use MAB vs. A/B? This project is directly citable in experimentation-platform interviews.",
+        "tech_stack": ["PyMC", "numpy", "scipy", "matplotlib"],
+        "rubric": [
+          "Simulation reproduces the traffic-allocation dynamics of a real experiment",
+          "Regret curves plotted for both approaches over time",
+          "Recommendation memo explicitly states the conditions under which each approach wins",
+          "Sensitivity analysis on key assumptions (prior strength, traffic volume, effect size)",
+          "Code runs end-to-end from a single notebook; random seed set for reproducibility"
+        ]
+      },
+      {
+        "title": "Market mix modelling (MMM) with Bayesian priors",
+        "difficulty": "Advanced",
+        "hours": "45-65",
+        "description": "Implement a simplified Media Mix Model for a public or synthetic advertising dataset. Model adstock transformation (geometric decay), saturation curves (Hill function), and control variables (seasonality, promotions). Fit with PyMC. Interpret the contribution of each channel. Compare budget allocation under current vs. optimal weights. This is a real DS deliverable at growth-stage consumer companies.",
+        "tech_stack": ["PyMC", "pandas", "numpy", "matplotlib", "ArviZ"],
+        "rubric": [
+          "Adstock transformation implemented with configurable decay rate",
+          "Saturation curve fitted — results shown not just assumed",
+          "Budget reallocation recommendation with credible intervals on ROI estimates",
+          "Prior sensitivity analysis — how do results shift with different channel priors?",
+          "Write-up readable by a non-Bayesian marketing analyst"
+        ]
+      },
+      {
+        "title": "SQL optimisation case study — query audit and rewrite",
+        "difficulty": "Intermediate",
+        "hours": "15-25",
+        "description": "Take a public database schema (NYC taxi data on BigQuery public datasets, TPC-H benchmark, Pagila sample database) and write a set of intentionally slow queries. Profile them with EXPLAIN ANALYZE. Identify the bottlenecks (missing indexes, cross-join explosions, full-table scans). Rewrite to achieve 5-20x improvement. Document each transformation. This project is the one most DS forget — and the one that impresses every data-engineering-adjacent interviewer.",
+        "tech_stack": ["PostgreSQL or DuckDB", "EXPLAIN ANALYZE"],
+        "rubric": [
+          "Baseline query and optimised query both present with execution time comparison",
+          "EXPLAIN output annotated in the README for each example",
+          "At least five distinct optimisation patterns demonstrated (index, CTE vs. subquery, partition pruning, materialization, join order)",
+          "Publicly reproducible — includes the database setup script",
+          "One-page cheat sheet of the top optimisation patterns produced as a deliverable"
+        ]
+      },
+      {
+        "title": "Recommendation system with offline + online evaluation strategy",
+        "difficulty": "Intermediate",
+        "hours": "35-50",
+        "description": "Build a movie or e-commerce recommender: collaborative filtering (matrix factorisation via Surprise or implicit), content-based (TF-IDF or sentence-transformer embeddings), and a hybrid. Implement the full offline evaluation framework: precision@k, recall@k, NDCG@10, coverage, serendipity. Then design — but do not necessarily implement — the online A/B test that would validate the offline results. This forces the gap between offline and online metrics into your portfolio.",
+        "tech_stack": ["pandas", "Surprise or implicit library", "sentence-transformers", "scikit-learn"],
+        "rubric": [
+          "Three algorithm families with honest offline metric comparison",
+          "Cold-start strategy documented — popularity fallback or content-based bootstrap",
+          "A/B test design written as a formal experiment memo with sample size calculation",
+          "Discussion of offline-online metric correlation — where offline results mislead",
+          "Live demo or Streamlit app where a user can select preferences and get recommendations"
+        ]
+      },
+      {
+        "title": "Public-data investigative analysis — Pudding / FiveThirtyEight style",
+        "difficulty": "Advanced",
+        "hours": "40-60",
+        "description": "Choose a question you genuinely care about that can be answered with public data. Write a 2000-3000 word data-driven piece with original analysis, interactive or highly-polished static charts, and a clear argument. Examples: 'Do cities with more bike lanes have lower collision rates?', 'Has the gender gap in academic publishing narrowed since 2020?', 'How did remote work change commute patterns in mid-sized US cities?' Publish on Medium, Substack, or a personal site. This is your proof-of-communication artifact.",
+        "tech_stack": ["pandas / DuckDB", "plotly or matplotlib", "publishing platform of your choice"],
+        "rubric": [
+          "The piece opens with a question the reader cares about, not with 'I used Python to analyse data'",
+          "Every chart in the piece has a declarative title and a takeaway caption",
+          "Methodology section at the end with links to data sources and code",
+          "Published publicly and shared — a post that does not exist on the internet does not count",
+          "You responded to the first ten comments or questions from readers"
+        ]
+      },
+      {
+        "title": "Capstone — end-to-end causal analysis and decision artefact",
+        "difficulty": "Advanced",
+        "hours": "60-90",
+        "description": "Design and execute a causal study on a real or realistic public dataset. Frame the business question, choose the identification strategy (RCT design, DiD, RDD, propensity matching), execute the analysis, communicate findings in both a technical appendix and a one-page executive summary, and propose the next experiment. The capstone demonstrates the full Data Scientist loop: question → data → method → uncertainty → decision. It is the project you lead with in senior DS interviews.",
+        "tech_stack": ["all of the above — pick the right tool per sub-problem"],
+        "rubric": [
+          "Business question stated with a decision framing — 'should we X?' not 'is there a relationship between A and B?'",
+          "Identification strategy justified with a DAG and written assumption discussion",
+          "Sensitivity analysis and robustness checks present",
+          "Executive summary: one page, no jargon, clear recommendation with confidence statement",
+          "Technical appendix: replicable code, assumption tests, alternative specifications"
+        ]
+      }
+    ],
+    "faqs": [
+      {"q": "Why is there no deep learning project in this list?", "a": "The Data Scientist track is calibrated to what the role actually requires in 2026 — statistical rigor, causal thinking, experimentation, and communication. Deep learning projects belong on the ML Engineer and AI Engineer tracks. If you want a neural net project, add one from the generalist or ML engineer list, but do not let it displace the causal inference and experimentation work that will actually be probed in DS interviews."},
+      {"q": "Do these projects need to be deployed publicly?", "a": "For most of them, yes. 'It worked on my machine' is not a portfolio artifact. A live Streamlit URL costs $0 to host on Streamlit Community Cloud. A GitHub repository with a clear README and reproducible instructions is the absolute minimum. Deployed is better."},
+      {"q": "How do I find real experimental data to practice causal inference?", "a": "Several public sources work well: LaLonde (1986) job training data, Card and Krueger minimum wage studies (ICPSR archive), econometrics textbook datasets (Wooldridge's DATA archive), the Lalonde dataset in the CausalML library, and the 'Causal Inference: The Mixtape' book datasets. For observational data, almost any Kaggle dataset with a treatment indicator works."},
+      {"q": "Is a Kaggle competition useful for a DS portfolio?", "a": "Useful but not the focus. DS work is about answering questions and influencing decisions — not maximising a leaderboard metric. A top-30% Kaggle finish demonstrates ML skill. The causal inference, experimentation, and communication projects on this list demonstrate Data Scientist skill. Do both, but don't let Kaggle crowd out the harder analytical work."},
+      {"q": "How do I handle it if I don't have access to real company data?", "a": "You don't need it. The public datasets available today — NYC Open Data, BigQuery public datasets, UCI ML Repository, IPUMS, Federal Reserve FRED, BLS microdata — are as analytically rich as most company data. The constraint is question quality, not data availability. Pick a question you genuinely care about and the data will be findable."},
+      {"q": "What makes a DS project stand out in an interview?", "a": "Three things, in order: (1) a clearly stated business question at the top — not 'I analysed the Titanic dataset'; (2) honest accounting of uncertainty — what you found AND what you cannot conclude; (3) a decision or recommendation that follows from the analysis. Most portfolios have the analysis but skip the question and the decision. Those are the parts interviewers probe."},
+      {"q": "How many of these should go on my resume?", "a": "Three, featured with a one-line tagline, tech stack, and live URL. The rest live on GitHub. For DS specifically: the A/B test engine, the causal inference study, and one of the Bayesian or MMM projects signal the statistical rigour tier-1 companies actually filter for."}
+    ]
+  },
+  "certifications": {
+    "intro": "A 2026 reality check on DS certifications: the field has accumulated a long tail of badges that employers largely ignore. The list below is filtered to programs that test applied skills, carry instructor credibility in the field, or are genuinely free and structured enough to build real competence. The platform policy is that every recommended certification must be zero-cost to complete (audit or fully free). Bootcamp certificates — Springboard, Galvanize, BrainStation — are commonly seen on resumes but carry marginal employer signal and are not listed here.",
+    "items": [
+      {
+        "name": "Machine Learning Specialization",
+        "provider": "DeepLearning.AI + Stanford (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/machine-learning-introduction",
+        "employer_signal": "Strong. Andrew Ng's course remains the most recognised ML entry point in the field. Signals you understand the core supervised/unsupervised learning cycle. The right first certification for anyone entering data science from a non-quantitative background.",
+        "best_for": "Beginners who want a mathematically grounded introduction to classical ML, including linear models, tree methods, and an introduction to neural networks."
+      },
+      {
+        "name": "Google Data Analytics Professional Certificate",
+        "provider": "Google (Coursera, audit free; financial aid available for verified certificate)",
+        "cost_usd": 0,
+        "prep_hours": 180,
+        "url": "https://www.coursera.org/professional-certificates/google-data-analytics",
+        "employer_signal": "Moderate for DS roles, strong for entry-level data analyst roles. Covers the full analytics workflow — data collection, cleaning, analysis, and visualisation — with R and Tableau. Google's name lends credibility. Note: this is an analyst certificate, not a statistics certificate — DS roles will probe beyond it.",
+        "best_for": "Career changers targeting analyst or junior DS roles who want a structured, credential-bearing program with Google's brand. Financial aid makes the verified certificate genuinely free for unemployed learners."
+      },
+      {
+        "name": "Introduction to Causal Inference (Brady Neal)",
+        "provider": "Independent (fully free — lectures + notes + slides + homework at causalcourse.com)",
+        "cost_usd": 0,
+        "prep_hours": 40,
+        "url": "https://www.causalcourse.com/",
+        "employer_signal": "Light as a listed item — it is not from a named institution — but the content is the most complete free causal inference curriculum available. More importantly: being able to talk fluently about causal graphs, identification, and quasi-experiments in interviews signals you completed something like this, regardless of whether you list it.",
+        "best_for": "Data scientists who want to understand causal inference from first principles — DAGs, identification assumptions, DiD, IV — at a level that matches what tier-1 companies expect of senior DS."
+      },
+      {
+        "name": "Bayesian Statistics: From Concept to Data Analysis",
+        "provider": "UC Santa Cruz (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 25,
+        "url": "https://www.coursera.org/learn/bayesian-statistics",
+        "employer_signal": "Light as a standalone item; strong as part of a profile that also shows PyMC or ArviZ projects. Demonstrates you understand the prior-posterior cycle, conjugate families, and credible intervals at a rigorous level — not just 'Bayesian A/B testing is better.'",
+        "best_for": "DS learners who completed the Brady Neal causal inference course and want to formalise their Bayesian statistical foundations before moving into probabilistic programming with PyMC."
+      },
+      {
+        "name": "Experimentation for Improvement",
+        "provider": "McMaster University (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 20,
+        "url": "https://www.coursera.org/learn/experimentation",
+        "employer_signal": "Light as a line item but the content is directly useful — factorial designs, response surface methodology, blocking, randomisation. Fills the gap between frequentist A/B testing and full design-of-experiments that most DS curricula skip.",
+        "best_for": "Data scientists working in product or growth who want to run experiments beyond the basic two-sample test — multi-arm tests, factorial designs, variance reduction."
+      },
+      {
+        "name": "Statistics with Python Specialization",
+        "provider": "University of Michigan (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/statistics-with-python",
+        "employer_signal": "Moderate. Three-course series covering visualisation, inference, and fitting models — all in Python. University of Michigan adds institutional credibility. Complements the DeepLearning.AI ML Specialisation by giving the statistical side depth.",
+        "best_for": "Learners from engineering or CS backgrounds who know Python but did not take a statistics sequence. This is the course that fills the stats gap without forcing a switch to R."
+      },
+      {
+        "name": "Khan Academy — Statistics and Probability",
+        "provider": "Khan Academy (fully free)",
+        "cost_usd": 0,
+        "prep_hours": 30,
+        "url": "https://www.khanacademy.org/math/statistics-probability",
+        "employer_signal": "Zero employer signal as a line item — do not list this on your resume. Use it as a reference resource to fill specific gaps: probability distributions, confidence intervals, hypothesis tests. Khan Academy's explanations are among the clearest available for concepts you can demonstrate in projects.",
+        "best_for": "People who need to refresh or fill specific statistics gaps while working through the more applied courses above. Not a substitute for applied project work."
+      },
+      {
+        "name": "Tableau Desktop Specialist (free preparation via Tableau Public)",
+        "provider": "Tableau (paid exam ~$250; free preparation resources)",
+        "cost_usd": 0,
+        "prep_hours": 30,
+        "url": "https://www.tableau.com/learn/certification/desktop-specialist",
+        "employer_signal": "Moderate for analytics-heavy DS roles. Tableau is still the dominant BI tool at enterprise companies. The certification signals hands-on proficiency rather than 'I watched a demo.' Preparation via Tableau Public (free) costs nothing; the exam is paid but reimbursable at most companies.",
+        "best_for": "DS roles at companies where Tableau is the standard BI tool and direct stakeholder communication is a core responsibility. Less valuable at companies that use Looker or purely Python-based reporting."
+      },
+      {
+        "name": "IBM Data Science Professional Certificate",
+        "provider": "IBM (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 120,
+        "url": "https://www.coursera.org/professional-certificates/ibm-data-science",
+        "employer_signal": "Moderate for early-career roles. IBM's brand is recognised; the certificate covers Python, SQL, visualisation, ML, and a capstone project. The breadth is a strength and a weakness — it is shallower than the specialised courses above in every individual area.",
+        "best_for": "Career changers who want a single, structured, credential-bearing program that touches every layer of the DS workflow before they specialise. The capstone project is the most valuable output."
+      }
+    ],
+    "employer_data": "Based on 90-day aggregate data from the AutomateEdge jobs pipeline, certifications appear as explicit requirements in under 4% of data scientist postings. What appears instead: 3+ years of experience doing something data-analytical (70%), a portfolio demonstrating causal or experimental work (45%), SQL proficiency (65%), Python (78%), and a specific industry domain at senior levels. The practical implication: complete certifications that teach you something; do not collect them as badge-substitutes for project work.",
+    "faqs": [
+      {"q": "Which certification should I do first?", "a": "If you have no statistical background: Andrew Ng's Machine Learning Specialization to build intuition, then the University of Michigan Statistics with Python Specialization to formalise it. If you already code but lack statistics, go directly to UM Statistics with Python plus the Brady Neal causal inference course in parallel."},
+      {"q": "Is the DeepLearning.AI Data Science certificate worth it?", "a": "There is no single 'DeepLearning.AI Data Science' certificate as of 2026 — there are specialisations in ML, deep learning, MLOps, and specific tools. Pick the one that matches your gap. The ML Specialization is the best starting point for this track."},
+      {"q": "Should I pay for the verified certificate on Coursera?", "a": "Usually not unless an employer will reimburse it. Audit-free gives you all the material. The PDF certificate adds marginal resume signal. Spend the money on compute for your projects instead — a deployed Streamlit app earns more trust than a certificate PDF."},
+      {"q": "Is a bootcamp certificate worth listing on a DS resume?", "a": "Marginally. Springboard, Galvanize, and BrainStation bootcamp certificates are commonly seen and rarely decisive. They signal you completed a structured curriculum, but experienced DS hiring managers have seen enough weak bootcamp portfolios that they weight the certificate lightly. The portfolio work from the bootcamp matters far more than the credential."},
+      {"q": "Are cloud provider certifications (AWS, GCP, Azure) useful for DS?", "a": "For pure DS roles, no. Cloud certs are more valuable for ML engineer, data engineer, or MLOps roles where infra ownership is part of the job. A DS who does not operate the infrastructure does not benefit much from a cloud practitioner cert. The exception: AWS ML Specialty if you are interviewing specifically at AWS-stack companies."},
+      {"q": "How many certifications should appear on my resume?", "a": "Two to three, maximum. More than three reads as credential-collecting, which signals anxiety rather than competence. Feature the ones with the highest employer signal (ML Specialization, Statistics with Python, Tableau if applicable) and keep the rest on LinkedIn."},
+      {"q": "Is there a meaningful credential for causal inference specifically?", "a": "No widely-recognised one exists as of 2026. The Brady Neal course is the best free curriculum; The Mixtape by Scott Cunningham and Causal Inference: What If by Hernán and Robins are the field's textbooks. Employers probe causal thinking through interview questions, not credentials. Your projects — specifically the DiD and propensity matching ones — are the credential."}
+    ]
+  },
+  "salary": {
+    "intro": "The salary ranges below are US market aggregates for Data Scientist titles in 2026 Q1. An honest 2026 framing: pure analytics-DS roles have compressed modestly in pay and prestige relative to ML Engineer and AI Engineer specialisations, as ML tooling commoditised and the modelling share of DS work decreased. That said, senior DS with causal inference, experimentation, and business-communication depth remain highly compensated — particularly at product-first companies where A/B testing, growth, and decision-science are strategic functions. Regional multipliers are rough guides; specific-company packages vary widely. Velocity data comes from the AutomateEdge jobs pipeline.",
+    "update_date": "2026-04-24",
+    "bands_us": [
+      {"level": "Entry (L2/L3, 0-2 yrs)", "base_low": 105000, "base_high": 145000, "total_comp_low": 125000, "total_comp_high": 200000, "notes": "Most entry DS roles require a BS in a quantitative field (statistics, math, CS, economics) or a strong portfolio equivalent. SQL + Python are hard requirements at screening; statistics is probed in the interview loop. Entry DS at brand-name product companies now competes directly with entry data analysts for base, with DS roles winning on equity."},
+      {"level": "Mid (L4, 2-5 yrs)", "base_low": 135000, "base_high": 185000, "total_comp_low": 175000, "total_comp_high": 300000, "notes": "The largest band by population. Mid-level DS who own experimentation programs or causal studies are at the high end. Those doing primarily dashboarding and reporting are at the low end. The split is real and is worth being aware of — scope shapes comp at this level."},
+      {"level": "Senior (L5, 5-8 yrs)", "base_low": 175000, "base_high": 235000, "total_comp_low": 245000, "total_comp_high": 450000, "notes": "Compensation at L5 is dominated by equity. Senior DS at growth-stage companies with high experiment velocity and causal ownership can clear $400k TC. Senior DS at BI-heavy roles at traditional enterprises may sit at $200-250k TC. The spread reflects scope, not just title."},
+      {"level": "Staff (L6, 8-12 yrs)", "base_low": 215000, "base_high": 300000, "total_comp_low": 360000, "total_comp_high": 680000, "notes": "Staff DS is rare and increasingly takes on a Decision Science or Applied Research flavour — framing multi-quarter experiments, owning causal inference methodology for a product area. At hyperscalers, Staff DS pay approaches ML Engineer pay at this level. At smaller companies, the title may not exist."},
+      {"level": "Principal (L7+, 10+ yrs)", "base_low": 270000, "base_high": 380000, "total_comp_low": 530000, "total_comp_high": 1100000, "notes": "Rare. Frontier labs and FAANG only at this level. Often cross-functional: setting experimentation policy, directing a causal inference center of excellence, or leading a research team. Comp competes with Director and VP-level engineering at mid-market companies. The $1M+ band is achievable but narrow."}
+    ],
+    "bands_regions": [
+      {"region": "SF Bay Area", "multiplier": 1.15, "note": "Reference market. DS pay in the Bay Area is driven by competition from ML Engineer and AI Engineer roles; companies pay up to retain analytical talent that could easily pivot to higher-paying specialisations."},
+      {"region": "NYC / Seattle / Boston", "multiplier": 1.08, "note": "Near-peer to SF for base. NYC fintech and hedge-fund DS roles can clear SF comp at mid-senior levels. Seattle's Amazon presence creates a strong anchor for data roles."},
+      {"region": "Other major US metros (Austin, Chicago, Denver, Raleigh)", "multiplier": 0.93, "note": "Modest discount vs. SF. Remote policy compression has closed the gap to roughly 7-8% below SF in 2026 for comparable roles."},
+      {"region": "Fully remote US", "multiplier": 0.90, "note": "Remote-band convergence has stabilised. DS roles typically have slightly more remote flexibility than ML Engineering roles, making this a meaningful option. Expect a 10% discount vs. co-located SF equivalent."},
+      {"region": "Toronto / Montreal (CAD)", "multiplier": 0.63, "note": "CAD comp runs materially below US at every level. Toronto's financial-services DS market is strong and partially mitigates the discount for mid-senior roles."},
+      {"region": "Western Europe (EUR)", "multiplier": 0.52, "note": "Strong discount across the board. London DS roles at hedge funds and fintech companies are exceptions — London can approach US senior-level comp for quantitative DS roles. Amsterdam tech companies pay in the middle of the European range."},
+      {"region": "India (INR)", "multiplier": null, "note": "Separate market. Entry: ₹8-16 LPA. Mid: ₹18-40 LPA. Senior at product companies + GCCs: ₹45-100 LPA. Top-of-market (frontier lab India offices, staff-level at Tier-1 product companies): ₹120-180 LPA."},
+      {"region": "Southeast Asia (SGD / MYR)", "multiplier": null, "note": "Singapore: entry S$55-80k, mid S$90-140k, senior S$150-260k. Strong demand in fintech and ride-hailing companies. Other SEA markets (Malaysia, Vietnam, Indonesia) run 40-60% below Singapore."}
+    ],
+    "velocity": {
+      "jobs_last_90d_us": "The AutomateEdge pipeline tracked approximately 1,800 US-based roles with 'Data Scientist' in the title over the trailing 90 days — up 9% year-over-year. Pure DS roles grew more slowly than AI Engineer and ML Engineer roles, consistent with the title compression trend where companies rebrand analyst-heavy DS roles upward to attract ML-capable candidates.",
+      "avg_days_to_fill": "Median time-to-fill for entry-level DS roles: 45 days. Senior DS roles: 72 days — longer than ML/AI engineer equivalents, reflecting higher specificity in domain and statistical-methodology requirements at senior levels.",
+      "top_hiring_companies": [
+        "Meta (product growth, ranking, experimentation teams)",
+        "Netflix (experimentation + consumer-product DS)",
+        "Airbnb (pricing, search, trust-and-safety DS)",
+        "Uber / Lyft (marketplace economics, incentive design, causal inference teams)",
+        "DoorDash (merchant analytics, consumer growth)",
+        "Stripe / Block (payments analytics, fraud)",
+        "Capital One / JPMorgan / Citi (credit risk, marketing analytics)",
+        "Insurance companies and healthcare analytics teams (actuarial-adjacent DS roles)"
+      ],
+      "trending_skills": [
+        "Causal inference + quasi-experimentation (up 85% YoY in postings)",
+        "CUPED + variance reduction methods (up 70% YoY)",
+        "Bayesian A/B testing (up 60% YoY)",
+        "dbt + analytics engineering collaboration (up 55% YoY)",
+        "LLM-assisted analysis workflows (up 45% YoY — prompting + tool-use for DS productivity)",
+        "Market mix modelling (up 30% YoY — driven by post-cookie attribution needs)"
+      ]
+    },
+    "negotiation_tips": [
+      "Know whether you are interviewing for a 'DS-as-analyst' role or a 'DS-as-scientist' role before negotiating — the market rates differ by 20-40% at mid-senior levels and the scope difference will follow you for years.",
+      "Collect three offers. Two is a data point; three is leverage. The variance in DS offers across companies is larger than in SWE — the range for a Senior DS can span $250k-$420k TC depending on company and team.",
+      "Ask about the experimentation platform and experiment volume. High-experiment teams have more scope and pay more for strong DS. 'We run 5 experiments per quarter' vs. '50 per week' is a material career-trajectory difference.",
+      "Counter the entire package: base + equity + sign-on + start date. Equity variance at private companies is real — ask for the strike price, the preferred stock stack, and the liquidation preference before weighting it in your comparison.",
+      "If you have a causal inference or Bayesian project to discuss, front-load it in final-round conversations — it signals a specialisation premium that justifies asking for the top of band.",
+      "Get the offer in writing before you decline anything else. A verbal 'we'll match that' from a hiring manager is not a legal offer.",
+      "Sign-on bonuses are the most flexible line — HR has budget discretion there that they do not have on base. Ask for a sign-on to offset any unvested equity you are leaving behind."
+    ],
+    "sources": [
+      {"name": "levels.fyi — Data Scientist salary distributions", "url": "https://www.levels.fyi/t/data-scientist"},
+      {"name": "Glassdoor — Data Scientist salaries", "url": "https://www.glassdoor.com/Salaries/data-scientist-salary-SRCH_KO0,14.htm"},
+      {"name": "US BLS — Mathematical Science Occupations", "url": "https://www.bls.gov/ooh/math/mathematical-science-occupations.htm"},
+      {"name": "LinkedIn Economic Graph — Jobs on the Rise", "url": "https://economicgraph.linkedin.com/"},
+      {"name": "AutomateEdge jobs pipeline (internal aggregation)", "url": "https://automateedge.cloud/jobs"}
+    ],
+    "faqs": [
+      {"q": "Do Data Scientists get paid less than ML Engineers in 2026?", "a": "Slightly, on average. Entry and mid levels overlap almost completely, but at senior and above, ML engineers who own production model infrastructure and AI engineers building LLM-powered products command a 15-25% premium. The reason is infrastructure ownership: an ML engineer who can optimise inference or scale training is a harder replacement than an analytically excellent DS. The gap is not a value judgement — it reflects market scarcity."},
+      {"q": "Has the DS market compressed since 2022?", "a": "Yes, measurably. 'Data scientist' job postings peaked in 2021-2022 alongside the analytics boom, then compressed in 2023-2024 as companies tightened headcount and as the LLM wave made 'AI engineer' the new prestige title. The market recovered in 2025-2026, but the role has differentiated: high-paying DS roles increasingly require causal inference and experimentation expertise, not just Python + ML familiarity. Pure-analytics DS titles are on slower trajectories."},
+      {"q": "How much does remote work affect DS compensation?", "a": "About 10% discount vs. co-located equivalent in 2026. The gap has narrowed from 20%+ in 2022. DS roles tend to have more remote flexibility than ML/AI engineering roles because the work is less infrastructure-dependent. For senior-level remote DS with deep experimentation skills, the discount may be smaller — those skills are scarce enough that companies relax location requirements."},
+      {"q": "Is equity meaningful in DS compensation?", "a": "At public hyperscalers (Google, Meta, Amazon, Netflix), equity is the dominant compensation variable at L5+ — it can be 40-60% of TC. At private companies, equity has real liquidation risk: a $500k paper equity grant from a Series C startup should be mentally haircut 50-70% when comparing to public-company equity. Get the fundamentals (preferred vs. common, strike price, waterfall) before valuing private equity."},
+      {"q": "What skills most change your negotiation leverage as a DS?", "a": "In 2026, two: (1) demonstrated causal inference work — not just 'I know what DiD is' but a portfolio project that ran a real quasi-experiment with robustness checks; and (2) experimentation platform ownership — evidence that you have owned the A/B testing workflow, not just consumed experiment results. Both signal a specialisation that commands a scarcity premium at mid-to-senior levels."},
+      {"q": "How do DS salaries differ across industries?", "a": "Tech (product companies): highest, following the bands above. Finance / fintech / hedge funds: competitive at mid-senior, occasionally above tech at very senior quant-DS roles. Healthcare / pharma: 15-25% below tech at comparable levels but with stronger job stability. Retail / CPG: 20-30% below tech. Government / non-profit: 35-50% below, partially offset by defined-benefit pensions and work-life balance. Industry choice at year 3-4 has large long-term comp implications."},
+      {"q": "Can a Data Scientist reach $500k TC without a management role?", "a": "Yes, on the IC track at Staff+ levels at hyperscalers or high-growth AI companies. It requires being excellent at both the technical work (deep statistical methodology, causal reasoning) and the organisational work (setting the experimentation culture, publishing externally, being the person VPs call for hard analytical questions). The population is small; the path is real."},
+      {"q": "Does a PhD significantly increase DS compensation?", "a": "At entry, a PhD typically commands a 15-20% base premium and a level-bump (starting at L4 rather than L3). By mid-senior levels, the PhD premium converges to near zero as demonstrated project work and scope ownership dominate comp. PhDs are still over-represented at frontier labs and research-adjacent DS roles, where methodology depth and publication record matter. For product DS roles, the premium does not persist past 3-4 years of strong performance."}
+    ]
+  },
+  "career_path": {
+    "intro": "Data science career ladders are less standardised than software engineering — the same job may be titled 'Data Scientist', 'Applied Scientist', 'Decision Scientist', or 'Research Analyst' depending on the company's taxonomy. The progression below maps common patterns at mid-to-large product organisations. Two transitions are unusually common in DS: the pivot to Product Management (very common at L5, where DS communication and prioritisation skills transfer directly) and the pivot to Analytics Engineering (for DS who prefer building robust data infrastructure over running studies).",
+    "stages": [
+      {
+        "year_range": "Year 0-2 — Entry (L2/L3)",
+        "title": "Data Scientist I / Junior Data Scientist / Analytics Analyst",
+        "focus": "Execute well-scoped analytical tasks under senior guidance. Typical work: run a pre-specified experiment and write up the results, build a report for a PM, clean and join datasets for a recurring business review. You are learning the company's data infrastructure, the team's analytical standards, and the domain.",
+        "typical_tasks": [
+          "Implement the analysis for a defined experiment (senior wrote the spec, you do the analysis)",
+          "Build a recurring dashboard in Tableau or Streamlit",
+          "Write SQL to answer a business question that landed in the team queue",
+          "Join and validate a new data source from the warehouse",
+          "Document the data dictionary for a table nobody has written up"
+        ],
+        "skills_gained": ["Production SQL on real data", "company-specific data architecture", "stakeholder communication basics", "analysis discipline from code review"],
+        "comp_us": "TC $125k-$200k",
+        "next_step": "Own an analysis end-to-end — from framing the question to presenting the recommendation — without hand-holding. Your manager reads your experiments for the result, not to correct the methodology."
+      },
+      {
+        "year_range": "Year 2-5 — Mid (L4)",
+        "title": "Data Scientist II / Data Scientist / Applied Scientist",
+        "focus": "Own project-sized analytical work start-to-finish. You frame the question, choose the method, run the analysis, and present the recommendation. You begin running experiments independently and designing studies, not just executing pre-specified ones. Domain expertise in one product area becomes your identity on the team.",
+        "typical_tasks": [
+          "Own the experimentation program for one product surface — sizing, running, analysing, reporting",
+          "Build a predictive model that feeds a product decision (churn, engagement, propensity)",
+          "Design a quasi-experimental study when an A/B test is not feasible",
+          "Mentor an entry-level DS through their first analysis review",
+          "Partner with a PM on quarterly prioritisation with data-backed recommendations"
+        ],
+        "skills_gained": ["Independent experiment design and analysis", "causal inference toolkit", "business framing of ambiguous questions", "stakeholder influence"],
+        "comp_us": "TC $175k-$300k",
+        "next_step": "Your work influences product decisions without requiring a senior sponsor to validate your methodology. You are the person the PM comes to with hard questions."
+      },
+      {
+        "year_range": "Year 5-8 — Senior (L5)",
+        "title": "Senior Data Scientist / Senior Applied Scientist / Decision Scientist",
+        "focus": "Own the analytical framework for a product area. You are the person who decides what questions to ask, not just answers the questions that come to you. You design multi-experiment programs, set the statistical standards the team works to, and translate data findings into product strategy. Your communication output reaches director and VP-level stakeholders directly.",
+        "typical_tasks": [
+          "Design a six-month experimentation roadmap for a product vertical",
+          "Build the team's causal inference methodology and train others on it",
+          "Produce a quarterly business review that influences executive investment decisions",
+          "Own the metric definition for a key product area — what the team measures and why",
+          "Act as the DS voice in product and engineering planning processes"
+        ],
+        "skills_gained": ["Metric strategy", "long-horizon experimentation planning", "executive communication", "cross-functional influence without authority"],
+        "comp_us": "TC $245k-$450k",
+        "next_step": "Staff path requires influence across multiple product areas and methodological leadership. Product Manager pivot is common here — DS communication skills transfer directly. The decision is whether you want to deepen the analytical work or broaden into general product ownership.",
+        "common_transitions": [
+          "→ Product Manager (very common — DS communication skills at L5 transfer directly to PM scope)",
+          "→ Analytics Engineer (for DS who prefer robust data infrastructure over running studies)",
+          "→ ML Engineer (for DS who want to own production models rather than analytical outputs)"
+        ]
+      },
+      {
+        "year_range": "Year 8-12 — Staff (L6)",
+        "title": "Staff Data Scientist / Lead Data Scientist / Principal Data Scientist (at some companies)",
+        "focus": "Set the DS methodology and analytical culture for an entire product domain (hundreds of millions of users, multiple product teams). You influence which questions the company is even asking. You represent the DS function in company-level planning. External technical communication — conference talks, blog posts, papers — is expected at this level.",
+        "typical_tasks": [
+          "Own the company's experimentation platform standards across product teams",
+          "Set multi-year data strategy for a product line",
+          "Represent the DS function in company OKR and investment discussions",
+          "Publish methodology externally — company engineering blog, internal conference talk, preprint",
+          "Sponsor and mentor senior DS toward staff-level scope"
+        ],
+        "skills_gained": ["Organisation-level influence", "external brand building", "long-horizon strategy under uncertainty", "leveraged impact through methodology rather than direct analysis"],
+        "comp_us": "TC $360k-$680k",
+        "next_step": "Principal / Director of Data Science / VP. IC path requires pan-company technical leadership. Management path requires demonstrated people-leadership impact. Both are valid; miserable managers are too common to default to the management path without genuine interest."
+      },
+      {
+        "year_range": "Year 12+ — Principal / Director",
+        "title": "Principal Data Scientist / Distinguished Data Scientist / Data Science Director / VP of Data Science",
+        "focus": "Output is decisions, people, and methodology — not analysis. On the IC path, you are defining the statistical and causal methodology for an entire company or research function. On the management path, you are running a multi-team DS organisation. The roles converge in that both require external credibility and the ability to set the vision others execute against.",
+        "typical_tasks": [
+          "Define the company's causal inference standards and experiment governance framework",
+          "Publish research that advances the field (journals, NeurIPS/ICML/KDD methods papers)",
+          "Set data-science hiring philosophy and career ladder design",
+          "Advise the CEO and board on measurement strategy for strategic bets",
+          "Recruit other senior DS leaders; sponsor high-risk analytical initiatives"
+        ],
+        "skills_gained": ["Executive presence", "board-level communication", "organisational design", "research credibility", "long-horizon risk tolerance"],
+        "comp_us": "TC $530k-$1.1M",
+        "next_step": "Advisory roles, chief analytics/data officer paths, founding a data-focused company, or senior research scientist at a frontier lab. The Principal DS and DS Director roles represent a narrow population — well below 1% of all DS — and the path requires both deep technical work and strong organisational impact sustained over a decade.",
+        "common_transitions": [
+          "→ Chief Data Officer or Chief Analytics Officer (management path)",
+          "→ Research Scientist at frontier AI lab (requires publications and methodology leadership)",
+          "→ Founding or joining early-stage data-infrastructure company as technical co-founder"
+        ]
+      }
+    ],
+    "transitions": [
+      "DS → Product Manager: The most common mid-career pivot in DS. Happens at L5 because DS communication skills — framing problems, measuring success, presenting trade-offs — directly map to PM responsibilities. The comp penalty is small (5-10%); the scope change is large. Many senior PMs at tech companies have DS backgrounds.",
+      "DS → Analytics Engineer: For DS who prefer building the data infrastructure their analysis runs on. The skills gap: dbt, Spark, Airflow ownership, data modelling for warehouse. The career path: Data Engineer → Senior Analytics Engineer → Staff. Pay is comparable; the work shifts from 'answer the question' to 'build the system that answers questions at scale'.",
+      "DS → ML Engineer: Requires closing gaps in production engineering (Docker, serving infrastructure, latency budgets) and deep learning depth. Common at company transitions — join a newer company at a level where the roles overlap and specialise from there. Two-year transition is realistic for a strong DS with solid scikit-learn depth.",
+      "DS → Applied Research Scientist: Hard direction from industry. Requires publications or co-authorship, ideally from active collaboration with academics. Most who make the move have 5+ years of strong methodology work and either an academic side project or a collaboration that produced an external paper.",
+      "Academic statistics → Industry DS: Natural transition — the methodology depth transfers well. Gaps to close: engineering practices (git, production Python, SQL), business framing, and moving from p-values to decisions. Most academics under-weight the communication change; that is the harder adjustment.",
+      "DS → Founder: Data-focused company ideas come naturally from DS who see the same analytical pain points repeatedly. The modal founding year is year 6-10 — after enough scope to see systems-level problems, before the golden handcuffs of staff+ comp become overwhelming."
+    ],
+    "faqs": [
+      {"q": "How do Data Scientist and Data Analyst titles differ in practice?", "a": "At most companies in 2026, the line is: Analysts produce reports and dashboards that answer specified questions; Data Scientists design experiments, build predictive models, and frame questions that had not been asked. In practice, the overlap is large at entry level and the distinction sharpens with seniority. The biggest differentiator in interviews is statistical rigour: a DS is expected to size and analyse experiments, not just describe data."},
+      {"q": "Is the DS → Product Manager transition worth it?", "a": "For the right person, yes. DS-to-PM is one of the most natural pivots in tech. The skills that make a senior DS excellent — understanding metrics, framing trade-offs, communicating under uncertainty — are exactly what makes a great technical PM. The pay is roughly equivalent at L5 level; the career ceiling in management is higher but the work changes fundamentally. Try a PM rotation or a tech-lead project role before fully committing."},
+      {"q": "Is a PhD required to advance to Staff DS?", "a": "No. The PhD share at Staff DS is roughly 50% at tier-1 tech companies and lower at growth-stage startups. What matters is methodology depth and organisational impact. A strong BS/MS DS with 8 years of genuine causal inference and experimentation ownership can reach Staff at the right company without a doctorate. The PhD matters most at research-adjacent DS roles and at frontier labs."},
+      {"q": "How do I know if I should stay on the IC path or move into management?", "a": "Test it before deciding. Lead a team project as an IC tech-lead. Mentor two or three junior DS through their first major analyses. If the people-side of that work energises you — if seeing them grow is as satisfying as doing the analysis yourself — management is probably the right path. If it feels like an interruption from the real work, stay IC. Miserable managers at L6+ are a common career cautionary tale."},
+      {"q": "What derails DS careers most often?", "a": "Three patterns: (1) doing analysis without framing decisions — producing outputs that get acknowledged and ignored; (2) staying in a low-experiment-velocity team for 3+ years and then having no evidence of experimental ownership in interviews; (3) narrowing too early into dashboarding without building causal or predictive depth, making L4 the effective career ceiling."},
+      {"q": "How does the DS career path differ at a startup vs. a FAANG?", "a": "At a Series B/C startup: the roles overlap more, you do more individual work earlier, the title inflation means a 'Senior DS' at a 200-person startup might be doing entry-level FAANG work. The upside is scope and growth speed — you own the experimentation program in year two, not year six. At FAANG: deeper specialisation, clearer career ladders, higher base but longer timelines to senior."},
+      {"q": "Is the Data Science field stable or is it at risk from LLMs?", "a": "Partially at risk in specific directions. LLMs have already displaced significant data wrangling, exploratory analysis, and basic reporting work — tasks that took a junior DS half a day can now be done in thirty minutes with AI assist. What is not at risk: experiment design (someone still has to decide what question to ask), causal reasoning (LLMs cannot identify causal effects from data), and the communication of uncertainty to decision-makers. The DS who invests in the latter three is insulated; the DS who relies on the former three is exposed."}
+    ]
+  }
+}

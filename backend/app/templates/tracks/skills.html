@@ -1,0 +1,129 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.skills %}
+
+{% block page_title %}{{ track.name }} Skills Matrix — 2026 Proficiency Ladder — AutomateEdge{% endblock %}
+{% block description %}The concrete skill ladder for a {{ track.name }} in 2026: what to master, at what proficiency, and in what order — calibrated against real job-posting demand.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/skills{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Skills Matrix — 2026 Proficiency Ladder") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/skills") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (track.name ~ " — Core Skill Categories") | tojson }},
+  "itemListElement": [
+    {% for cat in section.categories %}
+    {"@type": "ListItem", "position": {{ loop.index }}, "name": {{ cat.name | tojson }}, "description": {{ cat.blurb | tojson }}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Skills"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Skills</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Skills</div>
+<h1>{{ track.name }} Skills Matrix: 2026 Proficiency Ladder</h1>
+<p class="lede">{{ section.intro }}</p>
+
+{% for cat in section.categories %}
+<h2>{{ cat.name }}</h2>
+<p>{{ cat.blurb }}</p>
+<table class="grid">
+  <thead><tr><th>Skill</th><th>Target level</th><th>Note</th></tr></thead>
+  <tbody>
+    {% for item in cat['items'] %}
+    <tr>
+      <td>{{ item.skill }}</td>
+      <td><span class="level {{ item.level }}">{{ item.level }}</span></td>
+      <td>{{ item.note }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<h2>Suggested learning sequence</h2>
+<ul class="list">
+  {% for step in section.learning_sequence %}
+  <li>{{ step }}</li>
+  {% endfor %}
+</ul>
+
+<h2>How long to 'Intermediate' across the board?</h2>
+<p>{{ section.time_to_proficient }}</p>
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/tools">Tools inventory</a> — what you will install and use day-to-day</li>
+    <li><a href="/roadmap/{{ track.slug }}/projects">Portfolio projects</a> — 10-15 build ideas with evaluation rubrics</li>
+    <li><a href="/roadmap/{{ track.slug }}/certifications">Certifications</a> — free credentials that move interviews forward</li>
+    <li><a href="/roadmap/{{ track.slug }}/salary">Salary bands</a> — US + regional comp data refreshed quarterly</li>
+    <li><a href="/roadmap/{{ track.slug }}/career-path">Career path</a> — 1, 3, 5, and 10-year progression</li>
+    <li><a href="/">Start the 24-week study plan</a> — free, AI-curated</li>
+  </ul>
+</div>
+{% endblock %}

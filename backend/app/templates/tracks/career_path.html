@@ -1,0 +1,135 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.career_path %}
+
+{% block page_title %}{{ track.name }} Career Path 2026 — Entry to Principal Progression — AutomateEdge{% endblock %}
+{% block description %}The full {{ track.name }} career trajectory in 2026: entry-level, mid, senior, staff, and principal. Typical tasks at each stage, compensation ranges, and what it takes to level up.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/career-path{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Career Path — Entry to Principal in 2026") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/career-path") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": {{ ("Progress from Entry-Level to Principal " ~ track.name) | tojson }},
+  "description": {{ section.intro | tojson }},
+  "step": [
+    {% for stage in section.stages %}
+    {
+      "@type": "HowToStep",
+      "position": {{ loop.index }},
+      "name": {{ (stage.year_range ~ " — " ~ stage.title) | tojson }},
+      "text": {{ stage.focus | tojson }}
+    }{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Career path"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Career path</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Career path</div>
+<h1>{{ track.name }} Career Path: Entry to Principal in 2026</h1>
+<p class="lede">{{ section.intro }}</p>
+
+{% for stage in section.stages %}
+<h2>{{ stage.year_range }} — {{ stage.title }}</h2>
+<p><strong>What the role looks like —</strong> {{ stage.focus }}</p>
+
+<h3>Typical tasks</h3>
+<ul class="list">
+  {% for task in stage.typical_tasks %}
+  <li>{{ task }}</li>
+  {% endfor %}
+</ul>
+
+<h3>Skills you build at this level</h3>
+<div class="chips">
+  {% for s in stage.skills_gained %}<span>{{ s }}</span>{% endfor %}
+</div>
+
+<p><strong>Typical comp (US) —</strong> {{ stage.comp_us }}</p>
+<p><strong>What levelling up looks like —</strong> {{ stage.next_step }}</p>
+{% endfor %}
+
+<h2>Common cross-track transitions</h2>
+<ul class="list">
+  {% for t in section.transitions %}
+  <li>{{ t }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/skills">Skill matrix</a> — proficiency levels per category</li>
+    <li><a href="/roadmap/{{ track.slug }}/tools">Tools inventory</a> — install path + hours to learn</li>
+    <li><a href="/roadmap/{{ track.slug }}/projects">Portfolio projects</a> — 15 ideas recruiters actually read</li>
+    <li><a href="/roadmap/{{ track.slug }}/certifications">Certifications</a> — free credentials worth completing</li>
+    <li><a href="/roadmap/{{ track.slug }}/salary">Salary bands</a> — 2026 comp by level and region</li>
+    <li><a href="/jobs">Open {{ track.name }} jobs</a></li>
+  </ul>
+</div>
+{% endblock %}

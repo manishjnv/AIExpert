@@ -1,0 +1,696 @@
+{
+  "_meta": {
+    "description": "SEO-20 per-track quintet data for the 'generalist' track. Feeds six pages at /roadmap/generalist/{skills,tools,projects,certifications,salary,career-path}. Salary bands use US market figures from levels.fyi / Glassdoor / BLS 2025-2026; regional multipliers are aggregated estimates. Renewable yearly — bump last_updated + regenerate velocity snapshot from the jobs pipeline.",
+    "last_updated": "2026-04-24"
+  },
+  "slug": "generalist",
+  "name": "AI Generalist",
+  "tagline": "A broad, balanced foundation across the AI stack — math, classic ML, deep learning, LLMs, and production — so you can follow the field without locking into a narrow specialty in year one.",
+  "hero_blurb": "The generalist track is for people who want working AI fluency before they pick a specialization. You will ship a portfolio of six projects across classical ML, deep learning, and LLM applications, and leave with the background to move into AI Engineer, ML Engineer, or Data Scientist work within a year.",
+  "weeks_total": 24,
+  "hours_per_week": 8,
+  "skills": {
+    "intro": "The AI Generalist skill map below is calibrated against 2026 hiring signals — specifically, the skills that appear in ≥30% of junior-to-mid AI postings across the AutomateEdge jobs pipeline over the last 90 days. Proficiency levels follow a four-step ladder: Beginner (can follow tutorials), Intermediate (can build a solution to a new problem), Advanced (can debug production issues), Expert (can design systems from first principles). A generalist clears Intermediate across every category by week 24; Advanced follows specialization.",
+    "categories": [
+      {
+        "name": "Programming foundations",
+        "blurb": "Python is non-negotiable for AI work — every major library, every training framework, every inference runtime has a Python surface. Strong Python means fluent async I/O, type hints, virtual environments, and the standard-library tools (subprocess, pathlib, concurrent.futures) you will reach for when wiring models into applications.",
+        "items": [
+          {"skill": "Python 3.11+ syntax and semantics", "level": "Advanced", "note": "match-case, positional-only args, walrus, structural typing; rule of thumb — you can read and write it without googling daily."},
+          {"skill": "NumPy array operations", "level": "Intermediate", "note": "broadcasting, slicing, einsum, random generators, axis semantics."},
+          {"skill": "pandas dataframes", "level": "Intermediate", "note": "groupby, merge, pivot, vectorised ops. Avoid iterrows — it's the #1 junior-interview trap."},
+          {"skill": "Async / await", "level": "Intermediate", "note": "FastAPI handlers, httpx streaming, asyncio.gather. Critical once you ship AI APIs."},
+          {"skill": "Type hints + mypy", "level": "Intermediate", "note": "Generics, TypedDict, Protocols. Shrinks debugging time dramatically."},
+          {"skill": "Testing with pytest", "level": "Intermediate", "note": "fixtures, parametrize, monkeypatch, pytest-asyncio. At least 60% line coverage on every portfolio project."},
+          {"skill": "Git + GitHub workflow", "level": "Advanced", "note": "branching, rebase, squash, resolving conflicts, PR etiquette. Hiring managers read git history."},
+          {"skill": "Unix shell + Docker basics", "level": "Beginner", "note": "grep, awk, ssh, docker build/run. Enough to debug a VPS deploy without panic."}
+        ]
+      },
+      {
+        "name": "Mathematics for AI",
+        "blurb": "The math you actually use as a generalist is thinner than most curricula imply. Linear algebra and probability do 80% of the work; calculus appears only through the autograd abstraction you mostly trust. Skip real analysis, skip measure theory — come back for them only if you deep-dive into research.",
+        "items": [
+          {"skill": "Linear algebra — vectors, matrices, SVD", "level": "Intermediate", "note": "dot product as similarity, matrix as linear transform, SVD as the 'what's really there' operation."},
+          {"skill": "Probability + Bayes' rule", "level": "Intermediate", "note": "joint/conditional/marginal, expectation, variance, the 'likelihood × prior' shape of every learning algorithm."},
+          {"skill": "Calculus — gradients + chain rule", "level": "Beginner", "note": "You will rarely differentiate by hand, but you must read a gradient expression and know what it's saying."},
+          {"skill": "Statistics — hypothesis testing, confidence", "level": "Beginner", "note": "p-values, power, t-test vs chi-square. Needed the moment you A/B-test a model."},
+          {"skill": "Optimization — gradient descent variants", "level": "Intermediate", "note": "SGD, Adam, AdamW, learning-rate schedules, momentum. Not just 'which optimizer' — why each exists."},
+          {"skill": "Information theory basics", "level": "Beginner", "note": "Entropy, cross-entropy, KL divergence. Core to understanding every loss function."}
+        ]
+      },
+      {
+        "name": "Classical machine learning",
+        "blurb": "Classical ML is where every generalist builds intuition. Before you can evaluate an LLM response or debug a deep-net loss curve, you need to have trained, over-fit, regularised, and cross-validated on tabular data. It remains the right tool for 60% of real business problems.",
+        "items": [
+          {"skill": "scikit-learn API mastery", "level": "Advanced", "note": "pipelines, ColumnTransformer, cross_val_score, GridSearchCV, the fit/transform contract."},
+          {"skill": "Linear + logistic regression", "level": "Intermediate", "note": "regularisation (L1/L2), multicollinearity, interpreting coefficients."},
+          {"skill": "Tree ensembles — RF, XGBoost, LightGBM", "level": "Intermediate", "note": "Still the winning algorithm on most Kaggle tabular competitions. Learn feature importance + SHAP."},
+          {"skill": "Clustering + dimensionality reduction", "level": "Beginner", "note": "k-means, DBSCAN, PCA, t-SNE, UMAP. Knowing when to reach for each."},
+          {"skill": "Evaluation metrics across tasks", "level": "Intermediate", "note": "accuracy, precision, recall, F1, ROC-AUC, PR-AUC, RMSE, MAE. Pick the metric that matches the business cost."},
+          {"skill": "Feature engineering", "level": "Intermediate", "note": "categorical encoding, feature crosses, date-time features, target encoding pitfalls."},
+          {"skill": "Train/val/test discipline", "level": "Advanced", "note": "Stratified splits, time-series splits, leakage prevention, the #1 source of silent bugs."}
+        ]
+      },
+      {
+        "name": "Deep learning",
+        "blurb": "PyTorch is the field's lingua franca in 2026. JAX has a loyal niche but if you learn one, learn PyTorch — every paper ships a PyTorch reference implementation. Focus on the primitives (tensors, autograd, nn.Module) before reaching for higher-level wrappers.",
+        "items": [
+          {"skill": "PyTorch tensors + autograd", "level": "Intermediate", "note": "device placement, gradient accumulation, custom backward functions."},
+          {"skill": "nn.Module + training loops", "level": "Intermediate", "note": "forward, loss, backward, optimizer step — write it manually at least once before using Lightning."},
+          {"skill": "CNNs for image tasks", "level": "Beginner", "note": "conv, pool, batchnorm. Fine-tune a pretrained resnet on your own dataset."},
+          {"skill": "RNN + transformer basics", "level": "Intermediate", "note": "Why attention replaced recurrence. Multi-head attention, positional encoding, causal masks."},
+          {"skill": "Transfer learning + fine-tuning", "level": "Intermediate", "note": "Freeze / unfreeze, LoRA basics, data augmentation strategy."},
+          {"skill": "Training diagnostics", "level": "Intermediate", "note": "Loss curves, gradient norms, weight histograms. Catching divergence before it wastes a GPU-week."}
+        ]
+      },
+      {
+        "name": "LLMs + generative AI",
+        "blurb": "LLMs are the fastest-moving surface in the field. A generalist does not need to pre-train one, but must be fluent at wiring hosted models into applications, building retrieval systems, evaluating outputs, and knowing when a smaller classical model would win.",
+        "items": [
+          {"skill": "Prompting strategy + templating", "level": "Intermediate", "note": "system/user/assistant turns, few-shot, chain-of-thought, structured output, Pydantic-validated JSON."},
+          {"skill": "Retrieval-augmented generation (RAG)", "level": "Intermediate", "note": "chunking, embeddings, vector DBs (pgvector / Pinecone / Weaviate), hybrid search, re-ranking."},
+          {"skill": "Evaluation of generative output", "level": "Intermediate", "note": "automatic evals (exact match, rouge, BLEU, LLM-as-judge), rubric-based, pairwise preference."},
+          {"skill": "Agent + tool-use patterns", "level": "Beginner", "note": "Function calling, Anthropic/OpenAI tool APIs, the ReAct loop, when agents are the wrong answer."},
+          {"skill": "Cost + latency engineering", "level": "Intermediate", "note": "Context size vs cost, prompt caching, streaming, model routing, when to distill to a smaller model."},
+          {"skill": "Safety + guardrails", "level": "Beginner", "note": "PII redaction, jailbreak patterns, refusal classifiers, content moderation APIs."}
+        ]
+      },
+      {
+        "name": "Production + deployment",
+        "blurb": "A generalist who cannot deploy is 60% of a hire. Your portfolio projects must live on the public internet — a Docker Compose VPS is a complete, cost-controlled answer. Employers read 'I shipped it' as a hard multiplier on every other skill.",
+        "items": [
+          {"skill": "FastAPI + async backends", "level": "Intermediate", "note": "routers, dependencies, Pydantic models, background tasks, WebSockets for streaming."},
+          {"skill": "Docker + Docker Compose", "level": "Intermediate", "note": "multi-stage builds, volume persistence, health checks, reverse-proxy routing."},
+          {"skill": "SQL + one DB in depth", "level": "Intermediate", "note": "Postgres or SQLite. Indexes, transactions, migrations (alembic), explain plans."},
+          {"skill": "Observability basics", "level": "Beginner", "note": "Structured logging, request IDs, prompt/response logs with PII redaction, uptime monitoring."},
+          {"skill": "CI/CD fundamentals", "level": "Beginner", "note": "GitHub Actions lint + test on PR. A failing test blocks merge — non-negotiable."}
+        ]
+      }
+    ],
+    "learning_sequence": [
+      "Weeks 1-4 — Python + NumPy/pandas + Git. Ship a data-cleaning notebook with a public dataset.",
+      "Weeks 5-8 — Linear algebra + probability via 3Blue1Brown + Khan Academy. Re-derive linear regression from scratch.",
+      "Weeks 9-12 — scikit-learn end-to-end. Train, evaluate, and deploy a tree model behind FastAPI.",
+      "Weeks 13-16 — PyTorch fundamentals + one CNN and one transformer project on a real dataset.",
+      "Weeks 17-20 — LLM APIs + RAG system. Ship a retrieval-backed Q&A app with evals.",
+      "Weeks 21-24 — Integration project combining classic ML + LLM, deployed to a VPS, documented in a public README."
+    ],
+    "time_to_proficient": "Full-time learner: 5-6 months to Intermediate across all categories. Part-time (8-10 h/week): 9-12 months. What matters most for hiring is not speed but shipped artifacts — a well-documented GitHub with three deployed projects beats a completion certificate from a six-month bootcamp.",
+    "faqs": [
+      {"q": "Do I need to memorise calculus before starting?", "a": "No. You need gradient descent intuition — 'the model nudges its weights in the direction that reduces loss.' Formal derivatives appear rarely in a generalist's daily work. Revisit calculus if you specialise in research or optimization."},
+      {"q": "Should I learn TensorFlow or PyTorch?", "a": "PyTorch. ~95% of new research code, almost every Hugging Face model, and most production serving stacks are PyTorch-first in 2026. TensorFlow remains entrenched in large-enterprise MLOps stacks — learn it later if you hit a role that requires it."},
+      {"q": "How much math is 'enough'?", "a": "Linear algebra through SVD, probability through Bayes, calculus through the chain rule, optimization through Adam. That set covers 95% of generalist work. Beyond that, math is field-specific — NLP needs information theory, vision needs Fourier, RL needs dynamic programming."},
+      {"q": "Is Kaggle a good use of time for a generalist?", "a": "For weeks 1-12, yes — Kaggle tabular competitions teach feature engineering and evaluation discipline better than most courses. After that, diminishing returns. Shift to deploying personal projects that employers can actually click."},
+      {"q": "What if I skip classical ML and start with LLMs?", "a": "You will plateau within four months. Classical ML teaches the concepts that make LLM work legible — overfitting, regularisation, evaluation, baselines. LLM-first learners routinely fail debugging questions about why a model is wrong."},
+      {"q": "How do I know I have actually cleared Intermediate?", "a": "Three markers: (1) you can build a solution to a problem you have never seen a tutorial for, (2) you can read any blog post in the category without needing to pause for definitions, (3) you can explain the trade-offs of your choice to a non-technical stakeholder in two sentences."},
+      {"q": "Do I need a GPU?", "a": "Not at first. For weeks 1-14, Colab Free or Kaggle Notebooks is enough. For weeks 15-24, rent by the hour on Lambda / Vast / RunPod (~$0.30-$2/hr for a useful GPU). Owning a GPU is a hobby, not a requirement."}
+    ]
+  },
+  "tools": {
+    "intro": "This inventory covers the tools a 2026 AI generalist will touch in their first year. It is deliberately conservative — a dozen stable, widely-used tools beats fifty trend-chasing picks. Every item here is free to get started with (open source or a usable free tier). Hours-to-learn estimates are the time until you can solve a novel problem with the tool unaided; reaching mastery takes 3-5x that.",
+    "categories": [
+      {
+        "name": "Languages + core runtime",
+        "blurb": "The default working environment for every AI generalist in 2026. Skip exotic languages during the learning phase — the cognitive load of tool-switching compounds.",
+        "items": [
+          {"tool": "Python 3.11+", "purpose": "Primary language for every AI / ML / data task", "hours_to_learn": 40, "url": "https://docs.python.org/3/"},
+          {"tool": "uv (or pip + venv)", "purpose": "Package + virtual-env management; uv is 10-100x faster than pip", "hours_to_learn": 2, "url": "https://github.com/astral-sh/uv"},
+          {"tool": "ruff", "purpose": "Fast linter + formatter; replaces flake8 / black / isort", "hours_to_learn": 1, "url": "https://github.com/astral-sh/ruff"},
+          {"tool": "pytest", "purpose": "Test runner; the de-facto standard in Python", "hours_to_learn": 6, "url": "https://docs.pytest.org/"},
+          {"tool": "Jupyter Lab", "purpose": "Interactive notebooks for exploration + prototyping", "hours_to_learn": 3, "url": "https://jupyter.org/"}
+        ]
+      },
+      {
+        "name": "Data + classical ML",
+        "blurb": "Decade-stable stack; the libraries here have not had a breaking API change in years and will still be around in 2030. Invest deeply.",
+        "items": [
+          {"tool": "NumPy", "purpose": "N-dimensional arrays; the foundation of everything numerical", "hours_to_learn": 10, "url": "https://numpy.org/doc/"},
+          {"tool": "pandas", "purpose": "Tabular data manipulation — the 'Excel of Python'", "hours_to_learn": 15, "url": "https://pandas.pydata.org/docs/"},
+          {"tool": "scikit-learn", "purpose": "Classical ML algorithms + pipelines", "hours_to_learn": 25, "url": "https://scikit-learn.org/stable/"},
+          {"tool": "matplotlib + seaborn", "purpose": "Static charting; matplotlib for precision, seaborn for speed", "hours_to_learn": 8, "url": "https://matplotlib.org/"},
+          {"tool": "XGBoost or LightGBM", "purpose": "Gradient-boosted trees; the winning tabular algorithm", "hours_to_learn": 6, "url": "https://xgboost.readthedocs.io/"},
+          {"tool": "DuckDB", "purpose": "Fast columnar analytics — SQL on CSVs and parquet in one binary", "hours_to_learn": 4, "url": "https://duckdb.org/"}
+        ]
+      },
+      {
+        "name": "Deep learning",
+        "blurb": "The PyTorch ecosystem owns ~95% of new work in 2026. Add Hugging Face Transformers the moment you need pretrained models — reinventing them is a learning exercise, not a job skill.",
+        "items": [
+          {"tool": "PyTorch", "purpose": "Tensor + autograd + neural-net primitives", "hours_to_learn": 30, "url": "https://pytorch.org/docs/stable/"},
+          {"tool": "Hugging Face Transformers", "purpose": "Pretrained model zoo with a unified API", "hours_to_learn": 10, "url": "https://huggingface.co/docs/transformers"},
+          {"tool": "Hugging Face Datasets", "purpose": "Streamed, version-pinned datasets — no more copy-paste CSVs", "hours_to_learn": 3, "url": "https://huggingface.co/docs/datasets"},
+          {"tool": "Weights & Biases (free tier)", "purpose": "Experiment tracking; run logs without standing up MLflow yourself", "hours_to_learn": 4, "url": "https://wandb.ai/"},
+          {"tool": "PyTorch Lightning or Accelerate", "purpose": "Loop boilerplate reduction once you move past hand-written training loops", "hours_to_learn": 6, "url": "https://lightning.ai/"}
+        ]
+      },
+      {
+        "name": "LLM + RAG stack",
+        "blurb": "Fast-moving category. Prefer APIs with stable contracts (OpenAI, Anthropic, Google AI) while learning; local models (Ollama, llama.cpp) come in when cost or privacy drive the choice.",
+        "items": [
+          {"tool": "OpenAI API", "purpose": "Production-grade LLM access — GPT-4/5 class models", "hours_to_learn": 3, "url": "https://platform.openai.com/docs"},
+          {"tool": "Anthropic API", "purpose": "Claude models with a 1M-token context window", "hours_to_learn": 3, "url": "https://docs.anthropic.com/"},
+          {"tool": "Google Gemini API (free tier)", "purpose": "Cost-controlled entry point; 1500 req/day free for learning", "hours_to_learn": 2, "url": "https://ai.google.dev/"},
+          {"tool": "LiteLLM", "purpose": "Provider-agnostic wrapper — swap models without rewriting prompts", "hours_to_learn": 3, "url": "https://docs.litellm.ai/"},
+          {"tool": "pgvector on Postgres", "purpose": "Vector search inside your existing DB — the boring-is-good RAG backbone", "hours_to_learn": 5, "url": "https://github.com/pgvector/pgvector"},
+          {"tool": "sentence-transformers", "purpose": "Local embedding models — avoid paying per embedding when the corpus is small", "hours_to_learn": 3, "url": "https://www.sbert.net/"},
+          {"tool": "Ollama", "purpose": "Run open models (Llama, Mistral, Qwen) on your laptop for private experiments", "hours_to_learn": 2, "url": "https://ollama.com/"}
+        ]
+      },
+      {
+        "name": "Backend + deployment",
+        "blurb": "The shortest path from notebook to internet. Every tool below is free, open source, and runs comfortably on a $5 VPS.",
+        "items": [
+          {"tool": "FastAPI", "purpose": "Async Python web framework with automatic OpenAPI + Pydantic validation", "hours_to_learn": 12, "url": "https://fastapi.tiangolo.com/"},
+          {"tool": "uvicorn / hypercorn", "purpose": "ASGI server to run FastAPI in production", "hours_to_learn": 1, "url": "https://www.uvicorn.org/"},
+          {"tool": "Docker + Docker Compose", "purpose": "Containerisation + local multi-service stacks", "hours_to_learn": 15, "url": "https://docs.docker.com/"},
+          {"tool": "Caddy or nginx", "purpose": "Reverse proxy with automatic HTTPS (Caddy) or full control (nginx)", "hours_to_learn": 5, "url": "https://caddyserver.com/"},
+          {"tool": "SQLite + alembic", "purpose": "Zero-ops DB + migrations; excellent for < 10k req/min workloads", "hours_to_learn": 6, "url": "https://www.sqlite.org/"},
+          {"tool": "httpx", "purpose": "Async HTTP client; never use `requests` in async code", "hours_to_learn": 2, "url": "https://www.python-httpx.org/"}
+        ]
+      },
+      {
+        "name": "Dev + collaboration",
+        "blurb": "Non-negotiable ergonomics. Every tool here returns 50-100x its learning time in reduced friction over a career.",
+        "items": [
+          {"tool": "Git + GitHub", "purpose": "Version control + public portfolio substrate", "hours_to_learn": 20, "url": "https://docs.github.com/"},
+          {"tool": "VS Code", "purpose": "Editor with first-class Python + Jupyter integration", "hours_to_learn": 3, "url": "https://code.visualstudio.com/"},
+          {"tool": "GitHub Copilot (free tier)", "purpose": "Inline AI assist; useful once you can read the suggestions critically", "hours_to_learn": 1, "url": "https://github.com/features/copilot"},
+          {"tool": "Claude or ChatGPT Pro", "purpose": "Primary rubber-duck debugger + code explainer", "hours_to_learn": 0, "url": "https://claude.ai/"}
+        ]
+      }
+    ],
+    "install_path": [
+      "Install Python 3.11+ via pyenv (macOS/Linux) or the python.org installer (Windows). Verify with `python --version`.",
+      "Install uv. One binary, replaces pip/venv/pyenv-virtualenv workflows: `curl -LsSf https://astral.sh/uv/install.sh | sh`.",
+      "Initialise a project: `uv init my-first-ai-project && cd my-first-ai-project && uv add numpy pandas scikit-learn jupyterlab`.",
+      "Install VS Code + the Python + Jupyter extensions. Open the project folder.",
+      "Install Docker Desktop (macOS/Windows) or engine + compose (Linux). Run `docker run hello-world` to confirm.",
+      "Create a GitHub account. Configure SSH keys. Push your first repo.",
+      "Sign up for Gemini (free tier), OpenAI (pay-as-you-go), and Anthropic. Store keys in a `.env` file never committed to git.",
+      "Install Ollama. Pull one small model (`ollama pull llama3.2:3b`) so you can iterate offline."
+    ],
+    "faqs": [
+      {"q": "Is uv strictly better than pip?", "a": "For new projects, yes. It is 10-100x faster, resolves lockfiles deterministically, and handles Python installs. The only reason to stay on pip is an existing codebase whose tooling contract would churn."},
+      {"q": "Which LLM API should I start with?", "a": "Gemini's free tier is the fastest 'spend zero dollars to learn' entry. Once you are past toy prompts, run the same workload against OpenAI and Anthropic — knowing each provider's idiosyncrasies is itself a job skill."},
+      {"q": "Should I use LangChain?", "a": "Build one RAG system without LangChain first, then decide. Its abstractions are useful once you understand what they are wrapping; applied cold, they tend to hide the system behavior a junior most needs to see."},
+      {"q": "Do I need Kubernetes?", "a": "Not for the first two years. Docker Compose on a VPS handles every side project and most small-team production workloads. Learn Kubernetes when a real job requires it — the abstractions only make sense once you have felt their problems."},
+      {"q": "What IDE if not VS Code?", "a": "PyCharm Professional remains excellent for Python-heavy, refactor-heavy work. Cursor / Zed / Neovim all have serious user bases. Any of them is fine — the 'best IDE' debate ends once you stop switching."},
+      {"q": "How much does this stack cost per month?", "a": "Running locally: $0 beyond an occasional GPU rental ($1-10/mo while learning). Public-internet deploy on a $5-10 VPS + $5-20 in LLM API costs covers almost all portfolio projects. Total under $40/mo for a committed learner."},
+      {"q": "When do I add Hugging Face Spaces or Gradio?", "a": "Add Gradio the first time you need a quick demo UI — weeks 10-12. Hugging Face Spaces is a zero-ops deploy target for Gradio apps; treat it as a portfolio accelerator, not a replacement for learning Docker."}
+    ]
+  },
+  "projects": {
+    "intro": "These projects are ordered by dependency — each earlier one teaches a skill the later ones assume. Pick any ten to ship; the fifteenth on this list, not your first, is what gets the screening recruiter's attention. Every project below has been designed to be deployable on a $5 VPS; salary-positive portfolios are built of live URLs, not notebooks.",
+    "projects": [
+      {
+        "title": "Exploratory data analysis + prediction on a public dataset",
+        "difficulty": "Beginner",
+        "hours": "20-30",
+        "description": "Pick a Kaggle dataset (titanic, housing, bike-sharing) you find interesting. Produce a clean notebook covering: data dictionary, missingness audit, target distribution, univariate + bivariate analysis, baseline (mean predictor), three models with cross-validated metrics, feature-importance discussion, and a one-paragraph 'what I'd do next.' This is the universal first-project of the field — and the #1 place juniors reveal an absence of discipline.",
+        "tech_stack": ["Python", "pandas", "matplotlib / seaborn", "scikit-learn", "Jupyter"],
+        "rubric": [
+          "Notebook runs end-to-end from a freshly-cloned repo (reproducibility is not optional)",
+          "Baseline predictor comparison present (the #1 omission in beginner work)",
+          "Train/val/test split with no leakage, documented explicitly",
+          "README with dataset source, installation, and how to re-run",
+          "Commit history tells a story — incremental, not 'initial commit' dumps"
+        ]
+      },
+      {
+        "title": "Tabular classifier behind a FastAPI endpoint",
+        "difficulty": "Beginner",
+        "hours": "25-35",
+        "description": "Take the winner from project 1, serialise it (joblib / pickle), and expose it at `POST /predict`. Add Pydantic input validation, a health endpoint, Dockerfile, and docker-compose.yml. Deploy to a VPS. The project that converts notebook-code skills into production-service skills.",
+        "tech_stack": ["FastAPI", "Pydantic", "joblib", "Docker", "docker-compose"],
+        "rubric": [
+          "Pydantic model validates input shape + types + ranges",
+          "Dockerfile multi-stage; final image < 500 MB",
+          "Live public URL the reviewer can curl against",
+          "Structured JSON logging of request + inference time",
+          "README records the VPS IP, the deploy command, and how rollback works"
+        ]
+      },
+      {
+        "title": "Image classifier fine-tuned from a pretrained CNN",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Pick a non-obvious image domain — plant diseases, bird species, sketch categories. Fine-tune resnet50 or efficientnet. Track experiments in W&B. Produce a confusion-matrix analysis and a Grad-CAM interpretability section. Deploy behind FastAPI with a simple Gradio UI.",
+        "tech_stack": ["PyTorch", "torchvision", "Hugging Face Datasets", "W&B", "Gradio"],
+        "rubric": [
+          "Data augmentation strategy documented with before/after validation curves",
+          "Grad-CAM or SHAP interpretability section on 5+ misclassified examples",
+          "Learning-rate schedule justified (constant vs cosine vs step)",
+          "W&B report URL in the README",
+          "Gradio demo live; user can upload an image and see the top-3 predictions"
+        ]
+      },
+      {
+        "title": "Text classifier with a Transformer",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Fine-tune DistilBERT or ModernBERT on a text classification task — toxicity, sentiment on an underserved language, intent classification from chat logs. Benchmark against a TF-IDF + logistic regression baseline; show where the transformer wins and where it does not.",
+        "tech_stack": ["Hugging Face Transformers", "Datasets", "scikit-learn (baseline)", "W&B"],
+        "rubric": [
+          "Baseline comparison present with honest accounting (sometimes the baseline wins)",
+          "Tokenisation pitfalls documented (truncation, max length, padding)",
+          "Confusion matrix + per-class F1 table",
+          "Inference latency measured at batch sizes 1, 8, 32",
+          "Failure-mode analysis — 10 real mistakes discussed in prose"
+        ]
+      },
+      {
+        "title": "RAG Q&A system over a personal document corpus",
+        "difficulty": "Intermediate",
+        "hours": "40-55",
+        "description": "Build a retrieval-augmented Q&A system over 50+ documents you actually care about (your university syllabi, your saved articles, a public-domain book corpus). Use pgvector on Postgres. Chunk, embed, retrieve, re-rank, answer. Add a Gradio UI and an evaluation set of 30 questions scored by an LLM judge.",
+        "tech_stack": ["FastAPI", "pgvector", "sentence-transformers", "OpenAI or Gemini API", "Gradio"],
+        "rubric": [
+          "Chunk strategy explained (size, overlap, structure-aware splits)",
+          "30-question eval set with LLM-judge scoring + human spot-check of 5",
+          "Hybrid search (BM25 + dense) implemented or justifiably skipped",
+          "Streaming response in the UI (no 'Loading...' for 30 seconds)",
+          "Prompt injection defense layer — at least input allowlisting"
+        ]
+      },
+      {
+        "title": "Time-series forecasting of a domain you understand",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Forecast something you can sanity-check yourself — your local weather, a stock price you follow, energy demand for your city. Compare classical (ARIMA, Prophet) vs gradient-boosted (XGBoost with lag features) vs neural (N-BEATS, Temporal Fusion Transformer). Proper time-series cross-validation. Walk-forward evaluation on the last 90 days.",
+        "tech_stack": ["pandas", "statsmodels", "XGBoost", "Prophet or Darts library"],
+        "rubric": [
+          "Time-series train/val/test split (never random) — the leakage checkpoint",
+          "Feature engineering beyond raw lags — rolling stats, calendar, holidays",
+          "MAPE + MAE reported, not just one metric",
+          "Walk-forward evaluation with 90-day horizon",
+          "Discussion of failure windows — where each model breaks"
+        ]
+      },
+      {
+        "title": "Recommendation system for a niche taste graph",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Movies / books / music / recipes — pick one and build a recommender. Implement content-based, collaborative filtering, and a hybrid. Evaluate with precision@k, recall@k, and NDCG. Bonus points: cold-start strategy for new users.",
+        "tech_stack": ["pandas", "Surprise or implicit library", "sentence-transformers (for content)"],
+        "rubric": [
+          "Three algorithm families implemented + compared honestly",
+          "Precision@k, recall@k, NDCG@10 reported",
+          "Cold-start strategy written up — even if it's just 'popularity fallback'",
+          "Offline A/B of two recommenders with real evaluation set",
+          "Live demo where you can click 'I like X' and get updated recommendations"
+        ]
+      },
+      {
+        "title": "LLM function-calling agent with a narrow job",
+        "difficulty": "Advanced",
+        "hours": "40-60",
+        "description": "Build an agent that does one thing well — books calendar slots, drafts shell commands, summarises your pull requests. Expose 3-5 tools via the provider's function-calling API. Add a safety layer: dry-run before destructive operations, confirmation prompts, output bounds. Resist the urge to make it do ten things.",
+        "tech_stack": ["OpenAI or Anthropic function-calling", "FastAPI", "a domain-specific API (Google Calendar / GitHub / etc.)"],
+        "rubric": [
+          "Task scope explicitly narrowed — README has an 'out of scope' section",
+          "Dry-run flag for every destructive tool",
+          "Tool-call log persisted + inspectable (the #1 debugging surface)",
+          "Prompt + tool-schema live in their own files — not inlined in the Python",
+          "Failure modes documented — where the agent loops, hallucinates, or gives up"
+        ]
+      },
+      {
+        "title": "Anomaly detection on real production-like data",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Use a server-log dataset, credit-card fraud set, or an industrial IoT dataset. Implement isolation forest, one-class SVM, and an autoencoder-based anomaly scorer. Address the heavy class imbalance honestly — oversampling, undersampling, class weights, or cost-sensitive learning.",
+        "tech_stack": ["scikit-learn", "PyTorch (for autoencoder)", "imbalanced-learn"],
+        "rubric": [
+          "Class-imbalance strategy chosen + justified",
+          "Precision-recall curve present (ROC alone is misleading under imbalance)",
+          "Cost-sensitive evaluation (false-negatives weighted realistically)",
+          "Comparison of three algorithms with honest trade-off discussion",
+          "Live inference endpoint streaming results for a sample of incoming events"
+        ]
+      },
+      {
+        "title": "End-to-end Kaggle-style submission, public writeup",
+        "difficulty": "Advanced",
+        "hours": "50-80",
+        "description": "Pick an active Kaggle competition or a Hugging Face leaderboard task. Do the full cycle — EDA, baseline, iteration, ensembling, submission. Publish your approach as a Kaggle kernel or blog post. Top-50% finish is a respectable outcome; top-10% is a strong hiring signal. The public writeup is often as valuable as the rank.",
+        "tech_stack": ["whatever the competition rewards — typically PyTorch, XGBoost, or both"],
+        "rubric": [
+          "Final rank documented honestly, including what did not work",
+          "Reproducibility — a competition-winner's notebook runs in under 30 min",
+          "Ensemble strategy explained beyond 'I averaged three models'",
+          "Writeup published on Kaggle Discussions or a blog, minimum 1500 words",
+          "The README links the rank + writeup + notebook"
+        ]
+      },
+      {
+        "title": "Public-data dashboard with LLM-generated insights",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Take a public API (OpenWeather, Github Stars, a government open-data portal) and build a live dashboard that refreshes hourly. Surface a one-paragraph LLM-generated narrative of what changed. This project demonstrates three skills at once: ETL, visualisation, and LLM prompt engineering for structured output.",
+        "tech_stack": ["FastAPI", "apscheduler or cron", "plotly dash or streamlit", "Gemini / OpenAI API"],
+        "rubric": [
+          "Scheduled refresh documented — lives past your attention",
+          "LLM prompt is cached on inputs so you don't burn API cost per page load",
+          "Structured-output validation — the LLM's response gets Pydantic-parsed before display",
+          "Failure mode: what shows when the API is down or the LLM errors?",
+          "Deployed to a VPS or Railway / Fly, not just running locally"
+        ]
+      },
+      {
+        "title": "Re-implementation of a canonical paper in ≤ 500 lines",
+        "difficulty": "Advanced",
+        "hours": "40-60",
+        "description": "Pick a paper you care about — 'Attention Is All You Need', 'BERT', 'CLIP', 'Denoising Diffusion Probabilistic Models', 'Mamba'. Re-implement its core algorithm from scratch in PyTorch in under 500 lines. Train on a toy dataset. Publish a blog post explaining every non-obvious decision. This project cuts your claimed 'I know transformers' from vague to defensible.",
+        "tech_stack": ["PyTorch (no Hugging Face)", "einops"],
+        "rubric": [
+          "Paper citation + exact section-by-section mapping in the README",
+          "Toy-dataset training curves that clearly converge",
+          "Code reads like prose — no 4000-line files, no hidden magic",
+          "Blog post walks through the math in plain language",
+          "Comparison against the Hugging Face reference — yours should match within rounding on a small model"
+        ]
+      },
+      {
+        "title": "Open-source contribution to a library you use",
+        "difficulty": "Intermediate",
+        "hours": "10-30",
+        "description": "Pick a library in your stack — Hugging Face, FastAPI, scikit-learn, LangChain. Find a good-first-issue or reproduce a bug you have hit. Submit a PR. Survive the review. Ship it. One merged PR to a real library outranks five solo side projects for many hiring signals.",
+        "tech_stack": ["whichever library"],
+        "rubric": [
+          "PR is merged (un-merged PRs don't count until they are)",
+          "You wrote a test that fails on main and passes on your branch",
+          "You respond to reviewer feedback within 48h, professionally",
+          "Commit message follows the project's convention",
+          "README on your profile links the merged PR"
+        ]
+      },
+      {
+        "title": "Integration project: classic ML + LLM, deployed end-to-end",
+        "difficulty": "Advanced",
+        "hours": "60-90",
+        "description": "Capstone. Build something that uses classical ML as the reliable backbone and LLM as the flexible interface — example: a resume parser that uses a trained NER model for extraction and an LLM for rewriting, a triage system that routes tickets via a classifier then summarises the top five via LLM, or a pricing assistant that uses XGBoost for the number and an LLM for the explanation. Deployed, documented, evaluated. This is your graduation project.",
+        "tech_stack": ["everything above, pick the right tool per job"],
+        "rubric": [
+          "Architecture diagram in the README — one image, clear boxes",
+          "Classical + LLM roles justified per-subsystem — no 'let's throw an LLM at it all'",
+          "Cost + latency budgets documented per request",
+          "End-to-end eval set + metrics",
+          "Live URL. A recruiter should be able to use it in under 60 seconds."
+        ]
+      },
+      {
+        "title": "Teaching artifact — write-up or video tutorial",
+        "difficulty": "Beginner",
+        "hours": "10-20",
+        "description": "Teach one thing you learned in the last month, clearly, in public. A 1500-word blog post, a 10-minute YouTube video, or a well-illustrated Twitter thread. Teaching is the forcing function that turns 'I ran the tutorial' into 'I understand this.' Your teaching history is a de-facto hiring dossier.",
+        "tech_stack": ["your writing / video tool of choice"],
+        "rubric": [
+          "Draft circulated to one reviewer before publish",
+          "Opens with the problem, not the answer",
+          "Every claim is either demonstrable or cited",
+          "You answer the first wave of comments/questions — publish and disappear is a failure state",
+          "You publish at least three of these over your learning year"
+        ]
+      }
+    ],
+    "faqs": [
+      {"q": "How many of these should I actually ship?", "a": "Ten. Twelve is better. Fifteen is overkill unless your job search has stalled. Employers do not read more than five in-depth — so pick your best three to feature and list the rest."},
+      {"q": "What if my project isn't novel?", "a": "That is fine. Novelty is a research signal, not a hiring signal. Execution quality and the ability to explain your choices outrank originality for 99% of jobs."},
+      {"q": "How do I pick a dataset that won't be a Kaggle cliche?", "a": "Use a domain you already care about — local government data, your own fitness metrics, a hobby-specific dataset. Interviewer engagement spikes the moment you can explain the data in plain language because you actually know it."},
+      {"q": "Is Kaggle rank meaningful to employers?", "a": "A top-10% finish on a named competition is a real signal, especially for early-career roles. Kaggle grandmaster is a hard hiring signal. Below top-50%, it's a participation credit — still worth doing, not a résumé line."},
+      {"q": "How do I handle compute cost?", "a": "Weeks 1-14 on Colab Free / Kaggle Notebooks. Week 15+ rent by the hour. Most projects on this list complete in under $20 of GPU time. Set spending alerts on every provider you use."},
+      {"q": "Should I open-source everything?", "a": "Yes, with one exception — scrape-based projects where the source site's ToS is ambiguous. For those, release the code but not the dataset."},
+      {"q": "How many of these should go on my resume?", "a": "Three, featured with a one-line tagline, a tech stack line, and a live-URL link. The rest live on your GitHub profile and portfolio site."}
+    ]
+  },
+  "certifications": {
+    "intro": "A 2026 reality check: no certification is a substitute for shipped work, and no hiring manager is fooled by a wall of Coursera badges with no GitHub. That said, the free certifications below carry real employer signal — they demonstrate you know how to finish a long-form, assessed curriculum, and several test applied skills the interview panel will otherwise poke at. The list is deliberately restricted to free-to-audit or fully-free programs; the platform policy (per docs/PRD.md) is that every cert we recommend must be zero-cost to complete.",
+    "items": [
+      {
+        "name": "Machine Learning Specialization",
+        "provider": "DeepLearning.AI + Stanford (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/machine-learning-introduction",
+        "employer_signal": "Strong. Andrew Ng's name is the most recognised in the field. 'Took the ML Specialisation' clears the 'does this person know the basics?' question in under five seconds for 90% of screeners.",
+        "best_for": "Absolute beginners who want a gentle, mathematically-rigorous on-ramp to classical ML + early deep learning."
+      },
+      {
+        "name": "Deep Learning Specialization",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 80,
+        "url": "https://www.coursera.org/specializations/deep-learning",
+        "employer_signal": "Strong for generalists transitioning from classical ML into neural networks. Still holds up well in 2026 for the fundamentals even as the frontier moved past the specific architectures covered.",
+        "best_for": "Learners who finished the ML specialisation and want structured coverage of CNNs, RNNs, and transformer-predecessor architectures."
+      },
+      {
+        "name": "Generative AI with Large Language Models",
+        "provider": "DeepLearning.AI + AWS (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 16,
+        "url": "https://www.coursera.org/learn/generative-ai-with-llms",
+        "employer_signal": "Moderate-to-strong. The most up-to-date free LLM curriculum from a named provider in 2026. Signals you understand the full training-to-deployment lifecycle, not just prompting.",
+        "best_for": "Engineers who have built basic LLM integrations and want systematic coverage of fine-tuning, RLHF, and deployment."
+      },
+      {
+        "name": "fast.ai — Practical Deep Learning for Coders",
+        "provider": "fast.ai (fully free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 50,
+        "url": "https://course.fast.ai/",
+        "employer_signal": "Strong with the 'shipped something' crowd. Jeremy Howard's course is the most respected top-down deep-learning on-ramp — 'I did the fast.ai course' is widely recognised as code for 'I can actually build things.'",
+        "best_for": "Learners who want to train a production-quality model in week one and backfill the theory later. The opposite pedagogical style to Andrew Ng — pick the one that matches how you learn."
+      },
+      {
+        "name": "Google Machine Learning Crash Course",
+        "provider": "Google (free, browser-based)",
+        "cost_usd": 0,
+        "prep_hours": 15,
+        "url": "https://developers.google.com/machine-learning/crash-course",
+        "employer_signal": "Light. Commonly listed on resumes; rarely a differentiator. Useful as a weekend refresher or a first-touch introduction before committing to a longer course.",
+        "best_for": "Existing software engineers wanting a one-weekend 'what is ML' sweep before deciding whether to invest deeper."
+      },
+      {
+        "name": "Hugging Face NLP Course",
+        "provider": "Hugging Face (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 25,
+        "url": "https://huggingface.co/learn/nlp-course",
+        "employer_signal": "Strong for NLP-leaning roles. Hands-on coverage of the Transformers + Datasets + Tokenizers libraries — the de-facto production stack.",
+        "best_for": "Generalists leaning toward LLM-application work; this course's hands-on sections are the shortest path to productive transformer work."
+      },
+      {
+        "name": "Kaggle Learn micro-courses",
+        "provider": "Kaggle (free)",
+        "cost_usd": 0,
+        "prep_hours": 30,
+        "url": "https://www.kaggle.com/learn",
+        "employer_signal": "Light — the individual courses are weekend-length — but the Kaggle profile + competition record they unlock is a strong, differentiating signal.",
+        "best_for": "Fast, narrow skill acquisition (e.g., 'intro to pandas', 'feature engineering', 'data visualisation'). Stack them with actual competition participation."
+      },
+      {
+        "name": "MIT OpenCourseWare — Introduction to Deep Learning (6.S191)",
+        "provider": "MIT (free, publicly posted lectures)",
+        "cost_usd": 0,
+        "prep_hours": 40,
+        "url": "https://introtodeeplearning.com/",
+        "employer_signal": "Moderate as a line item; strong as context. MIT's brand adds weight, and the weekly lab assignments are non-trivial. More useful as signal that you engage with university-level material than as a standalone credential.",
+        "best_for": "Learners who want the rigorous-but-still-applied MIT pedagogy — more mathematical than fast.ai, more recent than Ng's original course."
+      },
+      {
+        "name": "DeepLearning.AI — MLOps Specialization",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/machine-learning-engineering-for-production-mlops",
+        "employer_signal": "Moderate-to-strong. Covers the unglamorous but highly-paid deployment + monitoring surface most beginners skip. Signals you care about the production side, not just the modelling side.",
+        "best_for": "Generalists who have trained models and want the deployment vocabulary — data drift, serving, monitoring, CI/CD for models."
+      },
+      {
+        "name": "Elements of AI",
+        "provider": "University of Helsinki + MinnaLearn (free)",
+        "cost_usd": 0,
+        "prep_hours": 30,
+        "url": "https://www.elementsofai.com/",
+        "employer_signal": "Light — explicitly non-technical — but the 'Building AI' follow-on does have practical content and the University of Helsinki name provides institutional credibility.",
+        "best_for": "Learners who want to anchor technical work in a strong, non-hype-y understanding of what AI is and is not. Useful for interviews that probe your ethical / societal framing."
+      }
+    ],
+    "employer_data": "Based on 90-day aggregate data from the AutomateEdge jobs pipeline, certifications appear as explicit requirements in under 3% of AI generalist roles — which is to say, they are almost never a hard gate. They function as tie-breakers. What shows up instead, in 70%+ of postings: a GitHub with three or more non-trivial projects, a bachelor's in a STEM field (or demonstrable equivalent), and conversational familiarity with the specific tools the team uses. The practical implication: treat every cert as worth completing if it teaches you something, worth nothing if it does not.",
+    "faqs": [
+      {"q": "Which one cert should I do first?", "a": "If you have no ML background, Andrew Ng's Machine Learning Specialization. If you are a software engineer who already ships, fast.ai Practical Deep Learning for Coders. Those two cover the widest ground for their audience."},
+      {"q": "Should I pay for the verified certificate?", "a": "Usually not. The audit-free version gives you the material; the paid version adds a sharable PDF. Save the money for GPU time or a book. Exception: if an employer reimburses it, take it."},
+      {"q": "Are AWS / GCP / Azure ML certifications worth it?", "a": "For generalists, no. Those certifications are valuable for cloud-specialist roles, not AI/ML-generalist roles. Revisit them if you end up in an ops-heavy job."},
+      {"q": "What about the Anthropic / OpenAI prompt-engineering certificates?", "a": "Light signal only — they are 2-hour courses. Good first-touch material, not resume-worthy on their own."},
+      {"q": "Will certifications help me get past the résumé screener?", "a": "Marginally. Keyword-matching screeners will notice 'Machine Learning Specialization' — write the full cert name, not just the provider. But a GitHub link with live projects dominates keyword signal every time."},
+      {"q": "How many certs is 'too many'?", "a": "Three featured on your résumé, maximum. Any more reads as cert-collecting, which signals anxious-beginner to experienced reviewers. The rest belong on LinkedIn."},
+      {"q": "Can I skip certifications entirely?", "a": "Yes, if your GitHub is strong and you can speak fluently about the material in interviews. Many senior AI engineers today hold zero formal ML certifications. The work speaks."}
+    ]
+  },
+  "salary": {
+    "intro": "The salary ranges below are US market aggregates for AI Generalist and adjacent titles in 2026 Q1. They cover people with 0-10 years of experience and a generalist skill set (no deep specialisation in LLMs, computer vision, or RL). Regional multipliers are applied to the US base and should be interpreted as rough guides — specific-company comp packages vary widely. Hiring velocity + top-company data comes from the AutomateEdge jobs pipeline, refreshed quarterly.",
+    "update_date": "2026-04-24",
+    "bands_us": [
+      {"level": "Entry (L2/L3, 0-2 yrs)", "base_low": 110000, "base_high": 150000, "total_comp_low": 130000, "total_comp_high": 210000, "notes": "Most entry roles at brand-name companies require a BS in a quantitative field or a strong portfolio-plus-bootcamp equivalent."},
+      {"level": "Mid (L4, 2-5 yrs)", "base_low": 145000, "base_high": 195000, "total_comp_low": 190000, "total_comp_high": 320000, "notes": "The largest band by population. Most 'AI/ML engineer' titles in industry are L4-equivalent."},
+      {"level": "Senior (L5, 5-8 yrs)", "base_low": 185000, "base_high": 245000, "total_comp_low": 260000, "total_comp_high": 480000, "notes": "Compensation at this level is dominated by equity. Total-comp spread is wide because equity grants vary 5-10x across companies."},
+      {"level": "Staff (L6, 8-12 yrs)", "base_low": 225000, "base_high": 310000, "total_comp_low": 380000, "total_comp_high": 700000, "notes": "Transition from IC path into technical-leadership scope. Pay at hyperscalers is top-decile at this level."},
+      {"level": "Principal (L7+, 10+ yrs)", "base_low": 280000, "base_high": 400000, "total_comp_low": 550000, "total_comp_high": 1200000, "notes": "Rare role. Frontier labs + FAANG only. Comp routinely clears $1M at this tier for top performers."}
+    ],
+    "bands_regions": [
+      {"region": "SF Bay Area", "multiplier": 1.15, "note": "The reference market. Everything compounds here — base, equity, and living cost."},
+      {"region": "NYC / Seattle / Boston", "multiplier": 1.08, "note": "Near-peer to SF for base; equity tends 10-20% lower outside of pure-play AI companies."},
+      {"region": "Other major US metros (Austin, Chicago, Denver, Raleigh)", "multiplier": 0.95, "note": "Most roles adjust only moderately; remote policies have compressed the gap to ~5% below SF over the last two years."},
+      {"region": "Fully remote US", "multiplier": 0.92, "note": "Remote-band convergence has largely stabilised at this level for generalist roles. Specialist roles command less of a discount."},
+      {"region": "Toronto / Montreal (CAD)", "multiplier": 0.65, "note": "CAD comp runs materially below US at junior-mid levels; senior-plus closes to ~75% of US equivalent once equity is included."},
+      {"region": "Western Europe (EUR)", "multiplier": 0.55, "note": "Strong discount vs US at all levels. Top Amsterdam / London AI labs are exceptions and pay near US senior rates."},
+      {"region": "India (INR)", "multiplier": null, "note": "Separate market. Entry: ₹8-18 LPA. Mid: ₹20-45 LPA. Senior at top-tier product companies + GCCs: ₹50-110 LPA. Top-of-market (frontier lab India offices, senior staff): ₹150+ LPA."},
+      {"region": "Southeast Asia (SGD / MYR)", "multiplier": null, "note": "Singapore: entry S$60-90k, mid S$100-150k, senior S$160-280k. Other SEA markets run materially below Singapore."}
+    ],
+    "velocity": {
+      "jobs_last_90d_us": "The AutomateEdge pipeline tracked ~2,400 US-based roles tagged AI Generalist / AI Engineer / ML Engineer over the trailing 90 days — up 14% year-over-year. The hiring recovery that began in mid-2024 has stabilised at materially above pre-2023 levels.",
+      "avg_days_to_fill": "Median time-to-fill for entry-level generalist roles sits at 38 days; senior roles run 62 days. Recruiter urgency picks up noticeably in Q1 and drops in Q4.",
+      "top_hiring_companies": [
+        "Google (search, cloud, core ML infra)",
+        "Meta (ranking, Llama team, reality-labs ML)",
+        "Amazon + AWS (Bedrock, retail ranking, Alexa)",
+        "Microsoft + OpenAI partnership roles",
+        "Apple (on-device ML, Siri, health)",
+        "Nvidia (applied-research + customer-ML engineering)",
+        "Palantir / Databricks / Snowflake (enterprise ML platforms)",
+        "Well-funded AI-native startups (Anthropic, Cohere, Perplexity, Hugging Face, Mistral)"
+      ],
+      "trending_skills": [
+        "LLM evaluation / eval-set engineering (up 180% YoY)",
+        "RAG system operation (up 120% YoY)",
+        "Agent orchestration + tool-use (up 90% YoY)",
+        "Responsible-AI + red-teaming (up 70% YoY)",
+        "Fine-tuning + LoRA (up 45% YoY)",
+        "GPU infrastructure + inference-optimization (up 40% YoY)"
+      ]
+    },
+    "negotiation_tips": [
+      "Collect three offers before negotiating. Two is a data point; three is leverage.",
+      "Ask total-comp, not base-salary. Equity and sign-on are where the real variance lives.",
+      "Don't negotiate against yourself. If asked for expectations, deflect to market data or a target range; make them name a number first.",
+      "Counter on the entire package — base + equity + sign-on + relocation + start date. Most of those are separate budget lines; moving one doesn't touch the others.",
+      "Get everything in writing. A verbal 'we'll make that work' is worth nothing once the offer letter lands.",
+      "Know your BATNA — what happens if you walk away? If the answer is 'nothing catastrophic,' you have enormous leverage most juniors never realise they have.",
+      "Sign-on bonuses are the cleanest ask — they cost the company once, don't compound, and HR has more room to move on them than on base."
+    ],
+    "sources": [
+      {"name": "levels.fyi — AI/ML Engineer distributions", "url": "https://www.levels.fyi/t/software-engineer/focus/ml-ai"},
+      {"name": "Glassdoor — Machine Learning Engineer salaries", "url": "https://www.glassdoor.com/Salaries/machine-learning-engineer-salary-SRCH_KO0,25.htm"},
+      {"name": "US BLS — Computer + Information Research Scientists", "url": "https://www.bls.gov/ooh/computer-and-information-technology/computer-and-information-research-scientists.htm"},
+      {"name": "LinkedIn Economic Graph — Jobs on the Rise", "url": "https://economicgraph.linkedin.com/"},
+      {"name": "AutomateEdge jobs pipeline (internal aggregation)", "url": "https://automateedge.cloud/jobs"}
+    ],
+    "faqs": [
+      {"q": "How fast does pay grow in the first five years?", "a": "Entry to mid roughly doubles TC for strong performers (110k → 220k range). Mid to senior adds another 40-60%. Gains plateau after senior unless you move to a frontier lab or hop jobs."},
+      {"q": "Does remote work still cost you money?", "a": "A modest discount persists — roughly 5-10% below co-located pay for equivalent roles. The gap was 20%+ in 2022 and has compressed steadily. Expect continued convergence."},
+      {"q": "How much of the pay is equity at senior levels?", "a": "At public hyperscalers, 40-60% of total comp at L5+ is equity. At private AI-native companies, it's often 60-80%, and the valuation risk is real. Discount private equity by 30-50% when comparing offers."},
+      {"q": "Do AI generalists get paid less than specialists?", "a": "At entry/mid, no — the pay bands overlap almost completely. At senior+, deep specialists (foundation-model training, GPU kernels, applied research) command 20-40% premiums. Generalist scales via breadth and leadership instead."},
+      {"q": "Is the AI-job boom a bubble?", "a": "Hiring velocity peaked in mid-2022, troughed in 2023, and has recovered to well above the pre-boom baseline by 2026. The shape matches a durable structural shift, not a one-time bubble — but role definitions continue to churn. Stay flexible."},
+      {"q": "Should I care about total comp or base?", "a": "Total comp, with a haircut on equity. A job with $160k base + $80k equity is not worth the same as $180k base + $60k equity — equity has volatility, vesting risk, and strike-price risk the base does not."},
+      {"q": "What's the highest-ROI skill to add if I want a raise?", "a": "In 2026, two skills move the negotiation needle most: (1) eval-engineering for LLM products — quantifying AI quality — and (2) production-grade RAG systems. Both skip most junior candidates and both appear in almost every interview loop."}
+    ]
+  },
+  "career_path": {
+    "intro": "Career ladders in AI are less standardised than in traditional software engineering — title-to-responsibility mappings vary dramatically across companies. The progression below describes common patterns you should be able to spot at most mid-to-large organisations. Expect hops, lateral moves, and non-linear steps; the stages are orientation, not rails.",
+    "stages": [
+      {
+        "year_range": "Year 0-1 — Entry (L2/L3)",
+        "title": "Associate AI Engineer / Junior ML Engineer / ML Associate",
+        "focus": "You execute well-scoped tasks under a senior's direction. Typical first-year work: implement a defined ML experiment, improve a data pipeline, build a small internal tool, debug a training-loop issue.",
+        "typical_tasks": [
+          "Implement a data-cleaning pipeline from spec",
+          "Train variants of an existing model and report metrics",
+          "Build evaluation notebooks for senior review",
+          "Write unit tests for an ML library module",
+          "On-call for a low-stakes model-serving system"
+        ],
+        "skills_gained": ["Production Python conventions", "version control at team scale", "evaluation discipline", "code review on both sides"],
+        "comp_us": "TC $130k-$210k",
+        "next_step": "Cleared Intermediate in all generalist skill categories. Shipped at least two features end-to-end. Your manager no longer spot-checks your diffs line-by-line."
+      },
+      {
+        "year_range": "Year 2-4 — Mid (L4)",
+        "title": "AI Engineer / ML Engineer II / Machine Learning Engineer",
+        "focus": "You own project-sized work start-to-finish. You spec the approach, implement, deploy, and maintain. You begin mentoring juniors. Domain expertise emerges — you specialise organically as the projects you lead require it.",
+        "typical_tasks": [
+          "Own a full ML pipeline for one business surface",
+          "Design eval harnesses; pick metrics against product goals",
+          "Run A/B tests with production traffic",
+          "Mentor one junior through their first deploy",
+          "Participate in hiring loops — screens + onsites"
+        ],
+        "skills_gained": ["Scoping + estimation", "cross-functional communication", "a depth area (NLP / ranking / time-series / LLM apps)", "on-call maturity"],
+        "comp_us": "TC $190k-$320k",
+        "next_step": "Promotion to senior or horizontal move to a tech-lead role. Your impact is legible to the manager above yours."
+      },
+      {
+        "year_range": "Year 5-7 — Senior (L5)",
+        "title": "Senior AI/ML Engineer / Tech Lead / Staff Engineer candidate",
+        "focus": "You own the architecture of one sub-system. You are the person the team routes novel problems to. You choose between build-vs-buy, influence roadmap, and your opinion on technical direction is weighted heavily.",
+        "typical_tasks": [
+          "Design a ranking / personalisation / LLM-powered system end-to-end",
+          "Write technical strategy docs that shape a quarter's work",
+          "Establish team-wide patterns (eval harness, CI, deployment)",
+          "Drive cross-team initiatives — data-platform migration, LLM-infra integration",
+          "Own the interview loop for senior hires"
+        ],
+        "skills_gained": ["Technical strategy", "ambiguity-tolerance", "org navigation", "public communication (blog posts, talks)"],
+        "comp_us": "TC $260k-$480k",
+        "next_step": "Staff path requires broader scope; manager path requires explicit people-leadership interest. Some engineers pause here permanently — it's a great local maximum."
+      },
+      {
+        "year_range": "Year 8-12 — Staff (L6)",
+        "title": "Staff Engineer / Principal Engineer (small companies) / Engineering Manager (M3)",
+        "focus": "You influence multiple teams. On the IC path, you work on the hardest problem in the org. On the management path, you are leading 8-15 engineers. The split is usually clean by the time you hit staff — occasional zigzags, but most stay on one path.",
+        "typical_tasks": [
+          "Drive architecture across team boundaries",
+          "Set multi-quarter technical strategy",
+          "Represent the team to the VP/CTO",
+          "Publish externally (arXiv, conference talks, high-signal blog)",
+          "If manager: performance management, hiring strategy, budget ownership"
+        ],
+        "skills_gained": ["Organisation design", "long-horizon thinking", "external brand", "leveraged impact through others"],
+        "comp_us": "TC $380k-$700k",
+        "next_step": "Principal / Director / VP / Co-founder. Depth of IC work or breadth of org work — rarely both after this point."
+      },
+      {
+        "year_range": "Year 12+ — Principal / Director / Founder",
+        "title": "Principal Engineer / Distinguished Engineer / Director of AI / VP / Founder",
+        "focus": "Your output is decisions and people, not code. On the IC path, you set the technical direction of an entire AI org — 50-500 people execute against your north stars. On the management path, you run a multi-hundred-person organisation. Founder paths diverge into their own world.",
+        "typical_tasks": [
+          "Define 3-5 year technical bets",
+          "Set compensation bands and hiring philosophy",
+          "Represent the company externally — press, analysts, investors",
+          "Sponsor high-risk research / product initiatives",
+          "Recruit other senior leaders"
+        ],
+        "skills_gained": ["Executive communication", "board dynamics", "talent market intelligence", "long-horizon risk tolerance"],
+        "comp_us": "TC $550k-$1.2M+",
+        "next_step": "Retirement, founding, advisory-only roles, or a different kind of second act altogether."
+      }
+    ],
+    "transitions": [
+      "Research → Applied: Many PhDs start in research labs and move to applied roles after 2-3 years. The comp is usually higher; the impact is more direct; the publication volume drops.",
+      "Applied → Research: Harder direction. Requires publications or co-authorship to be competitive. Most who make the move are at senior+ levels and have earned the lab's attention via side work.",
+      "Engineering → Product Management: A common L5-L6 pivot, especially into 'Technical PM for AI' roles. The salary penalty is small (~5-10%); the skill change is real.",
+      "Engineering → Founder: The data says most successful AI founders are ex-senior engineers, not fresh grads. Year 5-10 is the modal founding-year.",
+      "Specialist → Generalist: Rare but increasing as LLMs collapse formerly-separate disciplines. A speech-recognition specialist today can feasibly transition to general LLM applications in 12-18 months.",
+      "Industry → Academia: Uncommon post-2015. The research compute + data asymmetry between industry and academia is too large to easily reverse."
+    ],
+    "faqs": [
+      {"q": "Do I need a PhD to advance to senior?", "a": "No. The mix at L5 is roughly 40% PhD, 35% MS, 25% BS at most US tech companies in 2026. At frontier labs the PhD share is higher; at applied-AI startups it's lower."},
+      {"q": "How fast can I realistically progress?", "a": "With strong performance: L3 → L4 in 2-3 years, L4 → L5 in 2-3 more. Faster ladders exist at high-growth startups (you absorb scope growth at speed) but come with more volatility."},
+      {"q": "Is the IC path capped?", "a": "Functionally no, but the roles above L6 are rare — maybe 1% of the population. Principal+ roles require a combination of technical depth and organisational influence most people don't cultivate."},
+      {"q": "How do I choose IC vs management?", "a": "Trial the role before committing. Lead a project as an IC tech-lead first. If you find the people-management parts energising, move to manager. If you find them draining, stay IC. Both paths pay well; miserable managers are common enough to avoid becoming one."},
+      {"q": "What derails careers most often?", "a": "Staying too long at L3/L4 without owning something end-to-end (no scope story), under-communicating impact (the work exists but no one above your manager knows), and burnout from chasing titles faster than you grew the underlying skills."},
+      {"q": "How common are lateral moves?", "a": "Very. 60%+ of the L5-L6 engineers I've interviewed changed companies at least once to get there, usually for a level-bump and a significant comp correction. Staying put past 3 years at one company without a promotion is a yellow flag."},
+      {"q": "Does the manager path pay more?", "a": "At L5-L6, TC is roughly equal. At L7+, the IC path starts to outpace management on a per-head basis (fewer principals than directors) but the top of management is uncapped for the same reason CEO pay is uncapped."}
+    ]
+  }
+}

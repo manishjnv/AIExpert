@@ -1,0 +1,129 @@
+{# SEO-24: /roadmap hub — ItemList schema listing all roadmap tracks.
+
+   Context:
+     tracks — list of all track dicts (already in manifest order)
+     base   — "https://automateedge.cloud"
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Learning Roadmaps 2026 — Generalist, AI Engineer, ML Engineer, Data Scientist, MLOps — AutomateEdge</title>
+  <meta name="description" content="Every AutomateEdge AI learning track with skills, tools, projects, certs, salary, and career-path pages. Free, AI-curated, calibrated against real 2026 job-posting demand.">
+  <meta name="author" content="AutomateEdge">
+  <link rel="canonical" href="{{ base }}/roadmap">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AI Learning Roadmaps 2026 — AutomateEdge">
+  <meta property="og:description" content="5 tracks × 6 deep-dive pages each. Skills, tools, projects, certs, salary, career path — calibrated against 2026 job-posting demand.">
+  <meta property="og:url" content="{{ base }}/roadmap">
+  <meta property="og:image" content="{{ base }}/og/course/generalist.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+
+  {# SEO-24 primary: ItemList of all tracks. This is the whole point of /roadmap. #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "AutomateEdge AI Learning Tracks",
+    "description": "All AutomateEdge AI/ML learning roadmap tracks as a canonical list.",
+    "numberOfItems": {{ tracks | length }},
+    "itemListElement": [
+      {% for t in tracks %}
+      {"@type": "ListItem", "position": {{ loop.index }}, "url": {{ (base ~ "/roadmap/" ~ t.slug) | tojson }}, "name": {{ t.name | tojson }}}{{ "," if not loop.last else "" }}
+      {% endfor %}
+    ]
+  }
+  </script>
+
+  {# BreadcrumbList — Home → Roadmap #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+      {"@type": "ListItem", "position": 2, "name": "Roadmap"}
+    ]
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/nav.css">
+  <style>
+    :root { color-scheme: dark }
+    html, body { margin: 0; background: #0f1419; color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.65 }
+    main { max-width: 960px; margin: 0 auto; padding: 48px 24px 80px }
+    .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #e8a849; margin-bottom: 10px }
+    h1 { font-family: 'Fraunces', Georgia, serif; font-size: clamp(30px, 4.5vw, 44px); color: #f5f1e8; font-weight: 500; margin: 0 0 14px; letter-spacing: -0.01em }
+    p.lede { color: #c0c4cc; font-size: 16px; margin: 0 0 32px; max-width: 700px }
+    h2 { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 500; color: #f5f1e8; margin: 48px 0 14px; letter-spacing: -0.01em }
+    .track-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 18px 0 32px }
+    .track-card { background: #161c24; border: 1px solid #2a323d; border-radius: 6px; padding: 22px 24px; text-decoration: none; color: inherit; transition: border-color 0.2s }
+    .track-card:hover { border-color: #e8a849 }
+    .track-card h3 { margin: 0 0 6px; color: #e8a849; font-family: 'Fraunces', Georgia, serif; font-size: 19px; font-weight: 500 }
+    .track-card p { margin: 0 0 10px; color: #c0c4cc; font-size: 14.5px }
+    .track-card ul { padding: 0; list-style: none; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 6px }
+    .track-card ul li { padding: 3px 10px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; background: #1a2029; border: 1px solid #2a323d; border-radius: 999px; color: #b8b2a4 }
+    nav.crumbs { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px }
+    nav.crumbs a { color: #94a3b8; text-decoration: none }
+    nav.crumbs span.here { color: #e8a849 }
+    nav.crumbs span.sep { margin: 0 6px; color: #5a6473 }
+    .cross { margin-top: 48px; padding: 22px 24px; background: #161c24; border: 1px solid #2a323d; border-radius: 6px }
+    .cross h3 { margin: 0 0 10px; color: #e8a849; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500 }
+    .cross a { color: #e8a849; text-decoration: none }
+    .cross ul { padding: 0; list-style: none; margin: 8px 0 0 }
+    .cross li { padding: 4px 0; font-size: 14.5px; color: #d0cbc2 }
+  </style>
+</head>
+<body>
+<main>
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="sep">/</span>
+    <span class="here">Roadmap</span>
+  </nav>
+
+  <div class="eyebrow">AutomateEdge · Roadmap</div>
+  <h1>AI Learning Roadmaps 2026</h1>
+  <p class="lede">Five tracks, each with six deep-dive pages. Every roadmap is free, AI-curated, and calibrated against real 2026 job-posting demand from the AutomateEdge jobs pipeline. Pick the track that matches where you want to end up, not where you are starting from.</p>
+
+  <h2>Pick a track</h2>
+  <div class="track-grid">
+    {% for t in tracks %}
+    <a class="track-card" href="/roadmap/{{ t.slug }}">
+      <h3>{{ t.name }} →</h3>
+      <p>{{ t.tagline }}</p>
+      <ul>
+        <li>{{ t.weeks_total }} weeks</li>
+        <li>{{ t.hours_per_week }}h/wk</li>
+        <li>Free</li>
+      </ul>
+    </a>
+    {% endfor %}
+  </div>
+
+  <h2>What you get in every track</h2>
+  <p>Six dedicated pages per track, each a deep reference document: <strong>Skills</strong> (the concrete proficiency ladder), <strong>Tools</strong> (install path + hours to learn), <strong>Projects</strong> (10-15 portfolio builds with GitHub rubrics), <strong>Certifications</strong> (free credentials worth completing), <strong>Salary</strong> (US + regional comp bands refreshed quarterly), and <strong>Career path</strong> (entry to principal progression). Every page is source-controlled, versioned, and rebuilds to capture market shifts.</p>
+
+  <h2>Not sure which track?</h2>
+  <p>The <strong>Generalist</strong> track is the right default for most people. It covers the full AI stack — classical ML, deep learning, LLMs, and production — so you can specialise later from a position of strength. Pick a specialist track if you already have a specific target role (AI Engineer for LLM-product work, ML Engineer for model training + MLOps, Data Scientist for analysis + experimentation, or MLOps for serving + reliability engineering).</p>
+
+  <div class="cross">
+    <h3>Related</h3>
+    <ul>
+      <li><a href="/vs">Compare AI roles side-by-side</a> — 10 comparison pages (AI Engineer vs ML Engineer, RAG vs fine-tuning, etc.)</li>
+      <li><a href="/jobs">Open AI/ML jobs</a> — daily-refreshed, match-scored to your skill profile</li>
+      <li><a href="/blog">AutomateEdge essays</a> — deep-dives on building in AI</li>
+      <li><a href="/">Start the 24-week Generalist study plan</a> — free, AI-curated, email-reminded</li>
+    </ul>
+  </div>
+</main>
+<script src="/nav.js" defer></script>
+</body>
+</html>

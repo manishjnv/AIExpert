@@ -1,0 +1,697 @@
+{
+  "_meta": {
+    "description": "SEO-20 per-track quintet data for the 'mlops' track. Feeds six pages at /roadmap/mlops/{skills,tools,projects,certifications,salary,career-path}. Salary bands use US market figures from levels.fyi / Glassdoor / BLS 2025-2026; regional multipliers are aggregated estimates. Renewable yearly — bump last_updated + regenerate velocity snapshot from the jobs pipeline.",
+    "last_updated": "2026-04-24"
+  },
+  "slug": "mlops",
+  "name": "MLOps Engineer",
+  "tagline": "Build and own the infrastructure that keeps ML models reliable in production — from CI/CD pipelines and model registries to drift detection, GPU orchestration, and multi-model serving at scale.",
+  "hero_blurb": "MLOps Engineers exist because ML systems break in ways software systems do not. Data drifts. Training-serving skew accumulates silently. GPU clusters burn money while idle. Models pass tests at deploy time and degrade six weeks later with no alarm. This track teaches you to build the platform layer that makes ML teams fast, safe, and measurable. You will own Kubernetes-based serving infrastructure, CI/CD pipelines tuned for ML artefacts, feature stores with online-offline parity, drift detection systems, and the observability stack that catches silent regressions before they reach users. The role sits at the intersection of platform engineering and ML — and it pays like it.",
+  "weeks_total": 24,
+  "hours_per_week": 10,
+  "skills": {
+    "intro": "The MLOps Engineer skill map below is calibrated against 2026 hiring signals — specifically, skills that appear in ≥35% of MLOps / ML Platform Engineer / ML Infrastructure postings across the AutomateEdge jobs pipeline over the last 90 days. Proficiency levels follow a four-step ladder: Beginner (can follow tutorials), Intermediate (can build a solution to a new problem), Advanced (can debug production incidents), Expert (can design systems from first principles). An MLOps Engineer clears Advanced in container orchestration, CI/CD, and observability by week 24. One note on math: you do not need to be able to derive backpropagation, but you must understand what is expensive about it — batch size, activation memory, parameter count, gradient accumulation — so you can make sensible GPU scheduling decisions.",
+    "categories": [
+      {
+        "name": "Container orchestration and infrastructure",
+        "blurb": "Kubernetes is the operating system of MLOps. Everything else — serving, scheduling, autoscaling, feature computation — runs on top of it. You need to understand Kubernetes beyond 'I can apply a YAML' — operators, custom resources, HPA, VPA, pod disruption budgets, node affinity for GPU workloads, and the debugging workflow when a training pod OOMs at 3 a.m. Kubernetes 1.30+ in 2026 ships Gateway API as stable; know it alongside Ingress.",
+        "items": [
+          {"skill": "Kubernetes — cluster ops, workloads, networking", "level": "Advanced", "note": "Deployments, StatefulSets, DaemonSets, Services, Ingress/Gateway API, RBAC, namespaces. Comfortable reading events and logs to triage a failed pod without the docs open."},
+          {"skill": "Kubernetes — custom resources and operators", "level": "Intermediate", "note": "CRDs, controller reconciliation loops, Kubeflow PipelineRun / TrainingJob resources. Most ML platform work is operators writing operators."},
+          {"skill": "Kubernetes — GPU scheduling and resource quotas", "level": "Intermediate", "note": "nvidia.com/gpu resource requests, NUMA affinity, priority classes, ResourceQuota, LimitRange. Misaligned GPU scheduling is the #1 cause of silent under-utilisation."},
+          {"skill": "Helm chart authoring and management", "level": "Intermediate", "note": "Templates, values overrides, chart dependencies, Helmfile for multi-chart stacks. Every ML platform component you ship should be a Helm chart."},
+          {"skill": "Docker — multi-stage builds and layer optimisation", "level": "Advanced", "note": "COPY --from, .dockerignore, BuildKit secrets, distroless base images, image size discipline. A 12 GB CUDA image is a footgun; a 2 GB one takes 6x less time to pull on every scale-up event."},
+          {"skill": "Infrastructure-as-Code — Terraform or Pulumi", "level": "Intermediate", "note": "State management, modules, provider locking, plan/apply workflow, drift detection. Pulumi (Python-native) is gaining ground in ML orgs; Terraform still dominates ops teams."},
+          {"skill": "Linux internals and networking", "level": "Intermediate", "note": "cgroups v2, namespaces, iptables/eBPF basics, NFS/object-store mounts, /proc debugging. You will debug network policies and host-level issues that kubectl logs alone cannot surface."}
+        ]
+      },
+      {
+        "name": "CI/CD for ML systems",
+        "blurb": "A CI/CD pipeline for ML is not a software CI/CD pipeline with a training step bolted on. It must version data alongside code, gate on model quality metrics not just test pass rates, handle artefact sizes measured in gigabytes, and coordinate handoffs between training, evaluation, registry, and serving environments. Getting this right is the highest-leverage infrastructure investment an ML team can make.",
+        "items": [
+          {"skill": "GitHub Actions or GitLab CI for ML pipelines", "level": "Advanced", "note": "Multi-job workflows, matrix builds, artifact caching, self-hosted runners on GPU nodes, secrets management. Build pipelines that lint, test, train on a small slice, evaluate against a gate, and promote to the model registry — all in one YAML."},
+          {"skill": "Argo Workflows — DAG-based ML pipeline orchestration", "level": "Intermediate", "note": "Workflow CRD, steps vs DAG templates, artifact passing, retry policies, resource templates for GPU tasks. Argo Workflows is the de-facto Kubernetes-native orchestrator for training + eval pipelines."},
+          {"skill": "Model quality gating — eval-driven promotion", "level": "Intermediate", "note": "Define promotion criteria before you write the training code. Gating on accuracy delta, latency p99, data-drift score, and fairness metrics. A CI pipeline that promotes a model on 'accuracy >= 0.8' with no baseline comparison is broken by design."},
+          {"skill": "Data + artefact versioning with DVC or LakeFS", "level": "Intermediate", "note": "DVC remote storage, pipeline stages, dvc repro, LakeFS branches for datasets. Reproducibility requires locking data commits alongside code commits — every ML engineer learns this the hard way once."},
+          {"skill": "Container image scanning and supply-chain hygiene", "level": "Beginner", "note": "Trivy, Grype, or Snyk in CI. SBOM generation. ML images pull dozens of large transitive dependencies from PyPI — scanning is non-optional in security-conscious orgs."}
+        ]
+      },
+      {
+        "name": "Model serving and inference infrastructure",
+        "blurb": "Model serving is where ML meets real SRE work — SLOs, capacity planning, traffic management, rollback. The stack has fragmented: vLLM and SGLang have become the standard for generative-model serving; Triton Inference Server remains the standard for discriminative models and computer vision; TorchServe is a reasonable middle ground. Ray Serve covers the heterogeneous-model case. Know at least two serving runtimes well enough to choose between them.",
+        "items": [
+          {"skill": "vLLM and SGLang — generative model serving", "level": "Intermediate", "note": "vLLM's paged attention, continuous batching, async engine, LoRA adapter hot-swap. SGLang's structured generation, RadixAttention, multi-modal routing. These are the 2026 production stack for LLM serving — not TGI, not a plain transformers loop."},
+          {"skill": "NVIDIA Triton Inference Server", "level": "Intermediate", "note": "Model repository layout, ensemble pipelines, dynamic batching, ONNX / TensorRT backends, gRPC and HTTP protocols, perf_analyzer. Triton is the right answer for CV models, embedding services, and multi-model latency-sensitive pipelines."},
+          {"skill": "Ray Serve — multi-model and heterogeneous serving", "level": "Intermediate", "note": "Deployments, replica scaling, request batching, model composition graphs, Ray 2.x actor model. Covers the 'I have twelve models and they share compute' case that neither Triton nor vLLM handles natively."},
+          {"skill": "Kubernetes-native serving patterns", "level": "Advanced", "note": "HPA on custom metrics (requests/sec, GPU utilisation), Knative for scale-to-zero, node pools with GPU taints, preemptible GPU nodes, rollout strategies (canary, blue-green via Argo Rollouts). Autoscaling a serving fleet is the most common MLOps ops fire."},
+          {"skill": "Inference optimisation — quantisation, compilation, batching", "level": "Intermediate", "note": "INT8/FP8/INT4 quantisation trade-offs, TensorRT compilation, torch.compile, CUDA graphs, flash-attention. Know enough to cut GPU cost by 2-5x on a real serving workload; know when to stop optimising and buy more hardware."}
+        ]
+      },
+      {
+        "name": "Monitoring, observability, and drift detection",
+        "blurb": "ML systems fail silently. A software service that stops working pages instantly; a model that produces subtly wrong answers may go undetected for weeks. The MLOps Engineer builds the layer that converts 'model went bad' from a discovery event into a monitored, alerted, automatically-gated condition. Statistical drift detection, latency SLOs, cost dashboards, and model-quality proxies all belong here.",
+        "items": [
+          {"skill": "Prometheus + Grafana — ML-specific dashboards", "level": "Advanced", "note": "Custom metrics from serving containers (inference latency, batch size, GPU memory, request rate), PromQL queries, Grafana alert rules, recording rules for efficiency. Every serving component you ship should export /metrics — non-negotiable."},
+          {"skill": "OpenTelemetry — distributed tracing for ML pipelines", "level": "Intermediate", "note": "Instrumenting training scripts, pipeline steps, and serving handlers with spans and attributes. Trace from feature lookup → model inference → postprocessing in one waterfall. Particularly valuable in multi-model serving and RAG pipelines."},
+          {"skill": "Data and model drift detection", "level": "Advanced", "note": "PSI, KS test, MMD, Evidently AI report generation, Arize / WhyLabs / Fiddler for production monitoring. Understand the difference between covariate drift (input distribution shifts) and concept drift (the relationship between inputs and outputs changes). False-positive drift alerts are as expensive as missed drift."},
+          {"skill": "Model quality proxies — surrogate metrics", "level": "Intermediate", "note": "When ground-truth labels arrive late (or never), you need surrogate metrics: confidence calibration, output distribution entropy, proxy tasks, implicit feedback signals. Define these before go-live, not after the first incident."},
+          {"skill": "Cost observability — GPU and API spend dashboards", "level": "Intermediate", "note": "DCGM metrics for GPU utilisation and memory bandwidth, cost-per-inference attribution, idle-GPU alerts, spot-instance reclamation handling. In 2026 GPU cost is the dominant operational expense for ML-heavy companies; the engineer who instruments it becomes indispensable."}
+        ]
+      },
+      {
+        "name": "Data pipelines and feature stores",
+        "blurb": "Features are the interface between the data world and the model world. Training-serving skew — where the features a model was trained on differ subtly from the features it receives in production — is one of the top causes of production ML failures. Feature stores exist to close that gap. Airflow, Prefect, and Dagster are the orchestration layer; Feast is the most widely adopted open-source feature store; Redis and DynamoDB back the low-latency online store.",
+        "items": [
+          {"skill": "Airflow, Prefect, or Dagster — pipeline orchestration", "level": "Intermediate", "note": "DAG authoring, task dependencies, sensors, retry policies, schedule intervals, backfill. Know at least one in depth. In 2026 Prefect and Dagster have both pulled significantly ahead of raw Airflow for usability in Python-native teams."},
+          {"skill": "Feast — feature store architecture", "level": "Intermediate", "note": "Feature views, entity keys, online vs offline store split, feature retrieval for training vs serving, push-based and pull-based materialisation. The central tool for eliminating training-serving skew."},
+          {"skill": "Streaming data with Kafka or Kinesis", "level": "Beginner", "note": "Topics, consumer groups, at-least-once delivery semantics, KSQL for lightweight transformations. Online feature computation for real-time models requires a streaming backbone — understand the operational cost before committing to it."},
+          {"skill": "Data quality and validation — Great Expectations or Deequ", "level": "Intermediate", "note": "Expectation suites, validation checkpoints, data docs. Data validation upstream of training is 10x cheaper than debugging a model that was trained on corrupted data."},
+          {"skill": "Columnar storage and query — Parquet, Delta Lake, DuckDB", "level": "Intermediate", "note": "Parquet schema evolution, Delta Lake transaction log for offline feature stores, DuckDB for ad-hoc analytics on feature snapshots. The offline store is always larger and always cheaper per query when you use the right format."}
+        ]
+      },
+      {
+        "name": "MLflow, model registry, and governance",
+        "blurb": "A model registry is the source of truth for what is running in production. Every model that serves traffic must be traceable to a training run, a dataset version, a set of hyperparameters, and an author. MLflow is the most widely-adopted open-source tool for this; Vertex AI Model Registry and SageMaker Model Registry are the cloud-native equivalents. Model governance — who can promote a model to production, under what conditions — becomes critical at regulated companies and at scale.",
+        "items": [
+          {"skill": "MLflow — tracking, registry, and serving", "level": "Advanced", "note": "Experiment tracking (params, metrics, artefacts), the Model Registry lifecycle (Staging → Production → Archived), MLflow Models serving, custom Python models, model signatures. MLflow is the backbone of most MLOps pipelines outside of full cloud lock-in."},
+          {"skill": "Model lineage and reproducibility", "level": "Intermediate", "note": "Linking a deployed model version to the exact code commit, dataset hash, container image digest, and hyperparameter set that produced it. This is the chain of custody that enables incident post-mortems and regulatory audits."},
+          {"skill": "A/B testing and shadow deployment infrastructure", "level": "Intermediate", "note": "Traffic splitting at the proxy layer (Istio, Argo Rollouts, nginx weighted upstreams), logging both model variants' outputs, statistical significance testing for quality deltas, feature flags for model routing. The mechanism that separates 'we think the new model is better' from 'we know the new model is better.'"},
+          {"skill": "Canary and blue-green deployment for ML models", "level": "Intermediate", "note": "Staged rollout percentages, automatic rollback triggers on latency or quality SLO breach, the difference between a software canary (binary right/wrong) and an ML canary (stochastic quality degradation). Argo Rollouts is the Kubernetes-native implementation."},
+          {"skill": "Model cards and documentation", "level": "Beginner", "note": "Intended use, evaluation metrics, training data sources, known limitations, fairness analysis. Model cards are increasingly required at regulated companies and are a professional-grade habit regardless."}
+        ]
+      }
+    ],
+    "learning_sequence": [
+      "Weeks 1-4 — Linux internals, Docker advanced, Kubernetes fundamentals. Deploy a multi-container app to a local k3s cluster. Understand pods, services, deployments, and RBAC from first principles.",
+      "Weeks 5-8 — Kubernetes operators, GPU scheduling, Helm. Deploy an ML serving container on Kubernetes with HPA on a custom metric. Build your first Helm chart.",
+      "Weeks 9-12 — CI/CD for ML with GitHub Actions + Argo Workflows. Build a pipeline that trains, evaluates, gates on quality metrics, and pushes to MLflow registry. Wire DVC for data versioning.",
+      "Weeks 13-16 — Model serving deep-dive: vLLM, Triton, Ray Serve. Deploy one model on each runtime, compare latency/throughput profiles, instrument with Prometheus.",
+      "Weeks 17-20 — Observability, drift detection, feature stores. Build Grafana dashboards for a live serving fleet. Implement Evidently drift reports on a rolling production dataset. Stand up Feast with a toy online store.",
+      "Weeks 21-24 — Integration project: end-to-end ML platform slice. CI/CD → registry → canary deploy → drift monitoring → automated rollback. Document it as a system design writeup."
+    ],
+    "time_to_proficient": "Full-time learner: 6-8 months to production-ready MLOps skills. Part-time (10 h/week): 12-15 months. The longest poles are Kubernetes depth and production incident exposure — both require hands-on repetition, not just reading. The engineers who progress fastest deliberately break their own clusters and debug them.",
+    "faqs": [
+      {"q": "Do I need to know how to train models to be an MLOps Engineer?", "a": "You need to understand what is expensive and why — batch size effects on GPU memory, gradient accumulation, checkpoint frequency, why full fine-tuning costs 10x more than LoRA. You do not need to design architectures from scratch or understand backpropagation's calculus. The boundary is: you can read a training config and know what to ask, not that you can author one blindly."},
+      {"q": "Is this role basically SRE with ML bolted on?", "a": "Partially — the on-call, capacity planning, and reliability posture are very SRE-adjacent. But the domain knowledge required (training-serving skew, drift detection, model governance, feature store design) is distinct from traditional SRE. The highest-value MLOps engineers understand both worlds; the weakest ones are SREs who learned to deploy models, or ML engineers who learned to write Kubernetes YAMLs, without filling in the other half."},
+      {"q": "Kubernetes feels enormous. Do I need to know all of it?", "a": "No. Focus on: workloads (Deployments, Jobs, CronJobs), services + networking (ClusterIP, Ingress/Gateway), storage (PVCs, StorageClasses), RBAC, and the GPU resource model. That is ~70% of what you touch day-to-day. Operators, custom resources, and admission webhooks come later, organically, when a platform feature requires them."},
+      {"q": "Should I learn Terraform or Pulumi?", "a": "Terraform if you join an existing infra team with Terraform already in use. Pulumi if you are starting fresh or in a Python-native ML org — writing infrastructure in Python with type hints and testing is a significant ergonomic win for ML engineers. Both are worth knowing at Intermediate depth."},
+      {"q": "vLLM, SGLang, Triton, Ray Serve — which serving runtime should I learn first?", "a": "vLLM, then Triton. vLLM is where the industry has landed for generative models in 2026 and has the most community momentum. Triton is the right tool for discriminative models, embedding services, and latency-critical CV pipelines. Ray Serve is worth learning after those two, for the heterogeneous-model orchestration case."},
+      {"q": "How much Python do I need vs Go or Rust?", "a": "Python is primary — it is the language of ML tooling, orchestrators, and glue code. Advanced Python (async, type hints, profiling, C-extension calling) is mandatory. Go and Rust at Intermediate are increasingly useful for writing high-performance serving sidecars, admission webhook controllers, and custom Kubernetes operators — the kind of work that Kubernetes-native ML platforms generate. You will not be blocked without Go/Rust, but senior MLOps roles at platform-centric companies often expect it."},
+      {"q": "What does training-serving skew actually mean in practice?", "a": "A concrete example: you train a recommendation model with a feature called user_age_bucket computed by a Python function during batch training. In production, the same feature is computed by a different service in Java with a slightly different bucketing boundary. The model's predictions are subtly degraded for users near the bucket boundaries — and there is no error, no crash, just worse recommendations that degrade over weeks. Feature stores solve this by making the feature computation a single artifact used by both training and serving. This is the category of problem MLOps Engineers exist to eliminate."},
+      {"q": "Is the MLOps role being automated away by managed ML platforms?", "a": "Managed platforms (Vertex AI, SageMaker, Databricks) abstract a great deal of the undifferentiated heavy lifting. What they do not abstract is: organisation-specific compliance constraints, multi-cloud or hybrid infrastructure, the 'last 20%' of performance optimisation that determines whether GPU costs are sustainable, and cross-team coordination. The platforms eliminate the lowest-value MLOps work; the highest-value work grows as the company's ML footprint does."}
+    ]
+  },
+  "tools": {
+    "intro": "This inventory covers the tools a 2026 MLOps Engineer will use across their day-to-day platform work. The list is deliberately systems-infrastructure-heavy — less Jupyter, more Kubernetes operators. Free or open-source where possible; the two cloud-native exceptions (GCP Vertex AI and AWS SageMaker) are flagged as paid and noted with their free-tier limits. Hours-to-learn estimates are the time to solve a novel production problem with the tool unaided; mastery takes 3-5x that.",
+    "categories": [
+      {
+        "name": "Container orchestration and infrastructure",
+        "blurb": "The operational substrate everything else runs on. Kubernetes is not optional at any serious MLOps shop. Helm and Terraform/Pulumi are equally non-optional the moment you have more than one environment.",
+        "items": [
+          {"tool": "Kubernetes 1.30+", "purpose": "Cluster orchestration for ML workloads — training jobs, serving fleets, pipeline DAGs", "hours_to_learn": 80, "url": "https://kubernetes.io/docs/home/"},
+          {"tool": "Helm 3", "purpose": "Package manager for Kubernetes; chart authoring and release management", "hours_to_learn": 15, "url": "https://helm.sh/docs/"},
+          {"tool": "Terraform", "purpose": "Infrastructure-as-Code; provision cloud resources declaratively with state management", "hours_to_learn": 30, "url": "https://developer.hashicorp.com/terraform/docs"},
+          {"tool": "Pulumi (Python SDK)", "purpose": "IaC in Python — growing fast in ML orgs as an alternative to HCL-based Terraform", "hours_to_learn": 20, "url": "https://www.pulumi.com/docs/"},
+          {"tool": "k3s / kind / minikube", "purpose": "Lightweight local Kubernetes for development and CI — run the full stack on a laptop or in a GitHub Actions runner", "hours_to_learn": 5, "url": "https://k3s.io/"},
+          {"tool": "Docker + BuildKit", "purpose": "Container build, multi-stage images, layer caching — the atomic unit of every ML deployment", "hours_to_learn": 20, "url": "https://docs.docker.com/build/buildkit/"}
+        ]
+      },
+      {
+        "name": "Pipeline orchestration and CI/CD",
+        "blurb": "ML pipelines are more complex than software CI pipelines: they version data, gate on statistical metrics, and may run for hours on GPU nodes. The tools below cover the full spectrum from code-level CI to multi-day training DAGs.",
+        "items": [
+          {"tool": "GitHub Actions", "purpose": "CI/CD orchestration for code + model pipelines; self-hosted GPU runners", "hours_to_learn": 15, "url": "https://docs.github.com/en/actions"},
+          {"tool": "GitLab CI/CD", "purpose": "Alternative to GitHub Actions; dominant in enterprise and self-hosted environments", "hours_to_learn": 15, "url": "https://docs.gitlab.com/ee/ci/"},
+          {"tool": "Argo Workflows", "purpose": "Kubernetes-native DAG pipeline engine for ML training, evaluation, and data prep workflows", "hours_to_learn": 25, "url": "https://argoproj.github.io/workflows/"},
+          {"tool": "Argo Rollouts", "purpose": "Progressive delivery controller for Kubernetes — canary, blue-green, analysis-triggered rollback", "hours_to_learn": 10, "url": "https://argoproj.github.io/rollouts/"},
+          {"tool": "Prefect 3", "purpose": "Python-native workflow orchestrator with a strong local-to-cloud deployment story; strong competitor to Airflow for ML teams", "hours_to_learn": 20, "url": "https://docs.prefect.io/"},
+          {"tool": "Apache Airflow 2.x", "purpose": "De-facto standard for scheduled data + ML pipelines at large organisations; mature ecosystem", "hours_to_learn": 25, "url": "https://airflow.apache.org/docs/"},
+          {"tool": "Dagster", "purpose": "Asset-based orchestration model; strong data lineage and software-defined assets story", "hours_to_learn": 20, "url": "https://docs.dagster.io/"}
+        ]
+      },
+      {
+        "name": "Model training, registry, and experiment tracking",
+        "blurb": "The chain from training run to deployed model version needs to be fully traceable. MLflow is the open-source backbone; Ray handles distributed training at scale; Kubeflow ties the Kubernetes-native ML workflow together.",
+        "items": [
+          {"tool": "MLflow", "purpose": "Experiment tracking, model registry, artefact storage, model serving — the open-source MLOps backbone", "hours_to_learn": 20, "url": "https://mlflow.org/docs/latest/"},
+          {"tool": "Kubeflow", "purpose": "Kubernetes-native ML platform — Pipelines, Training Operator (PyTorchJob, TFJob), KServe", "hours_to_learn": 30, "url": "https://www.kubeflow.org/docs/"},
+          {"tool": "Ray 2.x (Train + Tune + Data)", "purpose": "Distributed ML compute — DDP training, hyperparameter tuning, scalable data preprocessing on a Ray cluster", "hours_to_learn": 25, "url": "https://docs.ray.io/en/latest/"},
+          {"tool": "DVC (Data Version Control)", "purpose": "Version datasets alongside code; reproducible pipelines with remote storage (S3, GCS, Azure)", "hours_to_learn": 12, "url": "https://dvc.org/doc"},
+          {"tool": "LakeFS", "purpose": "Git-like branching for object-store datasets — branch, diff, and merge large datasets atomically", "hours_to_learn": 10, "url": "https://docs.lakefs.io/"}
+        ]
+      },
+      {
+        "name": "Model serving runtimes",
+        "blurb": "The 2026 serving stack has consolidated: vLLM and SGLang for generative models, Triton for discriminative and CV models, Ray Serve for heterogeneous multi-model graphs, TorchServe for self-managed PyTorch deployments. Know the trade-offs — latency, throughput, hardware utilisation, operational complexity — well enough to choose without a tutorial.",
+        "items": [
+          {"tool": "vLLM", "purpose": "High-throughput LLM serving with paged attention, continuous batching, LoRA hot-swap, OpenAI-compatible API", "hours_to_learn": 15, "url": "https://docs.vllm.ai/"},
+          {"tool": "SGLang", "purpose": "Structured-generation serving runtime with RadixAttention; faster than vLLM on structured-output workloads", "hours_to_learn": 12, "url": "https://sglang.readthedocs.io/"},
+          {"tool": "NVIDIA Triton Inference Server", "purpose": "Production model serving for CV, NLP, and multi-model pipelines; ONNX, TensorRT, PyTorch, TensorFlow backends", "hours_to_learn": 20, "url": "https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/"},
+          {"tool": "Ray Serve", "purpose": "Scalable heterogeneous model serving on Ray clusters; model composition graphs, actor-based scaling", "hours_to_learn": 15, "url": "https://docs.ray.io/en/latest/serve/"},
+          {"tool": "TorchServe", "purpose": "PyTorch-native model server with handler API, multi-model workers, gRPC — simpler than Triton, tighter PyTorch integration", "hours_to_learn": 12, "url": "https://pytorch.org/serve/"}
+        ]
+      },
+      {
+        "name": "Monitoring, observability, and drift detection",
+        "blurb": "You cannot manage what you cannot measure. Every serving component should emit Prometheus metrics; every pipeline step should emit OpenTelemetry spans; every production dataset should run through a drift-detection gate. These tools are the nervous system of an ML platform.",
+        "items": [
+          {"tool": "Prometheus + Alertmanager", "purpose": "Metrics collection, storage, and alerting — the universal monitoring backbone for Kubernetes-based ML platforms", "hours_to_learn": 20, "url": "https://prometheus.io/docs/"},
+          {"tool": "Grafana", "purpose": "Dashboarding over Prometheus + Loki + Tempo — GPU utilisation, inference latency, model quality proxies", "hours_to_learn": 15, "url": "https://grafana.com/docs/grafana/"},
+          {"tool": "OpenTelemetry", "purpose": "Vendor-neutral distributed tracing, metrics, and logging instrumentation for ML pipelines and serving", "hours_to_learn": 15, "url": "https://opentelemetry.io/docs/"},
+          {"tool": "Evidently AI", "purpose": "Open-source data and model drift detection, report generation, test suites; integrates with Airflow/Prefect", "hours_to_learn": 10, "url": "https://docs.evidentlyai.com/"},
+          {"tool": "Arize AI or WhyLabs (free tier)", "purpose": "Managed model observability platforms — production drift alerts, embedding monitoring, performance tracking", "hours_to_learn": 8, "url": "https://arize.com/docs/"},
+          {"tool": "DCGM (Data Centre GPU Manager)", "purpose": "GPU-level metrics: utilisation, memory bandwidth, thermal throttle, NVLink health — the missing layer below Prometheus node-exporter", "hours_to_learn": 8, "url": "https://docs.nvidia.com/datacenter/dcgm/"}
+        ]
+      },
+      {
+        "name": "Cloud-native ML platforms and feature stores",
+        "blurb": "Vertex AI and SageMaker are the two dominant managed ML platforms in 2026. Both abstract a great deal of infrastructure complexity; both have traps around vendor lock-in and cost at scale. Feast is the leading open-source feature store — learn it before the managed alternatives so you understand what they are doing for you.",
+        "items": [
+          {"tool": "Feast (feature store)", "purpose": "Open-source feature store with online/offline parity — the primary tool for eliminating training-serving skew", "hours_to_learn": 15, "url": "https://docs.feast.dev/"},
+          {"tool": "GCP Vertex AI", "purpose": "Managed ML platform on GCP — Pipelines, Model Registry, Prediction, Feature Store, Vertex AI Workbench (paid; $300 free credit)", "hours_to_learn": 25, "url": "https://cloud.google.com/vertex-ai/docs"},
+          {"tool": "AWS SageMaker", "purpose": "AWS managed ML platform — Training, Endpoints, Pipelines, Model Monitor, Feature Store (paid; limited free tier)", "hours_to_learn": 25, "url": "https://docs.aws.amazon.com/sagemaker/"},
+          {"tool": "GCP GKE or AWS EKS", "purpose": "Managed Kubernetes services — the compute backbone for Kubernetes-based ML platforms; GPU node pools, spot/preemptible support", "hours_to_learn": 20, "url": "https://cloud.google.com/kubernetes-engine/docs"}
+        ]
+      }
+    ],
+    "install_path": [
+      "Install Docker Desktop (macOS/Windows) or Docker Engine + Compose (Linux). Run `docker run hello-world` to confirm.",
+      "Install kubectl and either k3s (Linux VPS) or kind (any OS) for a local Kubernetes cluster. Run `kubectl get nodes` successfully before moving on.",
+      "Install Helm 3: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`. Run `helm repo add stable https://charts.helm.sh/stable`.",
+      "Install Terraform or Pulumi. For Pulumi with Python: `pip install pulumi pulumi-gcp` (or pulumi-aws).",
+      "Install MLflow: `pip install mlflow`. Run `mlflow ui` locally to confirm the tracking server starts. Understand the artefact store vs tracking DB distinction before the first experiment.",
+      "Deploy vLLM on a GPU (Colab or rental): `pip install vllm && python -m vllm.entrypoints.openai.api_server --model mistralai/Mistral-7B-Instruct-v0.3`. Benchmark with a curl loop.",
+      "Install Argo Workflows on your local cluster: `kubectl apply -f https://github.com/argoproj/argo-workflows/releases/download/v3.5.8/install.yaml`. Submit your first workflow YAML.",
+      "Stand up Prometheus + Grafana via the kube-prometheus-stack Helm chart. Connect a Python service exposing a custom counter metric and watch it appear in Grafana."
+    ],
+    "faqs": [
+      {"q": "Do I need a full cloud account to learn this stack?", "a": "No. k3s or kind gives you a full Kubernetes cluster on a laptop or a $5 VPS. MLflow, Argo Workflows, Prometheus, and Feast all run in a local cluster. Cloud-specific tools (Vertex AI, SageMaker) are learnable via their free tiers — but they are not the right starting point. Learn the portable open-source layer first; the managed services will feel like obvious simplifications, not new concepts."},
+      {"q": "Is Kubeflow still relevant in 2026?", "a": "Yes, but with nuance. Kubeflow Pipelines has lost ground to Argo Workflows (more general) and cloud-native orchestrators. Kubeflow Training Operator (PyTorchJob, TFJob) remains the standard way to submit distributed training jobs to Kubernetes. KServe (the inference component) is increasingly the Kubernetes-native serving standard. Think of Kubeflow as a collection of CRDs more than a monolithic platform."},
+      {"q": "Should I learn Airflow or Prefect or Dagster?", "a": "At least one to Intermediate, plus familiarity with the others at the conceptual level. Most job descriptions name Airflow — it has the largest installed base and the most community knowledge. But Prefect 3 and Dagster have better developer-experience stories for Python-native teams. The patterns (DAGs, dependencies, retries, sensors) transfer across all three. Pick whichever your target employers use most."},
+      {"q": "vLLM vs SGLang — which one is winning in 2026?", "a": "Both are production-deployed at serious organisations. vLLM has a larger community and broader hardware support. SGLang is faster on structured-generation workloads (function calling, JSON schema, constrained decoding) due to RadixAttention and its compiler-based approach. The pragmatic answer: learn vLLM first (more community resources, more job postings), then SGLang when you hit a structured-output performance wall."},
+      {"q": "Do I need to know CUDA programming?", "a": "At Beginner to low-Intermediate. You need to understand GPU memory hierarchies, what CUDA kernels are and why they matter for inference optimisation, and how to read DCGM / nvidia-smi output during an incident. You do not need to write CUDA kernels yourself unless you move into ML compiler or inference-optimisation work. What you do need to understand: why attention is compute-bound, why matmul is the bottleneck, and why INT8 quantisation can 2x throughput without accuracy regression."},
+      {"q": "How big is the gap between local Kubernetes and cloud Kubernetes?", "a": "Conceptually small — the control-plane APIs are identical. Operationally significant: managed load balancers, CSI storage drivers, node auto-provisioning, GPU node pools, and IAM integration all behave differently across providers. The discipline is: learn the Kubernetes concepts locally until they are automatic, then learn the cloud-specific operations (EKS node groups, GKE autopilot, spot/preemptible handling) in a $30 cloud lab session."},
+      {"q": "What's the fastest path to an MLOps job if I'm coming from SRE or platform engineering?", "a": "Four projects in public GitHub: (1) deploy a vLLM serving container with Prometheus metrics and a Grafana dashboard, (2) build a CI/CD pipeline that trains a model and gates on accuracy before pushing to MLflow registry, (3) implement drift detection on a real dataset with Evidently and wire an alert, (4) write a Helm chart for a complete ML serving stack. That portfolio, combined with your existing Kubernetes and IaC experience, is competitive for mid-level roles."}
+    ]
+  },
+  "projects": {
+    "intro": "These projects are ordered by platform-building dependency — each earlier one builds skills the later ones require. A strong MLOps portfolio is built of systems, not notebooks: live URLs, working CI pipelines, instrumented dashboards, and post-mortems from the things you deliberately broke. Every project here can run on a $10/month VPS with a few hours of GPU rental; most can run entirely on free-tier cloud resources.",
+    "projects": [
+      {
+        "title": "Model registry from scratch using MLflow",
+        "difficulty": "Beginner",
+        "hours": "20-30",
+        "description": "Stand up a self-hosted MLflow tracking server with a PostgreSQL backend and an S3-compatible artefact store (MinIO). Train three variants of a binary classifier (logistic regression, random forest, XGBoost) on the same dataset. Log all parameters, metrics, and model artefacts to your registry. Transition the winner through Staging → Production using the MLflow registry lifecycle. Build a minimal Python client that fetches the Production model version and runs inference. This project teaches the artefact management discipline that separates professional MLOps work from ad-hoc model files dropped in S3.",
+        "tech_stack": ["MLflow", "PostgreSQL", "MinIO (S3-compatible)", "scikit-learn", "Docker Compose"],
+        "rubric": [
+          "MLflow server, PostgreSQL, and MinIO all run via Docker Compose with health checks",
+          "Three models logged with full parameter and metric provenance",
+          "Model transition history visible in the MLflow UI — Staging → Production documented",
+          "Client code uses `mlflow.pyfunc.load_model` with the registry URI, not a hardcoded file path",
+          "README explains the artefact store separation and why file-based artefacts are anti-patterns in shared teams"
+        ]
+      },
+      {
+        "title": "CI/CD pipeline for ML: lint, test, train, evaluate, register",
+        "difficulty": "Intermediate",
+        "hours": "35-50",
+        "description": "Build a GitHub Actions pipeline that runs on every pull request and every merge to main. The pipeline must: lint with ruff, run pytest on feature engineering code, train a model on a small held-out slice of a public dataset, evaluate against a quality gate (must beat the current Production model's accuracy by ≥0.5%), and push a new Staging candidate to MLflow only if all gates pass. The training step should run on a self-hosted runner or GitHub-hosted runner with DVC pulling the data from a versioned remote. This project is the CI/CD equivalent of a 'hello world' for MLOps — nearly every interview will ask you to whiteboard a version of it.",
+        "tech_stack": ["GitHub Actions", "DVC", "MLflow", "ruff", "pytest", "scikit-learn or PyTorch"],
+        "rubric": [
+          "Pipeline YAML is fully readable — no inline shell scripts longer than 5 lines",
+          "Quality gate implemented as a Python script, not a bash one-liner — takes current Production model baseline from registry",
+          "DVC data pull step uses a locked .dvc file — any uncommitted data change fails the pipeline",
+          "Failed quality gate produces a structured summary in the Actions run with the delta metrics",
+          "README includes a screenshot of a failing pipeline and a passing pipeline, both with the gate output visible"
+        ]
+      },
+      {
+        "title": "Model serving on Kubernetes with autoscaling and observability",
+        "difficulty": "Intermediate",
+        "hours": "40-55",
+        "description": "Deploy a text classification model behind a FastAPI serving container to a Kubernetes cluster (k3s or cloud). Expose it via Ingress. Add Prometheus metrics: requests per second, inference latency p50/p95/p99, and model version label. Wire Grafana dashboards. Configure HPA to scale replicas when p95 latency exceeds 200ms. Run a k6 load test that triggers the HPA. Document the incident you had during the load test. This project proves you understand the operational reality of running ML in production, not just deploying it once.",
+        "tech_stack": ["Kubernetes (k3s or GKE/EKS)", "FastAPI", "Prometheus", "Grafana", "HPA", "k6 or locust"],
+        "rubric": [
+          "Deployment YAML includes readiness and liveness probes — failing probes are tested, not just written",
+          "Prometheus metrics exported from the FastAPI app using prometheus-client — not pushed via a sidecar",
+          "HPA YAML targets a custom metric (latency p95 from Prometheus adapter) — not CPU, which is a proxy, not the signal",
+          "Grafana dashboard exported as JSON and committed to the repo",
+          "Load test report shows the HPA scale-up event and the latency recovery curve — both captured from Grafana"
+        ]
+      },
+      {
+        "title": "Drift detection system on a production-style data stream",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Take a public tabular dataset and simulate production drift: create a 'day 0' training distribution and a 'day 30' inference distribution where several feature distributions have shifted. Build a batch drift-detection job using Evidently AI that computes PSI for numeric features, chi-squared for categorical features, and a data-quality report. Run the job on a schedule (Airflow or Prefect cron). Alert when PSI > 0.2 (via a Slack webhook or email). Write up a one-page post-mortem as if this were a real production drift incident, including impact, root cause, and the remediation steps you would take.",
+        "tech_stack": ["Evidently AI", "Airflow or Prefect", "pandas", "Prometheus (for drift metrics)", "Slack webhook or email alert"],
+        "rubric": [
+          "Training vs inference distribution shift clearly documented with before/after histograms",
+          "PSI and chi-squared thresholds justified in the README — not just 'I used 0.2 because it's common'",
+          "Scheduled job produces an HTML report committed to an artefacts store (S3, MinIO)",
+          "Alert fires on a seeded drift injection — tested, not assumed",
+          "Post-mortem section in README covers impact, root cause, remediation, and prevention — the four-part structure"
+        ]
+      },
+      {
+        "title": "Feature store with online-offline parity",
+        "difficulty": "Intermediate",
+        "hours": "40-55",
+        "description": "Build a working feature store using Feast. Define feature views for a recommendation or fraud-detection use case. Materialise features from a Parquet offline store to a Redis online store. Build a training pipeline that pulls features from the offline store and a serving pipeline that retrieves features from the online store in under 5ms. Deliberately introduce a training-serving skew bug — different bucketing on one feature — and build a validation test that catches it. This project is the single most effective way to demonstrate that you understand why feature stores exist.",
+        "tech_stack": ["Feast", "Redis", "Parquet / S3 or GCS", "FastAPI (for serving)", "pytest"],
+        "rubric": [
+          "Feature views defined with clear entity keys and timestamps — not a notebook ad-hoc schema",
+          "Point-in-time correct feature retrieval demonstrated for training — no data leakage",
+          "Online store latency measured and documented: p50/p99 for feature lookup",
+          "Skew validation test written in pytest — fails with the bug, passes without it",
+          "README explains the training-serving skew concept using your specific project as the example"
+        ]
+      },
+      {
+        "title": "A/B testing infrastructure for two model variants",
+        "difficulty": "Intermediate",
+        "hours": "35-45",
+        "description": "Deploy two model versions (call them Model A and Model B) behind a traffic-splitting layer. Route 80% of requests to A and 20% to B. Log both models' outputs with a consistent request ID. Build a statistical significance test that runs daily on the accumulated logs and determines whether B's quality metrics are significantly better than A's. Build an automatic promotion script: if B is significantly better for 3 consecutive days, promote B to 100% traffic. This project teaches the measurement discipline that separates rigorous model deployment from opinion-based deployment.",
+        "tech_stack": ["nginx weighted upstreams or Argo Rollouts", "MLflow (for model versions)", "PostgreSQL (for response logs)", "scipy (for statistical tests)", "Prefect or cron for daily job"],
+        "rubric": [
+          "Traffic split implemented at proxy layer — not by the model server choosing which model to use",
+          "Request logs include: model version, input hash, output, timestamp, and any available implicit feedback signal",
+          "Statistical test is pre-registered — the test type (t-test vs Mann-Whitney), metric, threshold, and horizon are documented before the experiment starts",
+          "Automatic promotion script is idempotent — safe to run multiple times without double-promoting",
+          "README documents what happens if neither model is significantly better after the test horizon — 'keep A' logic is explicit"
+        ]
+      },
+      {
+        "title": "Canary deployment for an ML model with automatic rollback",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Implement a canary deployment for a model update using Argo Rollouts on Kubernetes. Configure a rollout strategy: 5% → 20% → 50% → 100% canary progression, with each step gated on a Prometheus metric (p99 latency < 300ms, error rate < 0.5%). Build an automatic rollback trigger: if p99 exceeds 400ms for 2 consecutive minutes, the rollout is paused and rolled back. Seed a regression in the canary model to verify the rollback fires. Write up the incident as a post-mortem.",
+        "tech_stack": ["Argo Rollouts", "Kubernetes", "Prometheus", "Prometheus Adapter (for custom metrics)"],
+        "rubric": [
+          "AnalysisTemplate YAML defines the rollback criteria — not manual kubectl commands",
+          "Rollback is triggered by a PromQL query, not a synthetic test flag",
+          "Regression seed is documented: what you changed in the canary model and what metric it broke",
+          "Rollout history is preserved in the Argo Rollouts dashboard — screenshot in README",
+          "Estimated blast radius quantified: max % of traffic that saw the regression before rollback, calculated from the rollout step timing"
+        ]
+      },
+      {
+        "title": "Multi-model serving with vLLM and routing by capability",
+        "difficulty": "Advanced",
+        "hours": "40-55",
+        "description": "Deploy two LLMs of different sizes (e.g. Qwen2.5-1.5B and Qwen2.5-7B) on vLLM. Build a routing layer that dispatches requests to the smaller model when request complexity is low (short prompt, simple output schema) and the larger model when complexity is high. Route 100% of structured-output requests through a quality gate that validates the JSON schema. Measure and report cost-per-request for each route. This project teaches the model routing and cost-optimisation skills that senior MLOps roles prize most.",
+        "tech_stack": ["vLLM", "FastAPI (routing layer)", "Prometheus (cost metrics)", "pydantic (schema validation)", "Kubernetes (two deployments, one per model)"],
+        "rubric": [
+          "Routing heuristic is documented and tested — not a random split",
+          "Both model versions running simultaneously on separate Kubernetes Deployments with GPU resource limits",
+          "Cost-per-request metric computed from GPU-hours and reported via Prometheus",
+          "Quality gate rejects malformed outputs and routes to the large model for retry — retry logic is bounded (max 1 retry)",
+          "Load test shows the routing percentages holding under 10x normal traffic"
+        ]
+      },
+      {
+        "title": "GPU cost-optimisation dashboard",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Build a Grafana dashboard that aggregates GPU utilisation, memory bandwidth, idle time, and cost attribution per team or model. Pull DCGM metrics from all GPU nodes. Implement a cost model: cost_per_hour × utilisation_fraction = attributed_cost. Build an alert for GPUs that are allocated but idle (utilisation < 5%) for more than 30 minutes. Document the three biggest waste sources you found in your cluster and the configuration changes that fixed them. This project is immediately valuable at any company with a GPU fleet and demonstrates measurable business impact.",
+        "tech_stack": ["DCGM Exporter", "Prometheus", "Grafana", "Alertmanager", "Kubernetes (namespace cost attribution labels)"],
+        "rubric": [
+          "DCGM metrics flowing from at least one GPU node (can be a $0.50/hr rental GPU) — real hardware, not mocked",
+          "Cost model documented with assumptions: on-demand hourly rate used, overhead factor included",
+          "Idle-GPU alert fires on a manually-induced idle condition — tested before submission",
+          "Dashboard exported as Grafana JSON and committed to the repo",
+          "Three waste findings documented with before/after utilisation metrics — this is the most valuable part of the writeup"
+        ]
+      },
+      {
+        "title": "Prompt version management system",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Build a system for managing prompt templates as versioned artefacts. Store templates in a DB with version history, author, and a description of what changed and why. Build a UI (minimal — FastAPI + Jinja2 is fine) for creating and promoting templates through a Draft → Staging → Production lifecycle. Wire prompt version as a logged field in every LLM call, so you can slice model quality metrics by prompt version. This project is directly relevant as LLM applications proliferate and 'we changed the prompt' becomes the most common cause of quality regressions.",
+        "tech_stack": ["FastAPI", "SQLite + Alembic (or PostgreSQL)", "Jinja2 (for UI)", "MLflow or a custom artefact store (for logging)"],
+        "rubric": [
+          "Template schema includes: id, version, content, author, created_at, status, change_reason",
+          "Status lifecycle transitions enforced at the API level — cannot go from Draft to Production directly",
+          "Prompt version logged in every LLM response record — query-able in the analysis notebook",
+          "A rollback scenario demonstrated: promote v2 to Production, log 10 calls, roll back to v1, log 10 more — show the version distribution in a query",
+          "README explains why prompt versioning belongs in an MLOps platform alongside model versioning, not in the application code"
+        ]
+      },
+      {
+        "title": "Model lineage tracking: code → data → model → deployment",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Build a lineage tracking layer that connects: (1) the git commit of the training code, (2) the DVC data version, (3) the MLflow run ID, (4) the model registry version, and (5) the Kubernetes Deployment that is serving the model. Implement this as a chain of metadata tags passed through the pipeline, persisted in a lineage DB, and queryable via a simple API. Given a production incident, you should be able to answer 'what training data was in scope for the model currently serving request X?' in under 30 seconds. This project demonstrates the audit-trail discipline that compliance-sensitive organisations require.",
+        "tech_stack": ["MLflow (artefact + run metadata)", "DVC", "Kubernetes annotations", "FastAPI (lineage query API)", "PostgreSQL or SQLite"],
+        "rubric": [
+          "Lineage chain covers all five links — no gaps",
+          "Query API: GET /lineage/{deployment_name} returns the full chain for the currently serving model version",
+          "Test case: redeploy with a different model version and verify the lineage chain updates correctly",
+          "Lineage ID is propagated as a Kubernetes Deployment annotation — visible via kubectl describe",
+          "README includes a diagram of the lineage chain"
+        ]
+      },
+      {
+        "title": "Inference latency profiler and optimisation report",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Profile a transformer model's inference latency end-to-end: tokenisation, model forward pass, de-tokenisation, and network overhead. Use PyTorch Profiler and NVIDIA Nsight Systems to identify the hottest kernels. Apply at least two optimisations from: dynamic batching, INT8 quantisation via bitsandbytes or TensorRT, torch.compile, attention implementation swap (flash-attention-2). Document the before/after latency and throughput for each optimisation. Publish a table of trade-offs. This project is the clearest way to demonstrate that you understand the inference side of the stack, not just the deployment side.",
+        "tech_stack": ["PyTorch Profiler", "NVIDIA Nsight Systems (or nsys)", "bitsandbytes / TensorRT", "flash-attention-2", "vLLM or bare transformers"],
+        "rubric": [
+          "Baseline measured at batch sizes 1, 8, 32 before any optimisation — latency p50/p99 and tokens/second",
+          "PyTorch Profiler trace captured and committed (as HTML) — hottest kernels identified by name",
+          "At least two independent optimisations applied and measured independently — not stacked before measurement",
+          "Trade-off table: latency gain, throughput gain, accuracy impact (if any), memory delta, implementation complexity for each optimisation",
+          "Conclusion section explains which combination you would ship to production and why"
+        ]
+      },
+      {
+        "title": "End-to-end Argo Workflows ML training pipeline",
+        "difficulty": "Advanced",
+        "hours": "40-55",
+        "description": "Build an Argo Workflows DAG that orchestrates: (1) data validation with Great Expectations, (2) feature engineering, (3) model training on a GPU job (PyTorchJob via Kubeflow Training Operator or plain Kubernetes Job), (4) evaluation and quality gating, (5) registration in MLflow, and (6) notification (Slack or email) with the evaluation metrics. Each step runs in an isolated container. The pipeline should be re-triggerable on any code or data change. This is the project that best simulates a production-grade training platform and the most common interview-loop system design question in MLOps.",
+        "tech_stack": ["Argo Workflows", "Kubernetes", "Kubeflow Training Operator (PyTorchJob)", "MLflow", "Great Expectations", "Slack webhook or SMTP"],
+        "rubric": [
+          "Each step in its own container image — no single monolithic image for the whole pipeline",
+          "Data validation step uses a Great Expectations checkpoint with at least 5 expectations — pipeline halts on validation failure",
+          "Training step uses a Kubernetes Job with GPU resource requests and backoff limits — not a Pod running directly",
+          "Quality gate step compares against the current Production model baseline from MLflow — not a hardcoded threshold",
+          "Notification step fires for both success and failure, with different message content — observed by the reviewer"
+        ]
+      },
+      {
+        "title": "Open-source contribution to an MLOps tool",
+        "difficulty": "Intermediate",
+        "hours": "15-40",
+        "description": "Pick an active open-source MLOps project: MLflow, Feast, Evidently AI, Ray, Argo Workflows, Kubeflow, DVC, Prefect. Find a good-first-issue, a documentation gap you hit while learning, or a bug you encountered in your projects. Submit a PR. Survive the review process. Ship it. One merged contribution to a production-grade MLOps tool demonstrates engineering maturity that no solo project can replicate.",
+        "tech_stack": ["whichever project you contribute to"],
+        "rubric": [
+          "PR is merged — un-merged PRs are noted, not featured",
+          "Your change includes a test that fails on main and passes on your branch",
+          "You respond to all review comments within 48 hours, professionally",
+          "Commit message follows the project's convention exactly",
+          "README links the merged PR with a one-line description of what you fixed or added"
+        ]
+      },
+      {
+        "title": "Capstone: end-to-end ML platform slice, documented as a system design",
+        "difficulty": "Advanced",
+        "hours": "60-90",
+        "description": "Build and document a coherent end-to-end slice of an ML platform: data ingestion → feature store → training pipeline → model registry → serving infrastructure → observability → drift alerting → automated rollback. Every component uses tools from this track. The deliverable is not just the working system — it is a system design document with architecture diagrams, trade-off discussions, and an honest section on what you would do differently at 10x scale. This is the project you present in Staff-level MLOps interviews.",
+        "tech_stack": ["all of the above; pick the right tool for each job"],
+        "rubric": [
+          "Architecture diagram in the README — one image, clear boxes, arrows with labels",
+          "Each technology choice justified in the design doc — not just 'I used MLflow because it's popular'",
+          "Training-serving skew proof: test demonstrating that your feature store eliminates it",
+          "Chaos experiment: what happens when the MLflow server is unavailable during serving? Documented and tested.",
+          "Live URL or a fully-scripted `make deploy` that stands up the entire stack in under 10 minutes from a clean cluster"
+        ]
+      }
+    ],
+    "faqs": [
+      {"q": "How many of these should I actually ship?", "a": "Eight to ten. The capstone and the CI/CD pipeline project are the two most important ones — every MLOps interview will probe you on both. Lead with those when describing your portfolio."},
+      {"q": "Do I need cloud access for any of these?", "a": "No. Every project on this list can run on a local Kubernetes cluster (k3s or kind) plus a $5 VPS. The GPU-required projects (vLLM serving, inference profiler) need 2-4 hours of rental GPU time each, typically under $15 total at current Lambda / Vast / RunPod pricing."},
+      {"q": "What separates a junior-level project from a senior-level one?", "a": "Three things: (1) the system handles failure explicitly — you tested what breaks and documented it, (2) every design choice is justified with a trade-off discussion, not just 'this is what the tutorial used', (3) the project can be re-run from scratch by a stranger with just the README. Junior projects often skip all three."},
+      {"q": "Is Kubernetes overkill for a portfolio project?", "a": "Not for MLOps. Every recruiter for a mid-level MLOps role expects Kubernetes experience. Docker Compose is table stakes. A portfolio project that runs on Kubernetes — even local k3s — is a significant signal differentiator. The counterargument is only valid for very small companies where Docker Compose is genuinely the production stack."},
+      {"q": "Should these projects be on my resume?", "a": "Three featured projects on the resume, each with a one-line tagline, the tech stack, and a live URL or GitHub link. The capstone, the CI/CD pipeline, and the serving/autoscaling project are the highest-signal three. The rest belong on GitHub with a project index README."},
+      {"q": "How do I find good open-source issues to contribute to?", "a": "MLflow and Evidently AI both label issues good-first-issue and have active maintainers who respond quickly to PRs. Feast has a smaller community but very responsive. Avoid huge monorepos (Airflow, Ray) as a first contribution — the review cycle is long and the onboarding cost is high. Documentation fixes, test coverage additions, and small API ergonomics bugs are the fastest path to a merged contribution."},
+      {"q": "What if a project doesn't work after I spend 30 hours on it?", "a": "Write up the failure. 'I tried to implement X, hit problems Y and Z, investigated and found root cause W, and here is what I would do differently' is a stronger portfolio entry than a toy project that works because you followed a tutorial exactly. MLOps is fundamentally about handling failures — demonstrating you can learn from them is more signal than demonstrating everything went right."}
+    ]
+  },
+  "certifications": {
+    "intro": "MLOps certifications follow the same 'shipped work beats a badge' rule as every other AI specialisation — but more strongly, because this is an operational role. No hiring manager will prefer a Coursera completion certificate over a candidate with a working CI/CD pipeline and a Kubernetes deployment in their GitHub. The certifications below are recommended because they cover structured knowledge that is hard to pick up from scattered blog posts, and several test applied skills the interview panel will probe. The two paid exceptions (CKA and GCP Professional ML Engineer) are called out explicitly — take them only if your employer reimburses or the role requires them.",
+    "items": [
+      {
+        "name": "Machine Learning Engineering for Production (MLOps) Specialization",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/machine-learning-engineering-for-production-mlops",
+        "employer_signal": "Strong. Andrew Ng's name clears the 'does this person know the fundamentals?' question for screeners. The four-course specialisation covers concept drift, data-centric ML, model serving, and pipeline automation — directly aligned with the daily MLOps role. The most credentialed-name MLOps program available for free.",
+        "best_for": "Engineers moving into MLOps from software engineering or ML backgrounds who want structured coverage of the entire lifecycle before building their own platform."
+      },
+      {
+        "name": "Made With ML — MLOps course",
+        "provider": "Made With ML / Goku Mohandas (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 40,
+        "url": "https://madewithml.com/",
+        "employer_signal": "Strong — especially with practitioners. The course is code-first, covers testing, CI/CD, serving, and monitoring with real tooling rather than toy examples, and has a well-known reputation in the applied ML community.",
+        "best_for": "Engineers who prefer code-first learning over lecture-first. The GitHub repo that comes with the course is a working reference implementation of a full MLOps pipeline."
+      },
+      {
+        "name": "Full Stack Deep Learning (FSDL)",
+        "provider": "FSDL (free lecture recordings, labs, notes)",
+        "cost_usd": 0,
+        "prep_hours": 50,
+        "url": "https://fullstackdeeplearning.com/course/",
+        "employer_signal": "Strong in ML engineering circles. FSDL covers the full lifecycle from data collection to production deployment with a pragmatic, practitioner-oriented perspective. Not a hands-held tutorial — it treats the learner as a working engineer.",
+        "best_for": "Engineers with some ML background who want the 'how do you actually ship this?' perspective. Particularly strong on tooling trade-offs and the organisational context for ML systems."
+      },
+      {
+        "name": "Kubernetes the Hard Way (Kelsey Hightower)",
+        "provider": "GitHub (free, self-directed)",
+        "cost_usd": 0,
+        "prep_hours": 25,
+        "url": "https://github.com/kelseyhightower/kubernetes-the-hard-way",
+        "employer_signal": "Strong as a practitioner signal. 'I did Kubernetes the Hard Way' tells an interviewer you understand what the control plane actually does, not just how to apply YAML. This is not a certification — it is a self-directed lab that produces deep understanding.",
+        "best_for": "Any engineer who needs Kubernetes depth rather than Kubernetes familiarity. Strongly recommended before preparing for the CKA."
+      },
+      {
+        "name": "Certified Kubernetes Administrator (CKA)",
+        "provider": "Linux Foundation / CNCF (paid — $395, discounts available)",
+        "cost_usd": 395,
+        "prep_hours": 60,
+        "url": "https://training.linuxfoundation.org/certification/certified-kubernetes-administrator-cka/",
+        "employer_signal": "Strong for platform-focused roles. CKA is a hands-on, proctored exam — you debug a live cluster under time pressure, which makes it a meaningful signal, not just a knowledge test. Take it only if your employer reimburses or if you are targeting roles where Kubernetes is the primary infrastructure concern.",
+        "best_for": "MLOps Engineers who want the most credible Kubernetes signal and are targeting ML Platform Engineer or Platform SRE roles. Pair with Kubernetes the Hard Way as the prep material."
+      },
+      {
+        "name": "GCP Professional Machine Learning Engineer",
+        "provider": "Google Cloud (paid — $200, free study materials)",
+        "cost_usd": 200,
+        "prep_hours": 80,
+        "url": "https://cloud.google.com/learn/certification/machine-learning-engineer",
+        "employer_signal": "Moderate-to-strong for GCP-heavy organisations. Covers Vertex AI, BigQuery ML, managed pipelines, and cloud MLOps architecture. Employer-reimbursable in most mid-to-large tech companies — take it if your team runs on GCP and the company pays. Skip if you are on AWS or your team is cloud-agnostic.",
+        "best_for": "MLOps Engineers at GCP-first organisations who want the Google-flavoured managed-platform credential. Free study materials (Google Cloud Skills Boost) are worth reading regardless of whether you sit the exam."
+      },
+      {
+        "name": "AWS Certified Machine Learning — Specialty",
+        "provider": "Amazon Web Services (paid — $300, free prep materials)",
+        "cost_usd": 300,
+        "prep_hours": 80,
+        "url": "https://aws.amazon.com/certification/certified-machine-learning-specialty/",
+        "employer_signal": "Moderate-to-strong for AWS-heavy organisations. Covers SageMaker, Data Wrangler, ML pipelines, and AWS managed services. Same employer-reimbursement caveat as the GCP cert — take it only if your company pays and runs on AWS. Does not substitute for Kubernetes depth.",
+        "best_for": "MLOps Engineers at AWS-first organisations. The free prep materials from AWS Skill Builder are worth reading for the SageMaker architecture coverage even without sitting the exam."
+      },
+      {
+        "name": "Designing Machine Learning Systems (Chip Huyen) — must-read",
+        "provider": "O'Reilly (book — ~$60, library access often free)",
+        "cost_usd": 60,
+        "prep_hours": 30,
+        "url": "https://www.oreilly.com/library/view/designing-machine-learning/9781098107956/",
+        "employer_signal": "Not a certification but routinely cited in interviews as the single most useful resource for MLOps system design thinking. If you read one book on this list, this is it. Covers data distribution shifts, feature engineering, model development, deployment, and monitoring from a systems perspective.",
+        "best_for": "Any MLOps Engineer preparing for system design interviews or wanting a conceptual framework for the decisions this track's projects require. Chapter 8 (Data Distribution Shifts and Monitoring) is worth reading three times."
+      },
+      {
+        "name": "Linux Foundation MLOps for Everyone",
+        "provider": "Linux Foundation (free self-paced course via edX)",
+        "cost_usd": 0,
+        "prep_hours": 20,
+        "url": "https://www.edx.org/learn/machine-learning/the-linux-foundation-mlops-for-everyone",
+        "employer_signal": "Light as a standalone line item, but the Linux Foundation brand adds institutional credibility. Good conceptual grounding for the lifecycle and terminology. Best used as a fast survey before going deep with Made With ML or DeepLearning.AI.",
+        "best_for": "Engineers brand-new to MLOps who want a one-weekend conceptual map before committing to a longer program. Not a substitute for the more applied courses on this list."
+      },
+      {
+        "name": "Kubeflow — Official documentation and tutorials",
+        "provider": "kubeflow.org (free)",
+        "cost_usd": 0,
+        "prep_hours": 20,
+        "url": "https://www.kubeflow.org/docs/started/introduction/",
+        "employer_signal": "Not a certification but the authoritative reference for Kubernetes-native ML pipelines. Working through the Getting Started documentation and deploying the full Kubeflow distribution is a rite of passage that teaches both the MLOps patterns and the Kubernetes operator model simultaneously.",
+        "best_for": "Engineers who want depth on the Kubernetes-native ML orchestration patterns before using managed equivalents like Vertex AI Pipelines or Amazon SageMaker Pipelines."
+      }
+    ],
+    "employer_data": "Based on 90-day aggregate data from the AutomateEdge jobs pipeline, explicit certification requirements appear in under 5% of MLOps / ML Platform Engineer postings. Cloud-specific certs (AWS ML Specialty, GCP Professional ML Engineer) appear in 8-12% of cloud-platform-specific roles. What appears in 65%+ of postings: Kubernetes experience, Python proficiency, CI/CD pipeline experience, model monitoring, and at least one of Airflow / Prefect / Dagster. The practical implication: certifications are useful for structured learning, not for passing the résumé filter. A GitHub with a working Kubernetes-based ML pipeline outranks any badge in this domain.",
+    "faqs": [
+      {"q": "Should I do CKA before or after learning Kubernetes on the job?", "a": "After. The CKA requires you to debug a live cluster under time pressure — it tests operational fluency, not knowledge. Attempt it after you have spent 3-6 months actually operating Kubernetes clusters, ideally after completing Kubernetes the Hard Way. A cold-study CKA pass is possible but the knowledge atrophies faster when it was not built on real experience."},
+      {"q": "Is the DeepLearning.AI MLOps specialisation still relevant in 2026?", "a": "Yes for the concepts (data drift, serving, monitoring, CI/CD for models), with the caveat that the specific tool versions are dated. The conceptual framework is sound; supplement with the Made With ML course and the official documentation for the current tool versions when you go hands-on."},
+      {"q": "Which is more valuable: CKA or AWS ML Specialty?", "a": "CKA, unless you are targeting exclusively AWS-managed-service roles. Kubernetes is cloud-portable; AWS ML Specialty is cloud-specific. At senior MLOps levels, Kubernetes depth is a universal signal whereas AWS-specific knowledge is only valued at AWS shops."},
+      {"q": "Is 'Designing Machine Learning Systems' worth the price?", "a": "Yes, and check your local public library first — many carry it via OverDrive or Hoopla. The chapters on data distribution shifts, feature engineering debt, and ML in production are direct preparation for 70% of MLOps interview questions. It is not a tutorial; it is a framework."},
+      {"q": "Should I pay for the verified certificate on Coursera?", "a": "Usually not. Audit-free gives you the material; the paid PDF adds marginal resume signal. The exception is the CKA, where the proctored, live-cluster format is the signal — the certificate cannot be separated from the exam experience."},
+      {"q": "How many certifications should appear on my resume?", "a": "Two to three, maximum. CKA plus DeepLearning.AI MLOps Specialization is a strong pair for MLOps roles. Adding a cloud-specific cert if your target employers are on that cloud is reasonable. Beyond three, it reads as cert-collecting rather than engineering depth."},
+      {"q": "Is there a free alternative to the paid cloud ML certs?", "a": "The free study materials for both GCP and AWS are substantive. Google Cloud Skills Boost has free lab credits for ML paths. AWS Skill Builder has free digital training. Going through the study materials without sitting the exam gives you 80% of the knowledge at 0% of the cost — rational if your employer won't reimburse."},
+      {"q": "Where does Made With ML rank against the DeepLearning.AI specialisation?", "a": "They complement rather than replace each other. DeepLearning.AI gives you the conceptual framework with Andrew Ng's rigour. Made With ML gives you the implementation with a working codebase. Both are worth doing in the sequence: DeepLearning.AI first for the mental model, Made With ML second for the hands-on grounding."}
+    ]
+  },
+  "salary": {
+    "intro": "The salary ranges below are US market aggregates for MLOps Engineer and ML Platform Engineer titles in 2026 Q1. MLOps comp tracks ML Engineer closely at junior-to-mid levels and exceeds it at senior-plus at hyperscalers, where owning shared infrastructure across hundreds of ML teams commands a premium. The role is rare enough that the market is thin — there are fewer MLOps engineers than ML engineers, so the supply-demand signal is distinctly favorable. Regional multipliers follow the overall software-engineering pattern. Hiring velocity data comes from the AutomateEdge jobs pipeline, refreshed quarterly.",
+    "update_date": "2026-04-24",
+    "bands_us": [
+      {"level": "Entry (L2/L3, 0-2 yrs)", "base_low": 130000, "base_high": 175000, "total_comp_low": 160000, "total_comp_high": 260000, "notes": "Entry MLOps roles are rarer than entry ML Engineer roles — most companies prefer to hire more experienced engineers who can run the platform independently. A portfolio with a working Kubernetes-based ML pipeline and a CI/CD project is effectively mandatory to land this level."},
+      {"level": "Mid (L4, 2-5 yrs)", "base_low": 170000, "base_high": 230000, "total_comp_low": 230000, "total_comp_high": 390000, "notes": "The most active hiring band. Mid-level MLOps engineers own complete pipeline slices end-to-end. Transition point where on-call maturity, incident post-mortems, and platform-design experience begin to differentiate candidates."},
+      {"level": "Senior (L5, 5-8 yrs)", "base_low": 215000, "base_high": 290000, "total_comp_low": 315000, "total_comp_high": 590000, "notes": "Compensation at this level is dominated by equity. Senior MLOps engineers own subsystem architecture — the serving layer, the feature store, the training platform — and make build-vs-buy decisions. Comp spread is wide because equity grants at pre-IPO AI companies vs public hyperscalers vary 4-6x."},
+      {"level": "Staff (L6, 8-12 yrs)", "base_low": 270000, "base_high": 370000, "total_comp_low": 470000, "total_comp_high": 880000, "notes": "Staff MLOps engineers influence platform architecture across multiple ML teams, set the MLOps standards and toolchain for the organisation, and represent the team in cross-company infrastructure decisions. Hyperscaler comp at this level is top-decile across all software roles."},
+      {"level": "Principal (L7+, 10+ yrs)", "base_low": 335000, "base_high": 480000, "total_comp_low": 680000, "total_comp_high": 1500000, "notes": "Rare role — fewer than 200 people hold this title at any company. Typically exists only at frontier labs, hyperscalers, and a handful of ML-native companies. The principal sets the multi-year technical direction for how the company builds and operates its ML systems. Comp routinely exceeds $1M TC at top-of-market."}
+    ],
+    "bands_regions": [
+      {"region": "SF Bay Area", "multiplier": 1.15, "note": "The reference market for MLOps roles. The highest concentration of ML-heavy companies means competition for platform engineers is intense. Total comp at hyperscalers and frontier labs (Google, Meta, OpenAI, Anthropic, Databricks) is significantly above the reference market."},
+      {"region": "NYC / Seattle / Boston", "multiplier": 1.08, "note": "Near-peer to SF. AWS-heavy Seattle has a particularly strong MLOps market due to SageMaker and Amazon's internal ML footprint. Boston has a growing ML infrastructure cluster around MIT/Harvard adjacent companies."},
+      {"region": "Other major US metros (Austin, Chicago, Denver, Raleigh)", "multiplier": 0.93, "note": "Moderate discount. Remote-work normalisation has compressed the gap to roughly 7% below SF in 2026. Specialist MLOps roles retain slightly less discount than generic software roles due to lower local supply."},
+      {"region": "Fully remote US", "multiplier": 0.90, "note": "Remote MLOps roles exist but are less common than remote SWE roles — platform teams often prefer co-location for incident response. Expect a 10% discount on base with variability by company culture."},
+      {"region": "Toronto / Montreal (CAD)", "multiplier": 0.65, "note": "CAD comp runs materially below US at junior-mid. Senior MLOps roles at Canadian AI labs (Vector Institute affiliate companies, Cohere's Toronto office) approach 75-80% of US equivalent TC when equity is included."},
+      {"region": "Western Europe (EUR)", "multiplier": 0.55, "note": "Strong discount vs US at all levels. Exceptions: London, Amsterdam, and Paris AI-native companies pay near US senior rates at mid-to-senior level. German automotive and industrial ML companies pay significantly below the tech-company benchmark."},
+      {"region": "India (INR)", "multiplier": null, "note": "Separate market. Entry MLOps: ₹10-22 LPA. Mid: ₹25-55 LPA. Senior at product companies and GCCs: ₹60-130 LPA. Top-of-market (frontier lab India offices, Staff+): ₹175+ LPA. MLOps roles are less common than ML Engineer roles in India; the scarcity premium is visible at senior levels."},
+      {"region": "Southeast Asia (SGD / MYR)", "multiplier": null, "note": "Singapore: entry S$70-100k, mid S$110-170k, senior S$180-320k. MLOps as a distinct role is newer in SEA markets; many companies fold it into the ML Engineer title. Other SEA markets run 40-60% of Singapore levels."}
+    ],
+    "velocity": {
+      "jobs_last_90d_us": "The AutomateEdge pipeline tracked approximately 1,100 US-based roles explicitly titled MLOps Engineer, ML Platform Engineer, or ML Infrastructure Engineer over the trailing 90 days — up 28% year-over-year. Growth is faster than the broader AI/ML market, reflecting the maturation of ML deployments at companies that moved from experimentation to production over 2023-2025.",
+      "avg_days_to_fill": "Median time-to-fill for MLOps roles is 52 days — materially longer than general SWE (34 days) and longer than ML Engineer (45 days). The supply of candidates with real Kubernetes + CI/CD + ML pipeline experience remains thin. Senior roles run 75+ days. This is a favorable market for qualified candidates.",
+      "top_hiring_companies": [
+        "Google (GCP Vertex AI, internal ML platform, Search, YouTube ranking)",
+        "Meta (ML Platform, PyTorch Infrastructure, Ranking Infra)",
+        "Amazon / AWS (SageMaker, Amazon Personalize, Prime Video ML)",
+        "Microsoft / OpenAI (Azure ML, Serving Infra)",
+        "Databricks (MLflow, Feature Store, LakehouseIQ)",
+        "Airbnb, Lyft, Uber (mature ML platform teams, large open-source footprint)",
+        "Stripe, Robinhood, DoorDash (high-traffic ML ranking / fraud / recommendations)",
+        "Well-funded AI-native companies (Cohere, Mistral, Perplexity, Hugging Face)"
+      ],
+      "trending_skills": [
+        "LLM serving infrastructure — vLLM, SGLang, Triton (up 210% YoY)",
+        "GPU cost optimisation and scheduling (up 160% YoY)",
+        "Feature store design and operation (up 90% YoY)",
+        "Model observability and drift detection (up 85% YoY)",
+        "Argo Workflows / Prefect for ML pipelines (up 70% YoY)",
+        "Kubernetes operators and custom controllers (up 55% YoY)",
+        "MLflow at scale — multi-tenant registry, remote artefact stores (up 50% YoY)"
+      ]
+    },
+    "negotiation_tips": [
+      "Collect three offers before negotiating. The MLOps market is thin enough that two competing offers gives you real leverage — use it.",
+      "Frame the ask in terms of infrastructure impact. 'I cut GPU costs 30% in my last role' lands harder than 'I have 5 years of experience.' Quantify the platform impact you delivered.",
+      "Ask total-comp, not base. At senior levels, 40-60% of comp is equity. Get the grant amount, the cliff, the vesting schedule, and the most recent 409A valuation before comparing offers.",
+      "Push on sign-on for the GPT-cost cliff: if you are joining a company where your work will immediately save them GPU spend, the sign-on is the cleanest negotiating lever.",
+      "Get the on-call scope in writing. MLOps roles vary from 'best-effort support' to 'you are the primary on-call for 50 models every night.' That is a salary factor, not a job perk.",
+      "Know the difference between principal and staff scope at the company you are joining — titles are not standardised. Ask directly: 'what is the scope difference between the staff and senior role you are hiring for?' before negotiating the level.",
+      "Remote-work permanence matters more than base salary for long-horizon comp. Negotiate the WFH policy in the same conversation as the offer number — switching companies because of a return-to-office mandate costs you more than a $10k base difference."
+    ],
+    "sources": [
+      {"name": "levels.fyi — MLOps / ML Infrastructure engineer distributions", "url": "https://www.levels.fyi/t/software-engineer/focus/ml-ai"},
+      {"name": "Glassdoor — MLOps Engineer salaries", "url": "https://www.glassdoor.com/Salaries/mlops-engineer-salary-SRCH_KO0,14.htm"},
+      {"name": "US BLS — Computer + Information Research Scientists", "url": "https://www.bls.gov/ooh/computer-and-information-technology/computer-and-information-research-scientists.htm"},
+      {"name": "LinkedIn Economic Graph — Jobs on the Rise 2026", "url": "https://economicgraph.linkedin.com/"},
+      {"name": "AutomateEdge jobs pipeline (internal aggregation)", "url": "https://automateedge.cloud/jobs"}
+    ],
+    "faqs": [
+      {"q": "Does MLOps pay more than ML Engineer?", "a": "At entry-to-mid, the bands overlap almost entirely. At senior and above at hyperscalers and frontier labs, MLOps / ML Platform Engineers tend to earn 5-15% more than ML Engineers of equivalent tenure, because they own shared infrastructure that multiplies the output of dozens of ML teams. The premium is for leverage, not for prestige."},
+      {"q": "How fast does pay grow in the first five years for MLOps?", "a": "Entry to mid roughly doubles TC for strong performers ($160k → $320k range). Mid to senior adds another 35-55%. Gains plateau at senior unless you make a lateral move to a higher-paying company or make the staff transition. Job-hopping at the 3-year mark is the most reliable pay-growth mechanism — internal promotions rarely fully price in market movement."},
+      {"q": "Is GPU cost to the company relevant to salary negotiations?", "a": "Yes, and it is underused by candidates. If you can quantify the GPU spend you managed or optimised in your last role, it translates directly to cost-savings language that resonates with engineering leadership and compensation committees. 'I reduced GPU idle time by 35%, saving $400k annually' is a more compelling negotiation anchor than any title or tenure argument."},
+      {"q": "Do remote MLOps roles pay less?", "a": "A modest 8-12% discount persists for fully remote roles versus co-located equivalents. The gap was larger (18-22%) in 2022-2023 and has compressed. Expect continued convergence as the supply shortage makes companies willing to accept remote for the right candidate."},
+      {"q": "Is the MLOps job market thin enough to worry about?", "a": "Thin in the sense that there are fewer MLOps roles than ML Engineer roles — approximately 40-50% as many open positions in any given quarter. This is a supply-demand advantage, not a risk. Your probability of finding a good role is lower in absolute numbers but higher as a percentage of your applications because the qualified-candidate pool is also smaller."},
+      {"q": "How much of senior MLOps pay is equity at pre-IPO companies?", "a": "Often 60-80% of the total comp picture, which carries significant valuation risk. Discount private equity by 40-60% when comparing a pre-IPO offer to a public-company offer at equivalent base — the paper value is real only if the company has a liquid exit. This is not a reason to avoid pre-IPO offers; it is a reason to negotiate base more aggressively when the equity is illiquid."},
+      {"q": "What's the comp delta between a general-purpose SRE and an MLOps Engineer?", "a": "At L4-L5 they are comparable. At L5-L6, MLOps commands a 10-20% premium at ML-heavy companies because the domain knowledge (drift detection, feature stores, GPU scheduling, model governance) is rarer than general SRE skills. The premium is highest at companies where the ML system's quality directly drives revenue — recommendation, ranking, fraud detection, personalisation."}
+    ]
+  },
+  "career_path": {
+    "intro": "MLOps career ladders are less standardised than traditional software engineering tracks — the role is young enough that title conventions vary significantly across companies. A 'Senior MLOps Engineer' at a 50-person AI startup may have broader scope than a 'Staff MLOps Engineer' at a large enterprise. The stages below describe the common patterns at mid-to-large technology companies where the role exists as a distinct function. Expect non-linear progression, lateral moves from adjacent roles (SRE, Backend Engineering, ML Engineering), and the occasional re-labeling as 'ML Platform Engineer' or 'ML Infrastructure Engineer' without a meaningful scope change.",
+    "stages": [
+      {
+        "year_range": "Year 0-2 — Entry (L2/L3)",
+        "title": "MLOps Engineer / ML Platform Engineer (junior)",
+        "focus": "You execute well-scoped platform tasks under a senior's direction. Typical first-year work: deploy a model to an existing serving infrastructure, add a metric to an existing Grafana dashboard, update a Helm chart, add a step to an existing Argo Workflow. The ramp is steep because the system is complex — your primary output is building mental models of why the platform is designed the way it is.",
+        "typical_tasks": [
+          "Deploy a new model version to the existing serving infrastructure under review",
+          "Write a drift-detection job for a new feature set using Evidently AI",
+          "Update a CI/CD pipeline to add a new quality gate metric",
+          "Respond to on-call alerts for serving latency under a senior's guidance",
+          "Write runbook documentation for the two most common incident types"
+        ],
+        "skills_gained": ["Kubernetes operational fluency", "MLflow and serving runtime fundamentals", "on-call discipline", "technical writing for runbooks"],
+        "comp_us": "TC $160k-$260k",
+        "next_step": "Own a complete pipeline end-to-end without direction. Your pull requests are approved without architectural comments. You handle a production incident start-to-finish and write the post-mortem alone.",
+        "common_transitions_in": ["SRE with Python background", "Backend engineer who shadowed ML teams", "ML Engineer who specialised into platform work", "Data Engineer with Kubernetes exposure"]
+      },
+      {
+        "year_range": "Year 2-5 — Mid (L4)",
+        "title": "MLOps Engineer / ML Platform Engineer",
+        "focus": "You own project-sized platform work start-to-finish. You design the CI/CD pipeline for a new ML use case, choose the serving runtime, spec the monitoring requirements, and deliver the whole slice. Domain expertise emerges — you develop a depth area, typically one of: serving infrastructure, training pipelines, feature stores, or observability. You begin mentoring juniors on incident response and platform conventions.",
+        "typical_tasks": [
+          "Design and build the serving infrastructure for a new ML product from scratch",
+          "Migrate an existing Airflow-based training pipeline to Argo Workflows",
+          "Implement a drift detection system for a ranking model with automated alerting",
+          "Lead a post-mortem for a high-severity production incident — root cause + prevention",
+          "Participate in hiring loops — technical screens for MLOps candidates"
+        ],
+        "skills_gained": ["Full platform ownership", "cross-functional communication with ML and data engineering teams", "incident-leadership skills", "a depth area in one platform component"],
+        "comp_us": "TC $230k-$390k",
+        "next_step": "Senior promotion requires owning the architecture of one platform subsystem and demonstrating that your technical decisions are legible to the engineering manager above yours. Impact beyond your team is the key signal.",
+        "common_transitions_in": ["SRE transitioning fully into ML infrastructure", "ML Engineer who has shipped multiple production models and wants to own the platform", "DevOps Engineer with growing ML domain knowledge"]
+      },
+      {
+        "year_range": "Year 5-8 — Senior (L5)",
+        "title": "Senior MLOps Engineer / ML Infrastructure Tech Lead",
+        "focus": "You own the architecture of one major platform subsystem — the serving layer, the training platform, the feature store, or the observability stack. You are the person the team routes novel technical problems to. You choose between build-vs-buy, write the technical strategy documents that shape a quarter's roadmap, and your architectural opinions carry weight in cross-team decisions. You regularly interact with ML teams as a platform customer, balancing platform-engineering goals against ML-productivity goals.",
+        "typical_tasks": [
+          "Design the company's model serving architecture for the next 18 months — capacity, multi-tenancy, cost model",
+          "Write the RFC for migrating from Airflow to Argo Workflows with a migration plan and rollback strategy",
+          "Build the team-level on-call runbook and escalation structure",
+          "Drive the evaluation and selection of drift-detection tooling for the entire organisation",
+          "Lead the technical interview loop for senior hires — design questions + debrief"
+        ],
+        "skills_gained": ["Subsystem architecture ownership", "technical strategy writing", "cross-functional leadership", "platform as a product mindset"],
+        "comp_us": "TC $315k-$590k",
+        "next_step": "Staff path requires cross-team impact — your decisions shape the platform decisions of multiple ML teams, not just your own. Some engineers pause at senior permanently; it is a high-paying, high-impact position that does not require the org-navigation overhead of staff work.",
+        "common_transitions_in": ["Platform engineer from a non-ML background who has developed ML domain expertise", "ML Engineer who has owned the platform work for 3+ years"]
+      },
+      {
+        "year_range": "Year 8-12 — Staff (L6)",
+        "title": "Staff MLOps Engineer / ML Infra Lead",
+        "focus": "You influence platform architecture across multiple ML teams and potentially across the whole organisation. You set the MLOps toolchain standards, sponsor major platform migrations, and represent the ML infrastructure perspective in company-wide technical decisions. On the IC path, you are working on the hardest infrastructure problem in the organisation. On the management path (ML Infra Lead / Engineering Manager), you lead a team of 6-12 platform engineers. The IC/management split is usually clean by this level.",
+        "typical_tasks": [
+          "Define the company-wide standards for model deployment, versioning, and rollback",
+          "Drive the multi-quarter migration from a legacy training infrastructure to a Kubernetes-native platform",
+          "Represent the ML infrastructure team to the CTO and VP of Engineering on quarterly planning",
+          "Publish externally — blog posts, conference talks at KubeCon / MLSys / NeurIPS",
+          "If manager: own team headcount planning, performance management, and hiring strategy for the ML platform team"
+        ],
+        "skills_gained": ["Organisational-level technical influence", "long-horizon platform strategy", "external brand building", "leveraged impact through platform teams"],
+        "comp_us": "TC $470k-$880k",
+        "next_step": "Principal or Head of ML Platform. The IC path becomes very narrow after staff — there are far fewer principal roles than staff roles. The management path leads to Director of ML Platform Engineering or VP of Infrastructure.",
+        "common_transitions_in": ["Senior MLOps engineers with 2+ years of cross-team impact", "SRE directors who develop ML domain expertise", "Occasionally: ML Engineering managers who shift ownership to the platform side"]
+      },
+      {
+        "year_range": "Year 12+ — Principal / Distinguished / Head of ML Platform",
+        "title": "Principal MLOps Engineer / Distinguished Engineer / Head of ML Platform",
+        "focus": "Your output is decisions, standards, and people — not PRs. On the IC path, you set the technical direction for how the entire organisation builds, deploys, and operates its ML systems. You are the author of the multi-year platform bets that determine whether the company can scale its ML footprint. On the management path, you run a 20-100 person ML infrastructure organisation. Both paths require external reputation — conference talks, published writing, open-source contributions that ML practitioners recognise.",
+        "typical_tasks": [
+          "Define the 3-5 year technical strategy for the ML platform — what you build, what you buy, what you deprecate",
+          "Set compensation philosophy and hiring strategy for the entire ML infrastructure organisation",
+          "Sponsor and review the most complex platform migrations — final sign-off on architectural changes with company-wide impact",
+          "Build and maintain external technical brand — recognized speaker or author in the MLOps community",
+          "Represent the company's ML infrastructure perspective to regulators, partners, and customers"
+        ],
+        "skills_gained": ["Executive-level technical communication", "talent market intelligence", "long-horizon risk tolerance", "platform-organisation design"],
+        "comp_us": "TC $680k-$1.5M+",
+        "next_step": "Retirement, founding an MLOps tooling company, advisory-only roles, or a CTO / VP Engineering path at a smaller organisation. Several founding teams of well-known MLOps tooling companies (Weights & Biases, Tecton, Arize, Evidently AI) were staffed from this level.",
+        "common_transitions_in": ["Staff MLOps Engineers with consistent cross-org impact", "ML Research engineers who shifted to platform as the leverage point", "Infrastructure-focused engineering leaders from adjacent domains (data infrastructure, developer tools)"]
+      }
+    ],
+    "transitions": [
+      "SRE / Platform Engineering → MLOps: The most common path in 2026. SREs with Python proficiency and a genuine interest in ML have all the operational skills and need to build ML domain knowledge — training-serving skew, feature stores, drift detection. 6-12 months of deliberate ML system study closes the gap.",
+      "ML Engineer → MLOps: Equally common. ML engineers who spend significant time on deployment plumbing and CI/CD for their models often formalise into MLOps roles. The gap is usually in Kubernetes depth and infrastructure-as-code — both learnable in 3-6 months with deliberate practice.",
+      "Data Engineer → MLOps: Natural progression for data engineers who already own pipeline orchestration. The gap is in model serving, model registry, and ML-specific monitoring — different from data pipeline monitoring in ways that take time to internalise.",
+      "MLOps → ML Engineering: Less common but real at smaller companies where roles merge. An MLOps engineer who spends time understanding model architectures and fine-tuning can take on ML engineering scope — the reverse is the more-traveled path.",
+      "MLOps → Founding: MLOps tooling is an active startup category. Engineers who have hit the pain points of building ML platforms from scratch are well-positioned to start companies addressing them — Weights & Biases, Tecton, Arize, Evidently AI, and Mosaic ML are all examples of this founding pattern."
+    ],
+    "faqs": [
+      {"q": "Do I need a ML or CS degree to break into MLOps?", "a": "No, and this is one of the least credential-gated paths in the broader AI field. The operational nature of the role means demonstrated Kubernetes and CI/CD experience weighs more heavily than academic background. Several mid-level MLOps engineers at well-known companies have backgrounds in systems administration, networking, or even DevOps without formal CS degrees."},
+      {"q": "How fast can I realistically progress from SRE to mid-level MLOps?", "a": "With deliberate skill-building, 12-18 months. The fastest path is building the projects in this track's portfolio while in your current role, then applying directly for MLOps roles with the portfolio as the differentiator. The ramp inside an MLOps role is faster for SREs because the operational instincts transfer immediately."},
+      {"q": "Is the IC path capped at a certain level for MLOps?", "a": "Practically, Staff (L6) is where most IC MLOps careers end in terms of title progression — there are very few Principal and Distinguished MLOps roles at any company. But the compensation and scope at Staff are genuinely excellent, and the demand for that level is consistently higher than the supply. It is a great local maximum for most engineers."},
+      {"q": "What derails MLOps careers most often?", "a": "Three patterns: (1) staying tooling-focused without developing system-design perspective — you can deploy models but cannot design a feature store architecture, (2) under-investing in the ML domain knowledge side of the role — you are an SRE who deploys models, not an engineer who understands what the models are doing, (3) on-call burnout from under-staffed ML platforms where one engineer owns too many systems."},
+      {"q": "How common are lateral moves from SRE at my current company vs joining a new company as MLOps?", "a": "Both are viable, but the new-company path tends to produce faster comp growth. If your current employer has an active ML platform team, a lateral move is faster and lower-risk. If they don't, you will need to build the ML domain knowledge on your own time and then sell it in interviews — a new company hire is more credible if you have the portfolio to back it up."},
+      {"q": "What's the difference between MLOps Engineer and ML Platform Engineer?", "a": "The titles are used interchangeably in most job postings in 2026. When a distinction is made: MLOps Engineer tends to emphasise the full ML lifecycle (training, evaluation, monitoring, retraining) while ML Platform Engineer emphasises the infrastructure layer (compute, serving, scheduling, resource management). In practice, both roles do both things. Pick the title your target companies use most; learn both bodies of knowledge."},
+      {"q": "How do I get my first MLOps job with no direct experience?", "a": "Three moves: (1) build three of the portfolio projects in this track — the CI/CD pipeline, the Kubernetes serving project, and the drift detection system are the highest-signal trio, (2) contribute to an open-source MLOps tool to demonstrate you can work in production-grade codebases, (3) target companies with growing ML footprints and emphasise your SRE or backend engineering experience as the foundation — the ML domain knowledge is learnable on the job; Kubernetes and CI/CD experience is not."}
+    ]
+  }
+}

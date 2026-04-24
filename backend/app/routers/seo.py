@@ -110,6 +110,13 @@ async def sitemap_pages(db: AsyncSession = Depends(get_db)) -> Response:
     urls.append(_url(f"{base}/vs", today, 0.7))
     for s in _vs_slugs():
         urls.append(_url(f"{base}/vs/{s}", today, 0.8))
+    # SEO-20 + SEO-24: roadmap hub + per-track hub + 6 section pages per track.
+    from app.routers.track_pages import all_track_slugs, all_section_slugs
+    urls.append(_url(f"{base}/roadmap", today, 0.9))
+    for ts in all_track_slugs():
+        urls.append(_url(f"{base}/roadmap/{ts}", today, 0.85))
+        for sec in all_section_slugs():
+            urls.append(_url(f"{base}/roadmap/{ts}/{sec}", today, 0.75))
     return Response(content=_xml(urls), media_type="application/xml",
                     headers=_CACHE_1H)
 

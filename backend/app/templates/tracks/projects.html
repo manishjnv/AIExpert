@@ -1,0 +1,128 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.projects %}
+
+{% block page_title %}{{ track.name }} Portfolio Projects — 15 Shippable Ideas (2026) — AutomateEdge{% endblock %}
+{% block description %}10-15 portfolio projects a {{ track.name }} should ship in 2026 — each with difficulty, hours, tech stack, and a GitHub evaluation rubric recruiters actually use.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/projects{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Portfolio Projects — 15 Shippable Ideas (2026)") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/projects") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (track.name ~ " — Portfolio Project Catalog") | tojson }},
+  "itemListElement": [
+    {% for p in section.projects %}
+    {
+      "@type": "ListItem",
+      "position": {{ loop.index }},
+      "item": {
+        "@type": "CreativeWork",
+        "name": {{ p.title | tojson }},
+        "description": {{ p.description | tojson }},
+        "educationalLevel": {{ p.difficulty | tojson }},
+        "timeRequired": {{ p.hours | tojson }}
+      }
+    }{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Projects"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Projects</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Portfolio Projects</div>
+<h1>{{ track.name }} Portfolio Projects: 15 Shippable Ideas</h1>
+<p class="lede">{{ section.intro }}</p>
+
+{% for p in section.projects %}
+<h2>{{ loop.index }}. {{ p.title }}</h2>
+<div class="chips">
+  <span>Difficulty · {{ p.difficulty }}</span>
+  <span>{{ p.hours }} hours</span>
+  {% for t in p.tech_stack %}<span>{{ t }}</span>{% endfor %}
+</div>
+<p>{{ p.description }}</p>
+<h3>Evaluation rubric (what recruiters check on your GitHub)</h3>
+<ul class="list">
+  {% for r in p.rubric %}
+  <li>{{ r }}</li>
+  {% endfor %}
+</ul>
+{% endfor %}
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/skills">Skill matrix</a> — proficiency levels per category</li>
+    <li><a href="/roadmap/{{ track.slug }}/tools">Tools inventory</a> — install order + hours to learn</li>
+    <li><a href="/roadmap/{{ track.slug }}/certifications">Certifications</a> — free credentials worth completing</li>
+    <li><a href="/roadmap/{{ track.slug }}/salary">Salary bands</a> — US + regional 2026 comp</li>
+    <li><a href="/roadmap/{{ track.slug }}/career-path">Career path</a> — entry to staff trajectory</li>
+    <li><a href="/jobs">Open {{ track.name }} jobs</a> — apply what you build</li>
+  </ul>
+</div>
+{% endblock %}

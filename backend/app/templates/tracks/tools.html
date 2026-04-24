@@ -1,0 +1,130 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.tools %}
+
+{% block page_title %}{{ track.name }} Tools Inventory — 2026 Install Path — AutomateEdge{% endblock %}
+{% block description %}Every tool a 2026 {{ track.name }} installs, in install order, with hours-to-learn estimates and direct links to official docs.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/tools{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Tools Inventory — 2026 Install Path") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/tools") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (track.name ~ " — Tool Categories") | tojson }},
+  "itemListElement": [
+    {% set ns = namespace(pos=0, total=0) %}
+    {% for cat in section.categories %}{% for item in cat['items'] %}{% set ns.total = ns.total + 1 %}{% endfor %}{% endfor %}
+    {% for cat in section.categories %}{% for item in cat['items'] %}{% set ns.pos = ns.pos + 1 %}
+    {"@type": "ListItem", "position": {{ ns.pos }}, "name": {{ item.tool | tojson }}, "url": {{ item.url | tojson }}, "description": {{ item.purpose | tojson }}}{{ "," if ns.pos < ns.total else "" }}
+    {% endfor %}{% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Tools"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Tools</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Tools</div>
+<h1>{{ track.name }} Tools: 2026 Install Path</h1>
+<p class="lede">{{ section.intro }}</p>
+
+{% for cat in section.categories %}
+<h2>{{ cat.name }}</h2>
+<p>{{ cat.blurb }}</p>
+<table class="grid">
+  <thead><tr><th>Tool</th><th>Purpose</th><th>Hours to learn</th><th>Docs</th></tr></thead>
+  <tbody>
+    {% for item in cat['items'] %}
+    <tr>
+      <td>{{ item.tool }}</td>
+      <td>{{ item.purpose }}</td>
+      <td>{{ item.hours_to_learn }}h</td>
+      <td><a href="{{ item.url }}" target="_blank" rel="noopener nofollow" style="color:#e8a849;text-decoration:none">Official docs →</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<h2>Quickstart install path</h2>
+<p>A step-by-step first-day install that gets you from zero to producing work. Follow in order — later steps assume earlier ones.</p>
+<ol class="list">
+  {% for step in section.install_path %}
+  <li>{{ step }}</li>
+  {% endfor %}
+</ol>
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/skills">Skill matrix</a> — what to master at each proficiency level</li>
+    <li><a href="/roadmap/{{ track.slug }}/projects">Portfolio projects</a> — apply these tools to 10-15 real builds</li>
+    <li><a href="/roadmap/{{ track.slug }}/certifications">Certifications</a> — free credentials recognised by employers</li>
+    <li><a href="/roadmap/{{ track.slug }}/salary">Salary bands</a> — market comp refreshed quarterly</li>
+    <li><a href="/roadmap/{{ track.slug }}/career-path">Career path</a> — entry to staff progression</li>
+    <li><a href="/">Start the 24-week study plan</a> — free, AI-curated</li>
+  </ul>
+</div>
+{% endblock %}

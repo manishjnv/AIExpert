@@ -1,0 +1,114 @@
+{% extends "tracks/_base.html" %}
+
+{% block page_title %}{{ track.name }} Roadmap 2026 — Complete Study Plan — AutomateEdge{% endblock %}
+{% block description %}{{ track.tagline }}{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Roadmap — Complete 2026 Study Plan") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }},
+  "description": {{ track.hero_blurb | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (track.name ~ " — Roadmap Sections") | tojson }},
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/skills") | tojson }}, "name": "Skills"},
+    {"@type": "ListItem", "position": 2, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/tools") | tojson }}, "name": "Tools"},
+    {"@type": "ListItem", "position": 3, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/projects") | tojson }}, "name": "Portfolio projects"},
+    {"@type": "ListItem", "position": 4, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/certifications") | tojson }}, "name": "Certifications"},
+    {"@type": "ListItem", "position": 5, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/salary") | tojson }}, "name": "Salary"},
+    {"@type": "ListItem", "position": 6, "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/career-path") | tojson }}, "name": "Career path"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <span class="here">{{ track.name }}</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · Roadmap</div>
+<h1>{{ track.name }} Roadmap: Complete 2026 Study Plan</h1>
+<p class="lede">{{ track.tagline }}</p>
+
+<div class="callout">{{ track.hero_blurb }}</div>
+
+<div class="chips">
+  <span>{{ track.weeks_total }} weeks</span>
+  <span>{{ track.hours_per_week }}h / week</span>
+  <span>Free</span>
+  <span>AI-curated</span>
+</div>
+
+<h2>Explore the {{ track.name }} track</h2>
+<p>This track is organised as six deep-dive pages. Start with <a href="/roadmap/{{ track.slug }}/skills" style="color:#e8a849">Skills</a> if you are planning your learning; start with <a href="/roadmap/{{ track.slug }}/salary" style="color:#e8a849">Salary</a> if you are weighing a career switch.</p>
+
+<div class="card-row">
+  <a href="/roadmap/{{ track.slug }}/skills" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Skills matrix →</h3><p>The concrete skill ladder with 2026-calibrated proficiency targets.</p></div>
+  </a>
+  <a href="/roadmap/{{ track.slug }}/tools" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Tools inventory →</h3><p>Every tool you install in your first year, with hours-to-learn estimates.</p></div>
+  </a>
+  <a href="/roadmap/{{ track.slug }}/projects" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Portfolio projects →</h3><p>10-15 shippable build ideas with GitHub evaluation rubrics.</p></div>
+  </a>
+  <a href="/roadmap/{{ track.slug }}/certifications" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Certifications →</h3><p>Free certs worth completing — ranked by employer-signal strength.</p></div>
+  </a>
+  <a href="/roadmap/{{ track.slug }}/salary" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Salary bands →</h3><p>US + regional comp data, 2026 Q1, refreshed quarterly.</p></div>
+  </a>
+  <a href="/roadmap/{{ track.slug }}/career-path" style="text-decoration:none;color:inherit">
+    <div class="card"><h3>Career path →</h3><p>Entry to principal progression, with pay and promotion markers.</p></div>
+  </a>
+</div>
+
+<h2>Ready to start?</h2>
+<p>AutomateEdge gives every learner a free, personalized study plan across the track. The platform tracks your weekly progress, evaluates your GitHub projects against the rubrics shown here, and issues a verifiable certificate when you complete the track.</p>
+
+<div class="cross">
+  <h3>Get started</h3>
+  <ul>
+    <li><a href="/">Start the 24-week {{ track.name }} study plan</a> — free, AI-curated, email-reminded</li>
+    <li><a href="/jobs">Open {{ track.name }} jobs</a> — apply what you build</li>
+    <li><a href="/roadmap">Compare all roadmap tracks</a></li>
+    <li><a href="/blog">Read essays on the craft</a></li>
+  </ul>
+</div>
+{% endblock %}

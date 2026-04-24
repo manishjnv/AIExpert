@@ -1,0 +1,700 @@
+{
+  "_meta": {
+    "description": "SEO-20 per-track quintet data for the 'ai-engineer' track. Feeds six pages at /roadmap/ai-engineer/{skills,tools,projects,certifications,salary,career-path}. Salary bands use US market figures from levels.fyi / Glassdoor / BLS 2025-2026; regional multipliers are aggregated estimates. Renewable yearly — bump last_updated + regenerate velocity snapshot from the jobs pipeline.",
+    "last_updated": "2026-04-24"
+  },
+  "slug": "ai-engineer",
+  "name": "AI Engineer",
+  "tagline": "The software engineer who ships AI features to production — owning prompt strategy, retrieval pipelines, evals, latency budgets, and the user-visible quality of AI-powered products.",
+  "hero_blurb": "AI Engineers are the connective tissue between foundation models and the users who depend on them. You will not train models from scratch — you will build the systems that make them useful: RAG pipelines, agentic workflows, structured-output APIs, eval harnesses, and cost-controlled inference layers. The 24-week track takes a working software engineer and turns them into someone who can own the AI layer of any product.",
+  "weeks_total": 24,
+  "hours_per_week": 8,
+  "skills": {
+    "intro": "The AI Engineer skill map below is calibrated against 2026 hiring signals — specifically, the skills that appear in the top 40% of AI Engineer postings across the AutomateEdge jobs pipeline over the last 90 days. The role sits at the intersection of senior software engineering and applied ML: strong production instincts, deep knowledge of LLM APIs, and the ability to quantify quality through evaluation. Proficiency levels follow a four-step ladder: Beginner (can follow tutorials), Intermediate (can build a solution to a new problem), Advanced (can debug production issues), Expert (can design systems from first principles). An AI Engineer clears Advanced across the core API and production categories by week 24; Eval-driven development and agent design follow close behind.",
+    "categories": [
+      {
+        "name": "LLM API mastery",
+        "blurb": "The AI Engineer's primary interface with foundation models is the API. OpenAI, Anthropic, and Google Gemini each expose a chat-completions surface with function-calling, streaming, and structured-output extensions — you need to know all three cold, including their quirks. Deep API knowledge means knowing token budgets, context-window limits, temperature semantics, stop sequences, and how each provider handles system prompts. Provider literacy is a hard hiring signal: interviewers distinguish 'I used ChatGPT' from 'I have production workloads on all three providers.'",
+        "items": [
+          {"skill": "OpenAI Chat Completions + Responses API", "level": "Advanced", "note": "message roles, function-calling schema, tool_choice, response_format JSON mode, logprobs, streaming via SSE. Know the token pricing model for gpt-4o and o-class models."},
+          {"skill": "Anthropic Messages API", "level": "Advanced", "note": "system/human/assistant turns, extended thinking, tool_use blocks, cache_control for prompt caching, streaming with usage events. Claude Sonnet 4 / Opus 4 differences matter for cost-routing decisions."},
+          {"skill": "Google Gemini API", "level": "Intermediate", "note": "GenerateContent, function declarations, grounding with Google Search, multi-modal inputs (vision + audio). Free tier quota management for cost-controlled pipelines."},
+          {"skill": "Prompt engineering patterns", "level": "Advanced", "note": "few-shot, chain-of-thought, step-back, self-consistency, XML-delimited instructions, meta-prompting. Know which pattern solves which class of quality failure."},
+          {"skill": "Structured output + JSON mode", "level": "Advanced", "note": "response_format: {type: json_object}, Pydantic schema injection, constrained decoding. Every LLM response that feeds application logic must be structurally validated before use."},
+          {"skill": "Streaming + partial response handling", "level": "Intermediate", "note": "SSE parsing, buffer management, partial-JSON token accumulation, rendering incomplete structured outputs progressively without breaking the UI."},
+          {"skill": "Provider cost + latency budgeting", "level": "Intermediate", "note": "calculate cost per call, build routing logic (cheap model for drafts, expensive model for final pass), track token spend per user/feature/session."},
+          {"skill": "Prompt caching", "level": "Intermediate", "note": "Anthropic cache_control, OpenAI prompt caching (automatic for 1024+ token prefix). Know the hit-rate conditions and measure cache savings in prod."}
+        ]
+      },
+      {
+        "name": "RAG and retrieval systems",
+        "blurb": "Retrieval-augmented generation is the dominant pattern for injecting knowledge into LLM responses without fine-tuning. A production RAG system is harder than it looks: chunking strategy, embedding quality, retrieval precision, re-ranking, and the prompt that synthesises retrieved context all interact. The AI Engineer owns every layer — from the ingestion pipeline to the eval harness that measures retrieval quality and answer faithfulness.",
+        "items": [
+          {"skill": "Document chunking strategies", "level": "Advanced", "note": "fixed-size, sentence-boundary, semantic, recursive-character, structure-aware (markdown headers, HTML sections). Wrong chunking is the root cause of 60% of RAG quality failures."},
+          {"skill": "Embedding models", "level": "Advanced", "note": "OpenAI text-embedding-3-small/large, Cohere embed v3, sentence-transformers (all-MiniLM, bge-m3, e5-large). Know tradeoffs: latency, cost, dimensionality, multilingual coverage."},
+          {"skill": "Vector databases", "level": "Advanced", "note": "pgvector (Postgres extension — the boring-is-good default), Pinecone, Weaviate. Know HNSW vs IVF index types, metadata filtering, namespace/collection design."},
+          {"skill": "Hybrid search", "level": "Intermediate", "note": "BM25 (sparse) + dense vector search combined via Reciprocal Rank Fusion. Hybrid consistently beats pure-dense on factoid recall. Know when not to bother (all-semantic corpora, short queries)."},
+          {"skill": "Re-ranking", "level": "Intermediate", "note": "Cohere Rerank, cross-encoder models (cross-encoder/ms-marco-MiniLM-L-6-v2), ColBERT late-interaction. Re-ranker improves precision; adds 20-80ms latency — budget accordingly."},
+          {"skill": "RAG quality measurement", "level": "Advanced", "note": "context recall, context precision, faithfulness, answer relevance — the Ragas metric suite. LLM-as-judge for open-ended answer quality. Never ship a RAG change without eval regression."},
+          {"skill": "Semantic caching", "level": "Intermediate", "note": "Cache LLM responses keyed on embedding similarity (GPTCache, Redis + pgvector). Reduces cost 30-70% on conversational workloads with repeated question patterns."}
+        ]
+      },
+      {
+        "name": "Agent design and function-calling",
+        "blurb": "Agents are LLMs that can act — calling APIs, writing files, running queries — across multiple steps. The gap between a demo agent and a production agent is large. Production agents need deterministic tool schemas, dry-run modes for destructive operations, interruption handling, per-turn logging, cost caps, and a fallback path for every tool call that can fail. An AI Engineer should be able to build a reliable single-task agent and articulate clearly why adding more tasks exponentially increases the failure surface.",
+        "items": [
+          {"skill": "OpenAI/Anthropic function-calling / tool_use", "level": "Advanced", "note": "JSON Schema tool definitions, parallel tool calls, required vs optional parameters, handling tool_call_id correlation. The low-level API is the durable skill; framework wrappers change."},
+          {"skill": "ReAct + plan-and-execute patterns", "level": "Intermediate", "note": "Thought-Action-Observation loop, when to use single-step vs multi-step agents, how to detect and break infinite loops. Know where ReAct fails (ambiguous tool selection, long horizons)."},
+          {"skill": "Multi-agent orchestration", "level": "Intermediate", "note": "Orchestrator-worker pattern, task decomposition, inter-agent message passing. OpenAI Swarm architecture, Anthropic multi-agent patterns. Keep the number of agents minimal until the complexity demands it."},
+          {"skill": "Tool design and schemas", "level": "Advanced", "note": "Write tool schemas that constrain the model's choices narrowly. Overly-broad tools cause hallucinated arguments. Every destructive tool needs a dry_run parameter."},
+          {"skill": "Agent memory patterns", "level": "Intermediate", "note": "In-context memory (conversation window), external key-value memory (Redis/SQLite), episodic memory via embedding search. Match the memory architecture to the task scope."},
+          {"skill": "Agent eval and testing", "level": "Intermediate", "note": "Trajectory-level evals (did the agent take the right steps?), outcome evals (did the final answer match?), adversarial inputs for tool-injection. Log every tool call for replay-based debugging."}
+        ]
+      },
+      {
+        "name": "Eval-driven development",
+        "blurb": "The AI Engineer's equivalent of unit testing is the eval harness. Without quantitative evals, every prompt change is a guess. Eval-driven development means you write an eval set before touching a prompt, you run it after every change, and you track regression over time exactly as you track software test coverage. This discipline is rare and coveted — it is the single fastest way to distinguish yourself from engineers who 'do LLM stuff' without accountability.",
+        "items": [
+          {"skill": "Eval harness construction", "level": "Advanced", "note": "Golden-set curation (50-200 examples covering happy paths + edge cases), automatic scorer selection (exact match, regex, semantic similarity, LLM judge), CI integration so evals block bad merges."},
+          {"skill": "LLM-as-judge patterns", "level": "Advanced", "note": "Rubric design (criteria + scale), pairwise preference, reference-guided scoring. Know hallucination traps: position bias, verbosity bias, self-enhancement bias in same-provider judges."},
+          {"skill": "Ragas / TruLens / Promptfoo", "level": "Intermediate", "note": "Ragas for RAG-specific metrics (faithfulness, answer_relevance, context_recall). TruLens for tracing-integrated eval. Promptfoo for prompt regression testing in CI. Know all three; pick based on your pipeline shape."},
+          {"skill": "Regression testing for prompts", "level": "Advanced", "note": "Version prompts in files (never inline strings). Run eval suite on every prompt diff. Track score distributions, not just means — a change that improves median but hurts p5 is usually bad."},
+          {"skill": "A/B testing AI features", "level": "Intermediate", "note": "Rollout gating, shadow mode, metric selection (business KPI vs model quality metric — they diverge), minimum detectable effect sizing for AI-output experiments."}
+        ]
+      },
+      {
+        "name": "Production engineering for AI",
+        "blurb": "AI features have failure modes that traditional software does not: latency spikes from context-length variance, cost blow-ups from runaway agents, quality regressions from silent prompt drift, and PII exposure through poorly-scoped LLM calls. The AI Engineer is responsible for all of these. The skills below are a superset of senior-SWE production skills, augmented for the specifics of model-in-the-loop systems.",
+        "items": [
+          {"skill": "Async Python + FastAPI", "level": "Advanced", "note": "async/await, httpx streaming, background tasks, WebSockets for real-time LLM streaming. Never block the event loop on a synchronous LLM call — 60s p99 latency will kill your product."},
+          {"skill": "LLM observability", "level": "Advanced", "note": "Log every prompt + completion with request_id, model, token counts, latency, cost, user_id. Use LangSmith, Langfuse, or Helicone for aggregation. Redact PII before logging (install_redacting_filter at the entrypoint)."},
+          {"skill": "Latency optimisation", "level": "Advanced", "note": "Streaming reduces perceived latency by 5-10x. Parallel tool calls cut multi-step agent latency. Semantic caching cuts repeat-query cost. Measure P50/P95/P99 — average is misleading."},
+          {"skill": "Cost management", "level": "Advanced", "note": "Per-user spend limits, per-feature budgets, model routing (cheap for drafts, expensive for finals), token count validation before send, prompt compression via summarisation for long sessions."},
+          {"skill": "Safety and guardrails", "level": "Intermediate", "note": "Input validation (allowlist expected patterns, block prompt injection vectors), output validation (Pydantic, regex, refusal detection), Llama Guard / OpenAI Moderation for content-policy enforcement."},
+          {"skill": "Docker + deployment", "level": "Intermediate", "note": "Multi-stage Dockerfiles, Docker Compose for local AI stacks, Modal or Replicate for GPU inference, Caddy/nginx reverse-proxy. Your AI feature must be deployable in under 10 minutes from a fresh clone."},
+          {"skill": "SQL + database patterns", "level": "Intermediate", "note": "Store every LLM interaction in structured form (users, sessions, messages, tool_calls). Async SQLAlchemy with alembic migrations. Prompt/completion logs are the source of truth for debugging and retraining."}
+        ]
+      },
+      {
+        "name": "Systems design for AI",
+        "blurb": "AI Engineers at senior+ levels design architectures, not just implement them. That requires familiarity with the tradeoffs between fine-tuning vs. RAG vs. in-context learning, when to use agents vs. deterministic pipelines, how to design for model swappability, and how to keep your system's quality measurable as the underlying models evolve underneath it.",
+        "items": [
+          {"skill": "RAG vs fine-tuning decision framework", "level": "Advanced", "note": "RAG wins when knowledge changes frequently or latency to update is important. Fine-tuning wins when style/tone matters more than factual retrieval, or when the task is narrow and highly repetitive. Know the cost differential."},
+          {"skill": "Context-window management", "level": "Advanced", "note": "Token budget allocation (system prompt, retrieved context, conversation history, output reserve), dynamic truncation strategies, sliding-window conversation summarisation for long sessions."},
+          {"skill": "Model abstraction layer design", "level": "Intermediate", "note": "Design your AI layer so swapping gpt-4o for claude-sonnet-4-5 or llama-3-70b requires no changes outside a config file. LiteLLM or a thin adapter achieves this; vendor-specific SDKs directly in business logic do not."},
+          {"skill": "Prompt version management", "level": "Advanced", "note": "Prompts are code. Store them in files with version history. Tag production-serving prompts in your deploy pipeline. Never hard-code prompts in function bodies — they become impossible to audit."},
+          {"skill": "Failure-mode analysis for AI systems", "level": "Intermediate", "note": "Hallucination propagation through multi-step pipelines, agent infinite loops, context poisoning from adversarial retrieval, cost runaway from recursive agents. Map failure modes before building, not after."}
+        ]
+      }
+    ],
+    "learning_sequence": [
+      "Weeks 1-3 — LLM API foundations. Build ten small scripts across OpenAI, Anthropic, and Gemini. Get comfortable with token counting, streaming, and structured output. Deploy one endpoint to a public URL.",
+      "Weeks 4-7 — RAG fundamentals. Chunk + embed a personal document corpus, store in pgvector, build retrieval + synthesis. Measure quality with 30 hand-labelled questions before touching the prompt.",
+      "Weeks 8-11 — Eval-driven development. Build a repeatable eval harness (Promptfoo or custom). Run it on your RAG system. Improve the pipeline against the eval, not intuition.",
+      "Weeks 12-15 — Agents and function-calling. Build a single-task agent with 3-5 tools. Add dry-run mode, tool-call logging, and an interrupt mechanism. Ship it — even a small CLI tool counts.",
+      "Weeks 16-19 — Production hardening. Add observability (LangSmith or Langfuse), cost tracking, semantic caching, and guardrails to one existing project. Measure the before/after on cost and latency.",
+      "Weeks 20-24 — Capstone. Build and deploy a multi-component AI application combining RAG, function-calling, streaming UI, evals, and production observability. This is your primary portfolio piece."
+    ],
+    "time_to_proficient": "An experienced software engineer (2+ years of production Python) will clear Advanced in LLM API mastery and Production Engineering within 4-5 months at 8 hours/week. Eval-driven development takes longer to internalise — plan 6 months before you trust your instincts. The biggest time-sink is not learning the APIs; it is learning why your pipeline's quality is below target and how to fix it systematically.",
+    "faqs": [
+      {"q": "Do I need a machine learning background to become an AI Engineer?", "a": "Not deeply, but you need intuition about what models can and cannot do. You do not need to implement backpropagation — but you do need to understand overfitting, evaluation metrics, train/val/test discipline, and the difference between model capability and prompt quality. A 2-week investment in the DeepLearning.AI ML Specialisation audit is usually enough for a senior SWE to reach working intuition."},
+      {"q": "What separates a good AI Engineer from someone who just calls the API?", "a": "Evals. A senior AI Engineer does not ship a prompt change without running it against a regression harness. They know that 'it feels better' is a personal bias until it is measured. That discipline — borrowed from traditional software testing and applied to LLM outputs — is the rarest and most valued skill in the category."},
+      {"q": "How important is knowing the internals of transformers?", "a": "Moderately. You need to understand attention, context windows, tokenisation, and temperature — enough to reason about why a model behaves a certain way. You do not need to implement a transformer from scratch. Save that for if you pivot toward ML Engineer work."},
+      {"q": "Should I specialise in one provider (OpenAI, Anthropic, Gemini) or stay provider-agnostic?", "a": "Stay provider-agnostic in your architecture, but go deep on two providers in practice. Provider quirks matter in production: Anthropic's XML-delimited instructions behave differently from OpenAI's, Gemini's grounding behaves differently from RAG. Provider-lock is a business risk and a skills risk — design for swappability from the start."},
+      {"q": "Is LangChain worth learning?", "a": "Build one complete RAG system without LangChain first. Understand chunking, embeddings, vector search, and prompt construction at the level where you could wire them yourself. Then LangChain's abstractions become legible. Learned cold, LangChain hides the behavior you most need to debug. Its higher-level abstractions add real value for complex agent workflows once you know what they wrap."},
+      {"q": "How do I keep up with a field this fast-moving?", "a": "Track two sources: the model changelog of your primary providers (OpenAI and Anthropic ship meaningful capability updates quarterly), and a handful of practitioners who write regularly about production AI (Simon Willison, Eugene Yan, Chip Huyen). Skip the academic Twitter noise. New models matter when their cost/quality frontier moves — evaluate each new release against your eval harness rather than benchmarks."},
+      {"q": "What is the hardest part of AI engineering in practice?", "a": "Diagnosing quality failures systematically. When an LLM response is wrong, the root cause can be in retrieval (wrong chunks returned), context (retrieved context not used), prompt (model misunderstood the task), model capability (beyond what the model can do), or evaluation (your rubric was wrong). Developing a debugging methodology for that five-layer stack — rather than just prompting until it seems better — is what distinguishes senior AI engineers."},
+      {"q": "Do I need to know Kubernetes or cloud platforms?", "a": "Not at entry or mid level. Docker Compose on a VPS handles every learning project and most small-team production AI workloads. Learn Kubernetes when a specific job requires it. Cloud AI services (SageMaker, Vertex AI, Azure AI) are additive skills — learn the underlying concepts first, then the cloud wrappers make sense."}
+    ]
+  },
+  "tools": {
+    "intro": "This inventory covers the tools a 2026 AI Engineer will use in production. The AI tooling landscape moves fast — but the categories below have stabilised into clear winner-takes-most patterns. Every tool here is free to get started with (open source or a usable free tier). Hours-to-learn estimates target the time until you can solve a novel production problem unaided. Where a tool has a flashier alternative, the stable boring choice is listed first.",
+    "categories": [
+      {
+        "name": "LLM provider SDKs",
+        "blurb": "Your primary surface with foundation models. Learn the raw SDK before reaching for wrappers — every abstraction leaks, and when it does you need to read the raw API response. All three major providers ship Python-first SDKs with near-identical chat-completions interfaces; differences are in tool-use schema, streaming event types, and provider-specific features.",
+        "items": [
+          {"tool": "OpenAI Python SDK", "purpose": "Primary SDK for GPT-4o, o-class models, Responses API, function-calling, and Assistants v2", "hours_to_learn": 6, "url": "https://platform.openai.com/docs/libraries/python-library"},
+          {"tool": "Anthropic Python SDK", "purpose": "Claude Sonnet/Opus/Haiku — excellent for long-context, tool_use blocks, extended thinking, prompt caching", "hours_to_learn": 5, "url": "https://docs.anthropic.com/en/api/getting-started"},
+          {"tool": "Google Generative AI Python SDK", "purpose": "Gemini 2.0/2.5 — multimodal, grounding, code execution, 1M context; generous free tier for learning", "hours_to_learn": 4, "url": "https://ai.google.dev/api/python/google/generativeai"},
+          {"tool": "LiteLLM", "purpose": "Provider-agnostic wrapper — same call signature across 100+ providers; indispensable for model routing and cost control", "hours_to_learn": 4, "url": "https://docs.litellm.ai/"},
+          {"tool": "Ollama", "purpose": "Run Llama 3, Mistral, Qwen, Phi locally — essential for offline development and privacy-sensitive workloads", "hours_to_learn": 2, "url": "https://ollama.com/"}
+        ]
+      },
+      {
+        "name": "RAG + retrieval stack",
+        "blurb": "The retrieval pipeline is the component that most determines RAG quality in practice — more than the model, more than the prompt. Invest in understanding this stack deeply. pgvector is the right starting point: it lives inside your existing Postgres database, handles hybrid search, and has no operational overhead until you exceed ~5M vectors.",
+        "items": [
+          {"tool": "pgvector", "purpose": "Vector similarity search inside Postgres — zero-ops default for RAG at scale up to ~5M vectors", "hours_to_learn": 5, "url": "https://github.com/pgvector/pgvector"},
+          {"tool": "Pinecone", "purpose": "Managed vector DB for high-scale production; serverless tier is cost-effective up to 1M vectors", "hours_to_learn": 4, "url": "https://docs.pinecone.io/"},
+          {"tool": "Weaviate", "purpose": "Open-source vector DB with built-in hybrid search (BM25 + dense), multi-tenancy, and GraphQL API", "hours_to_learn": 6, "url": "https://weaviate.io/developers/weaviate"},
+          {"tool": "sentence-transformers", "purpose": "Local embedding models (all-MiniLM-L6-v2, bge-m3, e5-large) — avoids per-embedding API cost for smaller corpora", "hours_to_learn": 3, "url": "https://www.sbert.net/"},
+          {"tool": "LangChain (selectively)", "purpose": "Use for LCEL chains + complex agent graphs once you understand the underlying primitives — not as a learning shortcut", "hours_to_learn": 12, "url": "https://python.langchain.com/"},
+          {"tool": "LlamaIndex", "purpose": "Document ingestion, indexing, and query engine abstractions — particularly strong for multi-document RAG and knowledge-graph-augmented retrieval", "hours_to_learn": 10, "url": "https://docs.llamaindex.ai/"},
+          {"tool": "Cohere Rerank", "purpose": "Cross-encoder re-ranking API — drop-in quality improvement for RAG precision, free tier covers development volume", "hours_to_learn": 2, "url": "https://docs.cohere.com/reference/rerank"}
+        ]
+      },
+      {
+        "name": "Structured output + validation",
+        "blurb": "Every LLM response that feeds application logic must be validated before use. Pydantic is the standard; Instructor is its most ergonomic LLM-specific layer. Structured output is not optional — it is the dividing line between an AI prototype and a production feature.",
+        "items": [
+          {"tool": "Pydantic v2", "purpose": "Data validation and settings management — the backbone of every FastAPI + LLM application", "hours_to_learn": 8, "url": "https://docs.pydantic.dev/"},
+          {"tool": "Instructor", "purpose": "Pydantic-integrated wrapper for structured LLM output — handles retry logic, partial parsing, and streaming validation", "hours_to_learn": 4, "url": "https://python.useinstructor.com/"},
+          {"tool": "Outlines (dottxt-ai)", "purpose": "Grammar-constrained generation for local models — enforces JSON, regex, or formal-grammar output at the token level", "hours_to_learn": 4, "url": "https://github.com/dottxt-ai/outlines"},
+          {"tool": "jsonschema", "purpose": "Low-level JSON Schema validation; useful when you need to validate LLM output without Pydantic's object layer", "hours_to_learn": 2, "url": "https://python-jsonschema.readthedocs.io/"}
+        ]
+      },
+      {
+        "name": "Eval harnesses + observability",
+        "blurb": "Observability for AI systems has two layers: execution tracing (what did the model receive and return, with latency and cost) and quality evaluation (was the output correct, faithful, and on-task). Both layers are necessary in production. LangSmith or Langfuse handles the first; Ragas or Promptfoo handles the second.",
+        "items": [
+          {"tool": "LangSmith", "purpose": "Trace and evaluate LLM runs — tight LangChain integration, but also works with raw SDK calls via the Python client", "hours_to_learn": 5, "url": "https://docs.smith.langchain.com/"},
+          {"tool": "Langfuse", "purpose": "Open-source LLM observability — self-hostable, provider-agnostic, strong prompt management UI", "hours_to_learn": 5, "url": "https://langfuse.com/docs"},
+          {"tool": "Helicone", "purpose": "Proxy-based LLM logging and caching — zero-code instrumentation via a single header change; useful for quick cost-visibility", "hours_to_learn": 2, "url": "https://docs.helicone.ai/"},
+          {"tool": "Ragas", "purpose": "RAG-specific evaluation metrics: faithfulness, answer_relevance, context_recall, context_precision — run in CI against golden sets", "hours_to_learn": 6, "url": "https://docs.ragas.io/"},
+          {"tool": "Promptfoo", "purpose": "Prompt regression testing in CI — YAML-defined test cases, multi-provider comparison, assertion types from exact-match to LLM-judge", "hours_to_learn": 5, "url": "https://www.promptfoo.dev/docs/intro/"},
+          {"tool": "TruLens", "purpose": "Feedback-function framework for LLM eval — particularly strong for tracking eval metrics over time as the pipeline evolves", "hours_to_learn": 5, "url": "https://trulens.org/"}
+        ]
+      },
+      {
+        "name": "Backend + deployment",
+        "blurb": "AI features live inside larger applications. FastAPI is the standard async Python web framework for AI APIs; Docker gives you portability; Modal and Replicate handle serverless GPU inference when you need it. The stack below deploys comfortably on a $10/month VPS or scales to cloud-native when required.",
+        "items": [
+          {"tool": "FastAPI", "purpose": "Async Python web framework with automatic OpenAPI, Pydantic validation, and WebSocket streaming support", "hours_to_learn": 12, "url": "https://fastapi.tiangolo.com/"},
+          {"tool": "Docker + Docker Compose", "purpose": "Containerise your AI stack including model servers, vector DBs, and the backend — one command to reproduce production locally", "hours_to_learn": 15, "url": "https://docs.docker.com/"},
+          {"tool": "Modal", "purpose": "Serverless GPU functions — deploy an inference endpoint in Python with no infrastructure config; pay-per-second pricing", "hours_to_learn": 4, "url": "https://modal.com/docs/guide"},
+          {"tool": "Redis", "purpose": "Session storage, semantic cache backend, rate-limit counters, and agent-state persistence", "hours_to_learn": 6, "url": "https://redis.io/docs/"},
+          {"tool": "SQLite + SQLAlchemy + alembic", "purpose": "Zero-ops relational store for user data, prompt logs, eval results, and session history — correct for every sub-hyperscale workload", "hours_to_learn": 8, "url": "https://docs.sqlalchemy.org/"},
+          {"tool": "httpx", "purpose": "Async HTTP client for calling external APIs, webhooks, and model endpoints — never use `requests` in an async FastAPI handler", "hours_to_learn": 2, "url": "https://www.python-httpx.org/"}
+        ]
+      },
+      {
+        "name": "Development environment + workflow",
+        "blurb": "The AI Engineer's development loop is tighter than a traditional SWE's — you iterate on prompts and pipelines together, and the feedback cycle from a change to seeing its quality impact matters. The tools below reduce friction at every step of that cycle.",
+        "items": [
+          {"tool": "Python 3.11+ with uv", "purpose": "Primary language and fast package manager — uv resolves dependencies 10-100x faster than pip", "hours_to_learn": 5, "url": "https://github.com/astral-sh/uv"},
+          {"tool": "Jupyter Lab", "purpose": "Interactive environment for rapid prompt iteration and data exploration — use notebooks for exploration, move to modules for production", "hours_to_learn": 3, "url": "https://jupyter.org/"},
+          {"tool": "Git + GitHub", "purpose": "Version control including prompts-as-files — commit messages on prompt diffs should explain why the change improves quality", "hours_to_learn": 10, "url": "https://docs.github.com/"},
+          {"tool": "VS Code + Continue (or Cursor)", "purpose": "Editor with AI assist; Continue is the open-source copilot that works with any provider; Cursor is a strong commercial alternative", "hours_to_learn": 3, "url": "https://code.visualstudio.com/"},
+          {"tool": "pytest + pytest-asyncio", "purpose": "Test framework; async fixture support is essential for testing FastAPI + LLM integrations — aim for 70%+ coverage on non-prompt code", "hours_to_learn": 6, "url": "https://docs.pytest.org/"}
+        ]
+      }
+    ],
+    "install_path": [
+      "Install Python 3.11+ via pyenv or python.org installer. Install uv for package management: `curl -LsSf https://astral.sh/uv/install.sh | sh`.",
+      "Create a project: `uv init my-ai-app && cd my-ai-app && uv add openai anthropic google-generativeai fastapi uvicorn pydantic httpx`.",
+      "Sign up for OpenAI, Anthropic, and Google AI Studio. Store all API keys in a `.env` file that is in your `.gitignore` from day one.",
+      "Install Ollama for local model experiments: download from ollama.com and run `ollama pull llama3.2:3b` to get a small fast model.",
+      "Install Docker Desktop. Run `docker run hello-world` to confirm. You will need Docker to run pgvector locally.",
+      "Spin up pgvector: `docker run -e POSTGRES_PASSWORD=pass -p 5432:5432 pgvector/pgvector:pg17`. Install the Python client: `uv add psycopg2-binary sqlalchemy asyncpg`.",
+      "Install Promptfoo globally: `npm install -g promptfoo`. Run `promptfoo init` in your project root to create your first eval config.",
+      "Sign up for LangSmith (free tier) or self-host Langfuse via `docker compose up`. Instrument your first LLM call with `LANGCHAIN_TRACING_V2=true`."
+    ],
+    "faqs": [
+      {"q": "Should I use LangChain or build my own abstractions?", "a": "Build one complete RAG system from raw SDK calls first — understand chunking, embedding, pgvector queries, and prompt construction at the code level. Then try LangChain on a second project. Its LCEL composition model and agent tooling add genuine value once you understand what they abstract. Applied cold as the first tool, they hide the behavior you most need to debug as a learner."},
+      {"q": "Which vector database should I start with?", "a": "pgvector. If you already run Postgres, you have a vector database — add the extension, create a vector column, and you are running hybrid search in a day. Move to Pinecone or Weaviate when you need managed scaling, not before."},
+      {"q": "Is LlamaIndex or LangChain better?", "a": "Different strengths. LlamaIndex excels at document ingestion, multi-source indexing, and query planning — it is the RAG-focused choice. LangChain excels at agent orchestration and LLM chain composition. Many production stacks use both: LlamaIndex for retrieval, LangChain for orchestration. You do not need both to start."},
+      {"q": "How do I handle prompt iteration without losing track of what worked?", "a": "Store prompts in versioned files, never inline Python strings. Name them descriptively (system_v3_with_cot_instructions.txt). Run your eval harness on every version and log the score alongside the file commit. This is the minimum viable prompt-management workflow — Langfuse or LangSmith's prompt management UI adds collaborative editing on top."},
+      {"q": "What is semantic caching and when is it worth the complexity?", "a": "Semantic caching stores LLM responses keyed on embedding similarity rather than exact string match — so 'What is the capital of France?' and 'Which city is the capital of France?' hit the same cache entry. It is worth adding when your workload has significant query repetition (customer-support bots, document Q&A tools). GPTCache is the simplest implementation; Redis + pgvector gives you more control over the similarity threshold."},
+      {"q": "How much should I worry about prompt injection?", "a": "In consumer-facing products, a lot. Prompt injection is the #1 security attack surface for AI features — users (or adversarial content in retrieved documents) can overwrite your system prompt and hijack the model's behavior. At minimum: validate and sanitise user input, use a separate system prompt that is not user-influenced, and never allow retrieved content to contradict your system-level instructions without explicit design."},
+      {"q": "What observability tools are worth the setup cost?", "a": "Langfuse is the best value for most teams — self-hostable, provider-agnostic, handles both tracing and prompt management, and has a generous free cloud tier. LangSmith is better if you are already deep in LangChain. Helicone is the fastest to instrument (proxy-based, one header change) — use it when you need visibility in 10 minutes."}
+    ]
+  },
+  "projects": {
+    "intro": "These projects are ordered by dependency: each earlier one teaches a skill the later ones assume. Every project is AI-Engineer-specific — no model-training projects appear here (those belong on the ML Engineer track). The focus throughout is on shipped, evaluated, production-ready AI features: retrieval systems, agentic workflows, structured-output pipelines, and observable LLM applications. Ship them to the public internet. A recruiter who can click your live URL and see streaming LLM output will form an impression in under 30 seconds — make sure it is the right one.",
+    "projects": [
+      {
+        "title": "Multi-provider LLM comparison harness",
+        "difficulty": "Beginner",
+        "hours": "10-15",
+        "description": "Build a CLI tool that sends the same prompt to OpenAI, Anthropic, and Gemini simultaneously, displays all three responses side by side, and logs token count, latency, and cost-per-call to a SQLite database. Add a `--best-of` flag that uses an LLM judge to score the responses and pick a winner. This is your first eval fixture and your first cost-tracking surface — skills you will use every day as an AI Engineer.",
+        "tech_stack": ["OpenAI SDK", "Anthropic SDK", "Google Generative AI SDK", "asyncio / httpx", "SQLite", "rich (terminal formatting)"],
+        "rubric": [
+          "All three providers called in parallel (not sequentially) — measure the latency difference",
+          "Token count + estimated cost logged per call, queryable from the DB",
+          "LLM-judge scoring uses a rubric, not free-form; rubric is stored as a versioned file",
+          "README documents every provider's API key setup and the cost per 1000 test runs",
+          "Error handling covers rate limits, network timeouts, and malformed responses"
+        ]
+      },
+      {
+        "title": "Streaming LLM chat backend with observability",
+        "difficulty": "Beginner",
+        "hours": "15-25",
+        "description": "Build a FastAPI backend that streams an LLM response token-by-token to the browser via Server-Sent Events. Persist every conversation turn (user message, assistant response, model, token counts, latency) to SQLite. Add a PII-redaction filter that strips email addresses and phone numbers from logs before writing them. Deploy to a VPS with nginx. This is the foundation of every chat-based AI product.",
+        "tech_stack": ["FastAPI", "OpenAI SDK (streaming)", "SQLAlchemy", "SSE / StreamingResponse", "Docker", "nginx"],
+        "rubric": [
+          "First token arrives in the browser within 500ms of the user pressing send (measure with browser devtools)",
+          "Every conversation persisted; conversation history reconstructable from DB for any session_id",
+          "PII redaction tested with phone and email inputs — redacted form visible in logs, never the original",
+          "nginx config includes rate-limit headers — no user can send more than 10 requests/minute",
+          "Live URL that a reviewer can open and chat with"
+        ]
+      },
+      {
+        "title": "RAG system over a personal document corpus",
+        "difficulty": "Intermediate",
+        "hours": "40-55",
+        "description": "Build a retrieval-augmented Q&A system over 50+ documents you actually care about — your company's internal docs, a technical book, a public-domain text corpus. Use pgvector for storage, sentence-transformers for embedding, and a hybrid search (BM25 + dense) strategy. Add a 30-question hand-labelled eval set and score the system using Ragas faithfulness and context_recall metrics. This is the portfolio centrepiece for most AI Engineer job applications.",
+        "tech_stack": ["FastAPI", "pgvector", "sentence-transformers", "OpenAI or Anthropic API", "Ragas", "Gradio or React frontend"],
+        "rubric": [
+          "Chunk strategy documented with before/after quality comparison across at least two strategies",
+          "30-question eval set with automated Ragas scores; baseline score documented before any prompt tuning",
+          "Hybrid search (BM25 + dense) implemented; ablation showing which strategy wins on your corpus",
+          "Streaming response — user sees tokens arriving, not a loading spinner for 10 seconds",
+          "Prompt injection defense: retrieved content cannot override system-level instructions"
+        ]
+      },
+      {
+        "title": "Prompt regression testing pipeline with CI",
+        "difficulty": "Intermediate",
+        "hours": "20-30",
+        "description": "Set up a Promptfoo test suite for an existing LLM feature. Define 40+ test cases covering happy paths, edge cases, and adversarial inputs. Wire it into GitHub Actions so every pull request that touches a prompt file runs the full eval suite and blocks merge if any case regresses more than 10%. Add a score-trend dashboard (a simple HTML file generated from the Promptfoo JSON output). This project is rare in portfolios and universally impressive to AI Engineering interviewers.",
+        "tech_stack": ["Promptfoo", "GitHub Actions", "OpenAI API", "Node.js (Promptfoo runtime)", "Python for score-trend chart"],
+        "rubric": [
+          "40+ test cases including at least 5 adversarial inputs (prompt injection attempts, boundary cases)",
+          "GitHub Actions workflow that fails the PR if quality regresses",
+          "Score-trend chart committed alongside the test run in CI artifacts",
+          "README explains how to add a new test case and what the CI gate protects",
+          "At least one example in the README where the CI gate caught a real regression"
+        ]
+      },
+      {
+        "title": "Structured-output extraction pipeline",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Build a pipeline that extracts structured data from unstructured text at scale — job descriptions into normalised fields, research papers into citation graphs, customer support tickets into categorised summaries. Use Instructor + Pydantic for validation; add retry logic for parse failures. Process 1,000 real documents; log accuracy by field. This project demonstrates the skill most enterprise AI work actually requires: turning messy text into reliable structured data.",
+        "tech_stack": ["Instructor", "Pydantic v2", "OpenAI or Anthropic SDK", "asyncio for batch concurrency", "pandas for accuracy analysis", "SQLite"],
+        "rubric": [
+          "Pydantic schema covers all target fields with appropriate types, validators, and field descriptions",
+          "Retry logic handles model refusals and malformed JSON — never crashes on bad output",
+          "Field-level accuracy table for 1,000 documents with honest failure-mode analysis",
+          "Async batch processing with concurrency limit (respect API rate limits)",
+          "Cost per 1,000 documents documented; optimisation applied if over $5"
+        ]
+      },
+      {
+        "title": "Function-calling agent for a narrow domain task",
+        "difficulty": "Intermediate",
+        "hours": "35-50",
+        "description": "Build an agent that does one task reliably: GitHub PR summariser, calendar booking assistant, database query agent for a specific schema, or shell-command assistant with safety gates. Expose 3-5 tools via the provider's function-calling API. Log every tool call. Add a dry-run mode for any destructive action. Resist feature creep — a narrow agent that works 95% of the time is a better portfolio piece than a broad one that works 60% of the time.",
+        "tech_stack": ["OpenAI or Anthropic function-calling API", "FastAPI or CLI", "a domain-specific API (GitHub / Google Calendar / Postgres)", "SQLite for tool-call log"],
+        "rubric": [
+          "Task scope narrowly defined in the README with an explicit 'out of scope' section",
+          "Every destructive tool has a dry_run=True default; explicit confirmation required for real execution",
+          "Tool-call log persisted and queryable — include request, tool name, arguments, response, latency",
+          "At least 20 test cases covering normal flows, bad inputs, and tool failures",
+          "Failure-mode section in README — where the agent loops, hallucinates arguments, or misses the task"
+        ]
+      },
+      {
+        "title": "Semantic search engine for a niche corpus",
+        "difficulty": "Intermediate",
+        "hours": "30-40",
+        "description": "Build a full semantic search engine over a corpus you choose: papers from a specific arXiv category, Stack Overflow posts for a niche technology, lyrics from a genre. Support both semantic (embedding) and keyword (BM25) search with a ranking blend. Add a web UI with faceted filtering (date, category, score range). Measure and compare retrieval quality via NDCG@10 against a keyword-search baseline. This demonstrates retrieval engineering depth beyond basic RAG.",
+        "tech_stack": ["Weaviate or pgvector", "sentence-transformers", "FastAPI", "BM25 via rank_bm25 library", "React or Svelte for the search UI"],
+        "rubric": [
+          "Corpus ≥ 5,000 documents; ingestion pipeline re-runnable from a single command",
+          "Hybrid ranking (BM25 + dense) with configurable alpha parameter; ablation table in README",
+          "NDCG@10 measurement against 50 hand-judged queries",
+          "Web UI with working faceted filter — not just a text box",
+          "Index rebuild time and search latency (P50/P95) documented"
+        ]
+      },
+      {
+        "title": "LLM-as-judge evaluation framework",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Build a reusable LLM-as-judge framework that scores generated text against rubrics you define. Support at minimum: binary pass/fail, 1-5 scale rating, and pairwise preference comparison. Implement bias mitigations (position randomisation for pairwise, temperature=0 for consistency). Validate your judge against 100 human-scored examples and report judge-human agreement rates (Cohen's kappa). This framework will underpin every future eval work — it is worth building well.",
+        "tech_stack": ["OpenAI or Anthropic API", "Pydantic for rubric definition", "SQLite for result storage", "pandas + matplotlib for analysis", "pytest for unit tests"],
+        "rubric": [
+          "Three evaluation modes implemented: binary, scale, pairwise",
+          "Position bias mitigation for pairwise (randomise A/B order, average both orderings)",
+          "Judge-human agreement reported as Cohen's kappa on 100 human-annotated examples — minimum kappa 0.6",
+          "Rubric files versioned in files, not hardcoded strings",
+          "Parallelised scoring — 100 examples should complete in under 60 seconds"
+        ]
+      },
+      {
+        "title": "Production RAG system with cost and quality dashboards",
+        "difficulty": "Advanced",
+        "hours": "50-70",
+        "description": "Extend the basic RAG project with a full production observability layer: per-query cost and latency tracking, retrieval quality trending over time, daily Ragas metric snapshots logged to a time-series table, and an admin dashboard that surfaces cost burn rate, p95 latency, and quality trend charts. Add semantic caching and measure its impact on cost. This project demonstrates what it takes to operate an AI feature in production — not just build one.",
+        "tech_stack": ["FastAPI", "Langfuse (self-hosted) or LangSmith", "Ragas", "pgvector", "Redis (semantic cache)", "Chart.js or Plotly for dashboard"],
+        "rubric": [
+          "Per-query cost logged; daily cost summary queryable from the DB",
+          "Ragas scores computed on a sample of 10 queries per day; time-series chart shows quality trend",
+          "Semantic cache hit rate measured and displayed in the dashboard",
+          "P50/P95/P99 latency tracked and alertable (a log message at P99 > 5s is acceptable; a silent slow query is not)",
+          "Admin dashboard live at a password-protected route"
+        ]
+      },
+      {
+        "title": "Multi-modal application (vision + text)",
+        "difficulty": "Advanced",
+        "hours": "35-50",
+        "description": "Build an application that combines vision and text modalities using GPT-4o vision or Gemini 2.0 Pro: a receipt data extractor, a diagram Q&A tool, a photo-to-structured-data pipeline, or a visual code-review assistant. Pay close attention to image pre-processing (resolution, format, token cost) and eval design (vision outputs are harder to auto-evaluate than text).",
+        "tech_stack": ["OpenAI GPT-4o vision API or Gemini 2.0 Pro", "Instructor + Pydantic for structured vision output", "Pillow for image processing", "FastAPI", "SQLite"],
+        "rubric": [
+          "Image size pre-processed to minimise token cost without sacrificing quality — document the trade-off",
+          "Structured output extraction validated with Pydantic — no raw string output fed to downstream logic",
+          "Eval set of 50 images with ground truth labels; accuracy by category reported",
+          "Error handling covers unsupported image formats, oversized images, and refusals",
+          "Cost per processed image documented at three quality settings"
+        ]
+      },
+      {
+        "title": "Agentic research assistant with tool composition",
+        "difficulty": "Advanced",
+        "hours": "50-70",
+        "description": "Build a research assistant that can answer complex questions by composing multiple tools: web search (via a search API), code execution (via a sandboxed subprocess), document retrieval (via your RAG system), and calculator tools. The key challenge is reliability: the agent must complete tasks across 5-10 tool calls without derailing. Implement a maximum-step budget and a quality-check step that reviews the answer before returning it.",
+        "tech_stack": ["Anthropic or OpenAI extended tool-use", "SerpAPI or Brave Search API (free tier)", "FastAPI", "Docker (for code execution sandbox)", "pgvector (for document retrieval)"],
+        "rubric": [
+          "Four or more distinct tool types implemented and tested independently before integration",
+          "Maximum step budget enforced — agent cannot loop more than 15 turns",
+          "Quality-check step (separate LLM call) validates the answer before return — catches obvious hallucinations",
+          "Complete execution trace (every tool call and response) persisted for debugging",
+          "20 multi-step benchmark questions with documented accuracy rate"
+        ]
+      },
+      {
+        "title": "Prompt version management system",
+        "difficulty": "Intermediate",
+        "hours": "20-30",
+        "description": "Build a lightweight prompt management system: store prompts in a database with version history, support A/B deployment (route X% of traffic to version A, Y% to version B), and track eval score per prompt version over time. This does not need to be a full SaaS — a FastAPI backend + simple admin UI + SQLite is the right scope. The goal is to demonstrate you understand prompts as production artifacts, not throwaway strings.",
+        "tech_stack": ["FastAPI", "SQLite + SQLAlchemy", "Pydantic", "simple HTML/JS admin UI"],
+        "rubric": [
+          "Prompt versions stored with immutable hash + semantic version number",
+          "A/B routing implemented at the API level — `POST /generate` samples between active versions by percentage",
+          "Eval score recorded per version per run; chart shows quality over time",
+          "Rollback to any previous version in one admin action with an audit log entry",
+          "README explains the deployment workflow: how to promote a new prompt version to 100% traffic"
+        ]
+      },
+      {
+        "title": "Real-time collaborative AI writing tool",
+        "difficulty": "Advanced",
+        "hours": "45-60",
+        "description": "Build a browser-based writing editor where an AI copilot provides inline suggestions, paragraph completions, and style critiques in real time. Use WebSockets for bidirectional communication, streaming completions for low-latency suggestions, and a debounce strategy to avoid hammering the API on every keystroke. This project stresses all the real-time engineering skills that distinguish AI product engineers from API wrappers.",
+        "tech_stack": ["FastAPI + WebSockets", "OpenAI streaming API", "vanilla JS or React for the editor", "Redis for session state", "Docker"],
+        "rubric": [
+          "WebSocket connection maintained across the editing session — reconnect on drop",
+          "Debounce strategy documented: minimum idle time before triggering completion",
+          "Streaming tokens rendered progressively in the editor UI without flickering",
+          "Suggestion acceptance / rejection tracked; acceptance rate logged per session",
+          "Cost per 1,000-word editing session documented; optimisation applied if over $0.10"
+        ]
+      },
+      {
+        "title": "Safety and guardrails layer for an LLM application",
+        "difficulty": "Intermediate",
+        "hours": "20-30",
+        "description": "Build a reusable input/output safety middleware for an LLM application. Input layer: classify and block prompt injection attempts, detect and redact PII, enforce topic constraints for domain-specific applications. Output layer: detect refusals and off-topic responses, validate structured output, flag potentially harmful content with a confidence score. Measure false-positive rate against 200 benign test inputs — overly aggressive guardrails are a real production problem.",
+        "tech_stack": ["OpenAI Moderation API", "Llama Guard (via Ollama) for local classification", "Pydantic for output schema enforcement", "pytest for automated safety testing"],
+        "rubric": [
+          "Input classifier tested against 100 adversarial inputs (known prompt injection patterns)",
+          "Output validator catches refusals and off-topic responses reliably",
+          "False-positive rate measured on 200 benign inputs — document the rate and the acceptable threshold",
+          "PII redaction covers at minimum: email, phone, SSN patterns, and credit card patterns",
+          "Middleware is extractable — it should drop into any FastAPI application as a dependency"
+        ]
+      },
+      {
+        "title": "Capstone: end-to-end AI-powered product feature",
+        "difficulty": "Advanced",
+        "hours": "70-100",
+        "description": "Build and deploy a complete AI-powered feature that a real user would pay for: a domain-specific Q&A assistant with RAG, a document analysis tool, an AI job-matching engine, or a personalised content recommender. The feature must combine at minimum: retrieval, structured output, streaming, evals, observability, and production deployment. Every component should be wired, measured, and documented. This is your graduation project — the piece you present in interviews and link from your resume.",
+        "tech_stack": ["all of the above — pick the right tool for each job"],
+        "rubric": [
+          "Architecture diagram in the README — one clear image showing every component and its responsibility",
+          "Ragas or equivalent eval suite with documented baseline and current scores",
+          "LangSmith or Langfuse tracing active in production with a dashboard link in the README",
+          "Cost and latency budget documented per user request",
+          "Live URL that any recruiter can open and interact with in under 60 seconds"
+        ]
+      }
+    ],
+    "faqs": [
+      {"q": "Why no model-training projects on this list?", "a": "Training models from scratch is the ML Engineer's domain, not the AI Engineer's. AI Engineers focus on making existing models useful in production — retrieval, evals, agents, structured output, and observability. You should understand what fine-tuning is, but it does not belong in an AI Engineer portfolio as a primary project."},
+      {"q": "How important is it to deploy every project publicly?", "a": "Critical. An AI Engineer who cannot deploy is 50% of a hire. Hosting is not expensive: a VPS at $5-10/month handles three concurrent visitors to a demo app. A live URL that a recruiter can click converts 3x better than a GitHub repo they have to clone and run locally."},
+      {"q": "Which project should I lead with in job applications?", "a": "The RAG system with eval harness (project 3) is the single highest-signal project for most AI Engineer roles in 2026. It demonstrates: retrieval engineering, evaluation discipline, production deployment, and quality measurement. Lead with that; list the others."},
+      {"q": "How do I make projects non-generic?", "a": "Choose domains you actually know. An AI Engineer who built a RAG system over cardiovascular clinical trials and can explain why standard chunking breaks on tables of drug interactions is infinitely more interesting than someone who built a RAG system over generic PDFs. Domain knowledge multiplies technical signal."},
+      {"q": "Should I build with LangChain or raw SDKs?", "a": "For your portfolio, do both. Show one project built from raw SDK calls (demonstrates depth) and one using a higher-level framework (demonstrates pragmatism). Interviewers often ask 'could you rebuild this without LangChain?' — having done it once means you can answer confidently."},
+      {"q": "How detailed should READMEs be?", "a": "Long. AI Engineers are judged by their ability to communicate technical decisions — a README is your first written design document in an interview context. Include: what problem you solved, why you made each architectural choice, your eval methodology and scores, cost and latency figures, and what you would do differently next time."},
+      {"q": "What if my eval scores are mediocre?", "a": "Ship anyway and document honestly. An AI Engineer who can measure quality at 68% and explain exactly why it is not higher — and what the tradeoffs are between the three approaches they tried — is far more compelling than someone who claims 95% with no methodology. The discipline of measurement is the signal; the score itself is secondary."}
+    ]
+  },
+  "certifications": {
+    "intro": "A 2026 reality check for AI Engineers specifically: the field moves fast enough that a two-year-old certification may describe deprecated practices. Favour certifications with the most recent curricula, and treat any cert primarily as a structured learning path rather than a credential. The list below is restricted to free-to-audit or fully-free programs — every cert here costs zero dollars to complete. The most valuable certification signal in an AI Engineer interview is still your GitHub, your eval methodology, and your ability to talk through a system you built.",
+    "items": [
+      {
+        "name": "Generative AI with Large Language Models",
+        "provider": "DeepLearning.AI + AWS (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 16,
+        "url": "https://www.coursera.org/learn/generative-ai-with-llms",
+        "employer_signal": "Strong. The most up-to-date free LLM curriculum from a named provider as of 2026. Covers the full LLM lifecycle — pre-training intuition, fine-tuning (LoRA, RLHF), deployment, and inference optimisation. Signals that you understand models from the inside, not just their API surfaces.",
+        "best_for": "AI Engineers who want systematic coverage of LLM internals to support better architectural decisions — particularly around model selection, context-window strategy, and when fine-tuning makes sense."
+      },
+      {
+        "name": "Building Systems with the ChatGPT API",
+        "provider": "DeepLearning.AI (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 4,
+        "url": "https://www.deeplearning.ai/short-courses/building-systems-with-chatgpt/",
+        "employer_signal": "Moderate — it is a short course (2-3 hours). Pairs well on a CV with the full Generative AI specialisation. Covers chaining, classification, evaluation, and moderation — the practical patterns that appear in real AI features. Best treated as a structured introduction rather than a standalone credential.",
+        "best_for": "Software engineers making their first serious AI API integration who want a guided walkthrough of production patterns before building from scratch."
+      },
+      {
+        "name": "ChatGPT Prompt Engineering for Developers",
+        "provider": "DeepLearning.AI + OpenAI (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 3,
+        "url": "https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers/",
+        "employer_signal": "Light standalone; moderate as part of a curriculum. The canonical starting point for prompt engineering from Isa Fulford and Andrew Ng. Every AI Engineer should have completed this — but so has everyone, so it does not differentiate. List it early in your learning, then focus on projects.",
+        "best_for": "Developers who have never written a system prompt in their life and want structured coverage of the foundational patterns in under a weekend."
+      },
+      {
+        "name": "LangChain Academy — Introduction to LangGraph",
+        "provider": "LangChain (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 10,
+        "url": "https://academy.langchain.com/courses/intro-to-langgraph",
+        "employer_signal": "Moderate-to-strong for agent-focused roles. LangGraph is the dominant agent-orchestration framework in production stacks in 2026. This course covers state machines, conditional routing, human-in-the-loop, and persistence — patterns every production agent needs. Completing it signals you have moved beyond toy agent examples.",
+        "best_for": "AI Engineers building multi-step agents or needing more control than simple ReAct loops — particularly those working on stateful, long-running workflows."
+      },
+      {
+        "name": "Hugging Face NLP Course",
+        "provider": "Hugging Face (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 25,
+        "url": "https://huggingface.co/learn/nlp-course",
+        "employer_signal": "Strong for AI Engineers who work with open-source models or need to fine-tune. Hands-on coverage of Transformers, Datasets, Tokenizers, and PEFT (LoRA) — the production stack for open-model work. The course's hands-on exercises are the fastest path to productive transformer work without a full deep-learning curriculum.",
+        "best_for": "AI Engineers who need to work with local or fine-tuned models (via Ollama, Hugging Face Inference Endpoints, or Modal) rather than purely hosted API models."
+      },
+      {
+        "name": "Anthropic Prompt Engineering Interactive Tutorial",
+        "provider": "Anthropic (free, browser-based)",
+        "cost_usd": 0,
+        "prep_hours": 5,
+        "url": "https://github.com/anthropics/prompt-eng-interactive-tutorial",
+        "employer_signal": "Light as a standalone line item; genuinely useful as practical study. Covers Claude-specific prompt patterns — XML delimiters, thinking blocks, tool_use schemas, extended context strategies. If you do significant work on Anthropic models (which many production stacks do in 2026), this material is worth its 5-hour investment.",
+        "best_for": "AI Engineers who use Claude in production and want to understand the idiosyncrasies of Anthropic's model behaviour versus OpenAI — particularly around system prompt structure and tool_use schema design."
+      },
+      {
+        "name": "fast.ai — Practical Deep Learning for Coders",
+        "provider": "fast.ai (fully free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 50,
+        "url": "https://course.fast.ai/",
+        "employer_signal": "Strong with the 'shipped something' crowd. Jeremy Howard's course carries genuine brand recognition in the practitioner community. For AI Engineers, Part 2 (foundations) is the most useful — it explains what is happening inside the transformer, which makes you a better system designer even when you never touch training code.",
+        "best_for": "AI Engineers who want to understand model internals deeply enough to make better architectural and prompt-strategy decisions — without committing to the full ML Engineer path."
+      },
+      {
+        "name": "DeepLearning.AI — LLM Ops: Building Real-World Applications with Large Language Models",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 12,
+        "url": "https://www.coursera.org/learn/llmops",
+        "employer_signal": "Moderate. Covers the production lifecycle: serving, monitoring, continuous evaluation, and deployment automation. Most LLMOps material is underdeveloped in the market — completing a structured course on it is a differentiator at mid-to-senior level.",
+        "best_for": "AI Engineers who have shipped an LLM feature and now need to operate it reliably — specifically covering evaluation pipeline automation, drift detection, and serving-cost management."
+      },
+      {
+        "name": "Google — Prompt Design in Vertex AI",
+        "provider": "Google Cloud Skills Boost (free credits available)",
+        "cost_usd": 0,
+        "prep_hours": 8,
+        "url": "https://www.cloudskillsboost.google/course_templates/976",
+        "employer_signal": "Light as a standalone; useful if you are working within GCP. Google's prompt engineering and Gemini API integration material is relevant for AI Engineers targeting Google Cloud-heavy stacks. Free course credits available via the monthly Skills Boost subscription.",
+        "best_for": "AI Engineers integrating with Google Cloud AI (Vertex AI, Gemini API, Document AI) who want structured guidance on Google's specific patterns and tooling."
+      },
+      {
+        "name": "Kaggle — Generative AI Intensive course (5-day whitepaper series)",
+        "provider": "Kaggle + Google (free)",
+        "cost_usd": 0,
+        "prep_hours": 20,
+        "url": "https://www.kaggle.com/learn-guide/5-day-genai",
+        "employer_signal": "Moderate. This is the most technically rigorous free generative AI curriculum from Google — covering foundational LLM architecture, embeddings, agents, MLOps for GenAI, and responsible AI. The companion whitepapers are unusually dense for a free course. Completing and discussing this material in an interview signals genuine technical depth.",
+        "best_for": "AI Engineers who want a technically rigorous (rather than tutorial-style) foundation in how generative AI systems work, written by Google DeepMind researchers."
+      }
+    ],
+    "employer_data": "Based on 90-day aggregate data from the AutomateEdge jobs pipeline, explicit certification requirements appear in under 5% of AI Engineer roles — they are almost never a gate. What appears in 75%+ of postings: a GitHub with two or more shipped AI features, demonstrated eval discipline (mentioned in a project README or cover letter), and familiarity with at least two LLM provider APIs. The practical implication: complete certifications because they teach you something — not because you expect them to open doors. The short DeepLearning.AI courses (2-4 hours each) are the highest ROI per hour; the full specialisations signal long-form commitment.",
+    "faqs": [
+      {"q": "Which certification should I do first as an AI Engineer?", "a": "If you are coming from a software engineering background with no LLM experience: 'ChatGPT Prompt Engineering for Developers' (3 hours, free) gets you oriented quickly, then 'Building Systems with the ChatGPT API' (3 hours) teaches the production patterns. After those two, build a project and run Promptfoo on it before touching another course."},
+      {"q": "Are cloud-provider AI certifications (AWS ML Specialty, Google Professional ML Engineer) worth it?", "a": "Not as a first priority for AI Engineers. Those certifications test cloud-platform-specific knowledge (SageMaker, Vertex AI workflows) that is valuable if your job is cloud-ML-platform-adjacent. For a product-facing AI Engineer building features on top of APIs, the general LLM engineering knowledge matters more. Revisit them if a specific role requires it."},
+      {"q": "Should I pay for the verified certificate on Coursera?", "a": "Usually no. The audit gives you the material; the verified certificate adds a sharable PDF. Spend the money on GPU time or LLM API credits instead. Exception: if an employer offers a learning stipend, take the verified version for the documentation."},
+      {"q": "Is a computer science degree necessary alongside these certifications?", "a": "Not for most AI Engineer roles. A strong portfolio — especially one showing eval discipline and deployed projects — regularly outweighs a CS degree in screening decisions. Where a degree matters most is at frontier labs (Anthropic, OpenAI, DeepMind) for research-adjacent engineering roles."},
+      {"q": "How many certifications should I list on my resume?", "a": "Three maximum as featured items. The rest belong on LinkedIn. More than three certifications on a resume reads as cert-collecting — which signals anxious-beginner to experienced interviewers. Let your projects and GitHub do the work."},
+      {"q": "Are there certifications specific to AI safety or responsible AI?", "a": "The Responsible AI practice is covered in the Google 5-day Generative AI course and in the Anthropic prompt engineering tutorial. Neither is a formal credential. More practically: demonstrating PII redaction, guardrails, and prompt injection mitigation in your projects does more than any safety certification."},
+      {"q": "What about OpenAI's certification program?", "a": "As of 2026 Q1, OpenAI does not offer a public certification program beyond the short instructional courses on the platform. The DeepLearning.AI courses co-created with OpenAI (including the ChatGPT courses) are the closest equivalent and carry more weight due to the academic framing."}
+    ]
+  },
+  "salary": {
+    "intro": "The salary ranges below are US market aggregates for AI Engineer titles in 2026 Q1. AI Engineers command compensation that tracks at or above senior software engineer pay — and substantially above at senior-plus levels at pure-AI companies where the role is central to the product. Regional multipliers are applied to the US base and should be interpreted as rough guides; specific company packages vary. Hiring velocity and top-company data comes from the AutomateEdge jobs pipeline, refreshed quarterly.",
+    "update_date": "2026-04-24",
+    "bands_us": [
+      {"level": "Entry (L2/L3, 0-2 yrs)", "base_low": 130000, "base_high": 180000, "total_comp_low": 160000, "total_comp_high": 260000, "notes": "Entry AI Engineers are expected to have a strong software engineering foundation plus demonstrated LLM API work (shipped projects, not just course certificates). Most roles at this level require at least one deployed AI feature on the portfolio."},
+      {"level": "Mid (L4, 2-5 yrs)", "base_low": 170000, "base_high": 225000, "total_comp_low": 230000, "total_comp_high": 380000, "notes": "The largest band by population. Mid-level AI Engineers own features end-to-end — retrieval pipelines, eval harnesses, and the production deployment. Equity begins to dominate TC at this level at pure-AI companies."},
+      {"level": "Senior (L5, 5-8 yrs)", "base_low": 210000, "base_high": 280000, "total_comp_low": 310000, "total_comp_high": 560000, "notes": "Senior AI Engineers architect systems, set eval standards, and lead cross-functional AI initiatives. TC spread is wide because equity grants vary 5-10x across companies — a $310k figure at a mid-stage startup is not equivalent to $560k at a public hyperscaler."},
+      {"level": "Staff (L6, 8-12 yrs)", "base_low": 260000, "base_high": 360000, "total_comp_low": 440000, "total_comp_high": 810000, "notes": "Staff AI Engineers influence AI strategy across multiple product surfaces. At frontier AI companies (Anthropic, OpenAI, Cohere, Mistral) this level commands a premium of 20-40% above equivalent SWE staff roles — the AI-specific depth is rare and valued."},
+      {"level": "Principal (L7+, 10+ yrs)", "base_low": 320000, "base_high": 460000, "total_comp_low": 620000, "total_comp_high": 1400000, "notes": "Rare roles at frontier labs and the most AI-product-forward hyperscalers. Comp routinely clears $1M at this tier. The defining characteristic is setting the AI architecture for an entire organisation, not just a product."}
+    ],
+    "bands_regions": [
+      {"region": "SF Bay Area", "multiplier": 1.15, "note": "The reference market and home of most frontier AI labs. AI Engineer pay in the Bay Area is particularly elevated relative to general SWE because the density of frontier-lab jobs sets the floor."},
+      {"region": "NYC / Seattle / Boston", "multiplier": 1.08, "note": "Near-peer to SF for base; equity tends 10-20% lower outside of pure-play AI companies. Seattle's AI hiring is dominated by Microsoft (Azure AI + Copilot teams) and Amazon (Bedrock, Alexa AI)."},
+      {"region": "Other major US metros (Austin, Chicago, Denver, Raleigh)", "multiplier": 0.95, "note": "Moderate discount to SF; remote policies have compressed the gap to ~5% below Bay Area over the last two years. AI-native startups in these metros sometimes pay at SF rates to compete for talent."},
+      {"region": "Fully remote US", "multiplier": 0.92, "note": "Remote-band convergence has stabilised at this level for AI Engineer roles. Specialist AI depth commands a smaller remote discount than general SWE; the talent pool is thin enough that employers concede on geography."},
+      {"region": "Toronto / Montreal (CAD)", "multiplier": 0.65, "note": "CAD comp runs materially below US at junior-mid levels; senior-plus closes to ~75% of US equivalent once equity is included. Vector Institute and Mila ecosystem creates local demand clusters."},
+      {"region": "Western Europe (EUR)", "multiplier": 0.55, "note": "Strong discount vs US at all levels. London, Amsterdam, and Paris AI lab exceptions pay near US senior rates. Mistral (Paris), DeepMind (London) set high local ceilings."},
+      {"region": "India (INR)", "multiplier": null, "note": "Separate market. Entry AI Engineer: ₹12-22 LPA. Mid: ₹25-55 LPA. Senior at top product companies + AI-native startups + frontier lab India offices: ₹70-140 LPA. Top-of-market (OpenAI / Google DeepMind India, Staff+): ₹180+ LPA."},
+      {"region": "Southeast Asia (SGD / MYR)", "multiplier": null, "note": "Singapore: entry S$70-100k, mid S$110-170k, senior S$175-310k. AI Engineers command a 15-25% premium over general SWE at equivalent levels in Singapore due to supply scarcity. Other SEA markets run materially below Singapore."}
+    ],
+    "velocity": {
+      "jobs_last_90d_us": "The AutomateEdge pipeline tracked ~3,100 US-based roles with 'AI Engineer' in the title over the trailing 90 days — up 34% year-over-year, making it the fastest-growing engineering title in the pipeline. The rate has not materially decelerated since mid-2025. Demand is concentrated in AI-native companies, hyperscaler AI product teams, and mid-size enterprise software companies building AI features.",
+      "avg_days_to_fill": "Median time-to-fill for AI Engineer roles sits at 44 days; senior and staff roles run 70+ days. The supply of credible senior AI Engineers (those with shipped production AI features and documented eval methodology) is thin enough that companies frequently relax level requirements to close roles.",
+      "top_hiring_companies": [
+        "Anthropic (Claude product + API engineering)",
+        "OpenAI (ChatGPT product, API platform, enterprise)",
+        "Google (Gemini API, AI Studio, Google Cloud AI, Search AI)",
+        "Microsoft (Azure OpenAI, GitHub Copilot, Bing)",
+        "Meta (Llama ecosystem, AI assistant, ranking + recommendation)",
+        "Amazon + AWS (Bedrock, Q Developer, Alexa+)",
+        "Cohere / Mistral / AI21 Labs (applied AI product teams)",
+        "Databricks / Snowflake / Palantir (enterprise AI features)",
+        "High-growth AI-native startups across vertical AI (legal, medical, finance)"
+      ],
+      "trending_skills": [
+        "LLM evaluation engineering / eval-set design (up 210% YoY)",
+        "Agentic workflow design and orchestration (up 175% YoY)",
+        "RAG system architecture and operation (up 140% YoY)",
+        "Structured output / constrained generation (up 95% YoY)",
+        "LLM observability and cost management (up 85% YoY)",
+        "Multi-modal AI feature engineering (up 70% YoY)",
+        "Safety, guardrails, and responsible AI (up 65% YoY)"
+      ]
+    },
+    "negotiation_tips": [
+      "Collect three offers before negotiating. Two is a data point; three is leverage.",
+      "AI Engineer roles have less standardised title-to-level mapping than general SWE — push to understand the levelling criteria before accepting a level. Being placed at L4 vs L5 is a $100k+ difference in TC.",
+      "Ask total-comp, not base-salary. Equity and sign-on are where the real variance lives, especially at AI-native startups.",
+      "Don't negotiate against yourself. If asked for expectations, deflect to market data (levels.fyi for 'AI Engineer' specifically) or a target range.",
+      "Counter on the entire package — base + equity + sign-on + relocation + start date. These are usually separate budget lines; moving one doesn't touch the others.",
+      "Get everything in writing. Verbal equity commitments are worth nothing until the option agreement or RSU grant is documented.",
+      "At AI-native companies, ask for annual equity refreshes explicitly — the default is often a 4-year cliff with no refresh. If the company is in a growth phase, refreshes are often negotiable.",
+      "Sign-on bonuses are the cleanest ask — they cost the company once, don't compound, and HR has more room to move on them than base."
+    ],
+    "sources": [
+      {"name": "levels.fyi — AI/ML Engineer distributions", "url": "https://www.levels.fyi/t/software-engineer/focus/ml-ai"},
+      {"name": "Glassdoor — AI Engineer salaries", "url": "https://www.glassdoor.com/Salaries/ai-engineer-salary-SRCH_KO0,11.htm"},
+      {"name": "US BLS — Computer + Information Research Scientists", "url": "https://www.bls.gov/ooh/computer-and-information-technology/computer-and-information-research-scientists.htm"},
+      {"name": "LinkedIn Economic Graph — Jobs on the Rise", "url": "https://economicgraph.linkedin.com/"},
+      {"name": "AutomateEdge jobs pipeline (internal aggregation)", "url": "https://automateedge.cloud/jobs"}
+    ],
+    "faqs": [
+      {"q": "Do AI Engineers get paid more than regular software engineers?", "a": "At mid-level and above, yes — by 15-30% in TC at comparable companies. The premium is largest at AI-native companies (Anthropic, OpenAI, Cohere) where the role is central to the product, and smallest at companies where AI features are add-ons to existing products. At entry level, the bands largely overlap."},
+      {"q": "How fast does pay grow in the first five years as an AI Engineer?", "a": "Entry to mid roughly doubles TC for strong performers — $180k → $350k range is representative at good companies. Mid to senior adds another 40-60%. The biggest step-change usually happens when you move companies at the L4 → L5 transition, not via in-place promotion."},
+      {"q": "How much of the pay is equity at senior levels?", "a": "At public hyperscalers, 40-60% of TC at L5+ is equity. At pre-IPO AI-native companies, equity often represents 60-80% of offered TC — discount this by 40-50% when comparing to public-company offers, because liquidity, valuation, and vesting risk are all real."},
+      {"q": "Is remote work still penalised for AI Engineers?", "a": "Less so than for general SWE. The talent pool for credible senior AI Engineers is thin enough that many companies have effectively accepted full remote for strong candidates. Expect a ~5-8% discount at most — smaller than the 10-15% that was common in 2023."},
+      {"q": "What is the highest-ROI skill to add for a raise?", "a": "In 2026, two skills move the TC needle most reliably: (1) eval engineering — the ability to design and operate quantitative eval pipelines that measure AI quality over time — and (2) agent system design with reliability guarantees. Both appear in almost every senior-level interview loop and are consistently underrepresented in the candidate pool."},
+      {"q": "Should I target AI-native companies or traditional tech companies with AI features?", "a": "AI-native companies (Anthropic, OpenAI, Cohere, Mistral, Perplexity) pay 20-40% more at equivalent levels and offer faster career progression because AI is the core business. The downside is binary equity risk. Traditional tech companies (Google, Microsoft, Meta) offer more stable equity and a broader career platform. Both paths are excellent; the choice depends on your risk tolerance and how central you want AI to be to your day-to-day scope."},
+      {"q": "Is the AI Engineer hiring boom real or a bubble?", "a": "The data suggests a structural shift rather than a cycle peak. AI features are now a table-stakes requirement for most consumer and enterprise software products — the underlying demand driver (companies needing engineers who can ship AI features) is durable. What will churn is the title taxonomy — 'AI Engineer' may be absorbed back into 'Senior Software Engineer with AI focus' over time. The skills remain valuable regardless of what the role is called."}
+    ]
+  },
+  "career_path": {
+    "intro": "The AI Engineer career ladder is newer and less standardised than traditional software engineering tracks — companies define it differently, and the role is still stabilising into industry-wide norms. The progression below describes patterns visible across mid-to-large technology organisations and AI-native companies in 2026. Expect non-linear movement: many AI Engineers join at mid-level from adjacent SWE backgrounds; the path to staff and above is heavily influenced by company size and how central AI is to the product.",
+    "stages": [
+      {
+        "year_range": "Year 0-2 — Entry (L2/L3)",
+        "title": "AI Engineer I / Junior AI Engineer / AI Software Engineer",
+        "focus": "You execute well-scoped AI feature work under a senior's direction. Typical work: implement a defined RAG pipeline, improve an existing prompt, add structured output validation to a feature, build an eval set for an existing model integration. The primary learning goal is internalising the difference between 'it worked in the demo' and 'it works reliably in production.'",
+        "typical_tasks": [
+          "Implement an LLM integration from a defined spec (model, prompt template, input/output schema)",
+          "Extend an existing eval set with 20 new test cases covering edge cases found in production",
+          "Add structured output validation (Pydantic + Instructor) to an existing LLM call",
+          "Build a streaming chat endpoint based on a backend spec",
+          "Write unit tests for an AI feature's input validation and output parsing layers"
+        ],
+        "skills_gained": ["LLM API fluency across at least two providers", "structured output patterns", "basic eval discipline", "async Python for AI workloads"],
+        "comp_us": "TC $160k-$260k",
+        "next_step": "Cleared Advanced in LLM API mastery and structured output. Shipped at least two AI features end-to-end with documented eval scores. Your manager no longer spot-checks prompt changes before they go to staging."
+      },
+      {
+        "year_range": "Year 2-5 — Mid (L4)",
+        "title": "AI Engineer II / AI Engineer / Applied AI Engineer",
+        "focus": "You own AI feature work start-to-finish — from architecture through deployment, eval, and post-launch monitoring. You begin to set eval standards for adjacent work. Domain expertise emerges as the products you build specialise: RAG-heavy, agent-heavy, or structured-output-heavy. You are the person on the team who knows why the retrieval quality degraded last Thursday.",
+        "typical_tasks": [
+          "Design and implement a full RAG pipeline for a product surface, including chunking strategy, eval harness, and observability",
+          "Define the eval methodology for a new AI feature before a line of prompt is written",
+          "Own a production AI system's cost and quality dashboards; reduce cost by 30% through caching and model routing",
+          "Mentor a junior engineer through their first RAG implementation",
+          "Present an AI feature's quality metrics to a non-technical product manager and translate them into product decisions"
+        ],
+        "skills_gained": ["eval-driven development", "RAG architecture depth", "cost and latency ownership", "cross-functional AI communication", "a depth area (agents / retrieval / structured output)"],
+        "comp_us": "TC $230k-$380k",
+        "next_step": "Promotion to senior or horizontal move to a tech-lead role on a larger AI product. Your impact is legible to the manager above yours; you can represent the team's AI work to a product director."
+      },
+      {
+        "year_range": "Year 5-8 — Senior (L5)",
+        "title": "Senior AI Engineer / AI Tech Lead / Staff AI Engineer candidate",
+        "focus": "You own the architecture of a complete AI system or multiple interconnected AI features. You are the person the team routes novel AI quality problems to. You choose between RAG vs fine-tuning, select the evaluation framework, and influence the AI roadmap. Your design decisions shape how 3-5 junior and mid engineers spend their time.",
+        "typical_tasks": [
+          "Design the AI architecture for a new product area — model selection, retrieval strategy, eval framework, observability plan",
+          "Write technical strategy documents that define a quarter's AI engineering work across the team",
+          "Establish team-wide prompt engineering and eval standards that junior engineers follow",
+          "Lead a cross-team initiative: migrating the company's LLM stack from one provider to another, or standardising the eval pipeline across three product surfaces",
+          "Own the AI engineering interview loop for mid-level and senior hires"
+        ],
+        "skills_gained": ["AI system architecture", "eval strategy at team scale", "technical strategy documentation", "ambiguity navigation", "external communication (blog posts, conf talks about production AI lessons)"],
+        "comp_us": "TC $310k-$560k",
+        "next_step": "Staff path requires scope that spans multiple product surfaces; manager path requires explicit people-leadership interest. Some engineers pause here — it is a strong, well-compensated local maximum with significant leverage in job markets."
+      },
+      {
+        "year_range": "Year 8-12 — Staff (L6)",
+        "title": "Staff AI Engineer / Principal AI Engineer (small companies) / AI Engineering Manager (M3)",
+        "focus": "You influence AI strategy across multiple teams or products. On the IC path, you work on the hardest AI quality and reliability problems in the org — the ones that have stumped multiple senior engineers. On the management path, you lead 8-15 AI engineers. The two paths diverge cleanly at this level; occasional IC-to-manager transitions continue, but reversions are uncommon.",
+        "typical_tasks": [
+          "Set multi-quarter AI architecture strategy across team boundaries",
+          "Define the org's evaluation philosophy — what 'good' means for AI quality across all products",
+          "Publish externally about production AI lessons — blog posts, conference talks, technical papers",
+          "Drive 0-to-1 AI capability investment decisions (new modality, new retrieval strategy, new model tier)",
+          "If manager: performance management, hiring strategy, budget ownership, career development for 10+ ICs"
+        ],
+        "skills_gained": ["organisation-wide AI strategy", "long-horizon technical planning", "external technical brand", "leveraged impact through others", "executive communication about AI capability and risk"],
+        "comp_us": "TC $440k-$810k",
+        "next_step": "Principal / Distinguished AI Engineer, Director of AI, VP of AI Engineering, or co-founder. The IC path at this level has genuine market scarcity — strong staff AI engineers are aggressively recruited."
+      },
+      {
+        "year_range": "Year 12+ — Principal / Director / AI Architect",
+        "title": "Principal AI Engineer / Distinguished Engineer / Director of AI / VP of AI / AI Architect",
+        "focus": "Your output is decisions, systems architecture, and people — not code. On the IC path, you set the AI technical direction for an entire organisation. On the leadership path, you run a multi-hundred-person AI engineering organisation and represent AI capability to the board. AI Architects at this level are defining what AI integration means for an entire company or product category.",
+        "typical_tasks": [
+          "Define 3-5 year AI capability roadmaps that guide hiring, model investment, and infrastructure decisions",
+          "Set the company's public position on AI quality, safety, and responsible deployment",
+          "Represent AI technical strategy to investors, press, and enterprise customers",
+          "Sponsor high-risk AI research bets that may define the next product generation",
+          "Recruit other senior AI leaders and set the technical culture for the AI engineering organisation"
+        ],
+        "skills_gained": ["executive communication about AI", "board-level AI risk framing", "talent market intelligence for AI roles", "long-horizon technical bets", "ecosystem influence"],
+        "comp_us": "TC $620k-$1.4M+",
+        "next_step": "Founding, advisory-only roles, CTO tracks, or building the next frontier AI company. At this level the career path is self-authored."
+      }
+    ],
+    "transitions": [
+      "SWE → AI Engineer: The most common transition in 2026. A senior SWE with 2-3 deployed LLM features and a documented eval methodology can make this move laterally at L4. The comp uplift at strong companies is 20-35%.",
+      "ML Engineer → AI Engineer: Natural move for ML Engineers who have spent more time on model deployment and inference than on training. The prompt engineering and eval depth is the gap to fill — both learnable in 3-4 months.",
+      "Data Scientist → AI Engineer: Requires adding production engineering skills (FastAPI, Docker, async Python, observability). Many Data Scientists make this move when their LLM work outgrows notebooks and needs to be shipped as a product.",
+      "AI Engineer → Product Management: A growing L5-L6 pivot path — specifically into 'AI Product Manager' or 'Technical PM for LLM products' roles. Companies value the combination of AI technical depth and product instincts. The pay gap to senior SWE/AI PM is small at top companies.",
+      "AI Engineer → AI Safety / Red-teaming: A niche but growing path. The skills overlap is high — eval engineering, adversarial testing, output analysis. Anthropic, Google DeepMind, and AI safety startups actively recruit from senior AI engineering ranks.",
+      "AI Engineer → Founder: The modal founding-year for AI-native startups in 2026 is year 4-8. Senior AI Engineers have a product advantage over pure researchers when the product is a vertical AI tool rather than a model."
+    ],
+    "faqs": [
+      {"q": "Do I need an ML or CS degree to become an AI Engineer?", "a": "No. The role is product-engineering-first. Many of the strongest AI Engineers in 2026 came from web engineering, backend engineering, or data engineering backgrounds and up-skilled on LLM APIs and evals over 6-12 months. What matters is shipped AI features and documented eval discipline."},
+      {"q": "How quickly can I transition from senior SWE to AI Engineer?", "a": "With focused effort: 3-6 months to build enough portfolio depth for a credible application at L4. The fastest path is: (1) ship a RAG system with an eval harness, (2) add production observability, (3) document what you measured and what improved. That portfolio answers 80% of AI Engineer screening questions."},
+      {"q": "Is the AI Engineer role stable or will it be automated away?", "a": "The irony is real, but the role is durable for at least a 5-10 year horizon. LLMs are currently excellent at generating code but poor at the eval, architecture, and quality-reasoning skills that define senior AI Engineering work. The scope of the role is shifting (more eval, more architecture, less boilerplate) — but the human judgment layer at the top is not disappearing."},
+      {"q": "Should I specialise early (e.g., RAG-focused, agents-focused) or stay broad?", "a": "Stay broad in the first 2-3 years — understand RAG, agents, structured output, and evals at the Intermediate level. Specialise organically as the projects you are hired to work on require depth. Forced early specialisation in a field this fast-moving creates risk of backing the wrong sub-trend."},
+      {"q": "How do I get promoted from mid to senior AI Engineer?", "a": "Three requirements show up consistently: (1) you have designed a significant AI system (not just implemented a spec), (2) your quality improvements are measurable and documented — you can show a chart of eval score over time, and (3) your impact is visible to your manager's manager. The eval-documentation requirement is the most commonly missed by capable mid-level engineers."},
+      {"q": "Is the manager path right for AI Engineers?", "a": "Only if people-development genuinely energises you. The IC path for AI Engineers is unusually well-compensated relative to management at comparable levels — because the supply of credible senior AI engineering ICs is thin. Managing a team of AI Engineers without the genuine enjoyment of coaching is a common and costly mistake."},
+      {"q": "What derails AI Engineer careers most often?", "a": "Three patterns: (1) staying in prototype mode — shipping demos but never owning a production system, which leaves no scope story; (2) never building eval discipline — measuring quality only qualitatively, which makes it impossible to demonstrate impact; (3) narrowing too early to a single provider or framework (LangChain-only engineers are vulnerable when the abstraction shifts)."}
+    ]
+  }
+}

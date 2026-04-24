@@ -1,0 +1,713 @@
+{
+  "_meta": {
+    "description": "SEO-20 per-track quintet data for the 'ml-engineer' track. Feeds six pages at /roadmap/ml-engineer/{skills,tools,projects,certifications,salary,career-path}. Salary bands use US market figures from levels.fyi / Glassdoor / BLS 2025-2026, skewed toward hyperscaler and frontier-lab data where ML Engineers command the highest premiums. Regional multipliers are aggregated estimates. Renewable yearly — bump last_updated + regenerate velocity snapshot from the jobs pipeline.",
+    "last_updated": "2026-04-24"
+  },
+  "slug": "ml-engineer",
+  "name": "ML Engineer",
+  "tagline": "Build, train, and ship machine learning models that survive contact with production — owning the full arc from dataset construction and distributed training to model serving, monitoring, and continuous retraining.",
+  "hero_blurb": "The ML Engineer track is for engineers who want to own models end-to-end, not just call them. You will train transformers from scratch, run distributed jobs across GPU clusters, fine-tune foundation models with LoRA, build feature stores, set up A/B testing for model improvements, and deploy serving systems that handle real traffic. The math is not optional here — you will read loss surfaces, reason about optimiser internals, and debug training instabilities that no tutorial prepared you for. At the end of 24 weeks you will have a portfolio that demonstrates you can ship models with measurable business impact, which is the sentence that gets ML Engineer roles at hyperscalers and frontier labs.",
+  "weeks_total": 24,
+  "hours_per_week": 10,
+  "skills": {
+    "intro": "The ML Engineer skill map below is calibrated against 2026 hiring signals — specifically the skills that appear in the top ML Engineer postings aggregated through the AutomateEdge jobs pipeline over the trailing 90 days. This is a math-heavy, systems-heavy role. Unlike the AI Engineer track, you are not primarily integrating models built by others; you are building them. Proficiency levels follow a four-step ladder: Beginner (can follow tutorials), Intermediate (can build a solution to a new problem), Advanced (can debug production issues), Expert (can design systems from first principles). An ML Engineer clears Advanced in mathematics and PyTorch, and Intermediate-to-Advanced in distributed training and serving, by week 24.",
+    "categories": [
+      {
+        "name": "Mathematics for ML — the non-negotiable foundations",
+        "blurb": "ML Engineers cannot treat the math as a black box the way AI Engineers sometimes can. Loss surfaces, optimiser convergence, regularisation, and model capacity are all mathematical objects. You will debug gradient explosions, reason about why Adam diverges on a particular loss landscape, and derive the variance of a Monte Carlo estimator when your evaluation needs it. Linear algebra and probability are the two workhorse domains; calculus and optimisation theory are close behind. Information theory appears in every loss function you will encounter. The goal is not to pass a graduate exam — it is to read a paper's methodology section without pausing.",
+        "items": [
+          {"skill": "Linear algebra — advanced", "level": "Advanced", "note": "Eigendecomposition, SVD, low-rank approximations, matrix norms, condition numbers. Understand why LoRA works geometrically — it's a low-rank perturbation. PCA, whitening, and batch normalisation are all linear algebra in disguise."},
+          {"skill": "Probability + statistics — advanced", "level": "Advanced", "note": "Distributions (Gaussian, Categorical, Dirichlet, Laplace). Expectation, variance, covariance. MLE, MAP, Bayesian inference. The bias-variance decomposition. Every loss function is a probability statement — cross-entropy is negative log-likelihood of a categorical distribution."},
+          {"skill": "Calculus — gradients, Hessians, chain rule", "level": "Intermediate", "note": "Partial derivatives, Jacobians, Hessians (for second-order methods). You will not hand-compute Hessians daily, but you need to read papers that reference curvature of the loss landscape and know what they mean."},
+          {"skill": "Optimisation theory — advanced", "level": "Advanced", "note": "Convex vs non-convex landscapes. Saddle points, local minima, flat regions. SGD, Adam, AdamW, Adafactor, SOAP. Momentum internals. Learning-rate schedules: constant, step, cosine, warmup-then-decay, polynomial. Why warmup matters for transformer training. Gradient clipping — when and why."},
+          {"skill": "Information theory — intermediate", "level": "Intermediate", "note": "Shannon entropy, cross-entropy, KL divergence, mutual information. Cross-entropy is the loss for classification; KL is the loss for distribution-matching (VAEs, RLHF KL penalty). Mutual information appears in contrastive learning objectives."},
+          {"skill": "Numerical computing and stability", "level": "Intermediate", "note": "Floating point precision (float32 vs bfloat16 vs float16), numerical overflow/underflow in softmax and log-sum-exp, condition number of the weight matrix, mixed-precision training stability. These are the issues that wake you up at 2am when a training run diverges at step 40,000."}
+        ]
+      },
+      {
+        "name": "Deep learning internals",
+        "blurb": "An ML Engineer is not a user of PyTorch; you are a programmer of it. You write custom layers, custom losses, custom optimisers, and custom CUDA kernels when the profiler tells you they're the bottleneck. You debug vanishing/exploding gradients not by googling 'gradient problems pytorch' but by reading the gradient norm logs you instrument. Transformer architecture internals, attention variants, and the training mechanics that make large models stable are core knowledge here, not advanced electives.",
+        "items": [
+          {"skill": "PyTorch 2.x internals — advanced", "level": "Advanced", "note": "torch.compile, torch.autograd.Function for custom backward, tensor dispatch, memory layout (contiguous vs strided), gradient hooks for diagnostics, parameter groups for differential learning rates, torch.no_grad vs inference_mode."},
+          {"skill": "Transformer architecture — advanced", "level": "Advanced", "note": "Multi-head self-attention, causal vs bidirectional masking, rotary positional embeddings (RoPE), grouped-query attention (GQA), sliding window attention, flash attention I/II/III. Understand why each architectural choice exists, not just its API."},
+          {"skill": "Training mechanics and diagnostics", "level": "Advanced", "note": "Loss curve pathologies: spikes, plateaus, divergence. Gradient norm tracking. Weight histogram monitoring. Learning-rate range tests. Loss scaling for mixed precision. Gradient accumulation for large effective batch sizes. Dead neurons and dying ReLUs."},
+          {"skill": "Regularisation and generalisation", "level": "Advanced", "note": "Dropout (standard, variational, DropPath), weight decay vs L2 regularisation (they are not the same with Adam), label smoothing, mixup/cutmix, early stopping vs checkpoint averaging, stochastic depth."},
+          {"skill": "Loss functions and objectives", "level": "Advanced", "note": "Cross-entropy, focal loss, contrastive losses (NT-Xent, InfoNCE, triplet), reconstruction losses (MSE, SSIM, perceptual), ELBO for VAEs, policy gradient objectives for RLHF. Design a custom loss for a new task without looking up a tutorial."},
+          {"skill": "Efficient architectures", "level": "Intermediate", "note": "KV cache, speculative decoding, mixture-of-experts (MoE) routing, state-space models (Mamba, RWKV). Not all production workloads can run a dense 70B transformer — efficient architecture selection is a daily job skill."},
+          {"skill": "JAX + Flax / Equinox for research-leaning roles", "level": "Beginner", "note": "JAX's functional transform model (jit, grad, vmap, pmap) is the dominant paradigm in DeepMind / Google Brain lineage research. If you are targeting frontier-lab research roles, investing 30-50 hours in JAX is high ROI. For applied / product ML roles, it's optional but impressive."}
+        ]
+      },
+      {
+        "name": "Distributed training",
+        "blurb": "Any model worth training in 2026 doesn't fit on a single GPU. Distributed training is not an advanced elective for ML Engineers — it is a core competency that separates mid-level from senior in every hyperscaler interview loop. You need to understand data parallelism, model parallelism, and the FSDP/DeepSpeed patterns that combine them, both conceptually and at the code level.",
+        "items": [
+          {"skill": "Data-parallel training — DDP and FSDP", "level": "Advanced", "note": "DistributedDataParallel (DDP) vs FullyShardedDataParallel (FSDP). All-reduce communication. Gradient synchronisation timing. FSDP sharding strategies (FULL_SHARD, SHARD_GRAD_OP, NO_SHARD). CPU offload for parameter states. When FSDP outperforms DDP and why."},
+          {"skill": "Model parallelism — tensor and pipeline", "level": "Intermediate", "note": "Tensor parallelism (Megatron-LM column/row split). Pipeline parallelism (GPipe, PipeDream). 3D parallelism (TP + PP + DP). These are the foundational techniques behind training GPT-4-class models. Even for applied roles, being conversational is table-stakes at senior levels."},
+          {"skill": "DeepSpeed integration", "level": "Intermediate", "note": "ZeRO stages 1/2/3 — what each stage offloads and the communication tradeoff. Optimizer state offload to CPU/NVMe. DeepSpeed-Chat for RLHF pipelines. fp16 + dynamic loss scaling in the DS engine."},
+          {"skill": "Multi-node GPU cluster management", "level": "Intermediate", "note": "NCCL topology, NVLink vs PCIe bandwidth, rdma/infiniband vs ethernet for large clusters, node failure handling, checkpointing frequency strategy for long-running jobs, torchrun + rank/world_size environment variables."},
+          {"skill": "Gradient checkpointing and memory optimisation", "level": "Advanced", "note": "Activation checkpointing trade-off (recompute vs store). Selective checkpointing for transformers. Micro-batching for pipeline stages. Flash attention's memory efficiency. Peak memory profiling with torch.cuda.memory_stats — you should be able to calculate whether a training run fits in memory before launching it."}
+        ]
+      },
+      {
+        "name": "Data, features, and pipelines",
+        "blurb": "Models are downstream of data. An ML Engineer who cannot build reliable data pipelines will be blocked constantly by data quality. Feature engineering, data versioning, and feature store design are as much ML Engineer territory as training loops. The best ML Engineers in the field are ruthlessly empirical about data — they know that 80% of model improvement comes from data improvement, not architecture tweaks.",
+        "items": [
+          {"skill": "Large-scale dataset construction", "level": "Advanced", "note": "Web crawl deduplication, quality filtering heuristics (Gopher rules, C4 filtering, FineWeb approach), data mixing ratios, curriculum learning data ordering, streaming vs cached datasets for large corpora. Hugging Face Datasets streaming API + WebDataset format."},
+          {"skill": "Feature engineering for structured data", "level": "Advanced", "note": "Target encoding without leakage, feature crosses, polynomial features, temporal features (lag, rolling, EWM), entity embeddings for categoricals. The ML Engineer touches feature engineering both for classical models and for ML ranking/recommendation systems."},
+          {"skill": "Feature stores", "level": "Intermediate", "note": "Point-in-time correctness (the #1 source of training-serving skew in feature stores). Online vs offline store architecture. Feast and Tecton concepts. Feature freshness SLAs. Backfill strategies for historical features."},
+          {"skill": "Data versioning and lineage", "level": "Intermediate", "note": "DVC for dataset + model versioning. Metadata tracking. Reproducing a training run from three months ago — can you? Data lineage graphs for debugging regressions. The difference between code reproducibility and data reproducibility."},
+          {"skill": "ETL and streaming data for ML", "level": "Intermediate", "note": "Apache Spark for batch feature computation. Kafka / Flink for real-time features. Parquet + Arrow + Delta Lake as the storage formats. Writing Spark transformations that are unit-testable. The ML-specific trap: aggregations that look at future data."},
+          {"skill": "Training-serving skew detection", "level": "Advanced", "note": "Distribution shift between training data and production inputs. Schema validation at serving time. Feature drift monitoring (PSI, KS test, Jensen-Shannon divergence). The feedback loop from production labels back to the training set — when it introduces bias and how to guard against it."}
+        ]
+      },
+      {
+        "name": "Model serving and inference optimisation",
+        "blurb": "Shipping a model means serving it at scale — reliably, cheaply, and fast enough that the product team doesn't replace it with an API call to a hosted model. Inference optimisation is a deep discipline: quantisation, batching, kernel fusion, speculative decoding, and hardware-specific compilation. The ML Engineer who can cut serving cost by 40% is worth a lot more to the company than one who can't.",
+        "items": [
+          {"skill": "Quantisation — INT8, INT4, GPTQ, AWQ", "level": "Advanced", "note": "Post-training quantisation (PTQ) vs quantisation-aware training (QAT). Weight-only vs activation quantisation. GPTQ and AWQ for LLM weight compression. bitsandbytes 4-bit inference. The quality-cost tradeoff — which models can survive INT4 and which can't."},
+          {"skill": "Model compilation and kernel fusion", "level": "Intermediate", "note": "torch.compile with Triton backends. ONNX export and ONNX Runtime optimisation. TensorRT for NVIDIA GPUs. Graph-level optimisation: operator fusion, memory layout transforms, constant folding. Know what the profiler is telling you before optimising blindly."},
+          {"skill": "Dynamic batching and continuous batching", "level": "Advanced", "note": "Naïve batching vs dynamic batching vs continuous batching (PagedAttention / vLLM approach). Throughput vs latency tradeoffs. Request scheduling under variable sequence lengths. KV cache memory management. Why throughput and latency are in fundamental tension and how to set SLOs."},
+          {"skill": "Serving frameworks — Triton, TorchServe, Ray Serve, vLLM", "level": "Advanced", "note": "NVIDIA Triton Inference Server: model repositories, ensemble pipelines, GRPC vs HTTP backends, dynamic batching configuration. TorchServe: mar packaging, handler lifecycle. Ray Serve: deployments, scaling policies, ingress. vLLM and SGLang for LLM-specific serving with PagedAttention."},
+          {"skill": "Speculative decoding and efficient generation", "level": "Intermediate", "note": "Draft-model speculative decoding: the acceptance probability derivation. Medusa and EAGLE for self-speculative approaches. Chunked prefill for TTFT optimisation. Why beam search is almost never the right choice in production."},
+          {"skill": "Canary deploys + rollback for models", "level": "Intermediate", "note": "Blue-green model deployments. Shadow mode (log predictions without serving them). Canary traffic splitting. Rollback trigger criteria — when a new model's production metrics regress, you need automated rollback, not a manual hotfix at 3am."}
+        ]
+      },
+      {
+        "name": "MLOps — CI/CD for models",
+        "blurb": "A model that cannot be reliably retrained, versioned, monitored, and rolled back is a liability, not an asset. MLOps is not just DevOps with a GPU — the data dependency, the non-determinism, the slow feedback loops, and the eval-as-a-service requirement make it a distinct discipline. ML Engineers at senior levels are expected to own the full lifecycle, not hand the model off to a 'platform team' once training is done.",
+        "items": [
+          {"skill": "Experiment tracking — W&B, MLflow", "level": "Advanced", "note": "Run tagging and grouping. Hyperparameter sweep orchestration (W&B sweeps, Optuna). Artifact versioning. Comparison dashboards. Reproducibility metadata — commit hash, data hash, random seeds, environment hash. The discipline of logging everything before you need it."},
+          {"skill": "Model registries and versioning", "level": "Advanced", "note": "MLflow Model Registry. Hugging Face Hub as a model store. Model card standards (Hugging Face format). Staging vs production versions. Champion-challenger model tracking. Deprecation and garbage-collection policy for old model versions."},
+          {"skill": "CI/CD pipelines for models", "level": "Advanced", "note": "Automated retraining triggers (schedule, data drift, label drift). Training + eval in CI (GitHub Actions with GPU runners or triggered pipeline runs). Regression gates: a new model must match or beat the previous champion on a held-out eval set before promotion. Pre-commit hooks for training code quality."},
+          {"skill": "Drift detection and production monitoring", "level": "Advanced", "note": "Data drift (input distribution shift). Concept drift (label distribution shift). Prediction drift (output distribution shift). Statistical tests: KS, PSI, chi-squared. Alerting thresholds. Shadow evaluation pipeline — run challenger model on live traffic without serving its predictions."},
+          {"skill": "Pipeline orchestration — Kubeflow, ZenML, Metaflow, Prefect", "level": "Intermediate", "note": "DAG-based pipeline definitions. Step caching and artifact reuse. Pipeline parameterisation for different training configurations. Multi-step pipelines: data-prep → train → eval → register → deploy. Kubeflow Pipelines for Kubernetes-native workloads; ZenML and Metaflow for simpler Python-first pipelines."},
+          {"skill": "A/B testing and online evaluation", "level": "Advanced", "note": "Statistical power and sample size calculation before launching an experiment. Sequential testing to avoid peeking. Business metric vs proxy metric alignment. Interaction effects between simultaneous experiments. Guardrail metrics — the business metric you monitor to catch regressions even when the ML metric improves."}
+        ]
+      }
+    ],
+    "learning_sequence": [
+      "Weeks 1-3 — Mathematics intensive: linear algebra (3Blue1Brown Essence series + Gilbert Strang lectures), probability and statistics (MIT 18.650 problem sets), optimisation basics (gradient descent derivation by hand). Do not skip this block — it is the compound-interest investment of the track.",
+      "Weeks 4-6 — PyTorch fundamentals from scratch: tensors, autograd, custom nn.Module, manual training loops, gradient diagnostics. Build a two-layer MLP on MNIST without any helper library. Instrument gradient norms and weight histograms.",
+      "Weeks 7-10 — Transformer architecture: implement a decoder-only transformer from scratch (under 500 lines of PyTorch, no Hugging Face). Train on TinyShakespeare. Understand every line. Then reproduce a classification benchmark with Hugging Face Transformers to see what the library is doing for you.",
+      "Weeks 11-13 — Distributed training: DDP on a multi-GPU instance (Lambda/Vast.ai/RunPod), then FSDP. Profile memory usage and throughput. Run a small training job with DeepSpeed ZeRO-2. Understand the NCCL all-reduce communication pattern.",
+      "Weeks 14-16 — Data and features: build a feature store prototype (Feast), version a dataset with DVC, write a Spark transformation that avoids future leakage, instrument training-serving skew detection.",
+      "Weeks 17-19 — Fine-tuning and alignment: fine-tune Llama 3.1 8B (or Qwen 2.5 7B) with LoRA using Hugging Face PEFT + Accelerate. Run ablations on rank and alpha. Reproduce ROUGE and perplexity metrics from a reference fine-tuned checkpoint.",
+      "Weeks 20-22 — Inference optimisation: quantise a model to INT4 with GPTQ/AWQ, profile latency improvement. Deploy with vLLM. Implement dynamic batching. Measure tokens/second under different request patterns.",
+      "Weeks 23-24 — Integration and portfolio: MLOps pipeline (Metaflow or ZenML), automated retraining trigger, champion-challenger A/B test, drift alerting. Write up one project as a technical blog post with charts."
+    ],
+    "time_to_proficient": "Full-time learner: 6-8 months to production-ready. Part-time (10 h/week): 10-14 months. The honest constraint is GPU access and iteration cycles — you cannot learn distributed training without running distributed training. Budget $100-300 for cloud GPU time across the 24 weeks. Hireable threshold: two shipped projects with verifiable metrics (training loss curves, eval benchmarks, serving latency numbers) beats any amount of coursework.",
+    "faqs": [
+      {"q": "Is the math really mandatory or can I learn it on the job?", "a": "It is mandatory at the level of depth described here. Interviewers at hyperscalers and frontier labs will ask you to derive the gradient of cross-entropy loss, explain why Adam diverges on sparse gradients, and reason about what happens to training stability when you increase the learning rate by 3x. You cannot bluff your way through these with API fluency. The math is not for passing interviews — it is for debugging training runs at 2am."},
+      {"q": "Should I start with PyTorch or JAX?", "a": "PyTorch. Every production ML team has PyTorch tooling. Every paper ships a PyTorch reference. JAX is the dominant research compute paradigm in Google-lineage labs and is gaining in research-to-production pipelines at DeepMind and certain Anthropic workloads. If your goal is a frontier-lab research role, spend 40 hours on JAX after you are strong in PyTorch. If your goal is applied ML at a product company, PyTorch is sufficient indefinitely."},
+      {"q": "Do I need to own a GPU?", "a": "No. For weeks 1-10, no GPU is needed — you are doing math and single-device PyTorch on small models. For weeks 11-24, rent on Lambda Labs, Vast.ai, or RunPod. A 2x H100 node for one hour costs ~$6. Most of the distributed training exercises in this track will complete in under 3 hours of GPU time per project. Total GPU spend for the 24-week track: $200-400 is more than sufficient."},
+      {"q": "What is the difference between an ML Engineer and a Research Scientist?", "a": "A Research Scientist produces new algorithmic ideas and validates them in controlled experiments. An ML Engineer builds the systems that make those ideas work in production at scale. The boundary is fuzzy — many people do both. Practically: an ML Engineer writes more production code, owns serving infrastructure, runs A/B tests on live traffic. A Research Scientist writes more paper drafts, runs more ablations, and cares more about the next SOTA than about p99 serving latency."},
+      {"q": "How important is CUDA / GPU kernel programming?", "a": "Baseline: you need to understand CUDA's thread/block/warp model well enough to read a Triton kernel and reason about coalesced memory access. Writing custom CUDA from scratch is an expert skill that gets you into GPU-kernel engineering roles — it is not required for most ML Engineer positions. If you enjoy it, write a custom attention kernel in Triton; it will make you one of the most technically differentiated candidates in any interview pool."},
+      {"q": "Is distributed training only relevant at large companies?", "a": "Increasingly no. Multi-GPU training is now common at Series B startups running on 8-GPU nodes. Fine-tuning a 7B model on one H100 is routine. Fine-tuning a 70B model on 4 H100s is something a 3-year ML Engineer at a mid-sized AI company will do. FSDP and DeepSpeed are not just hyperscaler tools anymore."},
+      {"q": "How much MLOps do I need to know?", "a": "Enough to own the model lifecycle without a platform team holding your hand. At minimum: experiment tracking with W&B or MLflow, model versioning, a retraining pipeline that can be triggered automatically, and drift alerting. At senior level: champion-challenger infrastructure, automated rollback, data quality gates upstream of training. The ML Engineers who cannot do their own MLOps are bottlenecked constantly — and the bottleneck is visible to their manager."},
+      {"q": "What is the best first project to show employers?", "a": "A fine-tuned language model or image model with a quantified improvement over the base model, a serving endpoint with latency numbers, and an experiment tracking report showing the ablations you ran. The project should answer three questions: what was the baseline, what did you change, and what was the measurable improvement. Every one of those three must have a number attached."}
+    ]
+  },
+  "tools": {
+    "intro": "This inventory covers the tools a 2026 ML Engineer will use daily or weekly. The list is intentionally deep on the training and serving stack — these are the tools that separate a productive ML Engineer from someone who is blocked by their own tooling. Every item here is either open source or has a usable free tier for learning. Hours-to-learn estimates represent the time until you can solve a novel problem unaided; production mastery takes 3-5x longer.",
+    "categories": [
+      {
+        "name": "Core training framework — PyTorch",
+        "blurb": "PyTorch 2.x is the lingua franca of ML engineering in 2026. The depth of knowledge required here exceeds what a generalist or AI Engineer needs — you are programming the framework, not just using it. torch.compile, custom autograd functions, and FSDP are all expected fluency for senior ML Engineers.",
+        "items": [
+          {"tool": "PyTorch 2.x", "purpose": "Primary training framework — tensor ops, autograd, nn.Module, distributed primitives", "hours_to_learn": 60, "url": "https://pytorch.org/docs/stable/"},
+          {"tool": "PyTorch FSDP", "purpose": "FullyShardedDataParallel for training models that don't fit on one GPU", "hours_to_learn": 20, "url": "https://pytorch.org/docs/stable/fsdp.html"},
+          {"tool": "torch.compile + Triton", "purpose": "Graph compilation for 1.5-3x training throughput; write custom Triton kernels when needed", "hours_to_learn": 25, "url": "https://pytorch.org/tutorials/intermediate/torch_compile_tutorial.html"},
+          {"tool": "TorchMetrics", "purpose": "GPU-accelerated, distributed-safe evaluation metrics library", "hours_to_learn": 4, "url": "https://torchmetrics.readthedocs.io/"},
+          {"tool": "einops", "purpose": "Readable tensor reshape / rearrange operations — eliminates view/permute bugs", "hours_to_learn": 3, "url": "https://einops.rocks/"}
+        ]
+      },
+      {
+        "name": "JAX ecosystem — research-leaning roles",
+        "blurb": "JAX is the dominant compute paradigm in Google Brain / DeepMind lineage and is gaining ground at Anthropic and other frontier labs. Its functional transform model (jit, grad, vmap, pmap, scan) produces exceptionally clean research code. Not required for applied-product ML roles; high ROI for frontier-lab positions.",
+        "items": [
+          {"tool": "JAX", "purpose": "Composable function transforms: jit, grad, vmap, pmap — the research ML compute engine", "hours_to_learn": 40, "url": "https://jax.readthedocs.io/"},
+          {"tool": "Flax / Equinox", "purpose": "Neural network libraries for JAX; Flax is Google's; Equinox is the community favourite for clean code", "hours_to_learn": 20, "url": "https://flax.readthedocs.io/"},
+          {"tool": "Optax", "purpose": "Gradient processing and optimiser library for JAX", "hours_to_learn": 8, "url": "https://optax.readthedocs.io/"}
+        ]
+      },
+      {
+        "name": "Training infrastructure and experiment tracking",
+        "blurb": "PyTorch Lightning, Hugging Face Accelerate, and Mosaic Composer sit above raw PyTorch and reduce boilerplate without hiding it. Experiment tracking with W&B or MLflow is non-negotiable — a training run that wasn't tracked didn't happen from a reproducibility standpoint.",
+        "items": [
+          {"tool": "Hugging Face Accelerate", "purpose": "Minimal-overhead distributed training wrapper — one `accelerate launch` and your single-GPU script runs on N GPUs", "hours_to_learn": 10, "url": "https://huggingface.co/docs/accelerate"},
+          {"tool": "PyTorch Lightning", "purpose": "Training loop abstraction with built-in distributed, mixed-precision, and checkpoint support", "hours_to_learn": 15, "url": "https://lightning.ai/docs/pytorch/stable/"},
+          {"tool": "MosaicML Composer", "purpose": "Training library with built-in efficiency methods (progressive resizing, ALiBi, BlurPool) — popular for pretraining runs", "hours_to_learn": 15, "url": "https://docs.mosaicml.com/projects/composer/"},
+          {"tool": "Weights & Biases (W&B)", "purpose": "Experiment tracking, hyperparameter sweeps, artifact versioning, dashboards — the de-facto standard", "hours_to_learn": 8, "url": "https://wandb.ai/"},
+          {"tool": "MLflow", "purpose": "Open-source experiment tracking + model registry; preferred in enterprises with strict data-residency requirements", "hours_to_learn": 10, "url": "https://mlflow.org/"},
+          {"tool": "Optuna", "purpose": "Hyperparameter optimisation — sampler-agnostic, integrates with W&B, supports pruning of bad runs", "hours_to_learn": 8, "url": "https://optuna.org/"}
+        ]
+      },
+      {
+        "name": "Hugging Face ecosystem",
+        "blurb": "The Hugging Face platform is the central repository for pretrained models, datasets, and the tooling to work with them. For ML Engineers, Transformers, PEFT, TRL, and Datasets are daily tools. The fine-tuning and alignment workflows (LoRA, QLoRA, DPO, GRPO) all live here in 2026.",
+        "items": [
+          {"tool": "Hugging Face Transformers 5.x", "purpose": "Pretrained model zoo — Llama 4, Qwen 3, Gemma 3, Mistral, Phi, BERT variants, ViT, Whisper", "hours_to_learn": 20, "url": "https://huggingface.co/docs/transformers"},
+          {"tool": "Hugging Face Datasets", "purpose": "Versioned, streaming dataset access — the right way to handle multi-hundred-GB training corpora", "hours_to_learn": 8, "url": "https://huggingface.co/docs/datasets"},
+          {"tool": "PEFT (Parameter-Efficient Fine-Tuning)", "purpose": "LoRA, QLoRA, IA3, prefix tuning — fine-tune 70B models on a single H100 without full weight updates", "hours_to_learn": 12, "url": "https://huggingface.co/docs/peft"},
+          {"tool": "TRL (Transformer Reinforcement Learning)", "purpose": "SFT, DPO, PPO, GRPO trainers for instruction-tuning and alignment pipelines", "hours_to_learn": 15, "url": "https://huggingface.co/docs/trl"},
+          {"tool": "Hugging Face Hub", "purpose": "Model + dataset + space hosting — your versioned model registry for open-source work", "hours_to_learn": 3, "url": "https://huggingface.co/"}
+        ]
+      },
+      {
+        "name": "Distributed compute — DeepSpeed, Ray, Spark",
+        "blurb": "Large-scale ML is distributed by default. DeepSpeed and Ray are the two most important additions beyond PyTorch's native distributed module. Spark handles the data-scale problems (terabyte-scale feature computation) that PyTorch doesn't touch.",
+        "items": [
+          {"tool": "DeepSpeed", "purpose": "ZeRO stages 1/2/3, optimizer offload, mixed precision — doubles or quadruples effective model size per GPU", "hours_to_learn": 20, "url": "https://www.deepspeed.ai/"},
+          {"tool": "Ray + Ray Train", "purpose": "Distributed Python + distributed ML training — scales from laptop to 1000-node cluster with the same API", "hours_to_learn": 20, "url": "https://docs.ray.io/en/latest/train/train.html"},
+          {"tool": "Apache Spark (PySpark)", "purpose": "Terabyte-scale batch feature computation, data deduplication, and ETL preprocessing", "hours_to_learn": 30, "url": "https://spark.apache.org/docs/latest/api/python/"},
+          {"tool": "Dask", "purpose": "Pandas-compatible distributed dataframes for medium-scale (100GB-10TB) data work without Spark's JVM overhead", "hours_to_learn": 12, "url": "https://docs.dask.org/"}
+        ]
+      },
+      {
+        "name": "Model serving",
+        "blurb": "Inference is not just 'call model.forward()' at scale. Dynamic batching, KV cache management, quantisation, and GPU utilisation are the differences between a serving system that costs $2k/month and one that costs $12k/month for the same traffic. The tools below are the production-grade options ML Engineers are expected to know.",
+        "items": [
+          {"tool": "vLLM", "purpose": "PagedAttention-based LLM serving — the state-of-the-art for throughput-efficient transformer inference", "hours_to_learn": 12, "url": "https://docs.vllm.ai/"},
+          {"tool": "SGLang", "purpose": "Structured generation language + serving runtime — faster than vLLM on constrained-generation workloads", "hours_to_learn": 10, "url": "https://sgl-project.github.io/"},
+          {"tool": "NVIDIA Triton Inference Server", "purpose": "Model serving for heterogeneous backends (PyTorch, ONNX, TensorRT, custom C++) with dynamic batching", "hours_to_learn": 20, "url": "https://developer.nvidia.com/triton-inference-server"},
+          {"tool": "TorchServe", "purpose": "PyTorch-native model server with MAR packaging, handler lifecycle, and multi-model management", "hours_to_learn": 12, "url": "https://pytorch.org/serve/"},
+          {"tool": "Ray Serve", "purpose": "Python-native model serving with dynamic scaling, A/B traffic splitting, and multi-model composition", "hours_to_learn": 10, "url": "https://docs.ray.io/en/latest/serve/"},
+          {"tool": "ONNX + ONNX Runtime", "purpose": "Portable model format + optimised inference runtime for CPU, GPU, and edge devices", "hours_to_learn": 10, "url": "https://onnxruntime.ai/"}
+        ]
+      },
+      {
+        "name": "Data versioning and feature stores",
+        "blurb": "Reproducible ML requires versioned data, not just versioned code. Feature stores solve the online/offline consistency problem that causes training-serving skew — the most pernicious silent bug in production ML systems.",
+        "items": [
+          {"tool": "DVC (Data Version Control)", "purpose": "Git for ML datasets + model artifacts — version, share, and reproduce data-dependent experiments", "hours_to_learn": 12, "url": "https://dvc.org/"},
+          {"tool": "Feast (open-source feature store)", "purpose": "Point-in-time correct feature retrieval for training; low-latency online retrieval for serving", "hours_to_learn": 20, "url": "https://docs.feast.dev/"},
+          {"tool": "Delta Lake / Iceberg", "purpose": "ACID-compliant table format for the data lake — time-travel queries, schema evolution, and upsert for ML pipelines", "hours_to_learn": 15, "url": "https://delta.io/"},
+          {"tool": "Great Expectations / Soda", "purpose": "Data quality validation — assert schema, distributions, and nullability constraints before data enters the training pipeline", "hours_to_learn": 10, "url": "https://docs.greatexpectations.io/"}
+        ]
+      },
+      {
+        "name": "GPU infrastructure and low-level tooling",
+        "blurb": "An ML Engineer who cannot use a profiler is flying blind on performance. CUDA and NVCC basics are not for writing kernels from scratch — they are for reading what the profiler is telling you and understanding why a kernel is slow. Mixed-precision and quantisation tooling is part of the daily inference-cost optimisation workflow.",
+        "items": [
+          {"tool": "NVIDIA Nsight Systems / Compute", "purpose": "GPU profiling — timeline traces, kernel occupancy, memory bandwidth utilisation", "hours_to_learn": 15, "url": "https://developer.nvidia.com/nsight-systems"},
+          {"tool": "bitsandbytes", "purpose": "INT8 / INT4 quantisation for inference and QLoRA training — the default quantisation backend for Hugging Face PEFT", "hours_to_learn": 6, "url": "https://huggingface.co/docs/bitsandbytes"},
+          {"tool": "CUDA Toolkit basics (nvcc, device query)", "purpose": "Understand thread/block/warp model, coalesced memory access, shared memory, warp divergence — enough to read Triton kernels", "hours_to_learn": 20, "url": "https://docs.nvidia.com/cuda/"},
+          {"tool": "FlashAttention (flash-attn)", "purpose": "IO-aware exact attention — 2-4x training speedup and linear memory for long sequences", "hours_to_learn": 5, "url": "https://github.com/Dao-AILab/flash-attention"}
+        ]
+      },
+      {
+        "name": "MLOps platforms and pipeline orchestration",
+        "blurb": "Training a model once is a research exercise. Training it reliably on a schedule, with data quality gates, drift alerting, and automated rollback, is ML engineering. Pick one orchestration framework to go deep on; be conversational about the others.",
+        "items": [
+          {"tool": "Kubeflow Pipelines", "purpose": "Kubernetes-native ML pipeline orchestration — the standard at large engineering orgs with Kubernetes clusters", "hours_to_learn": 25, "url": "https://www.kubeflow.org/docs/components/pipelines/"},
+          {"tool": "ZenML", "purpose": "Python-first MLOps framework — pipeline steps as decorated functions, stack-agnostic, integrates with W&B + MLflow + Kubeflow", "hours_to_learn": 15, "url": "https://docs.zenml.io/"},
+          {"tool": "Metaflow (Netflix)", "purpose": "Data-science-friendly pipeline framework with automatic versioning and local-to-cloud scaling", "hours_to_learn": 12, "url": "https://metaflow.org/"},
+          {"tool": "Prefect / Airflow", "purpose": "General-purpose workflow orchestration; useful for ML pipelines that mix data-engineering and ML steps", "hours_to_learn": 15, "url": "https://docs.prefect.io/"},
+          {"tool": "Evidently AI", "purpose": "Data drift + model monitoring reports — the open-source monitoring layer for production ML", "hours_to_learn": 8, "url": "https://www.evidentlyai.com/"}
+        ]
+      }
+    ],
+    "install_path": [
+      "Install Python 3.11+ via pyenv or uv. Create a project environment: `uv init ml-engineer-track && cd ml-engineer-track`.",
+      "Install the core training stack: `uv add torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124` (adjust CUDA version to your GPU). Add `einops transformers datasets accelerate peft trl`.",
+      "Install experiment tracking: `uv add wandb mlflow optuna`. Sign up for a free W&B account and run `wandb login`.",
+      "Install distributed and serving dependencies: `uv add deepspeed ray[train,serve] vllm`. Note: DeepSpeed requires a C++ compiler; on Ubuntu `apt install build-essential`.",
+      "Install data tooling: `uv add dvc great_expectations pyspark dask`.",
+      "Install profiling and quantisation: `uv add bitsandbytes flash-attn` (flash-attn requires a CUDA-capable GPU at install time).",
+      "Verify GPU access: `python -c 'import torch; print(torch.cuda.get_device_name(0))'`. If not available, set up a cloud instance (Lambda Labs, RunPod) with CUDA 12.4+.",
+      "Clone the Hugging Face PEFT examples repo and run the LoRA fine-tuning example end-to-end as a sanity check on your environment."
+    ],
+    "faqs": [
+      {"q": "Do I need a local GPU to get started?", "a": "No. Weeks 1-10 require no GPU — math, PyTorch on CPU, and small single-GPU experiments on Colab Free. From week 11 onward, rent on Lambda Labs, Vast.ai, or RunPod. A 1x H100 node for 3 hours costs about $10-15 and covers most distributed training exercises."},
+      {"q": "Should I use Lightning or raw PyTorch?", "a": "Write raw training loops first — every PyTorch Lightning abstraction makes more sense after you have written what it is replacing. Switch to Lightning or Accelerate when the boilerplate is costing you more time than the abstractions save. Most interview environments want you to debug raw PyTorch, not Lightning internals."},
+      {"q": "Is vLLM the right serving stack for all use cases?", "a": "For autoregressive LLM serving, vLLM is currently the highest-throughput open-source option and the right default. For non-LLM models (CNNs, BERT-class encoders, custom architectures), Triton Inference Server with TensorRT is often faster. For multi-model ensemble pipelines, Triton's ensemble model type is cleaner than vLLM's. Pick the tool that matches the workload."},
+      {"q": "Is DeepSpeed or FSDP better?", "a": "For PyTorch-native codebases, FSDP is now the recommended path — it is maintained by the PyTorch team, has fewer installation dependencies, and integrates cleanly with torch.compile. DeepSpeed has a richer optimizer-offload story (ZeRO-3 CPU/NVMe) and more deployment history at large scale. Many production systems use both: FSDP for training code, DeepSpeed for the optimizer offload extension."},
+      {"q": "How important is W&B vs MLflow for getting a job?", "a": "W&B is the more common tool in ML-native companies and research labs. MLflow is more common in enterprise and data-platform-heavy organisations. Learn W&B to the point you can demonstrate live experiment tracking in an interview; know MLflow's architecture conceptually. Both appear on job descriptions; neither is a hard gate in isolation."},
+      {"q": "What is the minimum viable MLOps setup for a portfolio project?", "a": "Three things: (1) W&B run tracking with hyperparameter logging, loss curves, and artifact versioning, (2) a DVC-tracked dataset so the training run is reproducible from a fresh clone, (3) a model card documenting training config, eval results, and limitations. That is more MLOps rigour than most portfolio projects show and will get positive attention in reviews."},
+      {"q": "Should I build a RAG system as an ML Engineer?", "a": "RAG is primarily an AI Engineer workload — wiring a retrieval layer to a hosted model. As an ML Engineer, your portfolio should emphasise training from scratch, fine-tuning, or serving optimisation. One RAG project is fine for breadth; five is scope creep into a different specialisation."}
+    ]
+  },
+  "projects": {
+    "intro": "These projects are ordered by depth and dependency — each one teaches something the later ones require. A strong ML Engineer portfolio contains 8-10 of these. The projects that get interviews are not the ones that use the most tools — they are the ones that show you understand what you built, why you made each decision, and what the numbers mean. Every project below should have: training/evaluation curves in a W&B report, a README that answers 'what problem, what approach, what result,' and a live demo or reproducible run command.",
+    "projects": [
+      {
+        "title": "Implement a transformer from scratch — decoder-only language model",
+        "difficulty": "Intermediate",
+        "hours": "40-55",
+        "description": "Write a decoder-only transformer (GPT-style) in under 500 lines of raw PyTorch — no Hugging Face, no Lightning. Include multi-head self-attention with causal masking, rotary positional embeddings, layer norm, and a standard feedforward block. Train on TinyShakespeare or a comparable small text corpus. Track loss curves in W&B. Compare your implementation against nanoGPT as a reference checkpoint. Write a blog post walking through each architectural decision with the mathematical motivation.",
+        "tech_stack": ["PyTorch", "einops", "Weights & Biases", "Jupyter"],
+        "rubric": [
+          "Training loss converges to < 1.5 nats on TinyShakespeare (matches nanoGPT reference within ±0.1)",
+          "Every attention head weights verified against a reference implementation on the same input (numerical match)",
+          "Gradient norms logged throughout training — spike detection and discussion in README",
+          "Ablation: compare RoPE vs learned positional embeddings, documented with loss curves",
+          "Blog post cites the Attention Is All You Need paper section-by-section and maps each equation to code"
+        ]
+      },
+      {
+        "title": "Fine-tune an LLM with LoRA — reproduce benchmark metrics",
+        "difficulty": "Intermediate",
+        "hours": "35-50",
+        "description": "Fine-tune Llama 3.1 8B or Qwen 2.5 7B on an instruction dataset (Alpaca, ShareGPT, or a domain-specific set you curate) using LoRA via Hugging Face PEFT + Accelerate. Run ablations on LoRA rank (r=4, 8, 16, 32) and alpha, tracking loss and downstream eval metrics. Report ROUGE, perplexity, or a task-specific accuracy depending on your dataset. Compare to a full-fine-tune baseline on the same number of trainable parameters. Quantise the final checkpoint to INT4 and measure inference throughput before and after.",
+        "tech_stack": ["Hugging Face Transformers", "PEFT", "Accelerate", "TRL", "bitsandbytes", "W&B"],
+        "rubric": [
+          "Ablation table: rank 4/8/16/32 × alpha 8/16/32, eval metric for each, training cost per run",
+          "Final model card documenting training config, dataset, and eval results in Hugging Face format",
+          "INT4 quantisation: latency before/after with throughput numbers (tokens/second at batch size 1 and 8)",
+          "Comparison against base model on 50 held-out test examples with LLM-judge scoring",
+          "Training-serving skew check: validate that Tokenizer config is identical in training and serving"
+        ]
+      },
+      {
+        "title": "Distributed training pipeline — train a model across 2+ GPUs",
+        "difficulty": "Advanced",
+        "hours": "40-60",
+        "description": "Take your transformer from project 1 (or a medium-sized image model) and train it across 2 or 4 GPUs using PyTorch FSDP. Profile single-GPU vs multi-GPU throughput (samples/second), memory usage per device, and communication overhead using PyTorch Profiler and NVIDIA Nsight. Then add DeepSpeed ZeRO-2 and compare. Document the setup, the results, and the trade-offs. The goal is to demonstrate you understand distributed training beyond 'I added `.to('cuda')`'.",
+        "tech_stack": ["PyTorch FSDP", "DeepSpeed", "torchrun", "PyTorch Profiler", "NVIDIA Nsight Systems"],
+        "rubric": [
+          "Throughput scaling table: 1 GPU, 2 GPU, 4 GPU — samples/second and GPU utilisation per run",
+          "Memory profile: per-device peak memory with FSDP FULL_SHARD vs SHARD_GRAD_OP vs NO_SHARD",
+          "Communication overhead measured: what fraction of wall-clock time is all-reduce vs compute",
+          "FSDP vs DeepSpeed ZeRO-2 comparison on the same model — documented trade-offs in README",
+          "Checkpoint-resume tested: kill the run mid-epoch, resume from checkpoint, verify loss continuity"
+        ]
+      },
+      {
+        "title": "Reproduce a research paper end-to-end",
+        "difficulty": "Advanced",
+        "hours": "55-80",
+        "description": "Pick a paper with a clear, measurable benchmark — LoRA, Mamba, DPO, CLIP, or Diffusion Policy are all reasonable choices depending on your interest area. Re-implement the core algorithm from scratch. Train on the paper's exact dataset (or a documented substitute). Report the primary metric from the paper and compare your result. Write a post-mortem: where did your first implementation differ from the paper, what did you have to fix, and what is still unexplained. Reproducing a paper is the single best signal of research-adjacent ML competence.",
+        "tech_stack": ["PyTorch (primary)", "Hugging Face Datasets", "W&B", "LaTeX / Markdown for write-up"],
+        "rubric": [
+          "Primary paper metric reproduced within 5% of the reported number (document any gap and why)",
+          "Commit-by-commit log that shows iteration: first broken implementation → debugging → working",
+          "Ablation of at least one hyperparameter not ablated in the original paper",
+          "Post-mortem write-up: 3 things the paper under-specified, how you resolved each",
+          "Code is clean, documented, and runnable in under 30 min from a fresh clone"
+        ]
+      },
+      {
+        "title": "Custom optimiser implementation + benchmarking",
+        "difficulty": "Advanced",
+        "hours": "30-45",
+        "description": "Implement two optimisers from scratch in PyTorch — Adam and one modern variant (SOAP, Muon, AdaFactor, or Adan). Verify mathematical correctness against PyTorch's reference on the same model and data. Benchmark convergence speed, final validation loss, and wall-clock time on a small language model task. Write up the derivation, the update rule, and the intuition behind each optimizer's design choice. This project demonstrates the math depth that separates ML Engineers from ML practitioners.",
+        "tech_stack": ["PyTorch", "W&B", "NumPy (for derivation verification)"],
+        "rubric": [
+          "Parameter-level numerical match between your Adam and torch.optim.Adam on the first 100 steps",
+          "Convergence curves on a standard benchmark (PTB perplexity, CIFAR-10 accuracy) for both optimisers",
+          "Math write-up: derive the Adam update rule from the EWMA formulation with bias correction",
+          "Sensitivity analysis: how each optimiser responds to 10x learning rate increase",
+          "README explains when each optimiser is the better choice — not just 'Adam is default'"
+        ]
+      },
+      {
+        "title": "A/B testing framework for model improvements",
+        "difficulty": "Intermediate",
+        "hours": "35-50",
+        "description": "Build an end-to-end A/B testing framework for ML models. Implement statistical power analysis to determine required sample size before launching an experiment. Run a real experiment pitting two model variants (e.g., base model vs LoRA fine-tune, or model with INT8 quantisation vs full precision) against each other on live or simulated traffic. Implement sequential testing (alpha spending) to allow early stopping. Log all predictions and compute the primary metric plus guardrail metrics. Report the result with a proper confidence interval.",
+        "tech_stack": ["FastAPI", "PostgreSQL", "Python (scipy.stats)", "Grafana or a custom dashboard"],
+        "rubric": [
+          "Power analysis tool: input effect size + alpha + beta, output required sample size — tested with known analytical results",
+          "Sequential testing implemented: experiment can be stopped early if the effect is conclusive at interim looks",
+          "Guardrail metrics tracked alongside the primary metric — catch regressions the primary metric misses",
+          "Interaction effect check: are any user segments responding differently?",
+          "Final report with confidence intervals, not just point estimates — 'Model B is 2.3% better (95% CI: 0.8%-3.8%)'"
+        ]
+      },
+      {
+        "title": "Model serving system with batching and autoscaling",
+        "difficulty": "Advanced",
+        "hours": "45-65",
+        "description": "Build a production-grade model serving endpoint that handles variable request loads. Implement dynamic batching (accumulate requests for up to 20ms before forwarding to the model). Deploy with Ray Serve or vLLM. Add horizontal autoscaling triggered by GPU utilisation. Load test with Locust or k6 at 1x, 5x, and 20x steady-state traffic. Report p50, p95, and p99 latency and throughput at each load level. Compare serving cost per 1000 requests before and after batching optimisation.",
+        "tech_stack": ["Ray Serve or vLLM", "FastAPI", "Prometheus + Grafana", "Locust", "Docker + Kubernetes or Docker Compose"],
+        "rubric": [
+          "Dynamic batching implementation with configurable max_batch_size and max_wait_ms — measured effect on throughput vs latency",
+          "p50/p95/p99 latency table at 1x / 5x / 20x traffic — tested with Locust and plotted",
+          "Autoscaling trigger: replica count increases when GPU utilisation > 80% for 30s, measured in the load test",
+          "Serving cost calculation: tokens/second per dollar at steady-state traffic",
+          "Rollback tested: deploy model v2, confirm v1 is accessible, switch back — all under 60 seconds"
+        ]
+      },
+      {
+        "title": "Feature store prototype with point-in-time correctness",
+        "difficulty": "Intermediate",
+        "hours": "30-45",
+        "description": "Build a feature store that correctly serves features with point-in-time join semantics — the key property that prevents training-serving skew in time-dependent ML systems. Use Feast for the core store implementation. Define an offline store (Parquet-backed) and an online store (Redis-backed). Show that naive joins would produce a different (biased) training set compared to point-in-time joins on the same data. Deploy a simple model that uses online feature lookup at inference time. Document the skew problem and how point-in-time joins solve it.",
+        "tech_stack": ["Feast", "Redis", "Apache Parquet", "pandas", "FastAPI (for serving)"],
+        "rubric": [
+          "Point-in-time correctness demonstration: side-by-side comparison of naive join vs PIT join training labels on the same event set",
+          "Offline → online consistency: verify that the online store returns the same feature values as the offline store for the same entity + timestamp",
+          "Feature freshness SLA documented: how stale can online features be before model accuracy degrades?",
+          "Backfill pipeline: populate historical features for a 6-month window without loading all data into memory",
+          "Training pipeline reads from offline store; serving endpoint reads from online store — both using Feast SDK"
+        ]
+      },
+      {
+        "title": "Train a diffusion model from scratch on a curated image dataset",
+        "difficulty": "Advanced",
+        "hours": "50-75",
+        "description": "Train a DDPM (Denoising Diffusion Probabilistic Model) or DDIM from scratch on a narrow, well-defined image domain you curate — pixel art, satellite imagery, medical images, or product photography. Implement the forward (noising) and reverse (denoising) processes, the noise prediction network (a UNet), and the sampling loop. Evaluate with FID score on a held-out test set. Track training in W&B. Ablate the number of diffusion timesteps (100 vs 500 vs 1000) and the noise schedule (linear vs cosine). This project demonstrates the mathematical depth of generative model training.",
+        "tech_stack": ["PyTorch", "torchvision", "Hugging Face Diffusers (as reference)", "W&B", "NVIDIA GPU (H100 or A100 recommended)"],
+        "rubric": [
+          "Forward process: mathematically correct implementation of q(x_t | x_0) with arbitrary timestep — verified against the closed-form formula",
+          "Generated samples visually coherent at 256x256+ resolution, FID score reported and compared to reference DDPM numbers",
+          "Ablation table: timesteps 100 / 500 / 1000 × linear / cosine schedule, FID and training time per configuration",
+          "Inference speed: samples/second for DDPM vs DDIM (the deterministic accelerated sampler)",
+          "Sample diversity vs quality trade-off: vary classifier-free guidance scale and document the effect"
+        ]
+      },
+      {
+        "title": "Experiment tracking dashboard — replay and compare runs",
+        "difficulty": "Intermediate",
+        "hours": "25-35",
+        "description": "Build a custom experiment tracking dashboard that aggregates runs from W&B, MLflow, or both, and surfaces actionable comparisons. Features: hyperparameter importance analysis (Optuna's fANOVA or a simpler correlation sweep), run comparison with delta-metric highlighting, learning curve smoothing, best-checkpoint selection by eval metric. The goal is a tool you actually want to use for your other projects. This demonstrates software engineering taste alongside ML knowledge.",
+        "tech_stack": ["W&B API / MLflow Python API", "Streamlit or Plotly Dash", "pandas", "Optuna"],
+        "rubric": [
+          "Hyperparameter importance chart: which hyperparameters account for >80% of val-loss variance across 50+ runs",
+          "Run comparison: select any two runs, see a side-by-side diff of every hyperparameter and metric",
+          "Best-checkpoint-per-run tracked: not just final checkpoint but the epoch with best val metric",
+          "Dashboard updates automatically as new runs complete — no manual refresh",
+          "Export function: download a CSV of all runs with hyperparameters + final metrics for offline analysis"
+        ]
+      },
+      {
+        "title": "Build a retrieval-augmented evaluation harness for LLMs",
+        "difficulty": "Intermediate",
+        "hours": "30-45",
+        "description": "Build an evaluation harness for an LLM that integrates retrieval. The eval harness should: (1) run a suite of benchmark tasks against a model, (2) compare retrieval-augmented vs non-augmented performance, (3) run LLM-as-judge scoring on open-ended outputs, and (4) track results across model versions in W&B. Make the harness model-agnostic so you can plug in different checkpoints. This project demonstrates evaluation engineering — one of the highest-signal skills in 2026 ML hiring.",
+        "tech_stack": ["Hugging Face Transformers + Evaluate", "LM Evaluation Harness (EleutherAI)", "pgvector / Chroma", "W&B", "FastAPI"],
+        "rubric": [
+          "Eval harness runs ≥3 task types: multiple-choice, open-ended generation, and retrieval-grounded QA",
+          "LLM-as-judge implementation with defined rubric, prompt reproducibility, and inter-rater reliability check on 20 examples",
+          "Model-agnostic design: swap from HF model to vLLM endpoint with a config change, not a code change",
+          "Regression detection: alert if a new checkpoint underperforms the baseline by >2% on any task",
+          "Retrieval ablation: RAG vs no-RAG comparison with statistical significance test"
+        ]
+      },
+      {
+        "title": "MLOps pipeline — automated retraining with drift detection and rollback",
+        "difficulty": "Advanced",
+        "hours": "50-70",
+        "description": "Build a complete MLOps pipeline that monitors a deployed model, detects data drift, triggers automated retraining when drift exceeds a threshold, evaluates the retrained model against the champion, and promotes the challenger only if it passes regression gates. Implement rollback that restores the previous model version in under 2 minutes. Use ZenML or Metaflow for pipeline orchestration. Deploy to Docker Compose on a VPS. This is the graduation project for the MLOps section and demonstrates production-grade ML engineering.",
+        "tech_stack": ["ZenML or Metaflow", "Evidently AI (drift detection)", "MLflow (model registry)", "FastAPI", "Prometheus + Grafana", "Docker Compose"],
+        "rubric": [
+          "Drift detection: PSI-based input distribution monitoring with configurable alert thresholds, confirmed by injecting known distribution shift",
+          "Automated retraining trigger: drift alert → retraining pipeline launches → challenger model evaluated → promoted or rejected",
+          "Regression gate: challenger model must exceed champion on 3 held-out eval metrics — all three must pass, not just one",
+          "Rollback tested: introduce a deliberately degraded model, confirm rollback restores the previous version in < 2 minutes",
+          "Pipeline reproducibility: every retraining run captures data hash, code commit, and hyperparameters — any run can be replicated"
+        ]
+      },
+      {
+        "title": "GPU kernel optimisation — implement flash attention in Triton",
+        "difficulty": "Expert",
+        "hours": "50-80",
+        "description": "Implement the forward pass of flash attention in Triton (the Python-embedded GPU kernel language). Start with a naive attention baseline in CUDA. Profile with Nsight Compute to identify the memory-bandwidth bottleneck. Implement the tiled, IO-aware forward pass from the FlashAttention-2 paper. Benchmark your kernel against torch.nn.functional.scaled_dot_product_attention and the reference flash-attn package on sequence lengths 512, 1024, 4096, and 8192. This project puts you in the top 5% of ML Engineer candidates. Treat it as an optional stretch goal; attempt only after the core portfolio is complete.",
+        "tech_stack": ["Triton (OpenAI)", "PyTorch", "NVIDIA Nsight Compute", "CUDA C++ (for the naive baseline)"],
+        "rubric": [
+          "Naive O(N^2) attention in CUDA verified numerically correct against PyTorch reference at FP32",
+          "Triton flash attention implementation numerically correct within FP16 tolerance at all tested sequence lengths",
+          "Benchmark table: naive CUDA / torch SDPA / flash-attn reference / your Triton impl — memory (GB) and TFLOPS at each sequence length",
+          "Nsight profile showing your kernel reaches ≥80% of theoretical memory bandwidth on H100",
+          "Writeup explains the IO complexity argument from the FlashAttention paper in your own words with a diagram"
+        ]
+      },
+      {
+        "title": "End-to-end ML system — train, serve, monitor, and retrain",
+        "difficulty": "Advanced",
+        "hours": "70-100",
+        "description": "Capstone. Build a complete ML system on a problem you define: a recommender, a ranker, a classifier, or a generative model. The system must train on a real dataset, serve predictions behind an API endpoint at sub-200ms p99 latency, log prediction distributions for drift monitoring, and have a retraining pipeline that can be triggered by a data volume threshold or a schedule. Deploy to a VPS. Add a public-facing demo. Write a 2000-word technical post-mortem. The capstone is the project you demo in interviews — it should be something you can talk about for 45 minutes.",
+        "tech_stack": ["PyTorch + Hugging Face (training)", "vLLM or Ray Serve (serving)", "Evidently (monitoring)", "ZenML or Metaflow (pipeline)", "FastAPI + Docker Compose (API + infra)"],
+        "rubric": [
+          "Architecture diagram in the README — training, serving, monitoring, and retraining components clearly separated",
+          "Sub-200ms p99 latency verified under realistic load (Locust load test report in README)",
+          "Drift monitoring active: describe what metric you are monitoring and what threshold triggers retraining",
+          "One documented retraining cycle: describe what data change triggered it, what improved, what the regression gate was",
+          "Live URL. A recruiter can interact with the system in under 60 seconds without setup."
+        ]
+      }
+    ],
+    "faqs": [
+      {"q": "How many of these projects should I actually complete?", "a": "Eight to ten. Four or five of them should be Advanced difficulty. The GPU kernel project is an optional stretch goal — attempt it only after the core portfolio is complete and you want to differentiate further. Employers will read three in depth and skim the rest."},
+      {"q": "Should I prioritise breadth or depth?", "a": "Depth for two or three core projects, breadth for the rest. The transformer-from-scratch and distributed-training projects are the ones interviewers will ask you to walk through line-by-line. Those deserve 60-80 hours. The others can be lighter."},
+      {"q": "Can I use Hugging Face for everything?", "a": "No. The transformer-from-scratch, custom-optimiser, and paper-reproduction projects require building things that the library provides for you. The learning value is in the building. Hugging Face is appropriate for fine-tuning projects and for anything downstream of those foundational projects."},
+      {"q": "How important are the numbers in each project?", "a": "Very. 'I trained a model' is a weak signal. 'I trained a transformer that reaches 1.48 nats on TinyShakespeare, matching nanoGPT within 2%, with an ablation showing cosine schedule outperforms linear by 0.08 nats' is a strong signal. Every project should have a quantified result."},
+      {"q": "Do these projects need to be on a GPU cloud to count?", "a": "Yes for the distributed training, diffusion model, and fine-tuning projects — there is no substitute for actually running on multi-GPU hardware. For the others, a single Colab GPU is sufficient. Budget your GPU spend: the three GPU-heavy projects together need about $80-150 of cloud GPU time."},
+      {"q": "Should I open-source all of these?", "a": "Yes. Public GitHub, with a polished README, W&B report link, and a live demo URL where applicable. ML Engineers who demo their work directly are materially more likely to pass phone screens than those who only describe it."},
+      {"q": "Is the Kaggle top-10% signal meaningful for ML Engineer roles?", "a": "More than for generalist roles. ML Engineer interviewers at hyperscalers are often former Kagglers themselves and recognise competition-specific skills (ensembling, leak detection, feature-engineering on edge cases). A top-10% finish on a named competition is worth mentioning; a gold medal is a hard differentiator."}
+    ]
+  },
+  "certifications": {
+    "intro": "A 2026 reality check specific to ML Engineer roles: certifications here matter less than they do in data science or cloud engineering. Hiring managers at frontier labs and hyperscalers are more likely to ask 'show me your training run' than 'show me your certificate.' That said, the programs below have real educational content — they are worth completing for the knowledge, with the certificate as a side effect. Every program listed is free to audit. The MLOps Specialisation carries the highest employer signal for this specific track because it covers the production side most self-taught ML Engineers leave weak.",
+    "items": [
+      {
+        "name": "Deep Learning Specialization",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 80,
+        "url": "https://www.coursera.org/specializations/deep-learning",
+        "employer_signal": "Strong. The five-course series — Neural Networks, CNNs, Sequence Models, Structured Projects, Hyperparameter Tuning — remains the best-known deep learning curriculum in the industry. For ML Engineers specifically, Course 2 (Improving DNNs) and Course 5 (Sequence Models) are the highest-signal content.",
+        "best_for": "Learners who want rigorous, assignment-heavy coverage of the theoretical foundations before they go deep into PyTorch. Pair with fast.ai for the top-down complement."
+      },
+      {
+        "name": "MLOps Specialization (Machine Learning Engineering for Production)",
+        "provider": "DeepLearning.AI (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://www.coursera.org/specializations/machine-learning-engineering-for-production-mlops",
+        "employer_signal": "High — the highest employer signal on this list for ML Engineer roles specifically. Covers the full production lifecycle: data pipeline quality, model serving, monitoring, drift detection, and CI/CD for models. Most self-taught ML Engineers have the training side but leave the production side weak. This specialisation closes that gap directly.",
+        "best_for": "ML Engineers who have trained models and want the vocabulary and patterns for the lifecycle after training. Signals to employers that you care about models surviving production, not just notebooks."
+      },
+      {
+        "name": "fast.ai — Practical Deep Learning for Coders",
+        "provider": "fast.ai (fully free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 50,
+        "url": "https://course.fast.ai/",
+        "employer_signal": "Strong with the 'shipped something' crowd. Jeremy Howard's top-down approach gets you training production-quality models in week 1 and backfills the theory later. Part 2 (from the foundations) is particularly valuable for ML Engineers — it re-derives the PyTorch training loop from near-scratch in a way that builds genuine system understanding.",
+        "best_for": "Engineers who learn by building first. The opposite pedagogical style to DeepLearning.AI — fast.ai Part 2 is essential for ML Engineers who want to understand what is actually happening inside the training loop."
+      },
+      {
+        "name": "MIT OpenCourseWare — Introduction to Deep Learning (6.S191)",
+        "provider": "MIT (free, publicly posted lectures)",
+        "cost_usd": 0,
+        "prep_hours": 40,
+        "url": "https://introtodeeplearning.com/",
+        "employer_signal": "Moderate as a line item; strong as context. The lab assignments are non-trivial and the curriculum is updated annually to cover current frontier topics (diffusion models, LLM fine-tuning, RL from human feedback). MIT's brand adds institutional weight for non-CS-background candidates.",
+        "best_for": "Learners who want the rigorous MIT treatment of deep learning with modern coverage. The 2025 and 2026 editions include transformer internals, fine-tuning mechanics, and deployment labs that older courses lack."
+      },
+      {
+        "name": "Hugging Face NLP Course",
+        "provider": "Hugging Face (free, self-paced)",
+        "cost_usd": 0,
+        "prep_hours": 25,
+        "url": "https://huggingface.co/learn/nlp-course",
+        "employer_signal": "Strong for any ML Engineer whose work touches language models — which in 2026 is most of them. Hands-on coverage of the Transformers + Datasets + Tokenizers + Accelerate + PEFT stack. The fine-tuning and sharing-models chapters are directly job-relevant.",
+        "best_for": "ML Engineers who need to get productive with the Hugging Face ecosystem quickly. The tokenisation chapter alone is worth the 25-hour investment — tokeniser bugs are a top source of training-serving skew."
+      },
+      {
+        "name": "Made With ML (Goku Mohandas)",
+        "provider": "Made With ML (fully free, open-source curriculum)",
+        "cost_usd": 0,
+        "prep_hours": 60,
+        "url": "https://madewithml.com/",
+        "employer_signal": "Strong and underrated. The course is free, project-driven, and covers the full ML lifecycle from data ingestion through serving and monitoring. Goku Mohandas's production emphasis — every section has a CI/CD, testing, and deployment angle — directly addresses the weakest section of most ML portfolios. Well-respected in the ML engineering community.",
+        "best_for": "ML Engineers who want the most production-engineering-oriented free curriculum available. If you only pick one additional resource beyond the standard university courses, Made With ML is the most job-aligned."
+      },
+      {
+        "name": "Full Stack Deep Learning (FSDL)",
+        "provider": "Full Stack Deep Learning (free, lectures and labs on YouTube / GitHub)",
+        "cost_usd": 0,
+        "prep_hours": 40,
+        "url": "https://fullstackdeeplearning.com/",
+        "employer_signal": "Moderate-to-strong. FSDL is known for its practical, ops-heavy angle — lab infrastructure, experiment management, model deployment. The project week is particularly valuable. Covers topics like labelling, data flywheel, team practices, and CI for ML that most academic courses skip.",
+        "best_for": "ML Engineers who have done the modelling coursework and want the engineering-and-ops layer on top. The lectures are freely available on YouTube; the course format is cohort-based but the materials remain accessible."
+      },
+      {
+        "name": "Generative AI with Large Language Models",
+        "provider": "DeepLearning.AI + AWS (Coursera, audit free)",
+        "cost_usd": 0,
+        "prep_hours": 16,
+        "url": "https://www.coursera.org/learn/generative-ai-with-llms",
+        "employer_signal": "Moderate-to-strong. The most up-to-date systematic coverage of the LLM training lifecycle from a named provider: pre-training data, fine-tuning, RLHF, and deployment. For ML Engineers, the fine-tuning and efficiency sections are the highest-value content. A 16-hour investment with a disproportionate signal-per-hour ratio.",
+        "best_for": "ML Engineers who need a structured overview of the LLM lifecycle — not to build prompting skills, but to understand the training and alignment pipeline from the inside."
+      },
+      {
+        "name": "Google Machine Learning Crash Course",
+        "provider": "Google (free, browser-based)",
+        "cost_usd": 0,
+        "prep_hours": 15,
+        "url": "https://developers.google.com/machine-learning/crash-course",
+        "employer_signal": "Light as a standalone credential. Useful as a weekend review of ML fundamentals — feature engineering, regularisation, evaluation metrics — before an interview or before starting a deeper programme. The TensorFlow integration sections are less relevant if you are using PyTorch.",
+        "best_for": "A crisp 15-hour refresher on the core ML concepts before diving into the deeper programmes above. Good for software engineers who want to verify they have no gaps in foundational ML vocabulary before starting the track."
+      },
+      {
+        "name": "Distributed Machine Learning with Apache Spark (IBM / Coursera)",
+        "provider": "IBM / Coursera (audit free)",
+        "cost_usd": 0,
+        "prep_hours": 20,
+        "url": "https://www.coursera.org/learn/distributed-machine-learning",
+        "employer_signal": "Light-to-moderate. The certificate itself carries limited signal, but the content — Spark MLlib, distributed model training patterns, data parallelism concepts — fills a gap that most ML Engineer curricula skip. Pair with hands-on Spark feature engineering work rather than treating as a standalone credential.",
+        "best_for": "ML Engineers targeting data-platform-heavy roles (financial services, retail, telecom) where Spark is a first-class tool and distributed feature computation is expected."
+      }
+    ],
+    "employer_data": "Based on 90-day aggregate data from the AutomateEdge jobs pipeline, ML Engineer job postings reference certifications as an explicit requirement in under 2% of cases — lower than the generalist track. What they do require (70%+ of postings): demonstrated experience with PyTorch, evidence of training models beyond toy scale (multi-GPU or LLM fine-tuning), MLOps tooling familiarity, and a GitHub with training runs that can be inspected. The practical implication: complete the MLOps Specialisation because it teaches things you need, not because the certificate unlocks a gate. The production side is where most self-taught ML Engineers have the biggest gap, and closing it is worth more than any wall of certificates.",
+    "faqs": [
+      {"q": "Which certification should I do first?", "a": "If you have a software engineering background but no deep learning background, start with fast.ai Practical Deep Learning for Coders — it gets you training real models immediately and the Part 2 content is genuinely deep. If you prefer structured learning with clear assignments, start with the DeepLearning.AI Deep Learning Specialisation."},
+      {"q": "Is the MLOps Specialisation really that important?", "a": "Yes, specifically for ML Engineer roles. Most self-taught ML Engineers have strong training skills and weak production skills. Interviewers at hyperscalers will probe your understanding of drift detection, CI/CD for models, serving infrastructure, and monitoring. The MLOps Specialisation is the fastest way to close that gap systematically."},
+      {"q": "Do I need cloud certifications — AWS ML Specialty, GCP Professional ML?", "a": "For most ML Engineer roles, no. Those certifications are valuable for MLOps-Engineer or cloud-specialist roles where the interview probes cloud-specific service knowledge. For ML Engineer roles, PyTorch + distributed training + serving knowledge dominates. Revisit cloud certifications if you end up in a heavily AWS or GCP shop."},
+      {"q": "Should I pay for the verified certificate?", "a": "Almost never. Audit the course for the material; the PDF adds marginal résumé value. The one exception: if your employer reimburses professional development, take the paid version — having it in your LinkedIn improves profile visibility in some recruiter searches."},
+      {"q": "Are the Hugging Face certifications worth doing?", "a": "The NLP Course is worth completing — it is substantive and the Hugging Face ecosystem is a daily tool. The shorter Hugging Face 'certification' programs (Audio Course, Diffusion Models Course) are worth auditing for content but carry light signal. The transformers + PEFT knowledge is what matters, not the certificate."},
+      {"q": "How many certifications should be on my résumé?", "a": "Two or three, maximum. Feature the ones that are highest signal for the specific role — MLOps Specialisation for production-ML roles, Deep Learning Specialisation for research-adjacent roles, fast.ai for applied-ML-with-deployed-projects roles. Any more reads as cert-collecting, which is a neutral-to-negative signal for ML Engineer positions where project depth is the primary criterion."},
+      {"q": "Can I skip certifications entirely?", "a": "Yes, if your GitHub demonstrates the equivalent knowledge. An ML Engineer with public training runs showing loss curve convergence, an ablation table, a W&B report, and a serving latency benchmark has demonstrated more than any certification can certify. The certifications are a structured path to that knowledge — not a gate to the job itself."},
+      {"q": "Is an online course the same as a university ML course?", "a": "No, but the gap is smaller than it used to be. MIT 6.S191 and Stanford CS229/CS231n (available on YouTube) are at or above the level of the best Coursera programmes on content. The difference is the credential — a Stanford transcript carries institutional weight an audit certificate does not. For ML Engineer roles, this matters less than for research positions."}
+    ]
+  },
+  "salary": {
+    "intro": "The salary ranges below are US market aggregates for ML Engineer roles in 2026 Q1. They reflect a role that owns training infrastructure, distributed compute, and serving systems — not just model integration. ML Engineers command a premium over AI Engineers and Data Scientists at senior+ levels, particularly at hyperscalers and frontier labs where the training infrastructure skill set is genuinely scarce. Numbers are base salary + total compensation (base + equity + bonus); regional multipliers are applied to the US base. Hyperscaler and frontier-lab data is weighted more heavily here because that is where ML Engineer role definitions and comp structures are clearest.",
+    "update_date": "2026-04-24",
+    "bands_us": [
+      {"level": "Entry (L2/L3, 0-2 yrs)", "base_low": 135000, "base_high": 180000, "total_comp_low": 165000, "total_comp_high": 270000, "notes": "Entry ML Engineer at a hyperscaler or well-funded AI-native startup. Strong portfolio (trained a transformer, fine-tuned an LLM, deployed a serving system) is the bar for this level — a list of tutorials is not. Sign-on bonuses of $30-60k are common to close offers."},
+      {"level": "Mid (L4, 2-5 yrs)", "base_low": 175000, "base_high": 235000, "total_comp_low": 240000, "total_comp_high": 400000, "notes": "The most common ML Engineer band. Owns a full ML pipeline end-to-end. Has shipped at least two models with measurable business impact — latency reduction, recall improvement, training cost cut. Comp at this level has compressed somewhat from the 2021-2022 peak but stabilised above pre-2020 baselines by 2026."},
+      {"level": "Senior (L5, 5-8 yrs)", "base_low": 220000, "base_high": 300000, "total_comp_low": 330000, "total_comp_high": 620000, "notes": "Senior ML Engineers at hyperscalers own an entire model family (training infra, serving, monitoring, retraining). Comp is dominated by equity at this level — the wide TC spread reflects 4-year RSU grants that vary 3-5x across companies and vesting schedules. Frontier labs (Anthropic, OpenAI, DeepMind, Meta FAIR) pay at the top of this range."},
+      {"level": "Staff (L6, 8-12 yrs)", "base_low": 275000, "base_high": 380000, "total_comp_low": 480000, "total_comp_high": 900000, "notes": "Staff ML Engineers at Google Brain, Meta FAIR, Nvidia Research, or frontier AI labs drive multi-team training infrastructure. At this level, the ML Engineer who can cut training cost by 20% for a team of 50 is worth millions in infrastructure savings. Equity grants at this level are often 4-year refreshers on top of base that keep TC climbing."},
+      {"level": "Principal (L7+, 10+ yrs)", "base_low": 345000, "base_high": 500000, "total_comp_low": 700000, "total_comp_high": 1600000, "notes": "Principal ML Engineers set the training infrastructure strategy for an entire AI organisation. At frontier labs and FAANG, these are roles with fewer than a hundred incumbents worldwide. The TC range reflects the extreme variance in equity grants at this level — a well-timed 4-year refresh at a private frontier lab can eclipse the upper bound. Rare role; the path runs through Staff with a demonstrated org-wide impact record."}
+    ],
+    "bands_regions": [
+      {"region": "SF Bay Area", "multiplier": 1.15, "note": "The reference market for ML Engineer compensation. Frontier labs (Anthropic, OpenAI, Google DeepMind), hyperscalers (Google, Meta, Apple, Nvidia), and the highest-density ML talent market all co-locate here. The premium has compressed from its 2021 peak as remote policies expanded, but SF remains the highest-base market."},
+      {"region": "NYC / Seattle / Boston", "multiplier": 1.08, "note": "Near-peer to SF for base salary. Seattle is the second-strongest market (Microsoft, Amazon, NVIDIA HQ-adjacent). NYC has grown significantly as a financial-services AI and LLM-application market. Boston carries the MIT/Harvard research-lab adjacency premium for research-leaning ML roles."},
+      {"region": "Other major US metros (Austin, Chicago, Denver, LA)", "multiplier": 0.94, "note": "Most companies that have expanded hiring to these markets have converged to within 5-8% of SF for ML Engineer roles, driven by talent competition for a scarce skill set. The gap is smaller for ML Engineers than for general software engineers."},
+      {"region": "Fully remote US", "multiplier": 0.91, "note": "Remote-band compression has stabilised for ML Engineer roles. The discount is smaller than for general software roles because ML Engineers are scarcer and companies compete harder. Specialists with distributed training or inference optimisation skills command near-on-site rates even remote."},
+      {"region": "Toronto / Montreal (CAD)", "multiplier": 0.65, "note": "Canadian ML Engineer comp runs materially below US at all levels, largely because equity values at Canadian AI companies (Cohere, Vector Institute affiliates, Google Brain Toronto) are structured differently. US-headquartered companies hiring in Canada often pay near-US rates for strong candidates."},
+      {"region": "Western Europe (EUR)", "multiplier": 0.52, "note": "Strong discount vs US at all levels. London DeepMind / Google / Waymo roles are exceptions and approach US senior rates. Berlin, Amsterdam, and Paris AI ecosystems are growing; top-of-market rates at European frontier-lab offices can hit 70% of US equivalent for senior roles."},
+      {"region": "India (INR)", "multiplier": null, "note": "Separate market. Entry ML Engineer at top Indian product companies and GCCs: ₹15-30 LPA. Mid: ₹30-65 LPA. Senior at top-tier orgs (Google India, Microsoft India, leading AI startups): ₹70-150 LPA. Staff / Principal at frontier-lab India offices: ₹180-350+ LPA. Compensation has accelerated significantly in 2025-2026 as Anthropic, DeepMind, and Meta expanded India engineering centres."},
+      {"region": "Southeast Asia (SGD / MYR)", "multiplier": null, "note": "Singapore: Entry S$75-110k, Mid S$120-180k, Senior S$200-350k. Singapore-headquartered AI companies (Sea Group, Grab ML) pay at the top of this range. Other SEA markets run materially below Singapore; remote work for US companies from SEA is common and paid at near-US rates for strong ML Engineer talent."}
+    ],
+    "velocity": {
+      "jobs_last_90d_us": "The AutomateEdge pipeline tracked approximately 1,800 US-based ML Engineer roles (title-matched) over the trailing 90 days — up 22% year-over-year, outpacing the generalist-AI-Engineer category. The hiring recovery is driven by frontier labs scaling training infrastructure teams and hyperscalers building next-generation model serving infrastructure. Distributed training and inference optimisation skills show the fastest growth in requirement frequency.",
+      "avg_days_to_fill": "Median time-to-fill for entry ML Engineer roles is 45 days; senior ML Engineer roles run 72 days. Senior+ ML Engineer roles at frontier labs regularly go unfilled for 90+ days — the candidate pool with distributed training + LLM fine-tuning + serving experience simultaneously is genuinely thin.",
+      "top_hiring_companies": [
+        "Anthropic (training infra, alignment, interpretability ML)",
+        "OpenAI (training infrastructure, post-training, inference)",
+        "Google DeepMind (Gemini 2.x training, research engineering)",
+        "Meta AI (Llama 4+ training, FAIR research engineering)",
+        "Nvidia (applied ML, customer training-infra support)",
+        "Microsoft + Azure ML (OpenAI integration, Azure ML platform)",
+        "Amazon (Bedrock training-infra, retail ranking, Alexa ML)",
+        "Apple (on-device ML, CoreML team, private cloud inference)",
+        "Databricks / Mosaic AI (open-source LLM training, enterprise ML)",
+        "Cohere / Mistral / AI21 (commercial LLM training infra)"
+      ],
+      "trending_skills": [
+        "Distributed training — FSDP, DeepSpeed ZeRO (up 85% YoY in job requirements)",
+        "LLM fine-tuning + alignment — LoRA, DPO, GRPO (up 140% YoY)",
+        "Inference optimisation — quantisation, speculative decoding, continuous batching (up 110% YoY)",
+        "Post-training pipelines — SFT, RLHF, constitutional AI patterns (up 95% YoY)",
+        "GPU infrastructure — CUDA, Triton kernel writing, profiling (up 60% YoY)",
+        "MLOps for LLMs — drift detection, eval pipelines, champion-challenger (up 75% YoY)"
+      ]
+    },
+    "negotiation_tips": [
+      "Demonstrate training cost reduction in your portfolio. An ML Engineer who reduced training cost by 30% for a team is a savings story, not a headcount cost. Frame your impact in dollar terms whenever possible.",
+      "Inference cost reduction is a lever. If you can demonstrate that your quantisation or batching work cut serving cost by 40%, that number belongs in the offer negotiation — compute costs at hyperscalers are enormous and engineering that reduces them has clear financial value.",
+      "Equity for private companies requires a 30-50% haircut. A private frontier lab's 4-year RSU grant at a $40B valuation is not the same as an equivalent Google grant. Ask about the preferred share vs common share structure, 409A valuation, and latest funding round terms before comparing TC numbers.",
+      "Get three offers from comparable tiers. ML Engineers have leverage — the candidate pool is thin. Use it. A hyperscaler offer improves your position at a frontier lab and vice versa.",
+      "Ask about compute access and training budget. At ML Engineer-level roles, having access to a 512-GPU cluster to run your experiments is worth real dollars. Ask explicitly about GPU budgets and training infrastructure in the offer discussion.",
+      "Sign-on bonuses are the cleanest ask for relocation. If you are moving to SF for a role, relocation + sign-on can cover the first year of living-cost differential. These come from separate budget lines and have more room to move than base.",
+      "Technical staff levels (L6, L7) vest on multi-year schedules. Ask about refresh grants — at hyperscalers, L6+ engineers receive annual equity refreshes that can equal or exceed the original grant over time. Those refreshes are not guaranteed but are the norm at Google, Meta, and Apple."
+    ],
+    "sources": [
+      {"name": "levels.fyi — Machine Learning Engineer distributions", "url": "https://www.levels.fyi/t/machine-learning-engineer"},
+      {"name": "Glassdoor — Machine Learning Engineer salaries", "url": "https://www.glassdoor.com/Salaries/machine-learning-engineer-salary-SRCH_KO0,25.htm"},
+      {"name": "US BLS — Computer + Information Research Scientists", "url": "https://www.bls.gov/ooh/computer-and-information-technology/computer-and-information-research-scientists.htm"},
+      {"name": "LinkedIn Economic Graph — Jobs on the Rise", "url": "https://economicgraph.linkedin.com/"},
+      {"name": "AutomateEdge jobs pipeline (internal aggregation)", "url": "https://automateedge.cloud/jobs"}
+    ],
+    "faqs": [
+      {"q": "Why does ML Engineer pay more than AI Engineer at senior levels?", "a": "At entry and mid levels, the bands overlap heavily. At senior and above, ML Engineers own training infrastructure — distributed training, custom kernels, inference optimisation — that directly impacts compute costs measured in millions of dollars annually. The scarcity of people who can do this AND the financial leverage they create pushes senior+ ML Engineer comp above AI Engineer and Data Scientist equivalents at hyperscalers and frontier labs."},
+      {"q": "Is frontier-lab pay really that much higher than a hyperscaler?", "a": "For strong candidates, yes — particularly on equity. Frontier labs in their growth phase (Anthropic Series D, OpenAI scale-up, comparable) offer equity packages that can significantly outperform public-company RSUs on a risk-adjusted basis if the company's valuation continues to climb. The risk is real — illiquid equity, preferred-vs-common share dilution, and secondary market limitations all matter. Model frontier-lab equity at 40-60 cents on the dollar vs public-company RSUs unless you have strong conviction on the outcome."},
+      {"q": "How much does training infrastructure specialisation affect pay?", "a": "Substantially. ML Engineers who can identify as 'training infrastructure' (FSDP/DeepSpeed, custom kernels, multi-node cluster management) rather than generic 'ML Engineer' see a 15-25% TC premium at senior+ levels, because the candidate pool is dramatically thinner. Inference optimisation specialists see a similar premium as LLM serving costs have become a material business line item."},
+      {"q": "Does remote work cost more here than for generalist roles?", "a": "The remote discount is smaller for ML Engineers (roughly 8-10% vs 15% for general engineers) because companies compete harder for a thinner talent pool. ML Engineers with demonstrable distributed training skills negotiate near-on-site rates for fully remote positions at several frontier labs as of 2026."},
+      {"q": "What is the pay difference between a research engineer and an ML engineer?", "a": "At the same level, research engineers at frontier labs (think L5 at Anthropic Research or Google DeepMind) carry a 10-20% TC premium over applied ML engineers at the same level, reflecting the publication requirement and the narrower candidate pool. Research engineering roles also tend to have higher equity stakes because the expected impact on the company's core product is more direct."},
+      {"q": "Should I optimise for base salary or equity when comparing offers?", "a": "For public-company offers (Google, Meta, Apple, Microsoft), weight equity heavily — RSUs at these companies have low liquidity risk and predictable vesting. For private frontier labs, apply a haircut to equity (30-50%) and optimise more heavily for base + cash sign-on. The ratio shifts as the company approaches IPO."},
+      {"q": "When do ML Engineer salaries plateau?", "a": "Base salary plateaus around Staff level ($300-380k) — there is only so much base a company will pay any IC. TC continues to climb through equity refreshes, performance bonuses, and additional grants. The most senior ML Engineers (Distinguished Engineer / Principal equivalent at frontier labs) have TC driven almost entirely by equity structure, not base."}
+    ]
+  },
+  "career_path": {
+    "intro": "ML Engineer career ladders differ from general software engineering ladders in two important ways: (1) the transition points are gated partly by demonstrable training-infrastructure capability, not just scope of work, and (2) the path regularly intersects with research scientist roles — both directions of transition are common and both require deliberate positioning. The stages below describe common patterns at mid-to-large technology organisations and frontier AI labs. Expect non-linearity; a move from applied ML to a research engineering role at a frontier lab is as common as a straight vertical promotion.",
+    "stages": [
+      {
+        "year_range": "Year 0-1 — Entry (L2/L3)",
+        "title": "ML Engineer / ML Associate / Research Engineer (new grad)",
+        "focus": "You execute scoped ML tasks under senior direction. Your primary output is clean, reproducible code and experiments that run reliably. You are learning the production patterns that your university coursework did not cover: CI/CD for models, data versioning, serving latency, experiment tracking discipline. Your job is to become autonomous on well-defined tasks within 6 months and to own a first feature end-to-end within 12.",
+        "typical_tasks": [
+          "Implement a defined model variant and run eval against the baseline",
+          "Debug a training instability identified by a senior engineer",
+          "Build a data preprocessing pipeline from a written spec",
+          "Add evaluation metrics to an existing model serving system",
+          "Write unit tests for a data transformation module"
+        ],
+        "skills_gained": ["Production Python at team scale", "experiment tracking discipline", "code review on both sides", "evaluation metric design", "first exposure to distributed training infrastructure"],
+        "comp_us": "TC $165k-$270k",
+        "next_step": "Cleared Intermediate in PyTorch, math, and training diagnostics. Shipped at least one end-to-end feature — from data to serving — without line-by-line review from a senior. Manager no longer checks your experiments before you log them."
+      },
+      {
+        "year_range": "Year 2-4 — Mid (L4)",
+        "title": "ML Engineer II / Applied Research Engineer / Machine Learning Engineer",
+        "focus": "You own project-sized work from scope to deployment. You propose the approach, implement it, evaluate it against a production baseline, and maintain it. A depth area is emerging — NLP, recommendation systems, computer vision, or training infrastructure. The distinction between 'ML Engineer who does some serving' and 'ML Engineer who deeply understands distributed training + serving' is where mid-level differentiation lives.",
+        "typical_tasks": [
+          "Own the full ML pipeline for one product surface — data, training, eval, serving, monitoring",
+          "Design the eval harness and pick the metrics against product goals",
+          "Run an A/B test on production traffic — power analysis, launch, analysis, write-up",
+          "Participate in architecture reviews for new ML systems",
+          "Mentor a junior engineer through their first multi-GPU training run"
+        ],
+        "skills_gained": ["End-to-end ownership of a production ML system", "A/B testing mechanics", "first distributed training experience", "cross-functional communication", "on-call for a live model"],
+        "comp_us": "TC $240k-$400k",
+        "next_step": "Senior promotion or horizontal move to a training-infrastructure-specialist role. Your impact is visible to the manager above yours, ideally via a shipped model with a documented business metric improvement."
+      },
+      {
+        "year_range": "Year 5-8 — Senior (L5)",
+        "title": "Senior ML Engineer / Staff Engineer (small companies) / Research Engineer",
+        "focus": "You own the architecture of a sub-system. You are the engineer the team goes to for distributed training questions, inference bottleneck diagnosis, or eval system design. You are influential on roadmap — your technical opinion shapes what the team builds next quarter. Common transition zone: senior ML Engineers at product companies often move to research engineering roles at frontier labs at this stage, drawn by the compute access and research adjacency. Both directions are valid; the skills transfer.",
+        "typical_tasks": [
+          "Design a distributed training pipeline for a new model family from scratch",
+          "Lead a multi-team initiative — training infra migration, LLM serving platform rollout",
+          "Write technical strategy docs that influence a quarter's roadmap",
+          "Own the hiring loop for senior ML Engineer candidates",
+          "Debug a multi-GPU training instability that junior engineers cannot diagnose"
+        ],
+        "skills_gained": ["Technical strategy and roadmap influence", "distributed systems design", "architecture decision documentation", "cross-team coordination", "mentorship at depth (not just task delegation)"],
+        "comp_us": "TC $330k-$620k",
+        "next_step": "Staff path requires influence beyond your immediate team. Research scientist path (at frontier labs) requires co-authorship or original algorithmic contribution. Both are achievable from Senior — plan the move deliberately, not accidentally."
+      },
+      {
+        "year_range": "Year 8-12 — Staff (L6)",
+        "title": "Staff ML Engineer / Principal Engineer (small/mid companies) / Senior Research Engineer",
+        "focus": "You influence multiple teams. On the IC path, you set the technical direction for the organisation's most important ML system — training infrastructure for the core model, inference cost reduction programme, next-generation eval platform. On the management path, you are leading 8-12 ML Engineers with a strong IC technical-advisor role alongside. At frontier labs, Staff ML Engineers are the connective tissue between research scientists and production teams.",
+        "typical_tasks": [
+          "Set multi-quarter strategy for training infrastructure or serving efficiency",
+          "Represent the team's technical direction to the VP / CTO",
+          "Drive architecture decisions that affect multiple dependent teams",
+          "Publish externally — arXiv preprints, conference talks, high-signal blog posts",
+          "Own post-training or inference-optimisation strategy for the company's core model family"
+        ],
+        "skills_gained": ["Organisation-level technical influence", "external brand and publication record", "multi-team coordination at the highest-difficulty seams", "long-horizon systems thinking"],
+        "comp_us": "TC $480k-$900k",
+        "next_step": "Principal / Distinguished Engineer on the IC path; Director of ML Engineering on the management path. Both require demonstrating that your impact is legible at the C-suite level."
+      },
+      {
+        "year_range": "Year 12+ — Principal / Distinguished Engineer / Director",
+        "title": "Principal ML Engineer / Distinguished Engineer / Director of ML Engineering / Founding ML Engineer",
+        "focus": "Your output is decisions that set the direction of an entire AI organisation. On the IC path (Distinguished Engineer / Principal), you are one of a handful of people setting the 3-5 year technical direction for how models are trained, evaluated, and deployed at scale. On the management path, you run a multi-hundred-person organisation. Founding paths — starting an AI-native company — are disproportionately populated by ML Engineers with this depth of experience.",
+        "typical_tasks": [
+          "Define 3-5 year bets on training infrastructure, evaluation methodology, or serving architecture",
+          "Represent the company's technical AI direction to investors, press, and the research community",
+          "Sponsor high-risk research and engineering initiatives with long feedback loops",
+          "Recruit principal-level ICs and engineering directors",
+          "Set compensation philosophy and calibration anchors for the ML engineering org"
+        ],
+        "skills_gained": ["Executive-level technical communication", "talent market intelligence at depth", "long-horizon risk assessment", "board and investor engagement", "org design at scale"],
+        "comp_us": "TC $700k-$1.6M+",
+        "next_step": "For Principal/Distinguished ICs: advisory roles, founding, or continued deepening. For Directors: VP of ML Engineering, CTO. For founders: whatever the company becomes. At this level the career path becomes self-defining."
+      }
+    ],
+    "transitions": [
+      "Research Scientist → ML Engineer: A common path for PhDs who want more production exposure and faster iteration cycles. The ML Engineer role at a frontier lab is often more research-adjacent than at a product company — the boundary is intentionally blurred.",
+      "ML Engineer → Research Scientist: Harder direction. Requires original algorithmic contribution (co-authored paper or demonstrable novel technique) to be competitive. Most successful transitions happen at L5+ with a frontier lab that values the systems perspective in research.",
+      "Applied ML Engineer → Training Infrastructure Specialist: A high-ROI sub-specialisation move that significantly raises senior+ comp. The path requires deliberately picking up distributed training work, GPU cluster management, and kernel optimisation skills — often as adjacent work before making a formal transition.",
+      "ML Engineer → MLOps Engineer: Some ML Engineers gravitate toward the infrastructure and tooling side and move into MLOps/ML Platform engineering. The comp premium goes to the ML side; the stability and breadth goes to the platform side. Both are valid.",
+      "ML Engineer → AI Engineer: Lateral move that can make sense if the company shifts from training-heavy work to LLM integration. TC is roughly equivalent at mid levels; diverges at senior where ML Engineers retain a premium for training infra depth.",
+      "ML Engineer → Founder: Disproportionately common among engineers with 6-10 years of deep training infrastructure experience. The operational knowledge of what frontier models cost to train and serve creates entrepreneurial insight — particularly around inference cost reduction and training efficiency."
+    ],
+    "faqs": [
+      {"q": "Do I need a PhD to become an ML Engineer?", "a": "No. The majority of ML Engineers at hyperscalers and product companies are BS or MS graduates. At frontier labs, the PhD share is higher (~50-60%) because the research-engineering boundary is blurry and many roles implicitly require research contributions. For applied ML Engineer roles, a strong portfolio with demonstrable training and serving experience outweighs degree credentials for most employers."},
+      {"q": "How important is publishing papers?", "a": "For applied ML Engineer roles at product companies, not important. For research engineering roles at frontier labs, increasingly important — even applied positions at Anthropic, DeepMind, and Meta FAIR expect at least co-authorship on technical reports or arXiv preprints at the senior level. For Staff and above at frontier labs, a publication record is close to mandatory."},
+      {"q": "What is the fastest path to Senior ML Engineer?", "a": "Own the training infrastructure for something that matters, not just the model definition. Engineers who can say 'I cut our training cost by 25% and reduced wall-clock time by 30% for the same final model quality' are promoted significantly faster than engineers who trained more models with the same infrastructure. The leverage is in the infrastructure, not the experiments."},
+      {"q": "How do I transition from data scientist to ML engineer?", "a": "The gap is primarily in production engineering: distributed training, model serving, CI/CD for models, and systems design. Close the gap by building the projects in this track — specifically the distributed training pipeline, the model serving system, and the MLOps pipeline projects. Then find a role or project at your current company that requires those skills, demonstrate them in production, and use that as the basis for a title adjustment or a new job search."},
+      {"q": "Is the research scientist path better compensated than ML engineering at senior levels?", "a": "At the same level, research scientists at frontier labs carry a 10-20% TC premium over applied ML engineers. The tradeoff: research science requires a publication record and has a slower promotion clock due to the longer feedback loop of research projects. ML engineering promotes faster via demonstrated production impact. Total career earnings tend to converge over a 10-15 year horizon."},
+      {"q": "What derails ML Engineer careers most often?", "a": "Three patterns: (1) Staying experiment-level and never owning the serving and monitoring lifecycle — you become senior on training but junior on everything else, creating a lopsided story. (2) Poor communication of impact — the model improvement happened but no one above your manager knows the business metric. (3) Under-investing in math depth — engineers who paper over gaps in optimisation theory or distributed systems fundamentals plateau at mid-level and struggle in senior interviews."},
+      {"q": "How common are lateral moves between companies at this level?", "a": "Very common and often necessary for progression. The highest-density path to Staff ML Engineer in under 8 years typically involves one company hop — from a product company to a frontier lab or vice versa — where the move delivers both a level bump and a 30-50% TC correction. Staying at one company past 3-4 years without a promotion is a yellow flag; staying past 5-6 years at the same level is a red flag that compounds over time."}
+    ]
+  }
+}

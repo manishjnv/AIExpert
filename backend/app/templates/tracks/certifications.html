@@ -1,0 +1,129 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.certifications %}
+
+{% block page_title %}Free {{ track.name }} Certifications Employers Recognize (2026) — AutomateEdge{% endblock %}
+{% block description %}Every free {{ track.name }} certification worth completing in 2026. Hours to prepare, employer-signal strength, and who each cert is best suited for.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/certifications{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ ("Free " ~ track.name ~ " Certifications Employers Recognize (2026)") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": "2026-04-24T00:00:00Z",
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/certifications") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {{ (track.name ~ " — Recommended Certifications") | tojson }},
+  "itemListElement": [
+    {% for cert in section['items'] %}
+    {
+      "@type": "ListItem",
+      "position": {{ loop.index }},
+      "item": {
+        "@type": "EducationalOccupationalCredential",
+        "name": {{ cert.name | tojson }},
+        "credentialCategory": "certification",
+        "educationalLevel": {{ cert.best_for | tojson }},
+        "offers": {"@type": "Offer", "price": "{{ cert.cost_usd }}", "priceCurrency": "USD"},
+        "url": {{ cert.url | tojson }},
+        "recognizedBy": {"@type": "Organization", "name": {{ cert.provider | tojson }}}
+      }
+    }{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Certifications"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Certifications</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Certifications</div>
+<h1>Free {{ track.name }} Certifications That Move 2026 Interviews Forward</h1>
+<p class="lede">{{ section.intro }}</p>
+
+{% for cert in section['items'] %}
+<h2>{{ loop.index }}. {{ cert.name }}</h2>
+<div class="chips">
+  <span>Provider · {{ cert.provider }}</span>
+  {% if cert.cost_usd == 0 %}<span>Free</span>{% else %}<span>${{ cert.cost_usd }}</span>{% endif %}
+  <span>{{ cert.prep_hours }}h prep</span>
+</div>
+<p><strong>Employer signal —</strong> {{ cert.employer_signal }}</p>
+<p><strong>Best for —</strong> {{ cert.best_for }}</p>
+<p><a href="{{ cert.url }}" target="_blank" rel="noopener nofollow" style="color:#e8a849">Enroll on the provider site →</a></p>
+{% endfor %}
+
+<h2>What {{ track.name }} hiring actually asks for</h2>
+<p>{{ section.employer_data }}</p>
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/skills">Skill matrix</a> — proficiency levels per category</li>
+    <li><a href="/roadmap/{{ track.slug }}/tools">Tools inventory</a> — install path + docs</li>
+    <li><a href="/roadmap/{{ track.slug }}/projects">Portfolio projects</a> — the work that outranks certificates</li>
+    <li><a href="/roadmap/{{ track.slug }}/salary">Salary bands</a> — US + regional 2026 comp</li>
+    <li><a href="/roadmap/{{ track.slug }}/career-path">Career path</a> — entry to staff progression</li>
+    <li><a href="/verify">How AutomateEdge issues + verifies its own certificates</a></li>
+  </ul>
+</div>
+{% endblock %}

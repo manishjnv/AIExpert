@@ -1,0 +1,167 @@
+{% extends "tracks/_base.html" %}
+{% set section = track.salary %}
+
+{% block page_title %}{{ track.name }} Salary Bands 2026 — US + Regional Comp Data — AutomateEdge{% endblock %}
+{% block description %}2026 salary bands for {{ track.name }} roles: entry through principal, base + total comp, regional multipliers, 90-day hiring velocity from the AutomateEdge jobs pipeline.{% endblock %}
+{% block canonical %}{{ base }}/roadmap/{{ track.slug }}/salary{% endblock %}
+
+{% block schemas %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ (track.name ~ " Salary Bands 2026 — US + Regional Comp Data") | tojson }},
+  "datePublished": "2026-04-24T00:00:00Z",
+  "dateModified": {{ (section.update_date ~ "T00:00:00Z") | tojson }},
+  "author": {"@type": "Organization", "name": "AutomateEdge"},
+  "publisher": {
+    "@type": "Organization",
+    "name": "AutomateEdge",
+    "logo": {"@type": "ImageObject", "url": "https://automateedge.cloud/assets/logo.png"}
+  },
+  "image": {{ (base ~ "/og/course/" ~ track.slug ~ ".png") | tojson }},
+  "mainEntityOfPage": {{ (base ~ "/roadmap/" ~ track.slug ~ "/salary") | tojson }},
+  "description": {{ section.intro | tojson }}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Dataset",
+  "name": {{ (track.name ~ " US Compensation Bands 2026 Q1") | tojson }},
+  "description": {{ ("US compensation data for " ~ track.name ~ " roles by seniority level, aggregating levels.fyi, Glassdoor, and BLS sources.") | tojson }},
+  "url": {{ (base ~ "/roadmap/" ~ track.slug ~ "/salary") | tojson }},
+  "dateModified": {{ section.update_date | tojson }},
+  "creator": {"@type": "Organization", "name": "AutomateEdge"},
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "temporalCoverage": "2026-01-01/2026-12-31"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://automateedge.cloud/"},
+    {"@type": "ListItem", "position": 2, "name": "Roadmap", "item": "https://automateedge.cloud/roadmap"},
+    {"@type": "ListItem", "position": 3, "name": {{ track.name | tojson }}, "item": {{ (base ~ "/roadmap/" ~ track.slug) | tojson }}},
+    {"@type": "ListItem", "position": 4, "name": "Salary"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for qa in section.faqs %}
+    {"@type": "Question", "name": {{ qa.q | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ qa.a | tojson }}}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="sep">/</span>
+  <a href="/roadmap">Roadmap</a>
+  <span class="sep">/</span>
+  <a href="/roadmap/{{ track.slug }}">{{ track.name }}</a>
+  <span class="sep">/</span>
+  <span class="here">Salary</span>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="eyebrow">AutomateEdge · {{ track.name }} · Salary</div>
+<h1>{{ track.name }} Salary Bands 2026: US + Regional</h1>
+<p class="lede">{{ section.intro }}</p>
+<p style="color:#94a3b8;font-size:13px;font-family:'IBM Plex Mono',monospace">Data last refreshed — {{ section.update_date }}</p>
+
+<h2>US compensation by seniority</h2>
+<p>All figures in USD. Base salary is cash annual; total comp includes base + equity (vested value) + bonus. Ranges show 25th-75th percentile — the middle half of actual offers seen over the trailing 180 days.</p>
+<table class="grid">
+  <thead><tr><th>Level</th><th>Base salary</th><th>Total comp</th><th>Notes</th></tr></thead>
+  <tbody>
+    {% for band in section.bands_us %}
+    <tr>
+      <td>{{ band.level }}</td>
+      <td>${{ "{:,}".format(band.base_low) }} – ${{ "{:,}".format(band.base_high) }}</td>
+      <td>${{ "{:,}".format(band.total_comp_low) }} – ${{ "{:,}".format(band.total_comp_high) }}</td>
+      <td>{{ band.notes }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Regional multipliers (apply to US base)</h2>
+<p>These are directional multipliers, not precise mappings. India and Southeast Asia use local-currency bands directly — see the notes column.</p>
+<table class="grid">
+  <thead><tr><th>Region</th><th>Multiplier</th><th>Notes</th></tr></thead>
+  <tbody>
+    {% for r in section.bands_regions %}
+    <tr>
+      <td>{{ r.region }}</td>
+      <td>{% if r.multiplier is not none %}{{ "%.2fx"|format(r.multiplier) }}{% else %}—{% endif %}</td>
+      <td>{{ r.note }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>90-day hiring velocity</h2>
+<p><strong>Open-role volume —</strong> {{ section.velocity.jobs_last_90d_us }}</p>
+<p><strong>Time to fill —</strong> {{ section.velocity.avg_days_to_fill }}</p>
+
+<h3>Top hiring companies (trailing 90 days)</h3>
+<ul class="list">
+  {% for c in section.velocity.top_hiring_companies %}
+  <li>{{ c }}</li>
+  {% endfor %}
+</ul>
+
+<h3>Skills moving the market most</h3>
+<ul class="list">
+  {% for s in section.velocity.trending_skills %}
+  <li>{{ s }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Negotiation playbook</h2>
+<ul class="list">
+  {% for t in section.negotiation_tips %}
+  <li>{{ t }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Data sources</h2>
+<ul class="list">
+  {% for s in section.sources %}
+  <li><a href="{{ s.url }}" target="_blank" rel="noopener nofollow" style="color:#e8a849">{{ s.name }}</a></li>
+  {% endfor %}
+</ul>
+
+<h2>Frequently asked questions</h2>
+<div class="faq">
+  {% for qa in section.faqs %}
+  <details>
+    <summary>{{ qa.q }}</summary>
+    <p>{{ qa.a }}</p>
+  </details>
+  {% endfor %}
+</div>
+
+<div class="cross">
+  <h3>Continue on the {{ track.name }} track</h3>
+  <ul>
+    <li><a href="/roadmap/{{ track.slug }}/skills">Skill matrix</a> — proficiency levels per category</li>
+    <li><a href="/roadmap/{{ track.slug }}/tools">Tools inventory</a> — install path + hours to learn</li>
+    <li><a href="/roadmap/{{ track.slug }}/projects">Portfolio projects</a> — 15 build ideas with rubrics</li>
+    <li><a href="/roadmap/{{ track.slug }}/certifications">Certifications</a> — free credentials to complete</li>
+    <li><a href="/roadmap/{{ track.slug }}/career-path">Career path</a> — entry to staff progression</li>
+    <li><a href="/jobs">Open {{ track.name }} jobs</a> — apply after you've shipped 3+ projects</li>
+  </ul>
+</div>
+{% endblock %}
