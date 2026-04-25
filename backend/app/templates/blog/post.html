@@ -129,6 +129,34 @@
   </script>
   {%- endif %}
 
+  {# HowTo JSON-LD (SEO-21). Emitted when payload declares `how_to`
+     with a `steps` list. Each step's `name` is the H2 it anchors to;
+     `text` is a 1-2 sentence summary that mirrors the visible H2's
+     content. Optional `url` deep-links to the step's anchor on the
+     same page so the rich result can navigate to it. Used on guide-
+     shaped pillar posts (e.g. "learn AI without CS degree"). #}
+  {%- if how_to and how_to.steps %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": {{ (how_to.name or title) | tojson }},
+    "description": {{ (how_to.description or description) | tojson }},
+    "step": [
+      {%- for step in how_to.steps %}
+      {
+        "@type": "HowToStep",
+        "position": {{ loop.index }},
+        "name": {{ step.name | tojson }},
+        "text": {{ step.text | tojson }}{% if step.url %},
+        "url": {{ step.url | tojson }}{% endif %}
+      }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ]
+  }
+  </script>
+  {%- endif %}
+
   <link rel="alternate" type="application/rss+xml" title="AutomateEdge Blog" href="https://automateedge.cloud/blog/feed.xml">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -449,6 +449,7 @@ def _render_post(
     author: str = "Manish Kumar",
     faqs: list | None = None,
     defined_terms: list | None = None,
+    how_to: dict | None = None,
 ) -> str:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
@@ -469,6 +470,7 @@ def _render_post(
         post_nav_html=post_nav_html,
         faqs=faqs or [],
         defined_terms=defined_terms or [],
+        how_to=how_to or {},
     )
 
 
@@ -923,5 +925,6 @@ async def post_dynamic(slug: str) -> HTMLResponse:
         author=payload.get("author", "Manish Kumar"),
         faqs=payload.get("faqs") or None,
         defined_terms=payload.get("defined_terms") or None,
+        how_to=payload.get("how_to") or None,
     )
     return HTMLResponse(html)
