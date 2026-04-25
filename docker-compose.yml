@@ -45,6 +45,7 @@ services:
       - ./data:/data
       - ./scripts:/app/scripts:ro
       - ./data/templates:/app/app/curriculum/templates
+      - ./docs/blog:/app/blog-archives:ro
     networks:
       - roadmap-net
     mem_limit: 512m
