@@ -80,7 +80,7 @@ OUTPUT SCHEMA (exact shape — do not add or remove required fields)
 
   "body_html": "<see BODY STRUCTURE section below. Plain HTML fragment, no <html>/<head>/<body>.>",
 
-  "word_count": <integer — your count of words in body_html, stripped of tags. >= {{MIN_WORDS}}.>,
+  "word_count": <integer — measured AFTER all editing is complete. Strip HTML tags, count words. The validator recounts and WARNS on drift > 50. Procedure: finish writing → strip tags mentally → recount → update this field LAST, just before emitting the artifact. Do not estimate; count.>,
 
   "faqs": [
     {"question": "<People Also Ask-style question>",
@@ -145,38 +145,191 @@ BODY STRUCTURE (body_html contract)
 Open with:
   <p class="lede">[lede text, same as the "lede" field above]</p>
 
+Then the HOOK paragraph (see ATTENTION GRABBERS #1):
+  <p>[25-40 word hook — counterintuitive number, contrarian claim, or specific fact]</p>
+
 Then the definitional paragraph (HARD GATE #2):
   <p>[40-60 word direct answer to the target query]</p>
 
-Then the 8-12 <h2> sections. Each H2 is a mini-headline, not a label.
-Suggested flow for a comparison/role-oriented query:
-  <h2>1. What is X, exactly?</h2>
-  <h2>2. What is Y, exactly?</h2>
-  <h2>3. Where they overlap — and where they really don't</h2>
+Then the 8-12 <h2> sections. Each H2 makes a CLAIM or asks the reader's
+question — never a category label (see ATTENTION GRABBERS #2). Each
+section opens with a <strong>-wrapped one-line takeaway (#3). The 2nd-
+to-last substantive H2 is the "Bottom line — what to do this week"
+section (#5). Suggested flow for a comparison/role-oriented query:
+
+  <h2>1. The 7 things that actually distinguish X from Y in 2026</h2>
+  <h2>2. What an X engineer does on Tuesday morning</h2>
+  <h2>3. What a Y engineer does on Tuesday morning</h2>
   <h2>4. The skills map — side by side</h2>           (comparison table here)
-  <h2>5. The day-to-day work, by role</h2>
-  <h2>6. Which pays more — and why that's misleading</h2>
-  <h2>7. How to choose (a decision you can actually make)</h2>
-  <h2>8. What AutomateEdge's tracks actually cover</h2>  (internal-link hub)
-  <h2>9. Where to dig deeper — the sources</h2>          (trusted citations)
-  <h2>Frequently asked</h2>                              (8-15 inline Q&A)
+  <h2>5. Why the salary median tells you nothing</h2>
+  <h2>6. The decision in one paragraph</h2>           (pivot blockquote near here)
+  <h2>7. The bottom line — what to do this week</h2>  (3-5 action bullets)
+  <h2>8. Where to dig deeper — the sources</h2>      (trusted citations)
+  <h2>Frequently asked</h2>                           (8-15 inline Q&A)
 
 Close with:
   <hr>
   <p class="meta"><strong>Live roadmap:</strong> <a href="/roadmap">...</a></p>
 
+ATTENTION GRABBERS (structural, not stylistic)
+==============================================
+Pillar posts compete with 7-10 entrenched results for the target query.
+Default essay structure loses. These five levers MUST be present:
+
+1. HOOK paragraph — between the <p class="lede"> and the definitional
+   paragraph (HARD GATE #2), insert ONE 25-40 word hook: a
+   counterintuitive number, a contrarian claim, or a specific fact
+   most searchers don't know. Earns the next 30 seconds of attention.
+
+   Examples by query type:
+   - Salary query:   "Bangalore senior IC AI compensation cleared
+                     ₹62L median in Q1 2026 — 18% above the same role
+                     in Austin. Most US-centric salary guides still
+                     don't reflect this."
+   - How-to query:   "The full RAG implementation below is 312 lines.
+                     LangChain's equivalent walkthrough imports 14
+                     packages and never shows the retrieval math."
+   - Vs query:       "The 'AI engineer' job title didn't exist on
+                     LinkedIn in 2022. By 2026, 27% of new ML postings
+                     list it. The split is real."
+   - Beginner query: "The math you actually need for AI fits on one
+                     page. The math you'll be told you need fills a
+                     degree. The gap is what this post is about."
+
+2. CLAIM H2s, not LABEL H2s. Every H2 makes an argument or asks the
+   reader's exact question. Examples:
+     WEAK: "Skills"            STRONG: "The 7 skills employers actually screen for in 2026"
+     WEAK: "Salary trends"     STRONG: "Why the median tells you nothing — and what to ask instead"
+     WEAK: "Tools"             STRONG: "The two tools you can skip in 2026 (and the one you can't)"
+     WEAK: "Day in the life"   STRONG: "What a senior AI engineer does between 9am and 1pm"
+     WEAK: "Conclusion"        STRONG: "The decision in one paragraph"
+
+3. SECTION OPENERS in <strong>. The first sentence of each H2 section
+   is a one-line takeaway wrapped in <strong>. A reader who scans only
+   H2s + first sentences must walk away with the post's full argument.
+
+4. PIVOT BLOCKQUOTE. The single allowed <blockquote> goes at the
+   argument's turn — usually section 4-6 — and contains the sharpest,
+   most surprising claim of the post in 1-2 sentences. Not a quote
+   from someone else; your own line made unmissable.
+
+5. "BOTTOM LINE" close before FAQ. The 2nd-to-last substantive H2 is
+   "The bottom line — what to do this week" (or equivalent), with
+   3-5 bulleted action items a reader can execute immediately. This
+   is the section that converts skim readers to platform users.
+
+VISUAL ELEMENTS (HTML-only, zero asset cost)
+============================================
+The blog template ships CSS for three structural visual elements you
+can use directly in body_html. They render styled — no images, no
+asset uploads, fully editable as text, mobile-perfect. Use them when
+the post topic genuinely needs them; do NOT force them in. Skipping
+them is fine for posts where prose carries the argument. The
+budgets below are caps, not quotas.
+
+1. STAT CARD — for ONE major numerical claim that deserves to stop
+   the scroll. Pattern:
+
+   <div class="stat-card">
+     <strong>₹62L</strong> Bangalore senior IC AI median, Q1 2026 — 18% above the same role in Austin.
+   </div>
+
+   Use 3-6 stat cards per pillar post, distributed across sections.
+   Use ONE stat card per major numerical claim — do not stack two
+   for the same data point. The <strong> wraps ONLY the headline
+   number / metric (currency, percentage, count). Body text after
+   gives one-sentence context.
+
+   Best for: salary numbers, growth percentages, market-size figures,
+   adoption rates, time-to-result metrics. NOT for: opinions,
+   qualitative claims, lists.
+
+2. STAT CARD ROW — 2-4 cards in a side-by-side grid for cluster
+   comparisons. Pattern:
+
+   <div class="stat-card-row">
+     <div class="stat-card"><strong>$240K</strong> US median total comp, AI engineer L5</div>
+     <div class="stat-card"><strong>₹62L</strong> Bangalore equivalent, Q1 2026</div>
+     <div class="stat-card"><strong>+18%</strong> Bangalore premium vs Austin</div>
+   </div>
+
+   Use AT MOST ONE stat-card-row per post — typically near the lead
+   to anchor the post's central claim with three numbers. Best for:
+   "the three numbers that summarize the topic". Each card stays under
+   2 lines on mobile.
+
+3. TREND MARKER — inline pill for showing direction + magnitude
+   inside tables and prose. Variants: trend-up (green ▲), trend-down
+   (red ▼), trend-flat (slate ●). Pattern (typical use is inside
+   <td>):
+
+   <td>Bangalore <span class="trend trend-up">+18%</span></td>
+   <td>San Francisco <span class="trend trend-down">-3%</span></td>
+   <td>NYC <span class="trend trend-flat">±0%</span></td>
+
+   Use freely inside comparison tables (the post-budget already
+   requires <table> when comparative=true). Also useful in prose for
+   quick deltas. No cap — but every trend marker must reference a
+   real, citation-backed delta. Do not invent percentages.
+
+4. CALLOUT — framed paragraph for a "what most guides miss" aside
+   or counterintuitive note. Pattern:
+
+   <div class="callout">
+     <strong>What most salary guides miss:</strong> the Bangalore
+     premium isn't a remote-work artifact — it's frontier-lab
+     concentration. Sarvam AI, Ola Krutrim, and Anthropic's APAC
+     hiring are all bidding for the same ~800 senior IC pool.
+   </div>
+
+   Use 1-2 callouts per pillar, max. Best at the argument's pivot
+   (often near the pivot blockquote, but not adjacent — alternate the
+   visual rhythm). Skip if you've used <blockquote> in the same H2
+   section. NOT a substitute for the pivot blockquote (#4 in
+   ATTENTION GRABBERS).
+
+WHEN TO USE EACH
+================
+- Salary / market-size / data-driven post (e.g. "AI engineer salary
+  2026"): heavy stat-card use (5-6), one stat-card-row near the lead,
+  trend markers throughout the comparison tables, 1-2 callouts.
+- How-to / tutorial post (e.g. "Build RAG from scratch"): light
+  stat-card use (2-3), trend markers in benchmark tables, 1 callout
+  for the "most tutorials skip this" aside.
+- Comparison / vs post (e.g. "AI engineer vs ML engineer"): moderate
+  stat-card use (3-4), trend markers in the skills/salary table, 1-2
+  callouts for the contrarian takes.
+- Pure beginner / explainer post (e.g. "Learn AI without CS degree"):
+  sparing stat-card use (2-3), no trend markers, 1 callout. Don't
+  hide explanation behind visual chrome.
+
 WRITING RULES
 =============
-- Paragraphs: 2-4 sentences, HARD MAX. Wall of text loses mobile readers.
-- Sentences: ideally <= 30 words.
+- Paragraphs: 2-4 sentences, HARD MAX. ZERO paragraphs longer than 4
+  sentences. Count periods before moving on. Worked example:
+
+  WRONG (5 sentences, fails gate):
+    <p>AI engineers integrate models. ML engineers train models. The
+    distinction matters because the skill sets diverge. AI engineers
+    learn retrieval and evaluation. ML engineers learn distributed
+    training.</p>
+
+  RIGHT (split at the conceptual break):
+    <p>AI engineers integrate models. ML engineers train them. The
+    distinction matters because the skill sets diverge.</p>
+    <p>AI engineers learn retrieval and evaluation. ML engineers
+    learn distributed training.</p>
+
+- Sentences: HARD MAX 30 words per sentence. If a sentence runs over,
+  split at the nearest conjunction or semicolon. Budget for the whole
+  post: NO MORE THAN 5 sentences over 30 words across the entire body.
+  Long sentences kill mobile readability and Google snippet eligibility.
 - Use <strong> for one claim per section the skim reader must catch.
 - Use <em> for tone, titles, quietly ironic phrases.
 - Tables (<table>) for any comparison; bullet lists (<ul>/<ol>) for
   any enumeration of 3+ items.
 - Anchor text is the claim, not "click here". Links read as prose.
 - ONE blockquote per post, max. Place it at a natural section break.
-- ZERO paragraphs longer than 4 sentences — count periods before
-  moving on.
 
 VOICE NOTES
 ===========
@@ -223,9 +376,22 @@ post shows them in the "Frequently asked" H2 section.
 SANITY CHECK BEFORE RETURNING
 ==============================
 Before you write the artifact, confirm in your head:
-  [ ] Word count >= {{MIN_WORDS}}
-  [ ] First non-lede paragraph is 40-60 words
+  [ ] Word count >= {{MIN_WORDS}} (recounted AFTER final edit)
+  [ ] word_count field drift from measured: <= 50
+  [ ] HOOK paragraph present (25-40 words, between lede and definitional)
+  [ ] First non-lede-non-hook paragraph is 40-60 words (definitional)
   [ ] 8-12 <h2> sections
+  [ ] All H2s read as claims/questions, not category labels
+  [ ] Each H2 section opens with a <strong> one-sentence takeaway
+  [ ] Exactly one <blockquote> placed at the argument's pivot
+  [ ] "Bottom line — what to do" H2 present before sources/FAQ sections
+  [ ] Visual elements used appropriately for the post type (3-6 stat
+      cards for data-heavy posts, 2-3 for explainers; <= 1 stat-card-row;
+      1-2 callouts max; trend markers freely inside tables)
+  [ ] Every stat-card number is real and citation-backed; no invented
+      percentages or fabricated data points
+  [ ] ZERO paragraphs over 4 sentences
+  [ ] <= 5 sentences over 30 words across the whole body
   [ ] >= 40 internal links, ALL from the manifest
   [ ] >= 5 external citations, ALL from the trusted list
   [ ] 8-15 FAQ pairs

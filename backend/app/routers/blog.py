@@ -428,6 +428,63 @@ _BLOG_CSS = """
   .post-nav-empty p {
     font-style: italic; margin: 0 0 14px; font-size: 14px;
   }
+
+  /* ----- Pillar visual elements (SEO-21 attention layer) ----- */
+  /* stat-card: zero-asset highlight for one big numerical claim. */
+  .stat-card {
+    background: linear-gradient(135deg, rgba(232,168,73,0.08), rgba(232,168,73,0.02));
+    border: 1px solid rgba(232,168,73,0.35);
+    border-left: 4px solid #e8a849;
+    border-radius: 6px;
+    padding: 16px 20px; margin: 24px 0;
+    font-size: 16px; line-height: 1.55; color: #d0cbc2;
+  }
+  .stat-card strong {
+    display: block;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 32px; font-weight: 600;
+    color: #f5c06a; letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  /* stat-card-row: 2-4 cards side-by-side, auto-wrap on narrow viewports. */
+  .stat-card-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px; margin: 24px 0;
+  }
+  .stat-card-row .stat-card { margin: 0; }
+
+  /* trend marker: inline pill + arrow, color-coded for direction. */
+  .trend {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.85em; font-weight: 600;
+    padding: 2px 7px; border-radius: 3px;
+    letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .trend-up    { background: rgba(143,208,165,0.15); color: #8fd0a5; }
+  .trend-up::before    { content: "▲ "; }
+  .trend-down  { background: rgba(252,165,165,0.15); color: #fca5a5; }
+  .trend-down::before  { content: "▼ "; }
+  .trend-flat  { background: rgba(148,163,184,0.15); color: #94a3b8; }
+  .trend-flat::before  { content: "● "; }
+
+  /* callout: short framed paragraph for "what most guides miss" asides. */
+  .callout {
+    background: #1a2029;
+    border: 1px solid #2a323d; border-left: 3px solid #94a3b8;
+    border-radius: 0 4px 4px 0;
+    padding: 14px 18px; margin: 24px 0;
+    color: #c0c4cc; font-size: 15px; line-height: 1.6;
+  }
+  .callout strong { color: #f5f1e8; }
+
+  @media (max-width: 480px) {
+    .stat-card { padding: 14px 16px; font-size: 15px; }
+    .stat-card strong { font-size: 26px; }
+    .stat-card-row { grid-template-columns: 1fr; gap: 10px; }
+  }
+
   @media (max-width: 480px) {
     main { padding: 32px 16px 72px; }
     h1 { margin: 0 0 16px; }
