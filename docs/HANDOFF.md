@@ -4,6 +4,59 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-25 (session 40 — pillar publishing infra + posts 03 + 04 live)
+
+**Branch:** `master` · 6 commits sitting on top of session 39's `98c43d0`. All pushed + deployed to VPS as of 2026-04-25 ~12:00 UTC.
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — at commit `91540ef`. Backend healthy, no errors in logs.
+**Tests:** Not re-run this session (changes are additive; no test classes deleted). Session-39 baseline was 65 blog tests passing.
+
+### Session 40 — pillar publishing pipeline + first two pillar posts shipped
+
+**Headline:** SEO-21 cluster goes from 0 → 2 live pillar posts. The path from "JSON archive in repo" to "live with rich-result schemas" is now a one-command operation. Found and fixed RCA-031 along the way — a latent bug that had silently disabled SEO-25 trusted-source validation in production since session 38.
+
+**Pillar posts now live:**
+
+| URL | JSON-LD blocks | Validator | HTTP |
+|---|---|---|---|
+| [/blog/03-ai-engineer-vs-ml-engineer](https://automateedge.cloud/blog/03-ai-engineer-vs-ml-engineer) | Article + BreadcrumbList + FAQPage[10] + DefinedTermSet[4] | ok=True, 0 errors, 2 editorial warnings | 200 (47 KB) |
+| [/blog/04-learn-ai-without-cs-degree-2026](https://automateedge.cloud/blog/04-learn-ai-without-cs-degree-2026) | Article + BreadcrumbList + FAQPage + DefinedTermSet + **HowTo** | ok=True, 0 errors, 2 editorial warnings | 200 (54 KB) |
+
+IndexNow auto-fired on each publish. Blog index `/blog` now lists 4 cards in newest-first order (04 → 03 → 02 → 01). Confirmed live emission of `"@type": "HowTo"` on post 04 — the schema is what makes Google eligible to render the post as a how-to rich result.
+
+**Commits (in order):**
+
+1. `742592f` — `feat(admin): reject-reason dropdown + expired-vs-rejected guide table` ([admin_jobs.py:1010](../backend/app/routers/admin_jobs.py#L1010), [docs/ADMIN_JOBS_GUIDE.md](./ADMIN_JOBS_GUIDE.md)) — replaces `prompt()` for single + bulk reject with a labelled `<select>` modal. Same backend contract; handles Esc/Enter/backdrop-click.
+2. `16a37cc` — `feat(blog): HowTo JSON-LD emission for SEO-21 pillar posts` ([post.html](../backend/app/templates/blog/post.html), [blog.py:443](../backend/app/routers/blog.py#L443)) — additive, gated by `payload.how_to.steps`. No live behavior change for existing posts.
+3. `aed9740` — `docs(blog): archive pillar post #4 draft (learn-ai-without-cs-degree-2026)` ([docs/blog/04-learn-ai-without-cs-degree-2026.json](./blog/04-learn-ai-without-cs-degree-2026.json))
+4. `c42b794` — `feat(blog): CLI to stage pillar-post archives as /admin/blog drafts` ([scripts/stage_blog_draft.py](../scripts/stage_blog_draft.py), [docker-compose.yml](../docker-compose.yml))
+5. `314748d` — `fix(blog): stage_blog_draft sys.path resolution inside container`
+6. `4162362` — `fix(seo): COPY backend/data into image so pillar validator sees trusted_sources.json` ([backend/Dockerfile:34](../backend/Dockerfile#L34))
+7. `91540ef` — `docs(rca): RCA-031 trusted_sources.json missing from container image` ([docs/RCA.md:233](./RCA.md#L233))
+
+**RCA-031 in plain English:** the SEO-25 trusted-sources allowlist file (`backend/data/trusted_sources.json`) was created in session 38 but the Dockerfile never gained a `COPY data ./data` instruction. So the validator inside the container could never load the file, and every pillar post would fail validation with "trusted_sources.json not found". Session 39 ran the validator locally (where the file exists at `backend/data/trusted_sources.json` and resolves correctly), saw `ok=True`, and shipped — but in prod the validator was silently a no-op. The bug was invisible until session 40 because no pillar post had been pasted into `/admin/blog` to trigger it. Surfaced when [scripts/stage_blog_draft.py](../scripts/stage_blog_draft.py) ran the validator inside the container for the first time. Fix is one line. New prevention pattern row added to [docs/RCA.md:257](./RCA.md#L257).
+
+**New tooling — [scripts/stage_blog_draft.py](../scripts/stage_blog_draft.py):**
+
+```bash
+# Stage every docs/blog/*.json archive that is not already published (idempotent)
+ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python scripts/stage_blog_draft.py --all"
+
+# Or specific files (paths inside container; docs/blog/ is mounted at /app/blog-archives)
+ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python scripts/stage_blog_draft.py blog-archives/05-foo.json"
+```
+
+The script calls the same `validate_payload` + `save_draft` the admin paste-form uses. Errors block; warnings pass through with a `!` prefix. Drafts then appear in `/admin/blog` exactly as if pasted, where the admin reviews and clicks Publish (no auto-publish, by design — content stays human-gated).
+
+**Open questions for next session:**
+
+1. Post 04 came back with 18 paragraphs >4 sentences and 29 sentences >30 words (vs post 03's 8 + 10) — editorial drift toward density. Tighten S41 (q2 — `ai-roadmap-2026-whats-changed`) in authoring rather than retrofitting? (Recommendation in §9: tighten in authoring.)
+2. `/admin/blog` "N published" badge counter excludes legacy posts (shows 1 when 2 + legacy are published; shows 1 when 4 + legacy are published). Visual mismatch only; 1-line fix worth queuing.
+3. Tier-1 user-facing jobs features (saved jobs, match chip) still queued — interleave with pillar-post batch, or finish pillars first?
+
+**Next action — Session 41:** see CLAUDE.md §9. Third pillar post `/blog/05-ai-roadmap-2026-whats-changed` (q2). Same validator constraints. Aim for tighter editorial than post 04.
+
+---
+
 ## Current state as of 2026-04-24 (session 39 — SEO-21 first pillar post + template wire-up)
 
 **Branch:** `master` · One commit sitting local on top of session 38's `5c81c21` (which is live on VPS).
