@@ -217,7 +217,7 @@ _BASE_CSS = """
   .card{background:#1a2029;border:1px solid #2a323d;border-radius:8px;padding:18px 22px;margin:12px 0;transition:all .2s ease;position:relative}
   .card:hover{border-color:#e8a849;background:#1d242e}
   .card a{color:inherit;text-decoration:none}
-  .card h3{margin:0 0 6px 0;font-size:17px;font-family:'Fraunces',Georgia,serif;font-weight:500;color:#f5f1e8;line-height:1.25}
+  .card h3{margin:0 0 6px 0;font-size:17px;font-family:'Fraunces',Georgia,serif;font-weight:500;color:#f5f1e8;line-height:1.25;padding-right:60px}
   .card p{color:#c0c4cc;font-size:14px;margin:8px 0 0}
   a{color:#e8a849}
   .breadcrumb{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:16px}
@@ -403,6 +403,11 @@ async def jobs_index(
     <button id="apply" class="apply-btn">Apply filters</button>
     <button id="clear" class="clear-btn">Clear</button>
   </aside>
+  <script>
+    if (window.matchMedia('(max-width:720px)').matches) {{
+      document.querySelectorAll('.filters > details[open]').forEach(d => d.removeAttribute('open'));
+    }}
+  </script>
 
   <div class="results">
     <div id="chips" class="chips-row"></div>
@@ -925,12 +930,24 @@ _HUB_CSS = """
   .pagination a:hover{background:#1a2029;color:#e8a849;border-color:rgba(232,168,73,.4)}
   .pagination strong{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:600}
   .pagination span.ellipsis{border-color:transparent;background:transparent;color:#94a3b8}
-  @media (max-width:720px){ .layout{grid-template-columns:1fr} }
+  @media (max-width:720px){
+    .layout{grid-template-columns:1fr;gap:14px}
+    .filters{position:static;max-height:none;overflow-y:visible;padding-right:0}
+    .filters details{margin-bottom:8px;padding:6px 14px}
+    .filters summary{padding:10px 0;min-height:24px}
+    .search-box{margin-bottom:10px}
+    .apply-btn{display:none}
+    .clear-btn{margin-top:4px}
+  }
   @media (max-width:480px){
     .layout{gap:12px}
-    .apply-btn,.clear-btn{min-height:44px;padding:12px 10px}
-    .filters input[type=text],.filters select{min-height:40px;padding:10px}
+    .clear-btn{min-height:44px;padding:12px 10px}
+    .filters input[type=text],.filters input:not([type]),.filters select{min-height:40px;padding:10px}
+    .filters summary{padding:14px 0;min-height:28px}
     .pagination a,.pagination strong,.pagination span{padding:10px 12px}
+    .match-ring{width:42px;height:42px;font-size:12px;top:14px;right:14px}
+    .card h3{padding-right:54px;font-size:16px}
+    .card{padding:16px 18px}
   }
 </style>
 """
