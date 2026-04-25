@@ -539,7 +539,7 @@ def _render_post_sidebar(current_slug: str, current_title: str, current_url: str
         '</div>'
     )
 
-    return essays_block + toc_block + share_block
+    return toc_block + essays_block + share_block
 
 
 def _render_post_nav(current_slug: str, base: str) -> str:
