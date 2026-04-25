@@ -99,6 +99,15 @@ Every job **must** have an Opus summary card before publishing. Flash extraction
 
 ## 3. Removing / Expiring Jobs
 
+### At a glance — expired vs rejected
+
+| Status | What the public sees | Admin action required |
+|---|---|---|
+| **Expired** | Dropped from the `/jobs` listing. `/jobs/<slug>` still serves the page with an "expired" banner (kept for SEO). Returns HTTP 410 after 90 days past expiry. | **None.** Cron handles it. Only step in on an `auto-expired 24h` spike (probe bug) or if a known-live role expired wrongly — then republish via the Expired tab. |
+| **Rejected** | Completely hidden. `/jobs/<slug>` returns 404 and the row is excluded from the listing, sitemap, and IndexNow. | **None after rejection.** The decision is one-and-done; the reason you picked feeds the extractor feedback loop. Don't re-reject or "unpublish" again. |
+
+> Same underlying mechanism, different intent: `expired` = "was legitimate, time's up" (system-set, reviewer absent). `rejected` = "should never have been live" (admin-set, reason required).
+
 ### Automatic expiry (no admin action needed)
 
 The system handles expiry automatically via three mechanisms:

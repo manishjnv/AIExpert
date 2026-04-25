@@ -916,14 +916,66 @@ _ADMIN_HTML = """<!DOCTYPE html>
   .qfilters input:focus,.qfilters select:focus{outline:none;border-color:#e8a849}
   .qfilters label{font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;color:#94a3b8;text-transform:uppercase;display:flex;align-items:center;gap:6px;cursor:pointer}
   .qfilters .pill-count{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#e8a849}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,20,25,.85);display:flex;align-items:center;justify-content:center;z-index:9999}
+  .modal-card{background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:20px 24px;min-width:360px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+  .modal-card h3{margin:0 0 4px;color:#f5f1e8;font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:500}
+  .modal-card .modal-sub{color:#94a3b8;font-size:12px;margin-bottom:14px}
+  .modal-card label{display:block;color:#94a3b8;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px}
+  .modal-card select{width:100%;padding:9px 10px;background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:3px;font-family:'IBM Plex Sans',sans-serif;font-size:13px}
+  .modal-card select:focus{outline:none;border-color:#e8a849}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 </style>
 </head><body>
 <main>
 <div class="page-eyebrow">AutomateEdge · Admin</div>
 <h1 class="page-title">Jobs Review Queue</h1>
 <div id="banner" class="banner">Loading…</div>
+
+<div id="actions-panel" style="background:#1a2029;border:1px solid rgba(109,181,133,.4);border-radius:6px;padding:12px 18px;margin-bottom:14px;font-size:13px;line-height:1.55">
+  <div style="color:#6db585;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px">Your Daily Actions</div>
+  <ol style="margin:0;padding-left:20px;color:#e8e4d8">
+    <li>Terminal first: <code>/summarize-jobs --status draft --limit 50</code> (required before publishing).</li>
+    <li><b>Draft</b> tab: review each → <b>Publish</b>, or <b>Reject</b> with a reason (drives the extractor feedback loop).</li>
+    <li>Watch banner chips: <em>auto-expired 24h</em> spike → probe bug; <em>⚠ streak-2+</em> → about to expire, spot-check if valuable.</li>
+  </ol>
+</div>
+
 <details class="stats" id="stats"><summary>Source stats (last 24h)</summary><div id="stats-body">Loading…</div></details>
 <details class="stats" id="sumstats"><summary>Summary-card pipeline (coverage · versions · 7d rate)</summary><div id="sumstats-body">Loading…</div></details>
+<details class="stats" id="adminref"><summary>Admin reference — statuses · reject reasons · don'ts</summary>
+<div style="padding:10px 2px;font-size:13px">
+
+  <div style="color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:8px 0 6px">When a job is expired or rejected</div>
+  <table>
+    <thead><tr><th style="width:100px">Status</th><th>Public site</th><th>Admin action</th></tr></thead>
+    <tbody>
+      <tr><td><b>Expired</b></td><td>Dropped from the list, but <code>/jobs/&lt;slug&gt;</code> still loads with an "expired" banner (kept for SEO). HTTP 410 after 90 days.</td><td>None — cron handles it. Only step in on a spike, or republish if expired wrongly.</td></tr>
+      <tr><td><b>Rejected</b></td><td>Completely hidden — 404 at the slug, not in list / sitemap / IndexNow.</td><td>None after rejection. Don't re-reject.</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:6px;color:#94a3b8;font-size:12px">Draft and Published are covered by <b>Your Daily Actions</b> above.</div>
+
+  <div style="color:#e8a849;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 6px">Reject reasons (always required)</div>
+  <table>
+    <tbody>
+      <tr><td style="width:110px"><code>fake</code></td><td>Scam, ghost job, unverifiable company.</td></tr>
+      <tr><td><code>expired</code></td><td>JD says closed, or <code>posted_on</code> > 45d. Use on drafts only — not on already-expired rows.</td></tr>
+      <tr><td><code>off_topic</code></td><td>Not AI/ML (sales, HR, generic backend, etc.).</td></tr>
+      <tr><td><code>duplicate</code></td><td>Same role already published from another source.</td></tr>
+      <tr><td><code>low_quality</code></td><td>Vague JD, no skills, enum violations.</td></tr>
+    </tbody>
+  </table>
+
+  <div style="color:#d97757;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:16px 0 6px">Never do</div>
+  <ul style="margin:0;padding-left:20px;color:#e8e4d8">
+    <li>Publish without a summary card — run <code>/summarize-jobs</code> first.</li>
+    <li>Bulk-reject without reasons — breaks the extractor feedback loop.</li>
+    <li>Edit <code>posted_on</code> — it's the source's truth, not ours.</li>
+    <li>Re-enable a probe-disabled source without confirming the board is back.</li>
+    <li>Bulk-approve > 20 jobs without a spot-check.</li>
+  </ul>
+</div>
+</details>
 <div class="tabs">
   <button data-status="draft" class="active">Draft</button>
   <button data-status="published">Published</button>
@@ -974,6 +1026,44 @@ _ADMIN_HTML = """<!DOCTYPE html>
 
 <script>
 const REJECT_REASONS = ["fake","expired","off_topic","duplicate","low_quality"];
+const REJECT_LABELS = {
+  fake: "Fake / spam posting",
+  expired: "No longer open",
+  off_topic: "Not an AI role",
+  duplicate: "Duplicate of another job",
+  low_quality: "Low quality / insufficient detail",
+};
+
+function pickRejectReason(title, sub) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    const opts = REJECT_REASONS.map(r => `<option value="${r}">${r} — ${REJECT_LABELS[r]}</option>`).join("");
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3>${title}</h3>
+        <div class="modal-sub">${sub}</div>
+        <label for="reject-reason-select">Reason</label>
+        <select id="reject-reason-select">${opts}</select>
+        <div class="modal-actions">
+          <button class="btn" data-action="cancel">Cancel</button>
+          <button class="btn danger" data-action="ok">Reject</button>
+        </div>
+      </div>`;
+    const sel = () => overlay.querySelector("#reject-reason-select");
+    const close = (val) => { document.body.removeChild(overlay); document.removeEventListener("keydown", onKey); resolve(val); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); close(null); }
+      if (e.key === "Enter")  { e.preventDefault(); close(sel().value); }
+    };
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
+    overlay.querySelector("[data-action=cancel]").onclick = () => close(null);
+    overlay.querySelector("[data-action=ok]").onclick = () => close(sel().value);
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(overlay);
+    sel().focus();
+  });
+}
 let currentStatus = "draft";
 let currentFlag = "";           // quick-filter: "", "non_ai", "tier2_lite", "enrichment_failed"
 let duplicateHashes = new Set(); // hashes appearing in 2+ jobs — flagged with a dup chip
@@ -1310,8 +1400,8 @@ async function pub(id, hasSummary) {
 }
 
 async function rej(id) {
-  const reason = prompt("Reject reason (" + REJECT_REASONS.join(" / ") + "):");
-  if (!reason || !REJECT_REASONS.includes(reason)) { alert("Invalid reason."); return; }
+  const reason = await pickRejectReason(`Reject job #${id}`, "Pick the reason this job is being rejected.");
+  if (!reason || !REJECT_REASONS.includes(reason)) return;
   const r = await fetch(`/admin/jobs/api/${id}/reject`, {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
@@ -1375,8 +1465,8 @@ async function bulkRej() {
     alert(`Selected ${ids.length} rows but server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`);
     return;
   }
-  const reason = prompt(`Reject ${ids.length} jobs.\nReason (` + REJECT_REASONS.join(" / ") + "):");
-  if (!reason || !REJECT_REASONS.includes(reason)) { alert("Invalid reason."); return; }
+  const reason = await pickRejectReason(`Reject ${ids.length} jobs`, "Pick the reason. This will be applied to every selected row.");
+  if (!reason || !REJECT_REASONS.includes(reason)) return;
   if (!confirm(`Reject ${ids.length} jobs as "${reason}"?`)) return;
   const r = await fetch(`/admin/jobs/api/bulk-reject`, {
     method:"POST", credentials:"include",
