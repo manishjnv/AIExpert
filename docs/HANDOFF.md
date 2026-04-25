@@ -4,6 +4,86 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-25 (session 42 — Courses strategy plan + Roadmap nav)
+
+**Branch:** `master` · 1 commit on top of session 41's `a2c0ac0` (which was uncommitted in HANDOFF/CLAUDE.md §9 at session-42 start — bundled into this session's commit).
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — deployed via `git pull --ff-only && docker compose up -d --build --force-recreate backend`.
+**Tests:** Not re-run — this session is doc-heavy (one new strategy doc) plus a 2-line frontend nav addition. No backend logic touched. Session 41 baseline holds (65 blog tests).
+
+### Session 42 — comprehensive AI courses strategy plan + Roadmap top-nav
+
+**Headline:** Authored [docs/COURSES.md](./COURSES.md) — a 30-task sequenced playbook (COURSE-00..COURSE-29) for the AI courses platform, mirroring the SEO.md pattern. Format ladder (1-2hr micro / 5-7d sprint / 1-2wk short / 4-12wk flagship), 41-course catalog across 4 learner levels (8 flagships Opus-authored + 22 shorts auto-pipeline + 8 micros + 3 sprints), capstone-rubric gating with AI evaluation, viral mechanics (showcase / quiz funnel / certs / streaks / 30-day challenge), tiered tech-shift response (T1 paradigm / T2 major / T3 minor / T4 noise). Plus shipped COURSE-00.5 — added "Roadmap" to top nav and footer linking to the existing `/roadmap` hub from SEO-24.
+
+**Plan key decisions (full rationale in [docs/COURSES.md](./COURSES.md)):**
+
+- **Topic-shaped → role-shaped catalog.** 2026 hiring is by role (LLM Engineer / ML Engineer / AI Product Builder / GenAI Engineer / MLOps); existing 3mo/6mo/12mo "AI in N months" tracks demote to "Custom / Explore" mode after Phase B.
+- **Default flagship is 12 weeks**, not 6 months — research convergence: 4-12wk = highest enrollment intent + 30-50% completion when gated; 12-month plans = SEO/credibility asset only (<3% completion).
+- **Per-week resources gain `type` field** (3 video + 3 non-video), with 1 primary per type ("if you only watch one" / "if you only read one"). Eliminates choice paralysis; renders as 2-column layout (COURSE-29). Replaces single-primary-of-six model.
+- **Flagships = manual Opus paste-upload only** per `feedback_opus_for_editorial.md`. Auto-pipeline for shorts/micros only. Sprint-format first authoring is manual; variants auto.
+- **Tech-shift response is operationalized**: 4-tier classifier (T1-T4) decides whether to rewrite a flagship (rare paradigm shift), bump a minor version (quarterly), auto-apply (monthly), or ignore noise. COURSE-22 wires the admin triage page; ~15-min weekly admin task.
+
+**COURSE-00.5 nav change shipped:** [frontend/nav.js:79](../frontend/nav.js#L79) topnav and [frontend/nav.js:170](../frontend/nav.js#L170) footer. Position Home → Roadmap → Leaderboard → Blog → Jobs (Roadmap as primary-product CTA right after Home). Active-class logic mirrors `/blog` and `/jobs` patterns. No backend change — `/roadmap` hub already exists from SEO-24 (shipped 2026-04-24). Decided to keep URL `/roadmap` (preserves ~36 internal links + ItemList JSON-LD + sitemap entries) rather than rename to `/courses`; the page H1 can become "AI Learning Roadmap — Browse Courses" when COURSE-21 redesigns the hub for the 41-course catalog.
+
+**Doc artifacts created:**
+
+- [docs/COURSES.md](./COURSES.md) — 700+ line strategy plan. §0 status board (auto-loads in Phase 0). §8 admin workflow SOP (weekly + quarterly + tech-shift cadences with explicit admin-UI click paths). §9 tech-shift response playbook (signal sources, trigger taxonomy, update playbooks per tier, versioning strategy, deprecation criteria).
+- `~/.claude/projects/e--code-AIExpert/memory/reference_course_plan.md` — memory pointer auto-loads next session.
+- `MEMORY.md` index entry added.
+- `CLAUDE.md` §8: Phase 0 reads list now includes `docs/COURSES.md` §0 (~120 lines); load-bearing memory section gates curriculum/prompt/template work to the course plan.
+
+**Session 41 close-out also bundled:** session 41's HANDOFF entry + CLAUDE.md §9 update were uncommitted at session-42 start (sat in the working tree). This commit picked them up so the doc state matches the deployed code chain. Same pattern session 41 used to bundle session 40's chain.
+
+**Open questions for next session:**
+
+1. The §13 capstone-rubric placeholders for the 8 flagships are TBD — they're filled when each flagship is actually authored (COURSE-04..COURSE-19). Do they need a generic template upfront, or is per-flagship-as-built right?
+2. Cohort mode (COURSE-27) is currently P2/Phase F. If Phase B retention metrics underperform, does it accelerate to Phase C? The research evidence (60-80% with cohort vs ~25% solo) suggests yes, but operational load is real.
+3. Pricing inflection — platform stays 100% free per CLAUDE.md §1. Once certificates + bundles drive demand, is there a paid tier? Out of scope for the doc; flagged as a separate strategic discussion.
+
+**Next action — Session 43:** **Either** continue the SEO-21 pillar cluster (post 05 q2 — third pillar, Article + FAQPage, ~3000-word target) per session 41's queued plan, **or** start COURSE-01 + COURSE-02 + COURSE-03 in parallel (Phase A foundation work that unblocks Phase B's MVP funnel: AI Foundations + LLM Engineer flagships + capstone showcase + quiz funnel + cert bundle). User to decide: pillar cluster continues SEO momentum; COURSE-01-03 starts the courses execution. Both are P0 in their respective plans.
+
+**Queued:** S43 SEO-21 q2 post · S44 SEO-21 posts 5+6 · S45 SEO-26 quiz landing (worktree + codex:rescue for `quiz_outcomes` Alembic migration) · COURSE-01 + COURSE-02 + COURSE-03 (Phase A foundation) · COURSE-04 + COURSE-05 (Phase B MVP funnel — AI Foundations + LLM Engineer flagships, manual Opus authoring).
+
+**Agent-utilization footer:**
+
+- Opus: Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + memory + SEO.md §0); strategic synthesis across 4 conversation turns (course architecture / duration research / micro+sprint formats / admin operating manual / tech-shift response); authored 700+ line COURSES.md + memory pointer + MEMORY.md index + CLAUDE.md §8 hooks; 2-line nav.js edit (smaller than subagent cold-start cost); pre-commit secret scan + commit + push + SSH deploy + 3-cycle verification (VPS HEAD, container ps, edge curl); HANDOFF + §9 doc updates.
+- Sonnet: n/a — this session was strategy + a single 2-line frontend edit; no mechanical fan-out eligible. COURSE-20 (22 parallel shorts) is the natural Sonnet engagement when Phase E starts.
+- Haiku: n/a — 3-call deploy verification cheaper as direct Opus tool calls than spawning a sweeper.
+- codex:rescue: **deferred** — pure docs + 2-line frontend nav HTML. No auth, no AI-classifier, no Alembic, no jobs_ingest/enrich. First engagement remains S45 (SEO-26 quiz_outcomes migration) and COURSE-23/COURSE-24 (course versioning + deprecation Alembic migrations in Phase F).
+
+---
+
+## Current state as of 2026-04-25 (session 41 — UX follow-ups + bundled deploy)
+
+**Branch:** `master` · 2 commits on top of session 40's `91540ef`. All pushed + VPS deployed via `docker compose up -d --build --force-recreate backend`.
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD at `a2c0ac0`. Backend healthy (5+ min uptime, no errors).
+**Tests:** Not re-run — both changes are tight + UI-only. Session 40 baseline holds (65 blog tests).
+
+### Session 41 — two UX follow-ups + the deploy that bundled session 40's full code chain
+
+**Headline:** Caught a documentation gap — session 40's HANDOFF declared `91540ef` deployed, but VPS git was actually at `aed9740` (4 commits behind) when this session opened. A separate Claude session at 19:44 IST shipped `055f036` (jobs mobile fix) without updating docs or deploying. This session bundled both that fix and a new H1 fix into one deploy.
+
+**Commits:**
+
+1. `055f036` — `fix(jobs): mobile layout — filter sidebar no longer overlaps results` ([jobs.py:?](../backend/app/routers/jobs.py)) — `.filters` was sticky on every breakpoint; at ≤720px the layout collapsed to one column but the sidebar kept pinning above results. Drops sticky on mobile, auto-collapses `<details>` accordions on first load, hides redundant Apply button (filters auto-apply on change), adds right-padding to `.card h3` so long titles no longer slide under the match-ring. **Authored by a separate session at 19:44 IST; this session deployed it.**
+2. `a2c0ac0` — `feat(blog): render post title as H1 between breadcrumb and meta-line` ([post.html:170-175](../backend/app/templates/blog/post.html#L170-L175)) — title was only present in breadcrumb (mono uppercase 11px) + document `<title>`, leaving article body without a visible heading. H1 styling already existed in `_BLOG_CSS` (Fraunces serif, `clamp(28px, 5vw, 42px)`, cream `#f5f1e8`); template just had no element to apply it to. Removed duplicated `· {{ title }}` span from breadcrumb. Safe — `blog_publisher._ALLOWED_TAGS` excludes `h1`, so no body can collide with the template heading.
+
+**Deploy verification:** SSH → `git pull --ff-only` (fast-forward succeeded, picked up session 40's 7 commits + `055f036` + `a2c0ac0` from `aed9740` to `a2c0ac0`) → `docker compose up -d --build --force-recreate backend` → image `b3bbf315` built fresh. Verified H1 live at the edge: `curl -ksS https://automateedge.cloud/blog/02-... | grep '<h1>'` returns `<h1>Why Most AI Roadmaps Expire Before You Finish Them</h1>`. No edge cache headers (no `cf-cache-status`, no `age`) — change is immediately live for fresh requests.
+
+**Doc-discrepancy postmortem:** Session 40 wrote HANDOFF claiming deploy at `91540ef`, but VPS HEAD was at `aed9740` when this session SSH'd in. Likely root cause: session 40's deploy step ran `docker compose up -d --build --force-recreate backend` while git was at `aed9740`, then later commits (`c42b794` through `91540ef`) were pushed to origin without re-pulling on VPS. The mobile-fix session at 19:44 IST also pushed without deploying. Pattern: HANDOFF "deploy status" reflects what the author *intended* to deploy, not what was independently verified at the VPS HEAD. **Prevention rule queued for next session:** Phase 6 deploy verification should `ssh a11yos-vps "cd /srv/roadmap && git rev-parse HEAD"` and assert it equals local `git rev-parse HEAD` before claiming "deployed".
+
+**Open questions for next session:** session 40's three open questions still apply (post 04 editorial density, `/admin/blog` published-counter badge mismatch, tier-1 jobs features queued). No new ones from this session.
+
+**Next action — Session 42:** unchanged from session 40's plan — third pillar post `/blog/05-ai-roadmap-2026-whats-changed` (q2), then stage via CLI, publish from `/admin/blog`.
+
+**Agent-utilization footer:**
+
+- Opus: Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + RCA + SEO + memory); template edit (3-line diff); commit + push with noreply env-var override; SSH deploy via `git pull --ff-only && docker compose up -d --build --force-recreate backend`; live verification (3 SSH cycles — VPS HEAD, container ps, edge curl); HANDOFF + §9 doc updates.
+- Sonnet: n/a — single 3-line template edit, smaller than subagent cold-start cost; no mechanical fan-out eligible.
+- Haiku: n/a — 3-call deploy verification cheaper as direct Opus tool calls than spawning a sweeper.
+- codex:rescue: **deferred** — pure presentational HTML edit + restart of jobs UI Python (no auth, no AI-classifier, no Alembic, no jobs_ingest/enrich). Engagement point remains S44 (SEO-26 `quiz_outcomes` migration).
+
+---
+
 ## Current state as of 2026-04-25 (session 40 — pillar publishing infra + posts 03 + 04 live)
 
 **Branch:** `master` · 6 commits sitting on top of session 39's `98c43d0`. All pushed + deployed to VPS as of 2026-04-25 ~12:00 UTC.

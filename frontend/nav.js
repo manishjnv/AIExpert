@@ -76,6 +76,7 @@
       </span>
       <div class="topnav-links">
         <a href="/"${activeClass('/')}>Home</a>
+        <a href="/roadmap"${path === '/roadmap' || path.startsWith('/roadmap/') ? ' class="active"' : ''}>Roadmap</a>
         <a href="/leaderboard"${activeClass('/leaderboard')}>Leaderboard</a>
         <a href="/blog"${path === '/blog' || path.startsWith('/blog/') ? ' class="active"' : ''}>Blog</a>
         <a href="/jobs"${path === '/jobs' || path.startsWith('/jobs/') ? ' class="active"' : ''}>Jobs</a>
@@ -166,6 +167,7 @@
 
         <nav class="ftr-links" aria-label="Footer navigation">
           <a href="/#about" class="ftr-link" data-open-about>About</a>
+          <a href="/roadmap" class="ftr-link">Roadmap</a>
           <a href="/leaderboard" class="ftr-link">Leaderboard</a>
           <a href="/blog" class="ftr-link">Blog</a>
           <a href="/jobs" class="ftr-link">Jobs</a>

@@ -126,12 +126,13 @@ The generic playbook — routing table, Phase 0–6 flow, hard rules — lives i
 
 ### Phase 0 reads (exact paths for this repo)
 
-In the Phase 0 parallel-tool-call burst, read all five in one message:
+In the Phase 0 parallel-tool-call burst, read all six in one message:
 
 - `CLAUDE.md` (this file)
 - `docs/HANDOFF.md`
 - `docs/RCA.md` — first ~150 lines (recent entries + the "Patterns to watch for" table at the bottom)
 - `docs/SEO.md` — §0 only, first ~100 lines (trigger conditions + task status board + next action). Load deeper sections on-demand when §0.1 trigger conditions apply to the current session's work.
+- `docs/COURSES.md` — §0 only, first ~120 lines (trigger conditions + task status board + next action). Load deeper sections on-demand when §0.1 trigger conditions apply.
 - `C:\Users\manis\.claude\projects\e--code-AIExpert\memory\MEMORY.md`
 
 ### Load-bearing paths (require Opus diff review + worktree isolation)
@@ -156,6 +157,7 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 - **Deployments** → `feedback_deploy_rebuild.md` (`restart` doesn't pick up code; build + force-recreate)
 - **Standalone scripts** → `feedback_scripts_need_init_db.md` (call `init_db()` / `close_db()` explicitly)
 - **SEO work** (any `<head>` / sitemap / robots / JSON-LD / nginx SEO directive / new public route / blog publish / OG image) → `reference_seo_plan.md` → full plan at `docs/SEO.md`. Any task in the `SEO-00..SEO-26` set governed by that doc. Do not free-style schema or ship ad-hoc SEO changes — follow the sequenced tasks.
+- **Course / curriculum work** (any change to curriculum templates / generation pipeline / prompts in `generate_curriculum.txt|review_curriculum.txt|refine_curriculum.txt|discover_topics.txt` / admin Pipeline / Topics / Templates UI / new course-format type / quiz / showcase / cohort / streak / cert-bundling routes / tech-shift response) → `reference_course_plan.md` → full plan at `docs/COURSES.md`. Any task in the `COURSE-00..COURSE-28` set governed by that doc. Flagships are manual Opus authoring (paste-upload), never auto-generated.
 
 ### Phase 6 exit — this repo specifically
 
@@ -168,26 +170,25 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-25 (session 40 — pillar publishing infra + posts 03 + 04 live)
-**Last session summary (session 40):** Six commits. Built CLI publish path for pillar posts, fixed a latent prod bug that had silently disabled SEO-25 validation since session 38, published the first two pillar posts live, and tightened admin UX for the jobs queue.
+**Last session date:** 2026-04-25 (session 42 — Courses strategy plan + Roadmap nav)
+**Last session summary (session 42):** Strategy + a tiny visible nav change. Authored [docs/COURSES.md](docs/COURSES.md) — a 30-task sequenced playbook (`COURSE-00..COURSE-29`) for the AI courses platform: format ladder (1-2hr micro / 5-7d sprint / 1-2wk short / 4-12wk flagship), 41-course catalog across 4 levels (8 flagships Opus-authored + 22 shorts auto-pipeline + 8 micros + 3 sprints), capstone-rubric gating, viral mechanics, admin SOP, tiered tech-shift response (T1-T4). Mirrors the SEO.md structure. Plus shipped COURSE-00.5 — added "Roadmap" link to top nav and footer.
 
-- **Pillar posts live:** [/blog/03-ai-engineer-vs-ml-engineer](https://automateedge.cloud/blog/03-ai-engineer-vs-ml-engineer) (HTTP 200, Article + BreadcrumbList + FAQPage + DefinedTermSet) + [/blog/04-learn-ai-without-cs-degree-2026](https://automateedge.cloud/blog/04-learn-ai-without-cs-degree-2026) (HTTP 200, all four + HowTo). IndexNow auto-fired on publish per [blog.py:670](backend/app/routers/blog.py#L670). Blog index now lists 4 cards (04 → 03 → 02 → 01).
-- **CLI publish path:** [scripts/stage_blog_draft.py](scripts/stage_blog_draft.py) — runs validate_payload + save_draft inside container; `--all` is idempotent (skips already-published, overwrites already-drafted). [docker-compose.yml](docker-compose.yml) mounts `./docs/blog:/app/blog-archives:ro`. Replaces the manual paste-into-textarea step. Admin still clicks Publish in `/admin/blog` — no auto-publish.
-- **RCA-031 — pillar validator inert in prod:** `backend/data/trusted_sources.json` was never `COPY`'d into the image; every "ok=True" pillar validation since session 38 was actually local-only. Container rejected every pillar with "trusted_sources.json not found". Fix: one-line `COPY data ./data` in [backend/Dockerfile:34](backend/Dockerfile#L34). New prevention pattern row in [docs/RCA.md:257](docs/RCA.md#L257).
-- **HowTo JSON-LD wire-up:** [post.html](backend/app/templates/blog/post.html) emits HowTo block when `payload.how_to.steps` present (gated). Confirmed live emitting on post 04 — SEO-21 schema stack for guide-style pillars complete.
-- **Admin UX (jobs queue):** reject `prompt()` → labelled `<select>` modal in [admin_jobs.py:1010](backend/app/routers/admin_jobs.py#L1010). Same backend contract; handles Esc/Enter/backdrop-click.
+- **COURSES.md key decisions:** topic-shaped → role-shaped catalog (LLM/ML/Product Builder/GenAI/MLOps tracks); 12-week is the new default flagship duration with monthly capstone gates (research convergence: 4-12wk = highest enrollment intent + 30-50% completion when gated); resources gain `type: "video"|"non-video"` field with 1 primary per type, rendered as 2-column layout (COURSE-29); flagships are manual Opus paste-upload only (auto-pipeline for shorts/micros). Tech-shift response is operationalized as 4-tier admin triage (~15-min weekly task — COURSE-22).
+- **COURSE-00.5 nav shipped:** [nav.js:79](frontend/nav.js#L79) topnav + [nav.js:170](frontend/nav.js#L170) footer. Position: Home → Roadmap → Leaderboard → Blog → Jobs (Roadmap as primary-product CTA right after Home). Active-class logic mirrors `/blog`/`/jobs`. Kept URL `/roadmap` to preserve SEO-24 equity (~36 internal links + ItemList JSON-LD + sitemap entries) — page H1 can become "AI Learning Roadmap — Browse Courses" when COURSE-21 redesigns the hub.
+- **Phase 0 wiring:** `docs/COURSES.md` §0 added to CLAUDE.md §8 Phase 0 reads; load-bearing memory section gates curriculum/prompt/template work to the course plan. Memory pointer at `~/.claude/projects/.../memory/reference_course_plan.md`; MEMORY.md index entry added.
+- **Session 41 close-out bundled:** session 41's HANDOFF entry + §9 update were uncommitted at session-42 start (sat in working tree). This commit picked them up so doc state matches deployed code.
 
-**Deploy status:** All 6 commits (`742592f` through `91540ef`) live on VPS as of 2026-04-25 ~12:00 UTC. Backend healthy. May 9 SEO-21 reminder agent disabled (both target posts went live — routine no longer needed).
+**Deploy status:** Pushed and deployed to VPS via `git pull --ff-only && docker compose up -d --build --force-recreate backend`. Roadmap link verified visible at edge on `/`, `/blog`, `/jobs` after deploy.
 
-**Open questions:** (1) Post 04 came back with 18 paragraphs >4 sentences and 29 sentences >30 words — editorial drift toward density vs post 03's 8+10. Tighten S41 in authoring, or accept as dense-pillar judgment? (2) `/admin/blog` "1 published" badge label inconsistent with rendered row count (legacy posts excluded from the counter). 1-line fix worth queuing? (3) Tier-1 user-facing jobs features (saved jobs, match chip) still queued after the pillar-post batch.
+**Open questions:** (1) §13 capstone-rubric placeholders for the 8 flagships are TBD — fill per-flagship-as-built or generic template upfront? (2) Cohort mode (COURSE-27) currently P2/Phase F — accelerate to Phase C if Phase B retention misses targets? (3) Pricing inflection (free → paid tier when bundles drive demand) flagged as separate strategic discussion.
 
-**Next action — Session 41:** Third pillar post by SERP priority — `/blog/05-ai-roadmap-2026-whats-changed` (q2). Schema stack: Article + FAQPage (no HowTo, no Review). Same validator + ~3000-word target. After authoring, run `ssh a11yos-vps "cd /srv/roadmap && docker compose exec -T backend python scripts/stage_blog_draft.py --all"` to stage as draft, then publish from `/admin/blog`.
+**Next action — Session 43:** **Either** continue SEO-21 pillar cluster (post 05 q2 — Article + FAQPage, ~3000-word target) per session 41's queued plan, **or** start COURSE-01 + COURSE-02 + COURSE-03 in parallel (Phase A foundation: `discovery_focus` param + format-specific generate prompts + capstone-rubric scorer dimension — unblocks Phase B's MVP funnel of AI Foundations + LLM Engineer flagships). User to decide.
 
-**Queued:** S42 post 4 + SEO-22 VideoObject template wire-up (parallel to HowTo wire-up shipped this session) · S43 posts 5 + 6 · **S44 SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` Alembic migration).
+**Queued:** S43 SEO-21 q2 post · S44 SEO-21 posts 5+6 · **S45 SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` Alembic migration) · COURSE-01..COURSE-03 (Phase A foundation) · COURSE-04 + COURSE-05 (Phase B MVP — manual Opus authoring of AI Foundations + LLM Engineer flagships).
 
 **Agent-utilization footer:**
 
-- Opus: Phase 0 reads + investigation; built staging CLI (~150 LOC) + docker-compose mount; diagnosed RCA-031 from CLI failure mode + Dockerfile fix; deploy + live verification (~6 SSH cycles); reject-dropdown modal UI; HowTo template wire-up; CLAUDE.md §9 + HANDOFF + SEO.md updates.
-- Sonnet: n/a — single-author UI/script work, no mechanical fan-out eligible.
-- Haiku: n/a — direct curl probes cheaper than spawning a sweeper for sub-5-call sweeps.
-- codex:rescue: **deferred** — no auth/AI-classifier/Alembic/jobs_ingest/jobs_enrich path touched. Engagement point remains S44 (SEO-26 `quiz_outcomes` migration).
+- Opus: Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + memory + SEO.md §0); strategic synthesis across 4 conversation turns (course architecture / duration research / micro+sprint formats / admin operating manual / tech-shift response); authored 700+ line COURSES.md + memory pointer + MEMORY.md index + CLAUDE.md §8 hooks; 2-line nav.js edit (smaller than subagent cold-start cost); commit + push with noreply env-var override; SSH deploy via `git pull --ff-only && docker compose up -d --build --force-recreate backend`; 3-cycle live verification (VPS HEAD, container ps, edge curl).
+- Sonnet: n/a — strategy session + 2-line frontend edit. No mechanical fan-out eligible. Natural Sonnet engagement is COURSE-20 (22 parallel shorts in Phase E).
+- Haiku: n/a — 3-call deploy verification cheaper as direct Opus tool calls than spawning a sweeper.
+- codex:rescue: **deferred** — pure docs + 2-line frontend nav HTML; no auth/AI-classifier/Alembic/jobs_ingest/enrich path touched. First engagement remains S45 (SEO-26 quiz_outcomes migration) and COURSE-23/COURSE-24 (course versioning + deprecation Alembic migrations in Phase F).
