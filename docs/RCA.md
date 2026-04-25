@@ -230,6 +230,16 @@
   - Any `<table>` SSR'd into a public page needs a `.table-wrap { overflow-x: auto }` wrapper if it has >4 columns — wrapping is cheap insurance, unwrapping is easy.
   - Uploaded-content renderers (blog post body is the canonical case) must set `img { max-width: 100%; height: auto }` and `pre { overflow-x: auto }` globally — authors can't be relied on to size images to every viewport.
 
+### 031 — Pillar-post validator inert in production: `trusted_sources.json` never copied into image (2026-04-25) [Deploy / file inclusion]
+
+- **Symptom:** New CLI `scripts/stage_blog_draft.py` ran the SEO-25 pillar validator inside the backend container and got `trusted_sources.json not found at /app/data/trusted_sources.json` for every pillar post — meaning *every* pillar-post validation since SEO-25 shipped (session 38, commit `5c81c21`) was effectively a no-op in production. The file existed locally at `backend/data/trusted_sources.json`, so session-39 validation runs (which were executed *locally*, not in the container) reported `ok=True, 0 errors` and the gap was invisible.
+- **Root cause:** [`backend/Dockerfile`](backend/Dockerfile) had `COPY app ./app`, `COPY alembic ./alembic`, `COPY tests ./tests`, etc. — but no `COPY data ./data`. The `backend/data/` directory was created in session 38 specifically for `trusted_sources.json` and nothing told the Dockerfile to include it. Validator's `_TRUSTED_SOURCES_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "trusted_sources.json"` resolves correctly to `/app/data/trusted_sources.json` inside the container — the path was right, the file just wasn't there. The legacy admin paste-flow happened to run validation in the same container path, so it would have failed identically — but no pillar post had been pasted into `/admin/blog` yet (both session-39 archives sat as JSON files only), so the failure mode was latent.
+- **Fix:** [backend/Dockerfile:34](backend/Dockerfile#L34) — added `COPY data ./data` between `COPY app ./app` and `COPY alembic.ini ./`. Image rebuilt + force-recreated. Verified `/app/data/trusted_sources.json` is now present inside the container; staging script now successfully validates + writes drafts for both pillar posts. Commit `4162362`.
+- **Prevention:**
+  - **Any new directory under `backend/` that the runtime reads must be added to the Dockerfile in the same PR.** The bug was a missed COPY, not a path mismatch — and the validator's relative-path resolution made it appear local-vs-container neutral when it wasn't.
+  - **Tests that import a fixture-loading helper must run it.** `blog_validator.load_trusted_sources()` should be exercised by at least one container-aware test (e.g., `pytest --no-header tests/test_blog_validator.py`) so a missing file would fail CI, not silent-pass.
+  - **Validators that depend on file-system state should fail loudly at import time, not at first-call time.** Consider eager-loading `_TRUSTED_SOURCES` at module load and raising `RuntimeError` if missing — turns a latent prod bug into a startup crash that the healthcheck catches.
+
 ---
 
 ## Patterns to watch for
@@ -254,3 +264,4 @@
 | SSR HTMLResponse missing viewport meta | Medium | Every `return f"""<!DOCTYPE html>` must include `<meta name="viewport" content="width=device-width, initial-scale=1">`. Missing = mobile renders at desktop width. |
 | Public SSR `<table>` with >4 columns | Low | Wrap in `<div class="table-wrap">` with `overflow-x: auto` — protects against mobile horizontal-scroll the whole page. |
 | Uploaded-content rendering without overflow rules | Medium | Blog/post renderers must set `img { max-width: 100% }` and `pre { overflow-x: auto }` — authors can't size content for every viewport. |
+| Runtime data dir not in Dockerfile COPY | High | Any new directory under `backend/` that runtime code reads (e.g. `backend/data/`) must be added as `COPY <dir> ./<dir>` in the same PR. Validate by running the consumer inside the container, not just locally. |
