@@ -892,8 +892,13 @@ async def job_match(
 
 _HUB_CSS = """
 <style>
-  .layout{display:grid;grid-template-columns:260px 1fr;gap:32px;margin-top:8px;align-items:start}
-  .filters{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:4px}
+  .layout{display:grid;grid-template-columns:1fr;gap:14px;margin-top:8px}
+  .filters{position:static}
+  .results{position:relative;z-index:1}
+  @media (min-width:721px){
+    .layout{grid-template-columns:260px 1fr;gap:32px;align-items:start}
+    .filters{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:4px}
+  }
   .search-box{background:#1a2029;border:1px solid #2a323d;border-radius:6px;padding:12px 14px;margin-bottom:12px}
   .search-box label{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e8a849;font-weight:500;margin-bottom:8px}
   .search-box input{width:100%;padding:9px 12px;font-size:14px;background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;border-radius:4px;box-sizing:border-box;font-family:'IBM Plex Sans',sans-serif}
@@ -931,8 +936,6 @@ _HUB_CSS = """
   .pagination strong{background:#e8a849;color:#0f1419;border-color:#e8a849;font-weight:600}
   .pagination span.ellipsis{border-color:transparent;background:transparent;color:#94a3b8}
   @media (max-width:720px){
-    .layout{grid-template-columns:1fr;gap:14px}
-    .filters{position:static;max-height:none;overflow-y:visible;padding-right:0}
     .filters details{margin-bottom:8px;padding:6px 14px}
     .filters summary{padding:10px 0;min-height:24px}
     .search-box{margin-bottom:10px}
