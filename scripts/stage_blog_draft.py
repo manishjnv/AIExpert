@@ -32,8 +32,11 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+_HERE = Path(__file__).resolve().parents[1]
+for _cand in (_HERE, _HERE / "backend"):
+    if (_cand / "app" / "services" / "blog_publisher.py").is_file():
+        sys.path.insert(0, str(_cand))
+        break
 
 from app.services.blog_publisher import (  # noqa: E402
     DRAFTS_DIR,
