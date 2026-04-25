@@ -114,20 +114,26 @@ def _count_words(text: str) -> int:
 
 
 def _first_paragraph(body_html: str) -> str:
-    """Return the text of the first <p>. If the first <p> is the
-    lede (class='lede'), use the second — the lede is a short hook,
-    the definitional snippet sits below it."""
+    """Return the definitional paragraph — the 40-60 word featured-snippet
+    target. Modern pillar posts (v2 prompt) inject a 25-40 word HOOK between
+    the lede and the definitional, so we scan the first 3 non-lede paragraphs
+    and prefer whichever lands in the 40-60 word target range. Falls back to
+    the first non-lede paragraph if none qualify, so the validator's
+    word-count error message still fires for actually-broken posts."""
     matches = _FIRST_P_RE.findall(body_html)
     if not matches:
         return ""
-    first = matches[0]
-    # If the first is a lede, prefer the second paragraph for the
-    # 40-60 word definitional check.
-    first_full_match = re.search(r"<p[^>]*class=[\"'][^\"']*\blede\b[^\"']*[\"'][^>]*>",
-                                 body_html, re.IGNORECASE)
-    if first_full_match and len(matches) > 1:
-        return _strip_tags(matches[1])
-    return _strip_tags(first)
+    has_lede = re.search(r"<p[^>]*class=[\"'][^\"']*\blede\b[^\"']*[\"'][^>]*>",
+                         body_html, re.IGNORECASE)
+    start = 1 if has_lede else 0
+    candidates = matches[start:start + 3]
+    for cand in candidates:
+        wc = _count_words(_strip_tags(cand))
+        if 40 <= wc <= 60:
+            return _strip_tags(cand)
+    if candidates:
+        return _strip_tags(candidates[0])
+    return ""
 
 
 def validate_pillar(payload: dict, trusted: Optional[dict] = None) -> dict:

@@ -110,7 +110,7 @@ OUTPUT SCHEMA (exact shape — do not add or remove required fields)
     "<optional second>"
   ],
 
-  "angle_note": "<optional — one sentence on editorial choices. Admin-visible, not published.>"
+  "angle_note": "<MANDATORY: include the line 'paragraph_audit: N paragraphs over 4 sentences (target: 0)' where N is your actual count after walking every <p> in body_html. If N > 0, split them BEFORE emitting the artifact — the validator warns but doesn't block, your audit is what catches it. After the audit line, optionally add one sentence on editorial choices. Admin-visible, not published.>"
 }
 ```
 

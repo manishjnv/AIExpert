@@ -219,7 +219,11 @@ def validate_payload(payload: dict) -> dict:
     elif actual_wc > 1500:
         warnings.append(f"body is {actual_wc} words — over the 1500 target (may lose recruiter readers).")
 
-    if isinstance(claimed_wc, int) and abs(claimed_wc - actual_wc) > 50:
+    # Tolerance scales with post length: 50 words for build-in-public posts
+    # (~5% of 1000), 250 words for pillars (~5-8% of 3000-5000). Below this
+    # threshold is normal Claude-side estimation noise and not worth flagging.
+    drift_tolerance = 250 if actual_wc >= 2500 else 50
+    if isinstance(claimed_wc, int) and abs(claimed_wc - actual_wc) > drift_tolerance:
         warnings.append(f"word_count mismatch — claimed {claimed_wc}, measured {actual_wc}.")
 
     h2_count = len(re.findall(r"<h2[^>]*>", body_html, re.IGNORECASE))
