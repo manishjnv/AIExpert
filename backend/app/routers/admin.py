@@ -987,6 +987,53 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
     </div>
   </details>
 
+  <details class="how-to" style="border-color:rgba(232,168,73,0.4)">
+    <summary>📌 Pillar post quick-pick — the 5 next-up briefs (click to expand)</summary>
+    <div style="color:#94a3b8;font-size:12px;margin-top:6px;line-height:1.55">
+      Pre-curated SEO-21 pillar posts queued after the existing 6-post slate.
+      Click <strong style="color:#e8a849">Load brief</strong> on any row to auto-fill the
+      Generate form below — picks the right tier, target query, angle, schema stack, and
+      the comparative checkbox. Then scroll to <strong>Section 1</strong> and click
+      <strong>Generate prompt</strong>. Execute in order — priority reflects commercial
+      intent + SERP beatability + product-fit moat.
+    </div>
+    <table class="admin" style="margin-top:12px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:48px">#</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Title (target query)</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:90px">Tier</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:140px">Schema satisfier</th>
+          <th style="text-align:right;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:130px">Action</th>
+        </tr>
+      </thead>
+      <tbody id="pillarBriefsTbody"></tbody>
+    </table>
+    <div style="margin-top:12px;padding:10px 12px;background:rgba(232,168,73,0.06);border-left:3px solid #e8a849;font-size:12px;color:#d0cbc2;line-height:1.55">
+      <strong style="color:#e8a849">Validator gates auto-applied to every pillar post:</strong>
+      <ul style="margin:6px 0 0 18px;padding:0">
+        <li>Word count ≥3000 (pillar) or ≥4500 (flagship)</li>
+        <li>≥40 internal links to <code>automateedge.cloud/*</code> — anchor-only links don't count</li>
+        <li>≥5 external citations to domains in <code>backend/data/trusted_sources.json</code> (arXiv, lab docs, BLS, Stanford AI Index, etc.)</li>
+        <li>8–12 H2 sections · 8–15 FAQ Q&amp;A pairs · first paragraph after the lede must be a 40–60 word definitional snippet</li>
+        <li>Schema stack: Article + FAQPage + at least one of HowTo / DefinedTerm / VideoObject / ItemList</li>
+        <li>If <em>comparative</em> is checked, body MUST contain at least one <code>&lt;table&gt;</code></li>
+      </ul>
+      Red errors block. Amber warnings (paragraphs &gt;4 sentences, sentences &gt;30 words) are editorial — fix before publish.
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:#94a3b8;line-height:1.6">
+      <strong style="color:#e8e2d3">Two ways to land Claude's JSON</strong> — both end up at <code>/data/blog/drafts/&lt;slug&gt;.json</code>:
+      <ul style="margin:4px 0 0 18px;padding:0">
+        <li><strong>Direct:</strong> paste / upload in Section 2 below → Validate → Save as draft.</li>
+        <li><strong>Git archive (audit trail):</strong> save Claude's file as <code>docs/blog/&lt;slug&gt;.json</code>, commit + push, then on VPS run <code>docker compose exec -T backend python scripts/stage_blog_draft.py --all</code> (idempotent — skips already-published).</li>
+      </ul>
+      <strong style="color:#e8e2d3">After Save as draft</strong> → click the new draft row in Section 3 → edit / preview / Publish.
+      <strong style="color:#e8e2d3">After Publish</strong> → run the live URL through
+      <a href="https://search.google.com/test/rich-results" target="_blank" style="color:#e8a849">Google Rich Results Test</a>
+      (validator checks structure; Google checks semantics — both must pass).
+    </div>
+  </details>
+
   <section class="section-card">
     <h2>1 · Generate Claude prompt</h2>
     <label style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;display:block;margin-bottom:6px;">Post type</label>
@@ -1168,6 +1215,132 @@ function clearBlogPrompt() {
   const tq = document.getElementById('bpTargetQuery'); if (tq) tq.value = '';
   const cmp = document.getElementById('bpComparative'); if (cmp) cmp.checked = false;
 }
+
+// --------------- Pillar quick-pick briefs ---------------
+// Curated SEO-21 pillar slate (posts 06-10). Schema satisfier picks the
+// 3rd schema beyond the mandatory Article + FAQPage — must match the
+// dropdown values in #bpSchemaStack (HowTo / DefinedTerm / VideoObject / ItemList).
+// Posts that need an extra schema (e.g. Dataset for the salary post) get a
+// "extra" note shown in the row; the admin adds it to schemas[] in the editor.
+const PILLAR_BRIEFS = [
+  {
+    n: 1,
+    tier: 'flagship',
+    title: 'AI Engineer Salary 2026: Real Data by Experience, Stack, and Region',
+    target_query: 'AI engineer salary 2026',
+    angle: 'Levels.fyi is a database. Glassdoor is stale. We have 25 live job sources refreshed daily — here is what AI engineers actually earn in 2026 by years of experience, AI stack, and metro, with the gaps nobody else surfaces.',
+    schema: 'ItemList',
+    schema_extra: 'Dataset',
+    comparative: true,
+    why: 'highest commercial intent on the topic graph; jobs DB is a primary-source moat',
+  },
+  {
+    n: 2,
+    tier: 'pillar',
+    title: 'AI Engineer Interview Prep: The 50 Questions Actually Asked in 2026',
+    target_query: 'AI engineer interview questions 2026',
+    angle: 'Glassdoor lists are theoretical. Reddit threads are anecdotal. We mined 25 live job sources for what 2026 employers actually screen for — 50 questions grouped by role tier with answer scaffolding, sourced from real JDs not LeetCode.',
+    schema: 'ItemList',
+    schema_extra: '',
+    comparative: false,
+    why: 'FAQPage schema IS the content shape — perfect rich-result fit; massive year-round volume',
+  },
+  {
+    n: 3,
+    tier: 'pillar',
+    title: 'AI Portfolio Projects That Get Interviews in 2026 (Ranked by Hiring Signal)',
+    target_query: 'best AI projects for portfolio',
+    angle: 'Towards Data Science listicles rank by GitHub stars. We rank by interview conversion — projects scored against real hiring-manager response data from our learner cohort, with one project reverse-engineered end-to-end.',
+    schema: 'HowTo',
+    schema_extra: 'ItemList',
+    comparative: false,
+    why: 'GitHub-eval product fit; only platform with hiring-response data on real learner repos',
+  },
+  {
+    n: 4,
+    tier: 'pillar',
+    title: 'How to Build a RAG System From Scratch in 2026 (Without LangChain)',
+    target_query: 'build RAG from scratch 2026',
+    angle: 'LangChain hides the moving parts. Vendor blogs are biased. Here is the vendor-neutral, 350-line implementation of retrieval-augmented generation in 2026 — every choice justified, every benchmark reproduced.',
+    schema: 'HowTo',
+    schema_extra: 'VideoObject',
+    comparative: true,
+    why: 'highest practitioner search volume in applied AI; "from scratch" + year-qualified is open',
+  },
+  {
+    n: 5,
+    tier: 'pillar',
+    title: 'Open-Source LLMs vs API LLMs: Which to Learn First in 2026',
+    target_query: 'open source LLM vs OpenAI 2026',
+    angle: 'Vendor blogs sell their stack. Medium posts are stale (Llama 3 era). The honest 2026 trade-off across cost, latency, quality, and learning curve — and the path that gets you hireable fastest depending on which segment of the market you target.',
+    schema: 'DefinedTerm',
+    schema_extra: '',
+    comparative: true,
+    why: 'every learner hits this fork; ancestor for future /vs/llama-vs-gpt programmatic pages',
+  },
+];
+
+function _esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function renderPillarBriefs() {
+  const tbody = document.getElementById('pillarBriefsTbody');
+  if (!tbody) return;
+  const tierBadge = (t) => {
+    if (t === 'flagship') return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(217,119,87,0.22);color:#f5a58a;border:1px solid rgba(217,119,87,0.55)">Flagship</span>';
+    return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(232,168,73,0.22);color:#f5c06a;border:1px solid rgba(232,168,73,0.55)">Pillar</span>';
+  };
+  tbody.innerHTML = PILLAR_BRIEFS.map((b, i) => {
+    const extra = b.schema_extra
+      ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">+ ' + _esc(b.schema_extra) + ' (add in editor)</div>'
+      : '';
+    const cmp = b.comparative
+      ? '<span style="font-size:10px;color:#f5c06a">comparative — table required</span>'
+      : '<span style="font-size:10px;color:#94a3b8">non-comparative</span>';
+    return ''
+      + '<tr>'
+      + '<td style="padding:10px 8px;color:#94a3b8;font-family:monospace;font-size:13px;vertical-align:top">' + b.n + '</td>'
+      + '<td style="padding:10px 8px;vertical-align:top">'
+      +   '<div style="color:#f5f1e8;font-size:13px;line-height:1.45;margin-bottom:3px">' + _esc(b.title) + '</div>'
+      +   '<div style="font-size:11px;color:#94a3b8;font-family:monospace;margin-bottom:3px">target: ' + _esc(b.target_query) + '</div>'
+      +   '<div style="font-size:11px;color:#7a8290;line-height:1.4;font-style:italic">why now: ' + _esc(b.why) + '</div>'
+      + '</td>'
+      + '<td style="padding:10px 8px;vertical-align:top">' + tierBadge(b.tier) + '</td>'
+      + '<td style="padding:10px 8px;vertical-align:top">'
+      +   '<div style="font-size:11px;color:#e8e2d3">Article + FAQPage + ' + _esc(b.schema) + '</div>'
+      +   extra
+      +   '<div style="margin-top:4px">' + cmp + '</div>'
+      + '</td>'
+      + '<td style="padding:10px 8px;text-align:right;vertical-align:top">'
+      +   '<button class="btn primary" onclick="loadPillarBrief(' + i + ')" title="Auto-fill the Generate form below with this brief">Load brief</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+function loadPillarBrief(idx) {
+  const b = PILLAR_BRIEFS[idx];
+  if (!b) return;
+  // 1. Pick the right tier radio + reveal pillar fields
+  const radio = document.querySelector('input[name="bpTier"][value="' + b.tier + '"]');
+  if (radio) { radio.checked = true; }
+  onTierChange();
+  // 2. Fill the form
+  document.getElementById('bpTitle').value = b.title;
+  document.getElementById('bpAngle').value = b.angle;
+  document.getElementById('bpTargetQuery').value = b.target_query;
+  document.getElementById('bpSchemaStack').value = b.schema;
+  document.getElementById('bpComparative').checked = !!b.comparative;
+  // 3. Confirmation + scroll the Generate section into view
+  const meta = document.getElementById('bpMeta');
+  meta.style.color = '#8fd0a5';
+  meta.textContent = '✓ Loaded brief #' + b.n + ' — review fields and click Generate prompt.';
+  document.querySelector('.section-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.addEventListener('DOMContentLoaded', renderPillarBriefs);
 
 // --------------- Upload / validate / save draft ---------------
 function parseJsonInput() {
