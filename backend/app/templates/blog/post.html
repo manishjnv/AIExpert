@@ -170,9 +170,8 @@
     <article class="post-article">
       <nav class="post-breadcrumb" aria-label="Breadcrumb">
         <a href="/blog">← Blog</a>
-        <span class="sep">·</span>
-        <span class="current">{{ title }}</span>
       </nav>
+      <h1>{{ title }}</h1>
       <div class="meta-line">Published {{ published }} · Manish Kumar · Build in Public</div>
       {{ body_html | safe }}
       {{ post_nav_html | safe }}
