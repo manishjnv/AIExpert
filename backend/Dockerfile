@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy the rest of the backend
 COPY app ./app
+COPY data ./data
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY tests ./tests
