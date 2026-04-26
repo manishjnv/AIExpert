@@ -3072,7 +3072,7 @@ async def admin_jobs_guide(_user: User = Depends(get_current_admin)):
 # ---- Tweet drafts (Phase B daily X auto-post queue) --------------------------
 #
 # Daily 8am IST cron queues a draft per slot rotation (Mon/Wed/Fri blog teaser,
-# Tue/Thu quotable line). Admin reviews on /admin/tweets, optionally edits the
+# Tue/Thu quotable line). Admin reviews on /admin/social, optionally edits the
 # text, and clicks Post — that calls twitter_client and updates the row.
 #
 # When TWITTER_* env vars aren't set, "Post" returns a 503 with "not configured"
@@ -3103,7 +3103,7 @@ async def list_tweets(
     db: AsyncSession = Depends(get_db),
 ):
     """30-ish most recent drafts, newest first. Single JSON payload — the
-    /admin/tweets page renders rows from this."""
+    /admin/social page renders rows from this."""
     stmt = (
         select(TweetDraft)
         .order_by(TweetDraft.created_at.desc())
@@ -3370,11 +3370,11 @@ async def queue_now(
 
 
 _TWEETS_ADMIN_HTML = """<!doctype html><html><head>
-<meta charset="utf-8"><title>Tweet drafts · Admin</title>
+<meta charset="utf-8"><title>Social drafts · Admin</title>
 <style>{{ADMIN_CSS}}</style></head><body>
 {{ADMIN_NAV}}
 <div class="page">
-  <h1>Tweet drafts</h1>
+  <h1>Social drafts</h1>
   <div class="subtitle">Daily X queue · curator picks at 8am IST · click Post to ship</div>
 
   <div id="cfgBanner" style="display:none;margin:16px 0;padding:12px 16px;
@@ -3531,10 +3531,11 @@ load();
 </script></body></html>"""
 
 
-@router.get("/tweets", response_class=HTMLResponse)
-async def admin_tweets_page(_user: User = Depends(get_current_admin)):
-    """Admin UI for the daily tweet queue. Reads /admin/api/tweets and posts
-    via /admin/api/tweets/{id}/post."""
+@router.get("/social", response_class=HTMLResponse)
+async def admin_social_page(_user: User = Depends(get_current_admin)):
+    """Admin UI for the daily social-post queue. Reads /admin/api/tweets and
+    posts via /admin/api/tweets/{id}/post (API paths stay tweet-named until
+    additional channels land)."""
     html = (_TWEETS_ADMIN_HTML
             .replace("{{ADMIN_CSS}}", ADMIN_CSS)
             .replace("{{ADMIN_NAV}}", ADMIN_NAV)

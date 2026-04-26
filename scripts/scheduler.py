@@ -153,7 +153,7 @@ async def weekly_audit_select_loop() -> None:
 async def daily_tweet_queue_loop() -> None:
     """Daily 08:00 IST = 02:30 UTC — pick a slot per weekday, queue a pending
     TweetDraft. Mon/Wed/Fri = blog_teaser, Tue/Thu = quotable, Sat/Sun = skip.
-    Admin reviews and clicks Post on /admin/tweets to ship."""
+    Admin reviews and clicks Post on /admin/social to ship."""
     while True:
         target = _next_daily(2, 30, datetime.now(timezone.utc))
         await _sleep_until(target, "daily_tweet_queue")

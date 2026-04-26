@@ -11,7 +11,7 @@
 
 ### Session 46 — Phase B X auto-post queue lands; engagement infrastructure ready
 
-**Headline:** Built and deployed Phase B end-to-end in one session — admin reviews drafts at [/admin/tweets](https://automateedge.cloud/admin/tweets) at 8am IST M-F (Mon/Wed/Fri = blog teaser, Tue/Thu = quotable line, Sat/Sun skipped), clicks Post → OAuth 1.0a signed POST to `api.twitter.com/2/tweets` ships the tweet. User got X dev account approved, generated 4 OAuth keys with Read+Write permissions, pasted them into VPS `.env`, force-recreated backend+cron. The yellow "X API not configured" banner is gone. One test draft was inserted via SQL at end-of-session (`scheduled_date=2026-04-26, slot=blog_teaser, source=01-ai-portfolio-projects-...`) sitting `pending` for the user to click Post and verify end-to-end posting works — verification happens on next browser-side click, not in this transcript.
+**Headline:** Built and deployed Phase B end-to-end in one session — admin reviews drafts at [/admin/social](https://automateedge.cloud/admin/social) (route renamed S47; legacy `/admin/tweets`) at 8am IST M-F (Mon/Wed/Fri = blog teaser, Tue/Thu = quotable line, Sat/Sun skipped), clicks Post → OAuth 1.0a signed POST to `api.twitter.com/2/tweets` ships the tweet. User got X dev account approved, generated 4 OAuth keys with Read+Write permissions, pasted them into VPS `.env`, force-recreated backend+cron. The yellow "X API not configured" banner is gone. One test draft was inserted via SQL at end-of-session (`scheduled_date=2026-04-26, slot=blog_teaser, source=01-ai-portfolio-projects-...`) sitting `pending` for the user to click Post and verify end-to-end posting works — verification happens on next browser-side click, not in this transcript.
 
 **Six commits with discrete value:**
 
@@ -44,7 +44,7 @@ Second pass declined to engage (matches S45's note that the codex helper is retu
 
 **Open broken artifact (delete via UI):** the Wed 2026-04-29 04:30 UTC routine `trig_015f2cVRhQGkmLseDZFWhKbm` is still armed but expected to fail — Gmail MCP token expired and Google blocked re-auth. User can delete at https://claude.ai/code/routines (no API delete). The `/admin/api/notify` endpoint is the durable replacement; future routines should curl it.
 
-**Open verification (next browser-side click):** test draft #1 sits `pending` in `tweet_drafts`; clicking Post on `/admin/tweets` will produce the first end-to-end live tweet. If 401, regenerate Access Token (was generated before Read+Write was set on the app); if 200, Phase B is fully live.
+**Open verification (next browser-side click):** test draft #1 sits `pending` in `tweet_drafts`; clicking Post on `/admin/social` will produce the first end-to-end live tweet. If 401, regenerate Access Token (was generated before Read+Write was set on the app); if 200, Phase B is fully live.
 
 **Next action — Session 47:** ship 3 engagement upgrades on the Phase B queue (cron time → US-tech-peak window, hook-prompt unification with the Share button, OG card image attachment via X media upload). See the next-session prompt in HANDOFF below the closing `---` marker. Bigger lever: image attachment is 2-3× engagement per the marketing literature.
 
@@ -104,7 +104,7 @@ Constraints:
 Acceptance:
 - All existing tweet_curator + twitter_client + admin tests pass.
 - New tests cover upload_media (success + 4xx error + missing image), post_tweet with and without media_ids, queue_today with image fetch failure (text-only fallback).
-- Manual VPS test after deploy: insert a test draft via SQL (slot=blog_teaser, source_ref=an existing slug), click Post on /admin/tweets, verify the resulting tweet on @manishjnvk has the OG hero image inline.
+- Manual VPS test after deploy: insert a test draft via SQL (slot=blog_teaser, source_ref=an existing slug), click Post on /admin/social, verify the resulting tweet on @manishjnvk has the OG hero image inline.
 - Codex:rescue review of the twitter_client diff before push; document outcome in commit message.
 
 Defer to S48: 4 surface ribbons (S45 queued), pagination test fix (S44 leftover), SEO-21 q2 post.

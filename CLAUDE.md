@@ -183,7 +183,7 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 **Open broken artifact:** Wed routine `trig_015f2cVRhQGkmLseDZFWhKbm` armed for 2026-04-29 04:30 UTC — expected to fail (CCR can't reliably execute curl, root cause unknown after 5 prompt iterations). User can delete via UI; the `/admin/api/notify` endpoint is the durable replacement.
 
-**Open verification:** test draft #1 sits `pending`; clicking Post on `/admin/tweets` produces the first end-to-end live tweet. If 401, regenerate Access Token (was generated before Read+Write was set on the X app); if 200, Phase B is fully live.
+**Open verification:** test draft #1 sits `pending`; clicking Post on `/admin/social` (route renamed S47; legacy `/admin/tweets`) produces the first end-to-end live tweet. If 401, regenerate Access Token (was generated before Read+Write was set on the X app); if 200, Phase B is fully live.
 
 **Next action — Session 47:** ship 3 engagement upgrades on Phase B — cron firing time `02:30 UTC → 13:30 UTC` (peak US tech-audience window), unify blog_teaser hook with the Share button's quotable-first pattern, image attachment via X media upload (the 2-3× engagement lever). Self-contained next-session prompt lives at the top of `docs/HANDOFF.md` under "Session 47 prompt".
 

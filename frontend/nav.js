@@ -105,7 +105,7 @@
         <a href="/admin/pipeline/settings"${activeClass('/admin/pipeline/settings')}>Settings</a>
         <a href="/admin/pipeline/ai-usage"${activeClass('/admin/pipeline/ai-usage')}>AI Usage</a>
         <a href="/admin/blog"${activeClass('/admin/blog')}>Blog</a>
-        <a href="/admin/tweets"${activeClass('/admin/tweets')}>Social</a>
+        <a href="/admin/social"${activeClass('/admin/social')}>Social</a>
         <a href="/admin/jobs"${activeClass('/admin/jobs')}>Jobs</a>
         <a href="/admin/jobs-guide"${activeClass('/admin/jobs-guide')}>Jobs Guide</a>
       </nav>
