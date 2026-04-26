@@ -1354,9 +1354,17 @@ function renderPillarBriefs() {
     if (t === 'flagship') return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(217,119,87,0.22);color:#f5a58a;border:1px solid rgba(217,119,87,0.55)">Flagship</span>';
     return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(232,168,73,0.22);color:#f5c06a;border:1px solid rgba(232,168,73,0.55)">Pillar</span>';
   };
-  const statusBadge = (tq) => {
-    const norm = (tq || '').trim().toLowerCase();
-    const hit = norm && PUBLISHED_POSTS.some(p => (p.target_query || '').trim().toLowerCase() === norm);
+  const statusBadge = (b) => {
+    // Match on title first — published JSONs reliably store title (verbatim
+    // from prompt input), but target_query isn't in the Claude output schema
+    // so it's empty for every published post.
+    const titleNorm = (b.title || '').trim().toLowerCase();
+    const tqNorm = (b.target_query || '').trim().toLowerCase();
+    const hit = PUBLISHED_POSTS.some(p => {
+      const pt = (p.title || '').trim().toLowerCase();
+      const pq = (p.target_query || '').trim().toLowerCase();
+      return (titleNorm && pt === titleNorm) || (tqNorm && pq && pq === tqNorm);
+    });
     if (hit) return '<span title="A published post already targets this query" style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(143,208,165,0.18);color:#8fd0a5;border:1px solid rgba(143,208,165,0.45)">Published</span>';
     return '<span title="Not yet published" style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.35)">Queued</span>';
   };
@@ -1381,7 +1389,7 @@ function renderPillarBriefs() {
       +   extra
       +   '<div style="margin-top:4px">' + cmp + '</div>'
       + '</td>'
-      + '<td style="padding:10px 8px;vertical-align:top">' + statusBadge(b.target_query) + '</td>'
+      + '<td style="padding:10px 8px;vertical-align:top">' + statusBadge(b) + '</td>'
       + '<td style="padding:10px 8px;text-align:right;vertical-align:top">'
       +   '<button class="btn primary" onclick="loadPillarBrief(' + i + ')" title="Auto-fill the Generate form below with this brief">Load brief</button>'
       + '</td>'
@@ -1511,9 +1519,20 @@ function parseAndValidateSuggestions() {
   var seenQueries = {};
   var flagshipCount = 0;
   var publishedQueries = {};
+  var publishedTitles = {};
   var slateQueries = {};
-  PUBLISHED_POSTS.forEach(function(p) { if (p.target_query) publishedQueries[p.target_query.trim().toLowerCase()] = true; });
-  PILLAR_BRIEFS.forEach(function(b) { if (b.target_query) slateQueries[b.target_query.trim().toLowerCase()] = true; });
+  var slateTitles = {};
+  // Published JSONs reliably store title but not target_query (not in the
+  // Claude output schema), so dedup must check title too — otherwise a
+  // suggestion that re-targets a shipped post slips through.
+  PUBLISHED_POSTS.forEach(function(p) {
+    if (p.target_query) publishedQueries[p.target_query.trim().toLowerCase()] = true;
+    if (p.title) publishedTitles[p.title.trim().toLowerCase()] = true;
+  });
+  PILLAR_BRIEFS.forEach(function(b) {
+    if (b.target_query) slateQueries[b.target_query.trim().toLowerCase()] = true;
+    if (b.title) slateTitles[b.title.trim().toLowerCase()] = true;
+  });
 
   suggestions.forEach(function(s, i) {
     var rowErrs = [];
@@ -1543,6 +1562,14 @@ function parseAndValidateSuggestions() {
       if (slateQueries[tq]) rowErrs.push('target_query duplicates current slate entry: ' + _esc(tq));
       if (seenQueries[tq]) rowErrs.push('target_query duplicates another suggestion in this batch: ' + _esc(tq));
       seenQueries[tq] = true;
+    }
+
+    // Duplicate title checks (matches retroactively against shipped posts
+    // whose published JSON predates target_query being persisted)
+    if (typeof s.title === 'string') {
+      var ttl = s.title.trim().toLowerCase();
+      if (publishedTitles[ttl]) rowErrs.push('title duplicates an already-published post: ' + _esc(s.title));
+      if (slateTitles[ttl]) rowErrs.push('title duplicates current slate entry: ' + _esc(s.title));
     }
 
     // Flagship count (only count if tier is valid string)
