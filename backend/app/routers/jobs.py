@@ -410,6 +410,7 @@ async def jobs_index(
   </script>
 
   <div class="results">
+    <div id="count" class="result-count" data-total="{total}"><strong>{len(rows)}</strong> of {total} jobs</div>
     <div id="chips" class="chips-row"></div>
     <div id="list">{initial_cards}</div>
     {pagination_html}
@@ -921,6 +922,8 @@ _HUB_CSS = """
   .apply-btn:hover{background:#f0b968}
   .clear-btn{width:100%;padding:8px;background:transparent;color:#94a3b8;border:1px solid #2a323d;border-radius:4px;cursor:pointer;margin-top:6px;font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
   .clear-btn:hover{color:#e8a849;border-color:#e8a849}
+  .result-count{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:#94a3b8;margin-bottom:10px}
+  .result-count strong{color:#e8a849;font-weight:500}
   .chips-row{margin-bottom:12px}
   .chips-row .filter-chip{background:#2a323d;color:#e8e4d8;padding:3px 10px;border-radius:3px;font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;margin-right:6px;cursor:pointer}
   .chips-row .filter-chip::after{content:" ×";opacity:.7;color:#e8a849}
@@ -1014,6 +1017,15 @@ async function loadJobs() {
   if (!r.ok) { $('list').innerHTML = '<p class="empty">Load failed.</p>'; return; }
   const items = await r.json();
   renderChips(f);
+  // Update result count for the filtered view. items.length is exact when
+  // < 100; at 100 we cap and signal "100+" so the user knows to narrow.
+  const _cnt = $('count');
+  if (_cnt) {
+    const n = items.length;
+    const label = n === 100 ? '100+' : String(n);
+    const noun = n === 1 ? 'job' : 'jobs';
+    _cnt.innerHTML = `<strong>${label}</strong> ${noun} match`;
+  }
   // SSR pagination links go to /jobs?page=N with no filter params, so once
   // JS has rendered a filtered view the footer numbers would drop the user
   // back to an unfiltered set. Hide it; JS view caps at limit=100.
