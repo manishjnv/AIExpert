@@ -360,9 +360,9 @@ async def jobs_index(
       <input id="f-q" type="search" placeholder="Title, company, or skill…" autocomplete="off">
     </div>
     <details open><summary>Time</summary>
-      <label><input type="radio" name="posted" value=""> Any time</label>
+      <label><input type="radio" name="posted" value="" checked> Any time</label>
       <label><input type="radio" name="posted" value="1"> Last 24h</label>
-      <label><input type="radio" name="posted" value="7" checked> Last 7 days</label>
+      <label><input type="radio" name="posted" value="7"> Last 7 days</label>
       <label><input type="radio" name="posted" value="30"> Last 30 days</label>
     </details>
     <details open><summary>Role</summary>
