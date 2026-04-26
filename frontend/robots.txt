@@ -3,7 +3,7 @@ Disallow: /admin
 Disallow: /api
 Disallow: /account
 Disallow: /share/
-Disallow: /og/
+Allow: /og/
 Allow: /
 
 Sitemap: https://automateedge.cloud/sitemap_index.xml

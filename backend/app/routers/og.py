@@ -10,8 +10,10 @@ Disk cache at /data/og-cache/{type}/{id}.png. First request renders and
 writes; subsequent requests serve from disk. No automatic TTL — callers
 or admin can rm the cache file to force a regeneration.
 
-/og/ is Disallowed in robots.txt — images are surfaced via og:image meta
-on actual pages, not as crawlable URLs.
+/og/ is Allowed in robots.txt — social-card crawlers (Twitterbot,
+LinkedInBot, Slackbot, Facebook external hit) respect robots.txt and
+fall back to the placeholder/summary card if the og:image URL is
+disallowed.
 """
 
 from __future__ import annotations
