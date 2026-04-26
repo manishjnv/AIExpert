@@ -117,6 +117,17 @@ async def sitemap_pages(db: AsyncSession = Depends(get_db)) -> Response:
         urls.append(_url(f"{base}/roadmap/{ts}", today, 0.85))
         for sec in all_section_slugs():
             urls.append(_url(f"{base}/roadmap/{ts}/{sec}", today, 0.75))
+    # SEO-27: /blog/topic/{slug} for each active pillar.
+    # lastmod = max published date of matching posts, or today if none.
+    from app.routers.blog import _load_pillar_config, _posts_for_pillar
+    for pill in _load_pillar_config().get("active_pills", []):
+        pill_slug = pill.get("slug", "")
+        if not pill_slug:
+            continue
+        matching = _posts_for_pillar(pill_slug)
+        dates = [p.get("published", "") for p in matching if p.get("published")]
+        lastmod = max(dates) if dates else today
+        urls.append(_url(f"{base}/blog/topic/{pill_slug}", lastmod, 0.7))
     return Response(content=_xml(urls), media_type="application/xml",
                     headers=_CACHE_1H)
 

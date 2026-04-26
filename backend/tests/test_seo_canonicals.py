@@ -81,3 +81,105 @@ async def test_public_profile_has_exactly_one_canonical():
         assert len(canonicals) == 1, f"expected 1 canonical, got {canonicals}"
         assert canonicals[0].endswith(f"/profile/{uid}")
     await close_db()
+
+
+# ---------------------------------------------------------------------------
+# SEO-27: Blog paginated + topic hub canonical tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_blog_page2_canonical_is_page2(monkeypatch):
+    """/blog?page=2 canonical URL must include page=2 (not just /blog)."""
+    # Create enough fake posts to have 2 pages
+    fake = []
+    for i in range(25):
+        slug = f"{i + 2:02d}-fake-post-{i}"
+        fake.append({
+            "slug": slug,
+            "title": f"Post {i}",
+            "og_description": f"Desc {i}",
+            "lede": "",
+            "body_html": "<p>Body</p>",
+            "published": f"2026-01-{i + 1:02d}",
+            "tags": [],
+            "target_query": "",
+        })
+    fake.sort(key=lambda p: p["published"], reverse=True)
+
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: fake)
+    by_slug = {p["slug"]: p for p in fake}
+    monkeypatch.setattr("app.services.blog_publisher.load_published", lambda s: by_slug.get(s))
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: True)
+    from app.routers.blog import _load_pillar_config
+    _load_pillar_config.cache_clear()
+
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog?page=2")
+        assert r.status_code == 200
+        canonicals = _CANONICAL_RE.findall(r.text)
+        assert len(canonicals) == 1, f"expected 1 canonical, got {canonicals}"
+        assert "page=2" in canonicals[0]
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_blog_topic_canonical(monkeypatch):
+    """/blog/topic/{slug} emits a canonical pointing at the topic URL."""
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    monkeypatch.setattr("app.services.blog_publisher.load_published", lambda s: None)
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: True)
+    from app.routers import blog as blog_module
+    from app.routers.blog import _load_pillar_config
+    _load_pillar_config.cache_clear()
+
+    monkeypatch.setattr(blog_module, "_load_pillar_config", lambda: {
+        "version": 1,
+        "active_pills": [
+            {
+                "slug": "career-paths",
+                "label": "Career Paths",
+                "intro": "Career intro.",
+                "matches": {"tags_any": ["career-guide"]},
+            }
+        ],
+        "start_here": [],
+    })
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/blog/topic/career-paths")
+        assert r.status_code == 200
+        canonicals = _CANONICAL_RE.findall(r.text)
+        assert len(canonicals) == 1, f"expected 1 canonical, got {canonicals}"
+        assert "/blog/topic/career-paths" in canonicals[0]
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_sitemap_pages_includes_topic_urls(monkeypatch):
+    """/sitemap-pages.xml includes /blog/topic/{slug} for each active pillar."""
+    monkeypatch.setattr("app.services.blog_publisher.list_published", lambda: [])
+    monkeypatch.setattr("app.services.blog_publisher.load_published", lambda s: None)
+    monkeypatch.setattr("app.services.blog_publisher.is_legacy_hidden", lambda s: True)
+    from app.routers import blog as blog_module
+    from app.routers.blog import _load_pillar_config
+    _load_pillar_config.cache_clear()
+
+    monkeypatch.setattr(blog_module, "_load_pillar_config", lambda: {
+        "version": 1,
+        "active_pills": [
+            {
+                "slug": "career-paths",
+                "label": "Career Paths",
+                "intro": "Intro.",
+                "matches": {"tags_any": ["career-guide"]},
+            }
+        ],
+        "start_here": [],
+    })
+    await _setup()
+    async with AsyncClient(transport=ASGITransport(app=_app()), base_url="http://t") as c:
+        r = await c.get("/sitemap-pages.xml")
+        assert r.status_code == 200
+        assert "/blog/topic/career-paths" in r.text
+    await close_db()

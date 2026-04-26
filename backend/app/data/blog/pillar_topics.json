@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "active_pills": [
+    {
+      "slug": "career-paths",
+      "label": "Career Paths",
+      "intro": "Posts on AI engineer vs ML engineer, role differences, salary by experience, transitions from adjacent roles, and what's actually hiring in 2026. Read these if you're choosing a track or comparing where you'd land.",
+      "matches": {"tags_any": ["career-guide", "ai-engineer", "ml-engineer"]}
+    },
+    {
+      "slug": "roadmaps",
+      "label": "Roadmaps",
+      "intro": "What to learn, in what order, and what changed this quarter. Honest takes on staying current in a field that ships a paradigm every 18 months.",
+      "matches": {"tags_any": ["roadmap", "curriculum"]}
+    },
+    {
+      "slug": "interview-prep",
+      "label": "Interview Prep",
+      "intro": "Real questions actually asked in 2026 AI engineering interviews — system design, coding, and the LLM-application questions that didn't exist two years ago.",
+      "matches": {"tags_any": ["interview", "interview-prep"]}
+    },
+    {
+      "slug": "salaries",
+      "label": "Salaries",
+      "intro": "Real compensation data by experience, region, and stack — not LinkedIn averages. Refreshed quarterly from primary sources (BLS, levels.fyi, public reports).",
+      "matches": {"tags_any": ["salary", "compensation"]}
+    },
+    {
+      "slug": "tutorials",
+      "label": "Tutorials",
+      "intro": "Hands-on walkthroughs: how to actually build the thing, what to skip, what trips up everyone the first time. Code-first, not theory-first.",
+      "matches": {"tags_any": ["tutorial", "how-to", "build-guide"]}
+    },
+    {
+      "slug": "comparisons",
+      "label": "Comparisons",
+      "intro": "Head-to-head breakdowns of frameworks, tools, models, and roles — with the tradeoffs the marketing pages skip.",
+      "matches": {"tags_any": ["comparison", "vs"]}
+    },
+    {
+      "slug": "build-in-public",
+      "label": "Build in public",
+      "intro": "Lessons from building AutomateEdge in the open — design principles, post-mortems, the things that didn't work.",
+      "matches": {"tags_any": ["build-in-public"]}
+    }
+  ],
+  "start_here": [
+    "03-ai-engineer-vs-ml-engineer",
+    "04-learn-ai-without-cs-degree-2026",
+    "05-ai-roadmap-2026-whats-changed",
+    "02-why-most-ai-roadmaps-expire-before-you-finish-them"
+  ]
+}
