@@ -1046,6 +1046,10 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
         </div>
       </div>
       <div id="suggestionsPreview"></div>
+      <div id="suggestionsFooter" style="display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(232,168,73,0.15)">
+        <button class="btn" id="sugUndoBtn" onclick="undoSuggestionsReplace()" disabled>Undo</button>
+        <span id="sugConfirmMsg" style="font-size:12px;color:#8fd0a5;line-height:1.4"></span>
+      </div>
     </div>
     <hr class="pillar-divider">
     <p style="font-size:11px;color:#94a3b8;margin:0 0 6px">Pre-curated slate — load a brief directly or replace via the AI suggestion flow above.</p>
@@ -1635,15 +1639,10 @@ function renderSuggestionsPreview(result) {
   applyRow.id = 'sugApplyRow';
   applyRow.innerHTML = ''
     + '<button class="btn primary" id="sugApplyBtn" onclick="applyCheckedSuggestions()">Replace slate with checked</button>'
-    + '<button class="btn" id="sugUndoBtn" onclick="undoSuggestionsReplace()">Undo last replace</button>'
     + '<span class="sug-count" id="sugCountBadge"></span>';
   el.appendChild(applyRow);
-
-  var confirmDiv = document.createElement('div');
-  confirmDiv.className = 'sug-confirm';
-  confirmDiv.id = 'sugConfirmMsg';
-  el.appendChild(confirmDiv);
-
+  // Undo button + confirmation message live in the persistent #suggestionsFooter,
+  // so they survive after the preview area is cleared on Replace.
   _updateSugApply();
 }
 
@@ -1664,10 +1663,39 @@ function _updateSugApply() {
   if (badge) badge.textContent = checked + ' checked / ' + chks.length;
   var applyBtn = document.getElementById('sugApplyBtn');
   if (applyBtn) applyBtn.disabled = (checked === 0 || checkedHasErr);
-  var undoBtn = document.getElementById('sugUndoBtn');
-  if (undoBtn) undoBtn.disabled = !localStorage.getItem('_pillarBriefsBackup');
   var hdr = document.getElementById('sugCountLine');
   if (hdr) hdr.textContent = checked + ' checked / ' + chks.length + ' ready';
+}
+
+// Multi-level undo: each Replace pushes the prior PILLAR_BRIEFS onto a
+// localStorage history stack capped at PILLAR_HISTORY_MAX entries (oldest
+// drops on overflow). Undo pops the most recent. Persists across reloads.
+var PILLAR_HISTORY_KEY = '_pillarBriefsHistory';
+var PILLAR_HISTORY_MAX = 10;
+
+function _readPillarHistory() {
+  try {
+    var raw = localStorage.getItem(PILLAR_HISTORY_KEY);
+    if (!raw) return [];
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function _writePillarHistory(arr) {
+  var trimmed = arr.slice(-PILLAR_HISTORY_MAX);
+  localStorage.setItem(PILLAR_HISTORY_KEY, JSON.stringify(trimmed));
+}
+
+function _updateUndoState() {
+  var btn = document.getElementById('sugUndoBtn');
+  if (!btn) return;
+  var depth = _readPillarHistory().length;
+  btn.disabled = (depth === 0);
+  btn.textContent = depth > 0 ? ('Undo (' + depth + ')') : 'Undo';
+  btn.title = depth > 0
+    ? ('Restore prior slate \\u00b7 ' + depth + ' undo level' + (depth !== 1 ? 's' : '') + ' available')
+    : 'No prior slate to restore';
 }
 
 function applyCheckedSuggestions() {
@@ -1681,7 +1709,10 @@ function applyCheckedSuggestions() {
     }
   });
   if (!chosen.length) return;
-  localStorage.setItem('_pillarBriefsBackup', JSON.stringify(PILLAR_BRIEFS));
+  // Push current slate onto the history stack (multi-level undo)
+  var history = _readPillarHistory();
+  history.push(PILLAR_BRIEFS);
+  _writePillarHistory(history);
   PILLAR_BRIEFS = chosen.map(function(s, i) {
     return {
       n: i + 1,
@@ -1698,23 +1729,35 @@ function applyCheckedSuggestions() {
   renderPillarBriefs();
   var tbl = document.getElementById('pillarBriefsTbody');
   if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  var msg = document.getElementById('sugConfirmMsg');
-  if (msg) msg.textContent = '\\u2713 Replaced slate with ' + chosen.length + ' brief' + (chosen.length !== 1 ? 's' : '') + ' \\u00b7 old slate saved (Undo available)';
   document.getElementById('suggestionsPreview').innerHTML = '';
   document.getElementById('suggestionsJsonInput').value = '';
   _lastSuggestions = null;
+  // Persistent footer message survives the preview clear.
+  var depth = _readPillarHistory().length;
+  var msg = document.getElementById('sugConfirmMsg');
+  if (msg) msg.textContent = '\\u2713 Replaced slate with ' + chosen.length + ' brief' + (chosen.length !== 1 ? 's' : '') + ' \\u00b7 ' + depth + ' undo level' + (depth !== 1 ? 's' : '') + ' available';
+  _updateUndoState();
 }
 
 function undoSuggestionsReplace() {
-  var backup = localStorage.getItem('_pillarBriefsBackup');
-  if (!backup) return;
-  try { PILLAR_BRIEFS = JSON.parse(backup); }
-  catch (e) { alert('Could not restore backup: ' + e.message); return; }
-  localStorage.removeItem('_pillarBriefsBackup');
+  var history = _readPillarHistory();
+  if (!history.length) return;
+  var prev = history.pop();
+  _writePillarHistory(history);
+  if (!Array.isArray(prev)) {
+    var msgErr = document.getElementById('sugConfirmMsg');
+    if (msgErr) { msgErr.style.color = '#fca5a5'; msgErr.textContent = '\\u2717 Could not restore \\u2014 saved slate was malformed; popped from history.'; }
+    _updateUndoState();
+    return;
+  }
+  PILLAR_BRIEFS = prev;
   renderPillarBriefs();
   var msg = document.getElementById('sugConfirmMsg');
-  if (msg) { msg.textContent = '\\u21a9 Restored previous slate'; }
-  _updateSugApply();
+  if (msg) {
+    msg.style.color = '#8fd0a5';
+    msg.textContent = '\\u21a9 Restored prior slate \\u00b7 ' + history.length + ' undo level' + (history.length !== 1 ? 's' : '') + ' remaining';
+  }
+  _updateUndoState();
 }
 
 // Holds last parsed suggestions so applyCheckedSuggestions() can read them.
@@ -1734,7 +1777,23 @@ var _lastSuggestions = null;
   };
 })();
 
-document.addEventListener('DOMContentLoaded', renderPillarBriefs);
+document.addEventListener('DOMContentLoaded', function() {
+  renderPillarBriefs();
+  // One-shot migration: old single-key backup ('_pillarBriefsBackup') becomes
+  // a single-element history. Then drop the legacy key.
+  try {
+    var legacy = localStorage.getItem('_pillarBriefsBackup');
+    if (legacy) {
+      var hist = _readPillarHistory();
+      if (!hist.length) {
+        var parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed)) { hist.push(parsed); _writePillarHistory(hist); }
+      }
+      localStorage.removeItem('_pillarBriefsBackup');
+    }
+  } catch (e) { /* corrupt legacy entry \\u2014 drop and move on */ }
+  _updateUndoState();
+});
 
 // --------------- Upload / validate / save draft ---------------
 function parseJsonInput() {
