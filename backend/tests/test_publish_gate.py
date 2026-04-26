@@ -67,15 +67,31 @@ def test_get_review_stamp_unknown_key():
     assert stamp == {"last_reviewed_on": None, "last_reviewed_by": None}
 
 
-def test_set_template_status_published_requires_reviewer_name():
-    """Direct call to set_template_status with status='published' must raise
-    when reviewer_name is missing — the prior contract silently skipped the
-    last_reviewed_on stamp, which excluded the template from the weekly
-    digest 'New courses' section. Closes the silent-empty-stamp hole."""
-    with pytest.raises(ValueError, match="reviewer_name is required"):
-        loader.set_template_status("k", "published", quality_score=95)
-    with pytest.raises(ValueError, match="reviewer_name is required"):
-        loader.set_template_status("k", "published", quality_score=95, reviewer_name="")
-    # Draft transitions don't need a reviewer (no audit trail at draft stage).
-    loader.set_template_status("k", "draft", quality_score=10)
-    assert loader.get_template_status("k")["status"] == "draft"
+def test_set_template_status_published_always_stamps_date():
+    """set_template_status('published', ...) must ALWAYS stamp
+    last_reviewed_on, even when reviewer_name is missing. The "New
+    courses" weekly digest section filters by recency — an unstamped
+    publish silently drops the template from user emails, which is what
+    this fix permanently closes. last_reviewed_by is only set when a
+    real reviewer name is supplied (no auto-attributed identity)."""
+    # No reviewer_name → date stamped, reviewer left unset
+    loader.set_template_status("k_no_reviewer", "published", quality_score=95)
+    stamp = loader.get_review_stamp("k_no_reviewer")
+    assert stamp["last_reviewed_on"] and len(stamp["last_reviewed_on"]) == 10
+    assert stamp["last_reviewed_by"] in (None, "")  # nothing claimed
+
+    # Empty-string reviewer_name → same: date stamped, no reviewer
+    loader.set_template_status("k_empty", "published", quality_score=95, reviewer_name="")
+    stamp = loader.get_review_stamp("k_empty")
+    assert stamp["last_reviewed_on"]
+    assert stamp["last_reviewed_by"] in (None, "")
+
+    # Real reviewer_name → both stamped
+    loader.set_template_status("k_named", "published", quality_score=95, reviewer_name="Manish Kumar")
+    stamp = loader.get_review_stamp("k_named")
+    assert stamp["last_reviewed_on"]
+    assert stamp["last_reviewed_by"] == "Manish Kumar"
+
+    # Draft transitions don't need or get a date stamp
+    loader.set_template_status("k_draft", "draft", quality_score=10)
+    assert loader.get_template_status("k_draft")["status"] == "draft"

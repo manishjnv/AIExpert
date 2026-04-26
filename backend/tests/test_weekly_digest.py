@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -340,6 +341,53 @@ async def test_send_sleeps_between_emails():
 # ---------------------------------------------------------------------------
 # Test 7 — blog section renders recent posts
 # ---------------------------------------------------------------------------
+
+def test_recent_courses_falls_back_to_file_mtime_when_stamp_missing(tmp_path, monkeypatch):
+    """Defensive: a published template with no last_reviewed_on stamp
+    (legacy data, direct meta edit, etc.) must NOT silently drop from
+    the digest. Falls back to the JSON file's mtime — if that's within
+    the lookback window, the row still surfaces. This is the permanent
+    self-heal at the read path that complements the always-stamp fix
+    in set_template_status."""
+    from app.curriculum import loader as ldr
+    from app.services import weekly_digest as wd
+
+    # Isolated meta + templates dir so the test doesn't mutate real state.
+    tmpl_dir = tmp_path / "templates"
+    tmpl_dir.mkdir()
+    meta_path = tmpl_dir / "_meta.json"
+
+    monkeypatch.setattr(ldr, "TEMPLATES_DIR", tmpl_dir)
+    monkeypatch.setattr(ldr, "META_PATH", meta_path)
+    monkeypatch.setattr(wd, "_recent_courses", wd._recent_courses)  # no-op; ensure import resolves
+    ldr.load_template.cache_clear()
+
+    # Create a stamp-less published template — the legacy bug shape.
+    tpl_path = tmpl_dir / "legacy_no_stamp.json"
+    tpl_path.write_text(json.dumps({
+        "key": "legacy_no_stamp",
+        "version": "v1",
+        "title": "Legacy Course With No Stamp",
+        "level": "intermediate",
+        "goal": "test",
+        "duration_months": 3,
+        "summary": "Legacy publish path forgot to stamp last_reviewed_on.",
+        "months": [],
+    }), encoding="utf-8")
+
+    # Meta says published but no last_reviewed_on
+    ldr._save_meta({
+        "legacy_no_stamp": {"status": "published", "quality_score": 90},
+    })
+
+    # mtime is brand-new (file was just written) → within lookback
+    out = wd._recent_courses(lookback_days=7)
+    keys = [c["key"] for c in out]
+    assert "legacy_no_stamp" in keys, "stamp-less published template must self-heal via mtime"
+    legacy = next(c for c in out if c["key"] == "legacy_no_stamp")
+    assert legacy["title"] == "Legacy Course With No Stamp"
+    assert legacy["published"]  # mtime got resolved into an ISO date
+
 
 def test_blog_section_caps_at_max_and_renders_overflow_link():
     """5 posts in → only 3 cards rendered + 'Read all 5 posts →' link."""

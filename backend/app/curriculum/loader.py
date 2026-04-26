@@ -239,26 +239,26 @@ def set_template_status(
 ) -> None:
     """Set publish status for a template ('draft' or 'published').
 
-    When status=='published', reviewer_name is REQUIRED — both
-    last_reviewed_on (UTC ISO date) and last_reviewed_by are stamped onto
-    the meta entry. The "New courses" digest section depends on
-    last_reviewed_on; the prior contract (silently skip stamp if no name)
-    let publishers ship empty fields and silently drop the template from
-    user emails.
+    When status=='published':
+    - last_reviewed_on (UTC ISO date) is ALWAYS stamped — required by the
+      "New courses" weekly digest section, which filters by recency. The
+      prior contract (only stamp when reviewer_name was provided) let
+      publishers ship undated rows and silently dropped the template from
+      user emails.
+    - last_reviewed_by is stamped only when reviewer_name is supplied.
+      Callers that lack an admin identity (legacy data fixers, scripts)
+      get a date but no attributed reviewer. The publish_template()
+      front door still requires admin_name; this function intentionally
+      stays permissive so it can't be the cause of a silent-drop bug.
     """
-    if status == "published" and not reviewer_name:
-        raise ValueError(
-            "set_template_status: reviewer_name is required when status='published' "
-            "(otherwise last_reviewed_on is never stamped and the template is silently "
-            "excluded from the weekly digest 'New courses' section)"
-        )
     meta = _load_meta()
     entry = meta.get(key, {})
     entry["status"] = status
     entry["quality_score"] = quality_score
     if status == "published":
         entry["last_reviewed_on"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        entry["last_reviewed_by"] = reviewer_name
+        if reviewer_name:
+            entry["last_reviewed_by"] = reviewer_name
     meta[key] = entry
     _save_meta(meta)
     load_template.cache_clear()

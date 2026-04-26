@@ -928,35 +928,58 @@ def _recent_blog_posts(lookback_days: int = 7) -> list[dict]:
 
 
 def _recent_courses(lookback_days: int = 7) -> list[dict]:
-    """Curriculum templates published (last_reviewed_on) within the last
-    ``lookback_days`` days. Reads _meta.json on disk."""
-    from app.curriculum.loader import _load_meta, load_template
+    """Curriculum templates published within the last ``lookback_days`` days.
+
+    Date resolution falls back through three sources so a template that
+    skipped the normal publish path is never silently dropped:
+      1. _meta.json `last_reviewed_on` (the canonical stamp)
+      2. The template JSON file's mtime (filesystem timestamp)
+      3. Skip the row if neither resolves to a valid date
+
+    Defends against legacy / direct-edited entries that ended up
+    published without a stamp — see RCA-036 + the related digest fix.
+    """
+    from app.curriculum.loader import _load_meta, load_template, TEMPLATES_DIR
     cutoff = date.today() - timedelta(days=lookback_days)
     out: list[dict] = []
     meta = _load_meta()
     for key, m in meta.items():
         if not isinstance(m, dict) or m.get("status") != "published":
             continue
+
+        # 1. Canonical stamp
+        pub_date: date | None = None
         last = m.get("last_reviewed_on", "")
-        if not last:
+        if last:
+            try:
+                pub_date = date.fromisoformat(str(last)[:10])
+            except ValueError:
+                pub_date = None
+
+        # 2. mtime fallback for stamp-less entries
+        if pub_date is None:
+            try:
+                tpl_path = TEMPLATES_DIR / f"{key}.json"
+                if tpl_path.exists():
+                    pub_date = date.fromtimestamp(tpl_path.stat().st_mtime)
+            except OSError:
+                pass
+
+        if pub_date is None or pub_date < cutoff:
             continue
-        try:
-            pub_date = date.fromisoformat(str(last)[:10])
-        except ValueError:
-            continue
-        if pub_date < cutoff:
-            continue
+
         try:
             tpl = load_template(key)
         except Exception:
             continue
+
         out.append({
             "key": key,
             "title": tpl.title,
             "summary": tpl.summary or "",
             "duration_months": tpl.duration_months,
             "level": tpl.level,
-            "published": str(last),
+            "published": pub_date.isoformat(),
         })
     return out
 
