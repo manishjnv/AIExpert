@@ -18,7 +18,7 @@
 
 .subscribe-ribbon {
   position: relative;
-  margin: 22px 0 28px;
+  margin: 22px 0 44px;
   padding: 18px 22px;
   background: linear-gradient(180deg, rgba(232, 168, 73, 0.06) 0%, rgba(232, 168, 73, 0.02) 100%);
   border: 1px solid rgba(232, 168, 73, 0.35);
