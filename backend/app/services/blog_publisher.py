@@ -56,7 +56,13 @@ REQUIRED_IMAGE_FIELDS = ("hero_prompt", "hero_alt", "hero_filename")
 # "PyTorch vs TensorFlow". When payload["pillar_tier"] is set, the
 # voice check is skipped. Operational-leak checks always run.
 _OPERATIONAL_LEAKS = [
-    r"github\.com/\S+", r"source\s+code", r"manishjnv/AIExpert",
+    # `(?<![\w.-])` matches `github.com/` only at a real domain
+    # boundary — NOT as a substring of `octoverse.github.com/` or
+    # `gist.github.com/...`, both of which are legitimate citations.
+    # `[^\s"'<>]*` scopes the match to the URL rather than greedily
+    # eating closing quote + anchor text.
+    r"(?<![\w.-])github\.com/[^\s\"'<>]*",
+    r"source\s+code", r"manishjnv/AIExpert",
     r"\bsession\s+\d+\b", r"\bcommit\s+[0-9a-f]{6,}\b",
 ]
 _VOICE_TERMS = [

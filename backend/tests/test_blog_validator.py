@@ -547,6 +547,38 @@ def test_pillar_tier_still_blocks_operational_leaks():
     assert any("banned term" in e for e in report["errors"])
 
 
+def test_pillar_tier_allows_trusted_github_subdomains():
+    """`octoverse.github.com/...` and `gist.github.com/...` are legitimate
+    trusted-source citations — the operational-leak regex must not match
+    them as a substring of a longer domain. Regression for the
+    'github.com/">GitHub' false-positive that blocked the AI portfolio
+    pillar post on 2026-04-26."""
+    payload = _mk_pillar_payload()
+    payload["body_html"] = payload["body_html"].replace(
+        "External authority:",
+        'External authority: see <a href="https://octoverse.github.com/">'
+        'GitHub Octoverse report</a> and '
+        '<a href="https://gist.github.com/example/abc">a gist</a>.'
+    )
+    report = validate_payload(payload)
+    banned_errors = [e for e in report["errors"] if "banned term" in e]
+    assert not banned_errors, banned_errors
+
+
+def test_bare_github_homepage_link_still_blocked():
+    """A literal `github.com/` (homepage or attribute-truncated) must
+    still trip — that's the case Claude was emitting in
+    `<a href="https://github.com/">GitHub</a>`."""
+    payload = _mk_pillar_payload()
+    payload["body_html"] = (
+        payload["body_html"]
+        + '<p>See <a href="https://github.com/">GitHub</a>.</p>'
+    )
+    report = validate_payload(payload)
+    assert report["ok"] is False
+    assert any("banned term" in e for e in report["errors"])
+
+
 def test_validate_payload_runs_pillar_validator_on_pillar_tier():
     """A pillar-tier payload with obvious pillar violations must bubble
     up through validate_payload()."""
