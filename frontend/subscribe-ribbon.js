@@ -1,8 +1,8 @@
 /* Subscribe-funnel ribbon — anonymous & logged-in flows.
  *
- * Anonymous:  4 buttons → /api/profile/subscribe-intent?channel=X (302 to login).
- * Logged in:  4 inline checkboxes reflecting notify_* state from /api/profile.
- *             Toggle → PATCH /api/profile { notify_X: bool } → toast on success.
+ * One channel per surface. Anonymous: single button → "/" (home).
+ * Logged in: single checkbox reflecting notify_<field> from /api/profile.
+ *            Toggle → PATCH /api/profile { notify_<field>: bool } → toast.
  *
  * Dismissal: per-surface, persists 30 days via localStorage.
  *
@@ -10,20 +10,17 @@
  *   <link rel="stylesheet" href="/subscribe-ribbon.css">
  *   <div id="subscribe-ribbon" data-surface="jobs|roadmap|blog|blog-post"></div>
  *   <script src="/subscribe-ribbon.js" defer></script>
- *
- * Defensive: any unexpected error reverts the ribbon to hidden state. We never
- * block the host page if our endpoints are unreachable.
  */
 
 (function () {
   'use strict';
 
-  var CHANNELS = [
-    { key: 'jobs',         label: 'AI jobs',         field: 'notify_jobs' },
-    { key: 'roadmap',      label: 'Course progress', field: 'notify_roadmap' },
-    { key: 'new_courses',  label: 'New courses',     field: 'notify_new_courses' },
-    { key: 'blog',         label: 'Blog posts',      field: 'notify_blog' }
-  ];
+  var SURFACE_CONFIG = {
+    'jobs':      { field: 'notify_jobs',        title: 'AI Jobs',     lede: 'Subscribe to receive new AI jobs.' },
+    'roadmap':   { field: 'notify_new_courses', title: 'New courses', lede: 'Subscribe to receive new AI courses.' },
+    'blog':      { field: 'notify_blog',        title: 'Blog',        lede: 'Subscribe to receive new blog posts.' },
+    'blog-post': { field: 'notify_blog',        title: 'Blog',        lede: 'Subscribe to receive new blog posts.' }
+  };
 
   var DISMISS_DAYS = 30;
   var DISMISS_MS = DISMISS_DAYS * 24 * 60 * 60 * 1000;
@@ -69,47 +66,28 @@
     );
   }
 
-  function renderAnonymous(root) {
-    var btns = CHANNELS.map(function (ch) {
-      var href = '/api/profile/subscribe-intent?channel=' + encodeURIComponent(ch.key);
-      return (
-        '<a class="subscribe-ribbon-btn" href="' + href + '">' +
-          '<span class="subscribe-ribbon-btn-plus" aria-hidden="true">+</span>' +
-          escText(ch.label) +
-        '</a>'
-      );
-    }).join('');
-
+  function renderAnonymous(root, cfg) {
     root.innerHTML =
-      renderHead(
-        'Stay in the loop',
-        'Free weekly digest — pick what you want delivered Monday morning.'
-      ) +
-      '<div class="subscribe-ribbon-buttons" role="group" aria-label="Subscribe to channel">' +
-        btns +
+      renderHead(cfg.title, cfg.lede) +
+      '<div class="subscribe-ribbon-buttons" role="group" aria-label="Subscribe">' +
+        '<a class="subscribe-ribbon-btn" href="/">' +
+          '<span class="subscribe-ribbon-btn-plus" aria-hidden="true">+</span>' +
+          'Subscribe' +
+        '</a>' +
       '</div>';
   }
 
-  function renderLoggedIn(root, profile) {
-    var rows = CHANNELS.map(function (ch) {
-      var checked = profile[ch.field] !== false; // default-on if undefined
-      return (
-        '<label class="subscribe-ribbon-check" data-channel="' + ch.key + '">' +
-          '<input type="checkbox" data-field="' + ch.field + '"' +
-                 (checked ? ' checked' : '') + '>' +
-          '<span>' + escText(ch.label) + '</span>' +
-        '</label>'
-      );
-    }).join('');
-
+  function renderLoggedIn(root, profile, cfg) {
+    var checked = profile[cfg.field] !== false; // default-on if undefined
     root.innerHTML =
-      renderHead(
-        'Your subscriptions',
-        'Toggle any channel — changes save instantly.'
-      ) +
+      renderHead(cfg.title, cfg.lede) +
       '<div class="subscribe-ribbon-checkboxes" role="group" ' +
-            'aria-label="Email subscription channels">' +
-        rows +
+            'aria-label="Email subscription">' +
+        '<label class="subscribe-ribbon-check" data-channel="' + escText(cfg.field) + '">' +
+          '<input type="checkbox" data-field="' + escText(cfg.field) + '"' +
+                 (checked ? ' checked' : '') + '>' +
+          '<span>' + escText(cfg.title) + '</span>' +
+        '</label>' +
       '</div>' +
       '<span class="subscribe-ribbon-status" data-status></span>';
   }
@@ -206,6 +184,11 @@
     var root = document.getElementById('subscribe-ribbon');
     if (!root) return;
     var surface = root.getAttribute('data-surface') || 'unknown';
+    var cfg = SURFACE_CONFIG[surface];
+    if (!cfg) {
+      root.setAttribute('data-dismissed', '1');
+      return;
+    }
 
     if (isDismissed(surface)) {
       root.setAttribute('data-dismissed', '1');
@@ -219,8 +202,8 @@
         return resp.json();
       })
       .then(function (profile) {
-        if (profile) renderLoggedIn(root, profile);
-        else         renderAnonymous(root);
+        if (profile) renderLoggedIn(root, profile, cfg);
+        else         renderAnonymous(root, cfg);
         wireDismiss(root, surface);
         if (profile) wireCheckboxes(root);
         root.setAttribute('data-ready', '1');
@@ -228,7 +211,7 @@
       .catch(function (_err) {
         // Profile probe failed unexpectedly — fall back to anonymous flow
         // so the funnel still works for visitors with flaky connections.
-        renderAnonymous(root);
+        renderAnonymous(root, cfg);
         wireDismiss(root, surface);
         root.setAttribute('data-ready', '1');
       });

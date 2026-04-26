@@ -350,10 +350,9 @@ async def digest_unsubscribe(t: str, db=Depends(get_db)):
 
 
 # ---- Anonymous subscribe-intent funnel ----
-# Anonymous visitors clicking a "Subscribe" CTA on /jobs / /roadmap / /blog
-# hit this endpoint. We don't capture their email here (login is the funnel),
-# we just redirect to login with a return URL that pre-checks the right
-# channel on /account after they sign in.
+# Kept for backward-compat with cached/external links. The ribbon's anonymous
+# CTA now points directly at "/", so this endpoint is no longer the primary
+# path — it just redirects to home if hit.
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter
@@ -367,7 +366,4 @@ _limiter = Limiter(key_func=get_remote_address)
 async def subscribe_intent(channel: str, request: Request):
     if channel not in _VALID_CHANNELS:
         raise HTTPException(status_code=400, detail="Invalid channel")
-    return RedirectResponse(
-        url=f"/?login=1&return=/account%3Fhint%3Dsubscribe-{channel}",
-        status_code=302,
-    )
+    return RedirectResponse(url="/", status_code=302)
