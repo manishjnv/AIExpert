@@ -55,6 +55,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/nav.css">
+  <link rel="stylesheet" href="/subscribe-ribbon.css">
   <style>
     :root { color-scheme: dark }
     html, body { margin: 0; background: #0f1419; color: #e8e4d8; font-family: 'IBM Plex Sans', system-ui, sans-serif; line-height: 1.65 }
@@ -93,6 +94,8 @@
   <h1>AI Learning Roadmaps 2026</h1>
   <p class="lede">Five tracks, each with six deep-dive pages. Every roadmap is free, AI-curated, and calibrated against real 2026 job-posting demand from the AutomateEdge jobs pipeline. Pick the track that matches where you want to end up, not where you are starting from.</p>
 
+  <div id="subscribe-ribbon" data-surface="roadmap"></div>
+
   <h2>Pick a track</h2>
   <div class="track-grid">
     {% for t in tracks %}
@@ -125,5 +128,6 @@
   </div>
 </main>
 <script src="/nav.js" defer></script>
+<script src="/subscribe-ribbon.js" defer></script>
 </body>
 </html>

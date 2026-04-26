@@ -1,0 +1,247 @@
+/* Subscribe-funnel ribbon — shared across /jobs /roadmap /blog /blog/{slug}.
+   Drops below the page H1 / hero, above the first content section.
+   Two render states (anonymous = button row, logged-in = checkbox row)
+   are populated by /subscribe-ribbon.js after a /api/auth/me probe. */
+
+:root {
+  --sr-accent: #e8a849;
+  --sr-accent-soft: #c98e2f;
+  --sr-bg: #161c24;
+  --sr-bg-dark: #0f1419;
+  --sr-paper: #f5f1e8;
+  --sr-line: #2a323d;
+  --sr-ink: #e8e4d8;
+  --sr-ink-soft: #94a3b8;
+  --sr-success: #6db585;
+  --sr-error: #fca5a5;
+}
+
+.subscribe-ribbon {
+  position: relative;
+  margin: 22px 0 28px;
+  padding: 18px 22px;
+  background: linear-gradient(180deg, rgba(232, 168, 73, 0.06) 0%, rgba(232, 168, 73, 0.02) 100%);
+  border: 1px solid rgba(232, 168, 73, 0.35);
+  border-radius: 8px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: var(--sr-ink);
+  display: none;
+}
+
+.subscribe-ribbon[data-ready="1"] {
+  display: block;
+}
+
+.subscribe-ribbon[data-dismissed="1"] {
+  display: none !important;
+}
+
+.subscribe-ribbon-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subscribe-ribbon-title {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sr-accent);
+  margin: 0 0 4px;
+  font-weight: 500;
+}
+
+.subscribe-ribbon-lede {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c0c4cc;
+}
+
+.subscribe-ribbon-dismiss {
+  background: transparent;
+  border: 1px solid var(--sr-line);
+  color: var(--sr-ink-soft);
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  padding: 0;
+}
+
+.subscribe-ribbon-dismiss:hover {
+  color: var(--sr-paper);
+  border-color: var(--sr-accent);
+}
+
+.subscribe-ribbon-dismiss:focus-visible {
+  outline: 2px solid var(--sr-accent);
+  outline-offset: 2px;
+}
+
+/* Anonymous variant — 4 buttons. */
+
+.subscribe-ribbon-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.subscribe-ribbon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid rgba(232, 168, 73, 0.4);
+  border-radius: 4px;
+  color: var(--sr-paper);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.subscribe-ribbon-btn:hover,
+.subscribe-ribbon-btn:focus-visible {
+  background: rgba(232, 168, 73, 0.1);
+  border-color: var(--sr-accent);
+  color: var(--sr-accent);
+  outline: none;
+}
+
+.subscribe-ribbon-btn-plus {
+  color: var(--sr-accent);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Logged-in variant — 4 inline checkboxes. */
+
+.subscribe-ribbon-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  margin-top: 4px;
+}
+
+.subscribe-ribbon-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sr-paper);
+  cursor: pointer;
+  user-select: none;
+}
+
+.subscribe-ribbon-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--sr-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.subscribe-ribbon-check input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.subscribe-ribbon-check[data-saving="1"] {
+  opacity: 0.7;
+}
+
+/* Tiny inline status (per-row) — not the global toast. */
+
+.subscribe-ribbon-status {
+  display: block;
+  margin-top: 10px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--sr-success);
+  min-height: 14px;
+  transition: opacity 0.3s;
+}
+
+.subscribe-ribbon-status[data-tone="error"] {
+  color: var(--sr-error);
+}
+
+.subscribe-ribbon-status[data-faded="1"] {
+  opacity: 0;
+}
+
+/* Toast — fixed-position confirmation when a checkbox flip succeeds.
+   Distinct from the surface's own toast (if any) so we never collide with
+   page-specific DOM. */
+
+.subscribe-ribbon-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--sr-bg-dark);
+  border: 1px solid var(--sr-accent);
+  color: var(--sr-paper);
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.subscribe-ribbon-toast[data-show="1"] {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 480px) {
+  .subscribe-ribbon {
+    margin: 18px 0 22px;
+    padding: 14px 16px;
+  }
+  .subscribe-ribbon-title {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+  .subscribe-ribbon-lede {
+    font-size: 13px;
+  }
+  .subscribe-ribbon-buttons {
+    gap: 6px;
+  }
+  .subscribe-ribbon-btn {
+    padding: 7px 11px;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+  }
+  .subscribe-ribbon-checkboxes {
+    gap: 10px 16px;
+    flex-direction: column;
+  }
+  .subscribe-ribbon-check {
+    /* WCAG-AA tap target on touch — 44px row height. */
+    min-height: 28px;
+  }
+}

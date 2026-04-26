@@ -163,6 +163,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/nav.css">
+  <link rel="stylesheet" href="/subscribe-ribbon.css">
   {{ blog_css | safe }}
   <style>
     /* Share button + modal — vanilla, scoped to .share-* classes. */
@@ -310,6 +311,7 @@
           Share
         </button>
       </div>
+      <div id="subscribe-ribbon" data-surface="blog-post"></div>
       {{ body_html | safe }}
       {{ post_nav_html | safe }}
     </article>
@@ -384,6 +386,7 @@
 
   <script id="shareCopyData" type="application/json">{{ share_copy | tojson }}</script>
   <script src="/nav.js" defer></script>
+  <script src="/subscribe-ribbon.js" defer></script>
   <script>
     // Auto-build Contents TOC from the article's H2s, and scroll-spy to
     // highlight the active section in the sidebar.

@@ -1199,6 +1199,7 @@ async def blog_index(
         '  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
         '  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">\n'
         '  <link rel="stylesheet" href="/nav.css">\n'
+        '  <link rel="stylesheet" href="/subscribe-ribbon.css">\n'
         "  <style>\n"
         "    :root { color-scheme: dark; }\n"
         "    html, body { margin: 0; background: #0f1419; color: #e8e4d8;\n"
@@ -1290,12 +1291,14 @@ async def blog_index(
         '    <div class="page-eyebrow">AutomateEdge · Blog</div>\n'
         '    <h1 class="page-title">AI engineering guides, career paths &amp; roadmaps</h1>\n'
         '    <p class="page-lede">Honest takes on learning AI, landing roles, and staying current in a field that ships a new paradigm every 18 months.</p>\n'
+        '    <div id="subscribe-ribbon" data-surface="blog"></div>\n'
         f"    {search_html}\n"
         f"    {pills_html}\n"
         f"    {zone2_html}\n"
         f"    {zone3_html}\n"
         "  </main>\n"
         '  <script src="/nav.js" defer></script>\n'
+        '  <script src="/subscribe-ribbon.js" defer></script>\n'
         "  <script>" + _INLINE_SEARCH_JS + "</script>\n"
         "</body>\n"
         "</html>"

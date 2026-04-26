@@ -347,11 +347,14 @@ async def jobs_index(
 {_BRAND_HEAD}
 {_BASE_CSS}
 {_HUB_CSS}
+<link rel="stylesheet" href="/subscribe-ribbon.css">
 </head><body>
 <main>
 <div class="page-eyebrow">AutomateEdge · Jobs</div>
 <h1 class="page-title">AI &amp; ML Jobs</h1>
 <p class="page-lede">Curated openings from verified AI-native companies. Daily scrape, AI-summarised, matched against your learning plan.</p>
+
+<div id="subscribe-ribbon" data-surface="jobs"></div>
 
 <div class="layout">
   <aside class="filters">
@@ -420,6 +423,7 @@ async def jobs_index(
 {_HUB_JS}
 </main>
 <script src="/nav.js" defer></script>
+<script src="/subscribe-ribbon.js" defer></script>
 </body></html>"""
     return HTMLResponse(html, headers={"Cache-Control": "public, max-age=600"})
 
