@@ -420,6 +420,79 @@ async def test_compose_email_has_four_unsub_links():
     await close_db()
 
 
+@pytest.mark.asyncio
+async def test_jobs_section_chips_never_render_dict_repr():
+    """Regression: when employment.salary is a dict (typed schema with
+    min/max/currency keys), the chip must NEVER fall through to str(dict)
+    — that leaks "{'min': None, '..." into the email body. The fix
+    formats dicts intentionally and skips when there's no usable data.
+    Mocks _top_matches so the test isn't coupled to the match-score
+    threshold; it's the chip rendering we want to verify."""
+    await _setup()
+    user = await _mk_user("dictsalary@t.com", experience_level="advanced")
+
+    # Salary as dict with only min:None (the production shape that broke).
+    # exp_y has a real min, so a chip should still render for it.
+    job = await _mk_job("dict-salary-job", data={
+        "tldr": "x",
+        "must_have_skills": ["PyTorch"],
+        "company": {"name": "Sarvam AI", "slug": "sarvam-ai"},
+        "location": {"country": "IN", "city": "Bengaluru", "remote_policy": "Onsite"},
+        "employment": {
+            "salary": {"min": None, "max": None, "currency": "INR"},
+            "experience_years": {"min": 3, "max": 8},
+        },
+    })
+
+    async def fake_top_matches(u, jobs_pool, db):
+        return [(job, {"score": 75})]
+
+    async with db_module.async_session_factory() as db:
+        with patch.object(weekly_digest, "_top_matches", new=fake_top_matches):
+            section = await weekly_digest._jobs_section(user, [job], db)
+
+    assert section is not None
+    html = section["html"]
+    # The fix: dict reprs never reach the email.
+    assert "{'min'" not in html, "dict repr leaked into HTML"
+    assert "&#x27;min&#x27;" not in html, "escaped dict repr also leaked"
+    # The exp_y chip should still render (proves we didn't over-filter).
+    assert "3+ years" in html
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_jobs_section_renders_dict_salary_with_min_max():
+    """When salary dict has real min+max+currency, format as 'INR 50–80'."""
+    await _setup()
+    user = await _mk_user("realsalary@t.com")
+    job = await _mk_job("good-salary-job", data={
+        "tldr": "x",
+        "must_have_skills": ["PyTorch"],
+        "company": {"name": "Razorpay", "slug": "razorpay"},
+        "location": {"country": "IN", "city": "Bengaluru", "remote_policy": "Hybrid"},
+        "employment": {
+            "salary": {"min": 50, "max": 80, "currency": "INR"},
+            "type": "Full-time",
+            "experience_years": {"min": 8, "max": 12},
+        },
+    })
+
+    async def fake_top_matches(u, jobs_pool, db):
+        return [(job, {"score": 88})]
+
+    async with db_module.async_session_factory() as db:
+        with patch.object(weekly_digest, "_top_matches", new=fake_top_matches):
+            section = await weekly_digest._jobs_section(user, [job], db)
+
+    assert section is not None
+    html = section["html"]
+    assert "INR 50–80" in html, f"expected formatted salary range, got: {html[:500]}"
+    assert "Full-time" in html
+    assert "8+ years" in html
+    await close_db()
+
+
 def test_courses_section_renders_recent_courses():
     """_courses_section includes title + summary + Enroll link."""
     courses = [

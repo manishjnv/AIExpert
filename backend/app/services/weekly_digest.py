@@ -376,17 +376,47 @@ async def _jobs_section(user: User, jobs_pool: list[Job], db) -> dict | None:
         badge_bg = "#e3eee5" if score_pct >= 70 else "#f5e0d6"
         badge_fg = _BRAND["success"] if score_pct >= 70 else _BRAND["danger"]
 
-        # Skill / employment chips
+        # Employment chips. Each field may be a string, a dict (min/max/currency
+        # for salary; min/max for experience_years), or missing. Render only
+        # when there is real data — never str(dict), which leaks "{'min': None}"
+        # into the email.
         emp = d.get("employment") or {}
         chips: list[str] = []
-        salary = emp.get("salary")
-        if salary:
-            chips.append(_esc_str(salary)[:30])
-        emp_type = emp.get("type")
-        if emp_type:
-            chips.append(_esc_str(emp_type)[:20])
+
+        def _fmt_salary(s) -> str:
+            if isinstance(s, str) and s.strip():
+                return s.strip()[:30]
+            if isinstance(s, dict):
+                lo, hi = s.get("min"), s.get("max")
+                cur = (s.get("currency") or "").strip()
+                cur_prefix = (cur + " ") if cur else ""
+                if lo and hi:
+                    return f"{cur_prefix}{lo}–{hi}"
+                if lo:
+                    return f"{cur_prefix}{lo}+"
+                if hi:
+                    return f"{cur_prefix}up to {hi}"
+            return ""
+
+        def _fmt_emp_type(t) -> str:
+            if isinstance(t, str) and t.strip():
+                return t.strip()[:20]
+            if isinstance(t, dict):
+                v = t.get("type") or t.get("name") or ""
+                if isinstance(v, str) and v.strip():
+                    return v.strip()[:20]
+            return ""
+
+        salary_str = _fmt_salary(emp.get("salary"))
+        if salary_str:
+            chips.append(salary_str)
+
+        emp_type_str = _fmt_emp_type(emp.get("type"))
+        if emp_type_str:
+            chips.append(emp_type_str)
+
         exp_y = emp.get("experience_years") or {}
-        if exp_y.get("min") is not None:
+        if isinstance(exp_y, dict) and exp_y.get("min") is not None:
             chips.append(f"{exp_y['min']}+ years")
         chips_html = "".join(
             f'<span style="display:inline-block;padding:4px 8px;background:{_BRAND["paper"]};color:{_BRAND["ink_soft"]};font-size:11px;font-weight:500;border-radius:4px;margin-right:4px;margin-bottom:4px">{c}</span>'
