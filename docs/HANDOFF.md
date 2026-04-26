@@ -4,6 +4,97 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-27 (session 49 — anonymous-funnel subscribe ribbons on /jobs /roadmap /blog /blog/{slug})
+
+**Branch:** `master` · clean working tree at `f405b25` (S48's audit `docs/AUDIT_2026-04.md`, `docs/AUDIT_TASKS.md`, `docs/PLAN_TIERED_CLAUDE_ROUTING.md` remain on disk as untracked artifacts of the parallel audit session; not committed by this session). **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `f405b25e82c795fd338d273f9d531dac08fff504` matches local. Backend container healthy. Static assets `/subscribe-ribbon.css` + `/subscribe-ribbon.js` serve 200 over the wire; all 4 surfaces return 200 with correct `data-surface` attribute + asset references; `/api/profile/subscribe-intent?channel=jobs` returns 302 anonymously.
+**Tests:** 200 passed across `test_jobs_public + test_blog + test_tracks` (the 4-surface adjacent suites). Pre-existing pagination failure count at `test_jobs_pagination.py` unchanged at 3 (S45 baseline; verified via stash round-trip — failures present on master without S49 changes).
+
+### Session 49 — funnel ribbons land on the 4 anonymous-discovery surfaces (closes S47-carry-over + fulfills S48-audit option 2)
+
+**Headline:** S45 shipped the per-channel email subscriptions backend (`notify_jobs / notify_roadmap / notify_blog / notify_new_courses`) + the `/api/profile/subscribe-intent` redirect funnel + the `/account` hint handler; S46 / S47 / S48-audit deferred the four ribbon UIs to this session. Shipped today: shared `frontend/subscribe-ribbon.{js,css}` asset pair, included on each of the 4 surfaces with a 3-line edit (CSS `<link>`, ribbon `<div>` with `data-surface`, JS `<script>`). Anonymous visitors see 4 brand-styled buttons (AI jobs / Course progress / New courses / Blog posts) that each 302 through to login → `/account` with the matching channel pre-checked. Logged-in visitors see 4 inline checkboxes reflecting their actual `notify_*` state from `/api/profile`; toggling any one fires `PATCH /api/profile` with optimistic UI + rollback on error and shows a "Subscribed"/"Unsubscribed" toast. Dismissal persists 30 days per surface via localStorage.
+
+**Design pivot caught in pre-Phase-1 recon:** the 4 surfaces have 4 different brace/escape conventions — `/jobs` is one big f-string with doubled braces (RCA-024/027 territory), `/blog` index is plain string concatenation, `/blog/{slug}` is the Jinja `blog/post.html` template, `/roadmap` is the Jinja `tracks/hub.html` template. Original plan called for parallel Sonnet × 4 each authoring ~150 lines of duplicated SSR ribbon. Realized during recon that the cleaner shape is one shared frontend asset pair with a 3-line insertion per surface — eliminates the 4× brace gauntlet, eliminates 4× drift surface for future iteration, and falls under the playbook's "don't delegate when self-executing is faster" rule (≤ 30 lines across files already in hot Opus cache). Routing flipped from "parallel Sonnet × 4" to "all Opus, no subagents." Confirmed nginx already serves arbitrary `*.js`/`*.css` at root via `location ~* \.(js|css)$` ([nginx.conf:56](../nginx.conf#L56)) — no nginx allowlist update needed (`feedback_nginx_allowlist_on_new_routes.md` honored).
+
+**One commit:** `f405b25` — feat(funnel): subscribe ribbons on /jobs /roadmap /blog /blog/{slug}. 6 files changed (+503 lines): 2 new (subscribe-ribbon.css 247 lines, subscribe-ribbon.js 242 lines), 4 modified (jobs.py +4, blog.py +3, blog/post.html +3, tracks/hub.html +4). All inserts pure HTML literals, zero `{` `}` characters in the new lines (confirmed safe across f-string + Jinja boundaries).
+
+**Phase 2 gates green:** secrets scan (AWS / OpenAI / xAI / HF / GitHub PAT / Google / Slack / hardcoded literal patterns) returned no matches. `node --check` on `subscribe-ribbon.js` parses clean. Python `ast.parse` on the modified routers confirms f-strings still parse. End-to-end TestClient render of all 4 surfaces (`/jobs`, `/roadmap`, `/blog`, `/blog/01`) returns 200 with the asset link, ribbon div with correct `data-surface`, and JS script tag in each. `git stash` round-trip confirmed the 3 pre-existing pagination failures are not introduced by S49.
+
+**Phase 3 review verdict:** ACCEPT. Brand palette matches existing tokens (`#e8a849` / `#161c24` / `#f5f1e8` / `#2a323d` / `#94a3b8` / `#6db585`). Login-state idiom (`fetch('/api/profile', { credentials: 'same-origin' })` with 401 → anonymous fallback) matches [account.html:309](../frontend/account.html#L309). Default-on `profile[field] !== false` matches [account.html:358-361](../frontend/account.html#L358). Zero changes to canonical / og / twitter / JSON-LD (Article / BreadcrumbList / FAQPage / DefinedTermSet / HowTo / WebSite / ItemList) markup on any surface. Mobile breakpoint at 480px stacks checkboxes vertically with 28px tap target. Accessibility: `role="group"`, `aria-label`, `aria-live="polite"`, `:focus-visible` outline.
+
+**Phase 5 verification:** server-side rendering proven end-to-end via TestClient + live curl on prod (4× 200 + correct `data-surface` + assets 200 + funnel 302). Browser-side interactivity (button click → 302 → pre-check, checkbox flip → PATCH → toast → reload preserves state, dismiss → reload → still gone, 375px viewport) deferred to founder browser smoke per Path B agreement.
+
+**No RCA entry this session** — clean feature ship, no bug fixed.
+
+**No codex:rescue** — none of the 3 touched paths qualify under §8's strictly-mandatory list (no `backend/app/auth/`, no `backend/app/ai/`, no Alembic, no jobs classifier). Helper-runtime returned empty 9× across S45/46/47 anyway. Will retry on `quiz_outcomes` migration (SEO-26) and course versioning Alembic migrations (COURSE-23/24).
+
+**Open questions / queued for S50:**
+
+1. **Browser-side interactivity validation pending.** Server-side render is verified end-to-end. The remaining checks need a real browser. Self-test on automateedge.cloud as `manishjnvk1@gmail.com` is the next user-side smoke; backend is already proven from the S45 plan A funnel testing.
+
+2. **S48-audit deliverables live as orphan untracked files** — `docs/AUDIT_2026-04.md` (~12K-word audit report), `docs/AUDIT_TASKS.md` (sequenced P0/P1/P2/P3 backlog), `docs/PLAN_TIERED_CLAUDE_ROUTING.md`. The audit ran in parallel with this session and didn't commit. They sit on disk; founder decides whether to commit (separate doc PR) or treat as advisory artifacts.
+
+3. **`/blog/topic/{slug}` pillar topic hub does NOT have the ribbon** — kept scope tight to the user's explicit 4-surface list. 3-line follow-up if the topic hub gets meaningful traffic.
+
+4. **Brevo daily cap (300/day)** still latent — only 1 user receives the digest today. Needs batching across days OR paid tier when user count grows. (Audit item B4.)
+
+**Next action — Session 50:** browser-side smoke + iteration if anything looks off; otherwise unblock either the audit P0 decision pass (~30 min, unblocks the whole P1/P2 sequence per S48-audit) or feature-roadmap items (SEO-21 q2, SEO-26 quiz landing, COURSE-01..03 Phase A).
+
+**Queued (carried over from S47 + S48 audit):**
+
+- **From audit (untracked artifacts)** — P0 decisions × 7 (D1–D7); P1 tasks × 8 (P1-01..08); P2 tasks × 12; P3 tasks × 18. See `docs/AUDIT_TASKS.md` for sizing, dependencies, and acceptance criteria.
+- **S47 carry-over** — S47's queued Phase B engagement upgrades on the daily X queue (cron firing time, image attachment, quotable-first hook); SEO-21 q2 / posts 5+6; SEO-26 quiz landing (worktree + codex:rescue for `quiz_outcomes` migration); COURSE-01..03 Phase A; COURSE-04+05 Phase B MVP; separate commit for `docs/COURSES.md` from S43.
+
+**Agent-utilization footer:**
+
+- Opus: full session — Phase 0 reads (CLAUDE.md + HANDOFF + RCA + memory in parallel); pre-Phase-1 reconnaissance across `routers/jobs.py`, `routers/blog.py`, `templates/blog/post.html`, `templates/tracks/hub.html`, `routers/profile.py`, `frontend/account.html`, `nginx.conf` to map insertion seams + login-state idiom + brace/escape conventions; design-pivot decision (parallel Sonnet × 4 → all Opus shared-asset shape) with explicit rationale; ~500-line authoring of `subscribe-ribbon.{css,js}` with brand-palette tokens + accessibility + mobile + dismiss localStorage + optimistic-UI PATCH + toast; 4 surface inserts (12 line additions across 4 files); Phase 2 deterministic gates (secrets scan + Python ast.parse + node --check + TestClient end-to-end render); `git stash` round-trip to confirm pagination failures pre-existing; Phase 3 line-by-line self-review against 15 audit criteria; one bundled commit with noreply identity; VPS deploy + HEAD verification + 4-surface curl smoke + asset 200 confirmation + 302 funnel verification; this HANDOFF + CLAUDE.md §9.
+- Sonnet: n/a — design-pivot collapsed the work to "≤ 30 lines across files already in hot Opus cache." Subagent cold-start (~20-30s) + brace/escape brief overhead would have outweighed direct typing on 4× tiny inserts. Net consciously-skipped, not skipped-by-default.
+- Haiku: n/a — no bulk reads/sweeps; targeted Opus reads on 7 specific files were cheaper than a Haiku summary round-trip.
+- codex:rescue: n/a — none of the touched paths in §8's strictly-mandatory list. Helper-runtime continues empty (now 9 attempts in a row across S45/46/47). First successful engagement still pending; will retry on SEO-26 (`quiz_outcomes` migration) and COURSE-23/24 (course versioning + deprecation Alembic migrations).
+
+---
+
+## Current state as of 2026-04-26 (session 48 — read-only end-to-end audit, no code changes)
+
+**Branch:** `master` · working tree unchanged (4 pre-existing M files from S47 still uncommitted: `backend/app/routers/blog.py`, `backend/app/routers/jobs.py`, `backend/app/templates/blog/post.html`, `backend/app/templates/tracks/hub.html`; S47's untracked subscribe-ribbon files also still pending). **Live site:** still `4c9f3c3` from S47, no deploy this session.
+
+### Session 48 — end-to-end self-audit (audit-only, no fixes)
+
+**Headline:** Ran the audit-only playbook from `prompt: docs/AUDIT_2026-04` against master at `4c9f3c3`. Wrote a single new file — [`docs/AUDIT_2026-04.md`](docs/AUDIT_2026-04.md) — with findings across 9 areas (DB / background jobs / AI / auth / frontend / tests / observability / product / GTM). No code edits, no git operations, no dependency changes. Phase 0 reads + targeted Phase 1 reads + Phase 2 written report + Phase 3 self-review pass. ~35 files read in full or substantially; ~140 surveyed via Glob/Grep.
+
+**Findings count (v2 revision after external-review fold-in):** **1 CRITICAL · 16 HIGH · ~21 MEDIUM · ~17 LOW.** No committed secrets, no auth bypass, no public credential leak. v1 was engineering-axis only (0 CRITICAL · 9 HIGH); v2 added **Area J — Sustainability, GTM motion, ops/contributor health** + 8 new findings (H8 chat-no-user-state, H9 cert-overclaim, H10 XP-gameable, H11 no-assessment, B5 engagement-email-only, C8 7-providers-vs-scale, D8 no-MFA, I7 live-site-UX-not-validated) and escalated H3 / H5 / I5 from LOW → HIGH. Revised TL;DR top-5:
+
+1. **[CRITICAL]** No documented monetization plan after 488 commits; AI/SMTP/VPS costs compound, free-tier-only is unsustainable past a few hundred MAU. Three viable wedges (affiliate / premium / B2B tenant) all near-zero new engineering. **J1**.
+2. **[HIGH]** Brand collision — AutomationEdge.com is an existing enterprise hyperautomation company; AutomateEdge loses every SERP fight. 0 stars / 0 forks / no acquisition motion. **I5 + J2**.
+3. **[HIGH]** AI chat is generic, not personalized — `routers/chat.py:104-119` injects only goal+level, not progress / eval scores / completed weeks / linked repos. The product's whole personalization wedge is ChatGPT-equivalent at the chat layer. **H8**.
+4. **[HIGH]** Cert is sold as "graduation" by self-reported progress (no quiz / MCQ / assessment) — overclaims what the underlying signal can carry. Reframe copy or add assessment. **H9 + H11**.
+5. **[HIGH]** CSRF documented as universal but only enforced on admin/pipeline routers; user-facing mutation surface relies on SameSite=Lax alone. **D5**.
+
+(Engineering top-5 from v1 — Gemini cost gate, doc drift, no DB backups, hollow `/api/health`, inline AI eval — preserved as items 6-10 in the audit's TL;DR.)
+
+**Other notable findings worth queuing into S49+:** No automated DB backups in compose (A3); Brevo 300/day cap not enforced in code (B4); `sanitize.py` doesn't yet match the new Gemini `AQ.Ab...` key format flagged by RCA-023 (C5); CI runs zero security gates — no `pip-audit` invocation despite being in `requirements.txt`, no `gitleaks`, no `node --check` on inline JS strings (F5); no PWA / service worker (E2); `frontend/index.html` is 3,015 LoC (E5); Caddy-vs-nginx topology unclear in `DEPLOYMENT.md` (G2); README claims "127 passing" tests, actual is 498 (F1); `pb_hooks/` directory referenced in CLAUDE.md §4 doesn't exist (G4).
+
+**Strong points to preserve:** RCA discipline (38 entries with consistent shape), test breadth (498 functions / 49 files), AI sanitize-before-LLM ordering, logging_redact installation order in `main.py:42-43`, full-strength HMAC-SHA256 cert signatures (README's "truncated HMAC" claim is doc-wrong, code is fine), cron-failure CRITICAL alerting from RCA-029, clean provider abstraction.
+
+**Next action — Session 49:** Two paths, founder picks:
+
+1. **Audit-remediation track (recommended).** Open [docs/AUDIT_TASKS.md](docs/AUDIT_TASKS.md) — the sequenced backlog generated from the audit. **P0 (decisions only, ~30 min)** unblocks everything downstream: brand rename Y/N, monetization sequence, cert credibility approach, cohort delivery, backup destination, CSRF approach, codex:rescue fix-or-drop. After P0, **P1 has 8 session-ready tasks** (P1-01 Coursera affiliate · P1-02 cert reframe · P1-03 chat user-state · P1-04 Brevo cap · P1-05 Gemini cap · P1-06 CSRF · P1-07 doc reconciliation · P1-08 CI security gates). P1-02/04/05/08 are XS — bundle two or three in one session.
+2. **Feature-roadmap track.** Ship the S47-deferred 4 anonymous-funnel ribbons (parallel Sonnet × 4 surfaces) before audit work. Frontend ribbon UI on `/jobs`, `/roadmap`, `/blog`, `/blog/{slug}`. Backend `/api/profile/subscribe-intent` already live + tested.
+
+**Queued (carried over from S47 + S48 audit; full sequenced backlog now lives in [docs/AUDIT_TASKS.md](docs/AUDIT_TASKS.md)):**
+
+- **From audit** — P0 decisions × 7 (D1–D7); P1 tasks × 8 (P1-01..08); P2 tasks × 12 (this month); P3 tasks × 18 (this quarter). See AUDIT_TASKS.md for sizing, dependencies, and acceptance criteria per item.
+- **S47 carry-over** — 4 funnel ribbons (parallel Sonnet × 4 surfaces); S46 `/admin/social` rename leftovers; SEO-21 q2 / 5+6; SEO-26 quiz landing (now P2-02 in AUDIT_TASKS as part of the assessment plan); COURSE-01..03 Phase A; COURSE-04+05 Phase B MVP; separate commit for `docs/COURSES.md` from S43.
+- **Engagement upgrades on Phase B** (S47 deferred) — cron firing time, image attachment, quotable-first hook. These compound with P2-01 launch traffic; consider deferring until after P2-01 fires so the upgrades are measured against real engagement signal, not synthetic.
+
+**Agent-utilization footer:**
+
+- Opus: full session lead — Phase 0 mandatory parallel reads (CLAUDE.md, README, 9 docs, RCA first 200 + tail, requirements.txt, docker-compose.yml, nginx.conf); Phase 1 targeted reads across 11 high-risk files (db.py, main.py, config.py, all 4 auth/* files, ai/provider.py, ai/sanitize.py, ai/health.py, ai/pricing.py, logging_redact.py, services/{certificates,github_client,evaluate,email_sender,weekly_digest}); cross-cutting greps for CSRF, BackgroundTasks, cost-limit, refresh-token, sanitize patterns, secret tracking, PWA/service-worker, test count, prompt count, migration count, route counts; Phase 2 [docs/AUDIT_2026-04.md](docs/AUDIT_2026-04.md) authored end-to-end (~12K words, 9 area tables, cross-cutting concerns, strong-points, trim list, 3-bucket remediation roadmap, open questions); this HANDOFF S48 entry.
+- Sonnet: n/a — audit was research-only; no implementation contracts to delegate.
+- Haiku: n/a — large in-context reads via Opus were cheaper than briefing a Haiku agent for distillation. The 1M context window swallowed the codebase grep results without strain.
+- codex:rescue: n/a — no diff or load-bearing change to gate; CLAUDE.md §8 hard rule applies only to security/auth/classifier code modifications, which this audit deliberately did not produce.
+
+---
+
 ## Current state as of 2026-04-26 (session 47 — weekly digest brand-template + 4-channel feature complete + permanent silent-drop fix)
 
 **Branch:** `master` · clean working tree at `4c9f3c3`. **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `4c9f3c3` matches local. Backend container healthy. `/api/health` 200. SMTP via Brevo verified end-to-end (multiple test sends to `manishjnvk1@gmail.com` over the session, each landed in inbox within seconds).
