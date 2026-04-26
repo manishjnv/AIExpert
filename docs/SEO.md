@@ -42,7 +42,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-11 | P0-adj | Dynamic OG image generator /og/{type}/{slug}.png | ✅ done (course/roadmap/blog/jobs shipped; week/vs/cert deferred per spec) |
 | SEO-12 | P1 | EducationalOccupationalCredential on /verify/{id} | ✅ done (2026-04-23) |
 | SEO-13 | P1 | Missing canonicals on blog index / profile / leaderboard / verify / account | ✅ done |
-| SEO-14 | P1 | WebSite + SearchAction (deferred — needs /search endpoint) | 🔒 blocked (no /search) |
+| SEO-14 | P1 | WebSite + SearchAction (deferred — needs /search endpoint) | 🔒 blocked (unblocked when SEO-27 ships /api/blog/search) |
 | SEO-15 | P2 | FAQPage on roadmap landing | ✅ done (2026-04-23) — visible FAQ section mirrors existing JSON-LD |
 | SEO-16 | P2 | Brotli compression in nginx | ✅ done (via Cloudflare edge) — origin nginx br redundant; CF serves Content-Encoding: br |
 | SEO-17 | P2 | WebP/AVIF images + font-display:swap | ✅ done — all Google Fonts URLs carry &display=swap; site has no raster above-fold imagery |
@@ -55,6 +55,7 @@ Update the Status column as tasks move. `⬜ pending` → `🟡 in progress` →
 | SEO-24 | P1 | Hub ItemList schema listing all roadmap tracks | ✅ done (2026-04-24) — `/roadmap` hub renders ItemList enumerating all 5 tracks (numberOfItems + position + url + name) + BreadcrumbList; landed jointly with SEO-20 |
 | SEO-25 | P1 | Trusted-sources allowlist + E-E-A-T enforcement in blog validator | ✅ done (2026-04-24) — `backend/data/trusted_sources.json` with 42 domains across 6 categories (papers, lab-docs, framework-docs, statistics, academic, textbook, standards); `is_trusted_domain()` uses safe suffix-match (rejects `fakemeta.com` vs `meta.com`); pillar validator enforces ≥5 trusted citations before publish |
 | SEO-26 | P2 | /start interactive quiz landing with personalized plan output | ⬜ pending |
+| SEO-27 | P1 | /blog three-zone redesign — search + pillar-hub pages + paginated feed (unblocks SEO-14) | ⬜ pending |
 
 **Next action** (always — source of truth for what to pick up next): SEO-21 posts 03 (q6) + 04 (q7) live as of 2026-04-25. **Highest-leverage next deliverable: third pillar post** `/blog/05-ai-roadmap-2026-whats-changed` (q2 — high-volume "AI roadmap 2026" intent; schema stack Article + FAQPage; no HowTo, no Review). Same validator + ~3000-word target. Author the JSON, commit, then `ssh a11yos-vps "cd /srv/roadmap && git pull && docker compose exec -T backend python scripts/stage_blog_draft.py --all"` to stage as draft, then publish from `/admin/blog`. After q2: q4 / intent-gap q3/q4 / intent-gap q10 — one per session — then SEO-26 quiz landing (worktree + codex:rescue for the Alembic migration). **Editorial note:** post 04 came back with 18 paragraphs >4 sentences and 29 sentences >30 words (post 03 had 8+10) — drift toward density. Tighten q2 in authoring rather than retrofitting. SEO-09, SEO-13, SEO-08, SEO-06, SEO-05, SEO-04, SEO-01, SEO-19, SEO-20, SEO-24, SEO-25 all shipped — see Change log at bottom.
 
@@ -1082,6 +1083,136 @@ Blog validator (SEO-21) enforces: ≥ 5 outbound links matching this allowlist p
 - Quiz completable in < 90 seconds
 - Result URL has unique og:image via SEO-11
 - GSC position for target query tracked monthly; goal top-10 within 90 days
+
+---
+
+### SEO-27 — `/blog` three-zone redesign: search + pillar hubs + paginated feed (P1)
+
+**Depends on:** SEO-06 (Article schema), SEO-08 (BreadcrumbList on blog), SEO-13 (canonicals on blog index), SEO-21 pillar slate (`PILLAR_BRIEFS` is the seed taxonomy). **Unblocks SEO-14** (`WebSite + SearchAction`).
+
+**Why this exists:** Today `/blog` is a single chronological flex column rendered by [`blog_index`](../backend/app/routers/blog.py#L753) — fine at 4 posts, breaks at 30+, useless at 200+. Sibling SEO-21 ships pillar posts at ~1/session and the SEO-21 slate plus quarterly-refresh cadence puts the index past the browseable threshold inside 12 months. At 2000 posts (the long-horizon ceiling) the chronological feed gives a reader no way to (a) find a topic, (b) discover what topics are even covered, or (c) re-find a post they read once. Search engines treat a single deep paginated list less favourably than a topic-clustered hub-and-spoke graph (Coursera's `/articles` and Stripe's `/blog` both ship this pattern; roadmap.sh's `/guides` does not — and they rank below us-target for several long-tail topics they actually own content for).
+
+The design picked over alternatives:
+
+| Alternative | Why rejected |
+|---|---|
+| Search-first (bar + autocomplete only) | Kills discovery — readers who don't know our taxonomy bounce |
+| Notion-style nested sidebar tree | Mobile-hostile; not a publishing-blog pattern |
+| Tag cloud | Looks dated; weights wrong topics by post count rather than reader intent |
+| Algolia / Typesense embed | Violates §2 #2 (no paid SEO tools) |
+| Status quo + "load more" button | Buys 6 months, doesn't solve discovery |
+
+Three-zone (search + pillar hubs + paginated feed) is the standard publisher pattern (Stripe, Vercel, Smashing Magazine, GitHub blog, Coursera articles) and reuses the pillar-cluster taxonomy `PILLAR_BRIEFS` already maintains — admin curation cost is near-zero because every pillar post is *already* tagged with a pillar slug + `target_query`.
+
+**Design — three zones, top to bottom on `/blog`:**
+
+1. **Hero band (zone 1).** Page title + lede stay. Below them: a single search input (`<input type="search">`) that posts to `/api/blog/search?q=…` and renders results inline (replaces the feed). To the right of the search box (or below on mobile): a horizontal scroll of **pillar pills** — one chip per active pillar topic, e.g. `Roadmaps · Salaries · Interview Prep · Tools · Career Paths · Tutorials · Comparisons · Build-in-public`. Each pill links to `/blog/topic/{pillar-slug}`. Pills are admin-curated (~8-12 active at a time), not auto-derived from tag frequency — auto-derivation would surface `build-in-public` (the default first tag on every post) above intent topics.
+
+2. **Curated row (zone 2).** "Start here" — 3-6 admin-picked cards (slug list in `pillar_topics.json`). Default picks for the v1 ship: post 03 (career-defining comparison), post 04 (audience-aligned roadmap), the latest q2 pillar (freshest "what changed"), post 02 (build-in-public flagship). Cards use the existing `.post-card` styling at larger size; row uses CSS grid (`grid-template-columns: repeat(auto-fit, minmax(280px, 1fr))`).
+
+3. **Feed (zone 3).** Existing `_render_index_card` chronological list, **paginated to 20 per page** with SSR `?page=N` (mirrors SEO-10's jobs hub pagination): canonical points at the page being viewed, `rel="prev"`/`rel="next"` link tags wire pages together for crawl, footer pagination UI matches `/jobs?page=N` style. URLs are ASCII-stable and crawlable — no infinite-scroll, no JS-only pagination.
+
+**Pillar hub pages — `/blog/topic/{pillar-slug}`:**
+
+- Same SSR template chrome as the post page (nav, breadcrumbs, footer)
+- 80-150 word intro paragraph (admin-authored in `pillar_topics.json`), explains *what this topic covers* and *who it's for* — the E-E-A-T moat versus a bare tag-archive page
+- `<h1>` = pillar label (e.g. "AI Engineer Career Paths")
+- Body = `_render_index_card` list of every post matching the pillar (chronological, no pagination at v1 — at >50 posts per pillar, paginate then)
+- JSON-LD: `CollectionPage` + `ItemList` enumerating posts + `BreadcrumbList` (Home → Blog → {Topic})
+- Sitemap `/sitemap-pages.xml` enumerates every `/blog/topic/{slug}` URL with `<lastmod>` set to the most recent published post in that topic
+
+**Search endpoint — `/api/blog/search?q={query}&limit=20`:**
+
+- Server-side scan over `_list_visible_posts()` matching `q` (case-insensitive) against `title`, `summary`, `lede`, `tags`, `target_query`, and the first ~500 chars of `body_html` (stripped). Returns JSON: `{"results": [{"slug","title","summary","published","matched_in"}], "total": N, "query": q}`
+- Rate-limited via slowapi (10/min/IP — matches the chat endpoint's defensive default; pure read but cheap protection vs. scraping)
+- v1 implementation is in-memory linear scan — fine through ~1000 posts (~10ms scan). **Upgrade path** when post count >1000 or scan p95 >50ms: SQLite FTS5 virtual table over title/summary/body, populated on publish. Don't over-engineer v1; the scaling threshold is 4-5 years out at current cadence.
+- Result rendering is client-side in `/blog`: a small inline `<script>` (≤30 lines, preserves §2 #1 file:// fallback because the search input is hidden when JS is unavailable via `<noscript>` styling) calls `/api/blog/search`, replaces zone 3 with rendered cards. No framework — vanilla `fetch` + `template`.
+
+**Pillar-topic config — `backend/app/data/blog/pillar_topics.json`:**
+
+```json
+{
+  "version": 1,
+  "active_pills": [
+    {
+      "slug": "career-paths",
+      "label": "Career Paths",
+      "intro": "Posts on AI engineer vs ML engineer, role differences, salary by experience, transitions from adjacent roles, and what's actually hiring in 2026.",
+      "matches": {"tags_any": ["career-guide","ai-engineer","ml-engineer"]}
+    },
+    {
+      "slug": "roadmaps",
+      "label": "Roadmaps",
+      "intro": "What to learn, in what order, and what changed this quarter…",
+      "matches": {"tags_any": ["roadmap","curriculum"]}
+    }
+  ],
+  "start_here": ["03-ai-engineer-vs-ml-engineer","04-learn-ai-without-cs-degree-2026","05-ai-roadmap-2026-whats-changed","02-why-most-ai-roadmaps-expire-before-you-finish-them"]
+}
+```
+
+Lives under `backend/app/data/` (not `backend/data/`) so it's covered by the existing `COPY app ./app` in [Dockerfile:33](../backend/Dockerfile) — avoids the RCA-031 trap (trusted_sources.json was missed by Dockerfile copy). Loaded once at import time via `lru_cache`. Admin maintenance for v1 is paste-edit-the-file + redeploy; v2 (admin-UI editor at `/admin/blog/topics`) is a separate task if curation cadence justifies it — flag for revisit at >20 active pillars or >2 edits/month.
+
+**Post-to-pillar matching:**
+
+- A post matches a pillar if `pillar_topics.json[slug].matches.tags_any` shares ≥1 tag with `post.tags`. (The `tags` field is already validated 3-5 strings per [blog_publisher.py:191](../backend/app/services/blog_publisher.py#L191).)
+- Posts can match multiple pillars (e.g. `tags=["build-in-public","ai-engineer","career-guide"]` matches both `career-paths` and `roles`). Acceptable — same post listed under both hubs is the desired behaviour, mirrors how Coursera shows the same article under multiple topic pages.
+- A post that matches **no** pillar is reachable only via the chronological feed + search. Surface this in `/admin/blog` as a UI badge ("untagged: not in any pillar hub") so the admin can either retag the post or add a new pillar — keeps the taxonomy honest. (Out of v1 scope; flagged for v2.)
+
+**WebSite + SearchAction JSON-LD on `/blog` (closes SEO-14):**
+
+Once `/api/blog/search` exists, emit on `/blog` and `/blog?page=N`:
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "url": "https://automateedge.cloud/",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": {
+      "@type": "EntryPoint",
+      "urlTemplate": "https://automateedge.cloud/blog?q={search_term_string}"
+    },
+    "query-input": "required name=search_term_string"
+  }
+}
+```
+
+Note the `urlTemplate` points at `/blog?q=…` (a *user-facing* search results URL), which is satisfied by reading `?q=` server-side in `blog_index` and pre-populating the search input — Google requires a working URL, not just an API endpoint. SEO-14 acceptance becomes "shipped by SEO-27."
+
+**Files touched:**
+
+- [backend/app/routers/blog.py](../backend/app/routers/blog.py) — split current `blog_index` into (a) hero + zone 2 + zone 3 paginated, (b) new `blog_topic_hub({slug})` route, (c) new `blog_search_api` JSON endpoint. Add `?q=` and `?page=N` query handling. Add WebSite JSON-LD.
+- `backend/app/data/blog/pillar_topics.json` — new config file
+- `backend/app/data/blog/__init__.py` — empty marker (ensures Python package treats `data/blog/` as resource dir; not strictly required but matches `app/data/tracks/`)
+- [backend/app/routers/seo.py](../backend/app/routers/seo.py) — `/sitemap-pages.xml` enumerates `/blog/topic/{slug}` URLs with `<lastmod>` from the latest post per topic
+- [nginx.conf](../nginx.conf) — allowlist regex `^/blog/topic/[a-z][a-z0-9-]{1,40}$` (per `feedback_nginx_allowlist_on_new_routes.md`)
+- [backend/tests/test_blog.py](../backend/tests/test_blog.py) — extend with: pagination boundary tests, topic-hub 200/404 + ItemList count, search endpoint result shape, search rate-limit, pillar-config loader rejects malformed JSON, post-to-pillar matching for known fixtures, WebSite JSON-LD parses
+- [backend/tests/test_seo_canonicals.py](../backend/tests/test_seo_canonicals.py) — extend canonical assertions to `/blog?page=2` (canonical points at `/blog?page=2`, not `/blog`) and `/blog/topic/{slug}`
+
+**Acceptance:**
+
+- `/blog` renders three zones: search input, pillar pills (≥6), curated 3-6 cards row, feed paginated to 20 per page
+- `/blog?page=2` returns SSR HTML with cards 21-40, canonical `…/blog?page=2`, `rel="prev"`/`rel="next"` link tags correct at boundaries
+- `/blog?q=salary` returns SSR HTML with the search input pre-populated and zone 3 replaced by matching cards (no JS required for the SSR fallback — matches §2 #1)
+- `/blog/topic/career-paths` returns 200 with intro paragraph, ItemList of all matching posts, BreadcrumbList JSON-LD; `/blog/topic/nonexistent` returns 404
+- `/api/blog/search?q=ml+engineer` returns JSON `{results:[...], total:N, query:"ml engineer"}` with title-substring + tag-match results ranked title-first
+- `WebSite` JSON-LD on `/blog` validates in Google Rich Results Test (closes SEO-14 — flip its status to ✅)
+- `/sitemap-pages.xml` includes one `<url>` per pillar slug with `<lastmod>` set to the most recent post in that topic
+- nginx allowlist accepts `/blog/topic/{slug}` and rejects `/blog/topic/<script>`
+- Lighthouse Performance on `/blog` does not regress more than 3 points vs the pre-SEO-27 baseline (the inline search script is small enough that this should be free)
+- Pre-merge: `node --check` on the rendered `/blog` HTML's inline `<script>` body parses clean (RCA-024 prevention)
+
+**Out of v1 scope (deliberate):**
+
+- Real view-count signal for "Most read" — defer until GSC / analytics data exists; v1 is admin-curated `start_here`
+- Admin UI for editing `pillar_topics.json` — paste-edit-and-redeploy is fine until taxonomy churn forces it
+- Untagged-post warning badge in `/admin/blog`
+- Pillar-hub pagination (kicks in at >50 posts/topic)
+- Multi-language search / stemming / fuzzy match — single-language English substring is sufficient at current scale
+
+**Estimated work:** 1 session, Sonnet-eligible. Spec is fully mechanical — file paths, contract, JSON shapes, acceptance tests all enumerated. Phase 3 diff review focuses on (a) the post→pillar matcher (off-by-one), (b) the inline search `<script>` (RCA-024 + XSS — search query reflected in the DOM must `escape()`), (c) the pillar-config loader's failure mode (malformed JSON should not 500 the blog index — fall back to "no pills, no curated row, paginated feed only" so the page stays up).
 
 ---
 
