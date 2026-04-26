@@ -351,8 +351,8 @@ async def digest_unsubscribe(t: str, db=Depends(get_db)):
 
 # ---- Anonymous subscribe-intent funnel ----
 # Kept for backward-compat with cached/external links. The ribbon's anonymous
-# CTA now points directly at "/", so this endpoint is no longer the primary
-# path — it just redirects to home if hit.
+# CTA now points at "/?login=1" directly, so this endpoint is no longer the
+# primary path — it just redirects to home with the sign-in modal flag.
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter
@@ -366,4 +366,4 @@ _limiter = Limiter(key_func=get_remote_address)
 async def subscribe_intent(channel: str, request: Request):
     if channel not in _VALID_CHANNELS:
         raise HTTPException(status_code=400, detail="Invalid channel")
-    return RedirectResponse(url="/", status_code=302)
+    return RedirectResponse(url="/?login=1", status_code=302)

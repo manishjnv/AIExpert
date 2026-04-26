@@ -70,7 +70,7 @@
     root.innerHTML =
       renderHead(cfg.title, cfg.lede) +
       '<div class="subscribe-ribbon-buttons" role="group" aria-label="Subscribe">' +
-        '<a class="subscribe-ribbon-btn" href="/">' +
+        '<a class="subscribe-ribbon-btn" href="/?login=1">' +
           '<span class="subscribe-ribbon-btn-plus" aria-hidden="true">+</span>' +
           'Subscribe' +
         '</a>' +

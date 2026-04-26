@@ -2405,6 +2405,10 @@ loadTemplateOptions().then(() => {
     setTimeout(() => exportPlanPDF(), 500);
     history.replaceState(null, '', '/');
   }
+  if (params.has('login')) {
+    signIn();
+    history.replaceState(null, '', '/');
+  }
 });
 
 function _getTopics() {
