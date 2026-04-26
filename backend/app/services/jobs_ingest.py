@@ -881,6 +881,40 @@ async def _auto_expire_missing(by_source: dict[str, list[RawJob]], stats: dict) 
 
 # ---------------------------------------------------------------- entry point
 
+async def _stamp_seen_sources(seen: set[str]) -> None:
+    """Stamp ``last_run_at = now`` for every source confirmed reachable this run.
+
+    Called from ``run_daily_ingest``'s finally block. RCA-029 + RCA-038
+    follow-up: a single uncaught failure in a downstream phase (auto-expire,
+    rejection-rate check, …) used to silently freeze every source's
+    ``last_run_at`` — even sources whose fetch had already succeeded — because
+    the stamp was a single batch transaction at the end. Stamping inside
+    ``finally`` against the per-run "seen" set means the freshness signal
+    reflects partial progress accurately: sources we got far enough to confirm
+    alive are stamped; sources we never reached stay stale (and surface as
+    such in the admin UI's 36h staleness chip).
+    """
+    if not seen:
+        return
+
+    async def _op() -> None:
+        async with _db.async_session_factory() as db:
+            now = datetime.utcnow()
+            for key in seen:
+                src = (await db.execute(
+                    select(JobSource).where(JobSource.key == key)
+                )).scalar_one_or_none()
+                if src:
+                    src.last_run_at = now
+            await db.commit()
+
+    try:
+        await _retry_db(_op, "stamp_seen_sources")
+    except Exception as exc:
+        logger.warning("failed to stamp last_run_at for %d sources: %s",
+                       len(seen), exc)
+
+
 async def run_daily_ingest() -> dict[str, int]:
     """Run the full daily ingest. Returns stats dict (for admin banner + logs).
 
@@ -889,116 +923,116 @@ async def run_daily_ingest() -> dict[str, int]:
     the whole batch. Per-source fetch remains inside one transaction is OK
     because fetch is read-only HTTP.
     """
-    await ensure_source_rows()
-    # Probe every board first; auto-disable degraded ones so the fetch loop
-    # doesn't waste a slot on a known-dead slug. Probe is cheap (parallel
-    # GETs, ~1s wall time for ~30 boards) and writes JobSource.last_run_error.
-    from app.services.jobs_sources.probe import probe_all
-    probe_results = {}
-    try:
-        probe_results = await probe_all()
-    except Exception as exc:
-        logger.warning("probe pass failed (continuing with fetch): %s", exc)
-    disabled_keys = {k for k, v in probe_results.items() if not v.get("enabled", True)}
-    if disabled_keys:
-        logger.info("skipping %d disabled boards: %s", len(disabled_keys), sorted(disabled_keys))
-
+    # Sources confirmed reachable this run (probed OR fetched ≥0 rows). The
+    # finally block stamps their last_run_at unconditionally so a downstream
+    # exception can never again silently freeze every source's freshness chip.
+    seen_sources: set[str] = set()
     stats = {"fetched": 0, "new": 0, "changed": 0, "unchanged": 0,
-             "skipped": 0, "errors": 0, "disabled_skipped": len(disabled_keys)}
+             "skipped": 0, "errors": 0, "disabled_skipped": 0}
 
-    fetchers = [
-        ("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all),
-        ("lever", LEVER_BOARDS, lv_fetch_all),
-        ("ashby", ASHBY_BOARDS, ash_fetch_all),
-    ]
-    sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
+    try:
+        await ensure_source_rows()
+        # Probe every board first; auto-disable degraded ones so the fetch loop
+        # doesn't waste a slot on a known-dead slug. Probe is cheap (parallel
+        # GETs, ~1s wall time for ~30 boards) and writes JobSource.last_run_error.
+        from app.services.jobs_sources.probe import probe_all
+        probe_results = {}
+        try:
+            probe_results = await probe_all()
+        except Exception as exc:
+            logger.warning("probe pass failed (continuing with fetch): %s", exc)
+        # A successful probe — pass or fail — means we reached the source.
+        # That's exactly what last_run_at signals. Stamp it.
+        seen_sources.update(probe_results.keys())
+        disabled_keys = {k for k, v in probe_results.items() if not v.get("enabled", True)}
+        stats["disabled_skipped"] = len(disabled_keys)
+        if disabled_keys:
+            logger.info("skipping %d disabled boards: %s", len(disabled_keys), sorted(disabled_keys))
 
-    # Group fetched jobs per source so we can apply the cap to genuinely NEW
-    # rows only (unchanged/existing rows are cheap — no enrichment call).
-    by_source: dict[str, list[RawJob]] = {}
-    for _kind, _boards, fetch in fetchers:
-        async for source_key, raw in fetch():
-            if source_key in disabled_keys:
-                continue
-            stats["fetched"] += 1
-            by_source.setdefault(source_key, []).append(raw)
+        fetchers = [
+            ("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all),
+            ("lever", LEVER_BOARDS, lv_fetch_all),
+            ("ashby", ASHBY_BOARDS, ash_fetch_all),
+        ]
+        sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
 
-    async def _process(raw: RawJob, source_key: str, new_budget: list[int]) -> str | None:
-        # Skip enrichment entirely if this row already exists unchanged.
-        async with _db.async_session_factory() as db:
-            job_hash = compute_hash(raw)
-            existing = (await db.execute(
-                select(Job).where(Job.source == source_key, Job.external_id == raw["external_id"])
-            )).scalar_one_or_none()
-            if existing and existing.hash == job_hash:
-                return "unchanged"
-
-        # Genuinely new or changed — respect the per-source budget.
-        if new_budget[0] <= 0:
-            return "deferred"
-        new_budget[0] -= 1
-        async with sem:
-            return await _stage_with_retry(raw, source_key)
-
-    stats["deferred"] = 0
-    for source_key, rows in by_source.items():
-        budget = [PER_SOURCE_NEW_CAP]
-        # Process serially by source so cap logic stays deterministic, but
-        # enrichment itself is parallel via the semaphore inside _stage.
-        tasks = [asyncio.create_task(_process(r, source_key, budget)) for r in rows]
-        for t in asyncio.as_completed(tasks):
-            try:
-                result = await t
-                if result is None:
+        # Group fetched jobs per source so we can apply the cap to genuinely NEW
+        # rows only (unchanged/existing rows are cheap — no enrichment call).
+        by_source: dict[str, list[RawJob]] = {}
+        for _kind, _boards, fetch in fetchers:
+            async for source_key, raw in fetch():
+                if source_key in disabled_keys:
                     continue
-                key = "skipped" if result == "skipped_blocked" else result
-                stats[key] = stats.get(key, 0) + 1
-            except Exception as exc:
-                logger.exception("ingest error in %s: %s", source_key, exc)
-                stats["errors"] += 1
+                stats["fetched"] += 1
+                by_source.setdefault(source_key, []).append(raw)
+                # Any row that came back means the source's HTTP feed is alive.
+                seen_sources.add(source_key)
 
-    # Auto-expire pass: published jobs whose external_id vanished from the
-    # source feed for N consecutive runs. Guards against mass-expire on a
-    # transient source outage by only inspecting boards that returned ≥1 row.
-    stats["auto_expired"] = 0
-    await _auto_expire_missing(by_source, stats)
-    # Date-based: flip published rows whose valid_through has elapsed.
-    await _auto_expire_past_valid_through(stats)
+        async def _process(raw: RawJob, source_key: str, new_budget: list[int]) -> str | None:
+            # Skip enrichment entirely if this row already exists unchanged.
+            async with _db.async_session_factory() as db:
+                job_hash = compute_hash(raw)
+                existing = (await db.execute(
+                    select(Job).where(Job.source == source_key, Job.external_id == raw["external_id"])
+                )).scalar_one_or_none()
+                if existing and existing.hash == job_hash:
+                    return "unchanged"
 
-    # Stamp JobSource.last_run_* in a short final transaction.
-    async def _stamp_op() -> None:
-        async with _db.async_session_factory() as db:
-            now = datetime.utcnow()
-            for kind, boards, _ in fetchers:
-                for board_slug, _ in boards:
-                    key = f"{kind}:{board_slug}"
-                    src = (await db.execute(select(JobSource).where(JobSource.key == key))).scalar_one_or_none()
-                    if src:
-                        src.last_run_at = now
-            await db.commit()
+            # Genuinely new or changed — respect the per-source budget.
+            if new_budget[0] <= 0:
+                return "deferred"
+            new_budget[0] -= 1
+            async with sem:
+                return await _stage_with_retry(raw, source_key)
 
-    try:
-        await _retry_db(_stamp_op, "stamp_last_run_at")
-    except Exception as exc:
-        logger.warning("failed to stamp JobSource.last_run_at: %s", exc)
+        stats["deferred"] = 0
+        for source_key, rows in by_source.items():
+            budget = [PER_SOURCE_NEW_CAP]
+            # Process serially by source so cap logic stays deterministic, but
+            # enrichment itself is parallel via the semaphore inside _stage.
+            tasks = [asyncio.create_task(_process(r, source_key, budget)) for r in rows]
+            for t in asyncio.as_completed(tasks):
+                try:
+                    result = await t
+                    if result is None:
+                        continue
+                    key = "skipped" if result == "skipped_blocked" else result
+                    stats[key] = stats.get(key, 0) + 1
+                except Exception as exc:
+                    logger.exception("ingest error in %s: %s", source_key, exc)
+                    stats["errors"] += 1
 
-    # Wave 4 #14: auto-disable sources whose admin-rejection rate exceeds
-    # threshold. Catches drifting sources that start emitting non-AI roles
-    # before the admin queue gets buried. PhonePe-RCA-026 in hindsight.
-    try:
-        auto_disabled = await check_source_rejection_rates()
-        stats["auto_disabled_high_reject"] = len(auto_disabled)
-        for src, rej, total, rate in auto_disabled:
-            logger.warning(
-                "auto-disabled source %s: %d/%d rejected (%.0f%%) — exceeds threshold",
-                src, rej, total, rate * 100,
-            )
-    except Exception as exc:
-        logger.warning("rejection-rate check failed (non-fatal): %s", exc)
-        stats["auto_disabled_high_reject"] = 0
+        # Auto-expire pass: published jobs whose external_id vanished from the
+        # source feed for N consecutive runs. Guards against mass-expire on a
+        # transient source outage by only inspecting boards that returned ≥1 row.
+        stats["auto_expired"] = 0
+        await _auto_expire_missing(by_source, stats)
+        # Date-based: flip published rows whose valid_through has elapsed.
+        await _auto_expire_past_valid_through(stats)
 
-    logger.info("jobs ingest complete: %s", stats)
-    return stats
+        # Wave 4 #14: auto-disable sources whose admin-rejection rate exceeds
+        # threshold. Catches drifting sources that start emitting non-AI roles
+        # before the admin queue gets buried. PhonePe-RCA-026 in hindsight.
+        try:
+            auto_disabled = await check_source_rejection_rates()
+            stats["auto_disabled_high_reject"] = len(auto_disabled)
+            for src, rej, total, rate in auto_disabled:
+                logger.warning(
+                    "auto-disabled source %s: %d/%d rejected (%.0f%%) — exceeds threshold",
+                    src, rej, total, rate * 100,
+                )
+        except Exception as exc:
+            logger.warning("rejection-rate check failed (non-fatal): %s", exc)
+            stats["auto_disabled_high_reject"] = 0
+
+        logger.info("jobs ingest complete: %s", stats)
+        return stats
+    finally:
+        # ALWAYS stamp last_run_at for every source we confirmed alive, even if
+        # the body raised. Sources never reached stay stale — accurately. The
+        # batch-stamp-at-the-end pattern this replaces was the silent-freeze
+        # vector documented in RCA-029 (8-day outage) and RCA-038.
+        await _stamp_seen_sources(seen_sources)
 
 
 # ---------------------------------------------------------------- Wave 4 #14

@@ -354,4 +354,85 @@ async def test_auto_expire_ignores_other_statuses():
         rows = {j.external_id: j.status for j in (await db.execute(select(Job))).scalars().all()}
         assert rows == {"gh-draft": "draft", "gh-reject": "rejected", "gh-already": "expired"}
     await close_db()
+
+
+# ---------- last_run_at finally-stamp (RCA-038) ----------
+
+@pytest.mark.asyncio
+async def test_stamp_seen_sources_updates_last_run_at():
+    """The helper bumps last_run_at for every source key in the set."""
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:anthropic", kind="greenhouse",
+                         label="Anthropic", tier=1, enabled=1))
+        db.add(JobSource(key="ashby:cohere", kind="ashby",
+                         label="Cohere", tier=1, enabled=1))
+        # Source NOT in the seen set — should remain stale.
+        db.add(JobSource(key="lever:never_reached", kind="lever",
+                         label="Never", tier=1, enabled=1))
+        await db.commit()
+
+    await jobs_ingest._stamp_seen_sources({"greenhouse:anthropic", "ashby:cohere"})
+
+    async with db_module.async_session_factory() as db:
+        rows = {s.key: s.last_run_at
+                for s in (await db.execute(select(JobSource))).scalars().all()}
+    assert rows["greenhouse:anthropic"] is not None
+    assert rows["ashby:cohere"] is not None
+    assert rows["lever:never_reached"] is None  # stayed stale, accurately
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_run_daily_ingest_stamps_last_run_at_even_if_downstream_raises():
+    """RCA-029 + RCA-038: a single uncaught exception in a downstream phase
+    (auto-expire, rejection-rate check, …) used to silently freeze every
+    source's last_run_at — even sources whose probe/fetch had succeeded —
+    because the stamp was a single batch transaction at the end. The
+    finally-block stamp means partial progress is captured: any source we
+    confirmed alive this run gets stamped, regardless of what blew up later.
+    """
+    await _setup()
+    async with db_module.async_session_factory() as db:
+        db.add(JobSource(key="greenhouse:anthropic", kind="greenhouse",
+                         label="Anthropic", tier=1, enabled=1))
+        await db.commit()
+
+    # Probe succeeds and reports the source enabled — ensures the source is
+    # added to seen_sources before any later phase has a chance to fail.
+    async def _fake_probe_all():
+        return {"greenhouse:anthropic": {"enabled": True}}
+
+    # Empty fetchers — irrelevant to this test, just want the body to advance
+    # to the auto-expire phase quickly.
+    async def _empty_fetch():
+        if False:
+            yield None  # pragma: no cover — never yields
+
+    # Force the body to raise mid-flight, AFTER seen_sources has been populated
+    # by the probe but BEFORE control reaches the (now-removed) end-of-run
+    # stamp. The old code path lost the stamp here; the new finally captures it.
+    async def _boom(*_a, **_k):
+        raise RuntimeError("simulated downstream failure")
+
+    # probe_all is imported inline inside run_daily_ingest, so patch the source
+    # module — the function-local `from … import probe_all` re-resolves at call
+    # time and picks up the patched attribute.
+    with patch("app.services.jobs_sources.probe.probe_all", new=_fake_probe_all), \
+         patch("app.services.jobs_ingest.gh_fetch_all", new=_empty_fetch), \
+         patch("app.services.jobs_ingest.lv_fetch_all", new=_empty_fetch), \
+         patch("app.services.jobs_ingest.ash_fetch_all", new=_empty_fetch), \
+         patch("app.services.jobs_ingest._auto_expire_past_valid_through",
+               new=AsyncMock(side_effect=_boom)):
+        with pytest.raises(RuntimeError, match="simulated downstream failure"):
+            await jobs_ingest.run_daily_ingest()
+
+    # Despite the exception, the source we confirmed alive must be stamped.
+    async with db_module.async_session_factory() as db:
+        src = (await db.execute(
+            select(JobSource).where(JobSource.key == "greenhouse:anthropic")
+        )).scalar_one()
+    assert src.last_run_at is not None, \
+        "RCA-038 regression: downstream raise silently froze last_run_at"
+    await close_db()
     await close_db()
