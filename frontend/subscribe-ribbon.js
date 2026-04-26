@@ -1,10 +1,8 @@
 /* Subscribe-funnel ribbon — anonymous & logged-in flows.
  *
- * One channel per surface. Anonymous: single button → "/" (home).
+ * One channel per surface. Anonymous: single button → "/?login=1" (sign-in modal).
  * Logged in: single checkbox reflecting notify_<field> from /api/profile.
  *            Toggle → PATCH /api/profile { notify_<field>: bool } → toast.
- *
- * Dismissal: per-surface, persists 30 days via localStorage.
  *
  * Hosting page contract:
  *   <link rel="stylesheet" href="/subscribe-ribbon.css">
@@ -22,31 +20,6 @@
     'blog-post': { field: 'notify_blog',        title: 'Blog',        lede: 'Subscribe to receive new blog posts.' }
   };
 
-  var DISMISS_DAYS = 30;
-  var DISMISS_MS = DISMISS_DAYS * 24 * 60 * 60 * 1000;
-
-  function dismissKey(surface) {
-    return 'subscribe-ribbon:dismissed:' + surface;
-  }
-
-  function isDismissed(surface) {
-    try {
-      var raw = window.localStorage.getItem(dismissKey(surface));
-      if (!raw) return false;
-      var ts = parseInt(raw, 10);
-      if (!isFinite(ts)) return false;
-      return (Date.now() - ts) < DISMISS_MS;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function setDismissed(surface) {
-    try {
-      window.localStorage.setItem(dismissKey(surface), String(Date.now()));
-    } catch (_) { /* private mode / quota — degrade silently */ }
-  }
-
   function escText(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -56,12 +29,8 @@
   function renderHead(titleText, ledeText) {
     return (
       '<div class="subscribe-ribbon-head">' +
-        '<div>' +
-          '<p class="subscribe-ribbon-title">' + escText(titleText) + '</p>' +
-          '<p class="subscribe-ribbon-lede">' + escText(ledeText) + '</p>' +
-        '</div>' +
-        '<button type="button" class="subscribe-ribbon-dismiss" ' +
-                'aria-label="Dismiss subscribe banner">×</button>' +
+        '<p class="subscribe-ribbon-title">' + escText(titleText) + '</p>' +
+        '<p class="subscribe-ribbon-lede">' + escText(ledeText) + '</p>' +
       '</div>'
     );
   }
@@ -127,15 +96,6 @@
     }
   }
 
-  function wireDismiss(root, surface) {
-    var btn = root.querySelector('.subscribe-ribbon-dismiss');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      setDismissed(surface);
-      root.setAttribute('data-dismissed', '1');
-    });
-  }
-
   function wireCheckboxes(root) {
     var labels = root.querySelectorAll('.subscribe-ribbon-check');
     Array.prototype.forEach.call(labels, function (label) {
@@ -185,15 +145,8 @@
     if (!root) return;
     var surface = root.getAttribute('data-surface') || 'unknown';
     var cfg = SURFACE_CONFIG[surface];
-    if (!cfg) {
-      root.setAttribute('data-dismissed', '1');
-      return;
-    }
-
-    if (isDismissed(surface)) {
-      root.setAttribute('data-dismissed', '1');
-      return;
-    }
+    // Unknown surface → leave hidden (default CSS state, no data-ready set).
+    if (!cfg) return;
 
     fetch('/api/profile', { credentials: 'same-origin' })
       .then(function (resp) {
@@ -204,7 +157,6 @@
       .then(function (profile) {
         if (profile) renderLoggedIn(root, profile, cfg);
         else         renderAnonymous(root, cfg);
-        wireDismiss(root, surface);
         if (profile) wireCheckboxes(root);
         root.setAttribute('data-ready', '1');
       })
@@ -212,7 +164,6 @@
         // Profile probe failed unexpectedly — fall back to anonymous flow
         // so the funnel still works for visitors with flaky connections.
         renderAnonymous(root, cfg);
-        wireDismiss(root, surface);
         root.setAttribute('data-ready', '1');
       });
   }

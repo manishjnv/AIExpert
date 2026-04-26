@@ -32,15 +32,7 @@
   display: block;
 }
 
-.subscribe-ribbon[data-dismissed="1"] {
-  display: none !important;
-}
-
 .subscribe-ribbon-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -61,33 +53,7 @@
   color: #c0c4cc;
 }
 
-.subscribe-ribbon-dismiss {
-  background: transparent;
-  border: 1px solid var(--sr-line);
-  color: var(--sr-ink-soft);
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: color 0.15s, border-color 0.15s;
-  font-family: inherit;
-  padding: 0;
-}
-
-.subscribe-ribbon-dismiss:hover {
-  color: var(--sr-paper);
-  border-color: var(--sr-accent);
-}
-
-.subscribe-ribbon-dismiss:focus-visible {
-  outline: 2px solid var(--sr-accent);
-  outline-offset: 2px;
-}
-
-/* Anonymous variant — 4 buttons. */
+/* Anonymous variant — single Subscribe button. */
 
 .subscribe-ribbon-buttons {
   display: flex;
@@ -129,7 +95,7 @@
   line-height: 1;
 }
 
-/* Logged-in variant — 4 inline checkboxes. */
+/* Logged-in variant — single inline checkbox. */
 
 .subscribe-ribbon-checkboxes {
   display: flex;
