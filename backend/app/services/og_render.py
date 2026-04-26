@@ -66,14 +66,70 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str,
     return lines
 
 
+def _draw_logo(img: Image.Image, x: int, y: int, size: int) -> None:
+    """Draw the site favicon (frontend/favicon.svg, a 32x32 mark) into
+    img at (x, y) scaled to `size` x `size`. Uses PIL primitives so we
+    don't take on a new SVG-renderer dep. Geometry mirrors the SVG:
+    rounded gold square, dark inverted-V stroke, dark dot at the apex,
+    dark horizontal crossbar — read as an abstract "A" / peak."""
+    s = size / 32  # SVG → output scale
+    draw = ImageDraw.Draw(img)
+    # Gold rounded background
+    rx = max(3, int(6 * s))
+    draw.rounded_rectangle(
+        [(x, y), (x + size, y + size)],
+        radius=rx, fill=ACCENT,
+    )
+    # The "A" stroke: M9,23 → L16,8 → L23,23 (SVG stroke width 2.5)
+    sw = max(2, int(2.5 * s))
+    pts = [
+        (x + int(9 * s), y + int(23 * s)),
+        (x + int(16 * s), y + int(8 * s)),
+        (x + int(23 * s), y + int(23 * s)),
+    ]
+    draw.line(pts, fill=BG, width=sw, joint="curve")
+    # Round-cap the apex (PIL's line caps are square) by overlaying a
+    # small filled circle at the peak.
+    cap_r = sw // 2
+    apex = pts[1]
+    draw.ellipse(
+        [(apex[0] - cap_r, apex[1] - cap_r), (apex[0] + cap_r, apex[1] + cap_r)],
+        fill=BG,
+    )
+    # Filled dot just below apex: (16, 13) r=2.5
+    cx, cy = x + int(16 * s), y + int(13 * s)
+    cr = max(2, int(2.5 * s))
+    draw.ellipse(
+        [(cx - cr, cy - cr), (cx + cr, cy + cr)],
+        fill=BG,
+    )
+    # Horizontal crossbar: (12, 19) → (20, 19), stroke width 2
+    bw = max(2, int(2 * s))
+    draw.line(
+        [(x + int(12 * s), y + int(19 * s)),
+         (x + int(20 * s), y + int(19 * s))],
+        fill=BG, width=bw,
+    )
+
+
 def _render_card(kicker: str, title: str, subtitle: Optional[str] = None) -> bytes:
     img = Image.new("RGB", (WIDTH, HEIGHT), BG)
     draw = ImageDraw.Draw(img)
 
-    # Wordmark (top-left) + gold accent bar
-    wm_font = _font("mono", 24)
-    draw.text((PAD_X, 56), "AUTOMATEEDGE", font=wm_font, fill=ACCENT)
-    draw.rectangle([(PAD_X, 98), (PAD_X + 180, 102)], fill=ACCENT)
+    # Logo (top-left) + wordmark to its right + gold accent bar below.
+    # Logo is a real visual element — gives the OG card recognizable
+    # brand identity in a feed before any text is read.
+    logo_size = 80
+    logo_x, logo_y = PAD_X, 48
+    _draw_logo(img, logo_x, logo_y, logo_size)
+    wm_font = _font("mono", 30)
+    wm_y = logo_y + (logo_size - 30) // 2 - 2
+    draw.text((logo_x + logo_size + 22, wm_y), "AUTOMATEEDGE",
+              font=wm_font, fill=ACCENT)
+    draw.rectangle(
+        [(PAD_X, logo_y + logo_size + 18), (PAD_X + 220, logo_y + logo_size + 22)],
+        fill=ACCENT,
+    )
 
     # Kicker (small, muted, uppercase)
     k_font = _font("mono", 22)

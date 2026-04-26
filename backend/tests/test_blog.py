@@ -497,6 +497,10 @@ def test_blog_post_template_renders_with_dummies():
         body_html="<p>body</p>",
         sidebar_html="<div>side</div>",
         post_nav_html="<nav>nav</nav>",
+        share_copy={
+            "twitter": "Hello\n\nhttps://example.com/blog/x",
+            "linkedin": "Hello\n\nA description\n\nhttps://example.com/blog/x",
+        },
     )
     assert html.strip().startswith("<!DOCTYPE html>")
     assert html.strip().endswith("</html>")

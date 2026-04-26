@@ -55,7 +55,7 @@ SCHEMA (exact shape — do not add or remove fields)
   "author": "<same as AUTHOR input>",
   "published": "<same as PUBLISHED_DATE>",
   "tags": ["build-in-public", "<tag-2>", "<tag-3>"],
-  "og_description": "<1–2 sentences, ≤ 200 chars, matches the post's lede. Readable by someone who has never heard of AutomateEdge. NEVER mention any technology, library, framework, or AI provider.>",
+  "og_description": "<1–2 sentences, ≤ 200 chars total. THE FIRST SENTENCE MUST BE ≤ 120 CHARS AND READ AS A COMPLETE, STANDALONE THOUGHT — Twitter/X truncates social-card descriptions around 125 chars, so a long opening sentence gets cut mid-word and looks broken. Conversational, plain English, like you're texting a friend the takeaway. No marketing voice ('powerful', 'comprehensive', 'cutting-edge'). No em-dash interrupting the first sentence. Matches the post's lede. Readable by someone who has never heard of AutomateEdge. NEVER mention any technology, library, framework, or AI provider.>",
   "lede": "<the italic one-sentence lede, plain text, no HTML — under 30 words>",
   "body_html": "<the post body as valid HTML fragment (no <html>, <head>, or <body> wrappers). Use <h2> for sections, <p> for paragraphs, <strong>/<em> for emphasis, <ul><li> for bullets, <hr> for the dividing rule before the closing line, and <a href=\"...\">anchor</a> for links. Escape inner quotes. NO inline <style> or <script>.>",
   "word_count": <integer — your count of words in body_html, stripped of tags. Target 800–1500.>,

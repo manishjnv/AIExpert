@@ -73,7 +73,7 @@ OUTPUT SCHEMA (exact shape — do not add or remove required fields)
   "schemas": {{SCHEMA_STACK_JSON}},
 
   "tags": ["<3-5 strings, first MUST be 'build-in-public'>", "..."],
-  "og_description": "<1-2 sentences, <= 200 chars, directly answers the target query. Plain language.>",
+  "og_description": "<1-2 sentences, ≤ 200 chars total. THE FIRST SENTENCE MUST BE ≤ 120 CHARS AND READ AS A COMPLETE, STANDALONE THOUGHT — Twitter/X truncates social-card descriptions around 125 chars, so a long opening sentence gets cut mid-word and looks broken. Conversational, plain English, like you're texting a friend the takeaway. No marketing voice ('powerful', 'comprehensive', 'cutting-edge', 'ultimate'). No em-dash interrupting the first sentence. Directly answers the target query.>",
   "og_image": "/og/blog/{{SLUG}}.png",
 
   "lede": "<one-sentence italic lede, plain text, no HTML, under 30 words. This becomes <p class='lede'>.>",
