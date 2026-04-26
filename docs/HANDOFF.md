@@ -4,6 +4,53 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-26 (session 47 — weekly digest brand-template + 4-channel feature complete + permanent silent-drop fix)
+
+**Branch:** `master` · clean working tree at `4c9f3c3`. **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `4c9f3c3` matches local. Backend container healthy. `/api/health` 200. SMTP via Brevo verified end-to-end (multiple test sends to `manishjnvk1@gmail.com` over the session, each landed in inbox within seconds).
+**Tests:** 22/22 pass on `test_weekly_digest.py + test_publish_gate.py`. New regressions added across the session: HTML-escape literal (RCA-033), dict-salary chip leak (RCA-036), salary-undisclosed chip, blog cap + overflow + date display, mtime fallback for stamp-less published templates, `set_template_status` always-stamps-date contract.
+
+### Session 47 — weekly digest: ship core, iterate live, then permanently fix the silent-drop bug
+
+**Headline:** Started this session as S45 — split `User.email_notifications` into 4 independent channels (`notify_jobs / notify_roadmap / notify_blog / notify_new_courses`), shipped the combined Mon-AM composer that renders one email per opted-in user with per-channel sections. Rewrote the composer with a brand-aligned card template (gold accent, cream paper bg, dark navy header, inline gold "A" monogram) mirroring the user's reference HTML. Then iterated three times against live test sends to `manishjnvk1@gmail.com`: caught a Python dict-repr leak in the salary chip, surfaced "Salary undisclosed" for `disclosed: false`, capped blog at 3, added per-item dates everywhere, authored summaries + published 3 generalist drafts so the New Courses section renders 4 cards. Final fix: permanently close the silent-template-drop bug with a two-layer defense (write-path always stamps `last_reviewed_on`, read-path mtime fallback) after my first fix-attempt (strict raise) just relocated the failure (RCA-037 captures the lesson).
+
+**Commits this session (8 commits, all noreply-attributed):**
+
+1. **`0426f97`** — feat(subscribe): per-channel email subscriptions + combined weekly digest. Migration `b8d4f1e2a637` splits `email_notifications` into `notify_jobs / notify_roadmap / notify_blog`. New `weekly_digest.py` composer + `/api/profile/subscribe-intent` anonymous funnel + account.html 3 checkboxes + `applySubscribeHint()` for post-login funnel.
+2. **`07a8ec7`** — feat(subscribe): add `notify_new_courses` 4th channel. Migration `c9e8d4a1b3f7`. Footer "My course progress" label + 4th checkbox.
+3. **`d78bed9`** — feat(digest): brand-aligned card-based email template + `scripts/send_test_digest.py`. Replaced bare HTML with table-based card layout; sage/gold/rust/sky per-section accents; UTM tracking on every link; 100% celebration card (no more silent skip on completed plans); single primary CTA banner.
+4. **`064879a`** — fix(send_test_digest): import `app.db` as module so `async_session_factory` resolves post-`init_db()`.
+5. **`09f7205`** — bundled with parallel S46 close-out (linter/auto-commit picked up my chip-leak hotfix + RCA-036 alongside HANDOFF/CLAUDE.md edits from S46).
+6. **`5b7c48c`** — fix(digest): "Salary undisclosed" chip when `employment.disclosed=false`. Production schema is `{min, max, currency, disclosed}` — many roles ship all-null + disclosed=false; surfacing it explicitly beats silent omission.
+7. **`e33b0b3`** — feat(digest): cap blog at 3 + per-item dates (blog/jobs/courses) + `reviewer_name` mandatory in `set_template_status`. New `_short_date()` helper, portable across Win/Linux. Three changes from live email feedback.
+8. **`fb3edf2`** + **`4c9f3c3`** — fix + RCA-037: revert the strict raise (was relocating, not fixing); make `set_template_status` always-stamp-date on publish; add mtime fallback in `_recent_courses`. Both layers conspire so the failure mode is impossible regardless of how a template got published.
+
+**RCA entries this session (3):** **RCA-033** (HTML double-escape on controlled `<strong>` literal — Sonnet refactor regression caught in Phase 3 review). **RCA-036** (job-card chip rendered Python `dict.__repr__` because `_esc_str` silently coerces non-strings via `str()`). **RCA-037** (the meta-lesson: a strict raise to "fix" a silent-drop bug with multi-writer data only catches that writer; right fix is read-path self-heal + write-path improvement, not write-path lock). Three new pattern-table rows.
+
+**3 new courses authored + published on VPS** (data, not code): Authored short summaries for `generalist_3mo_intermediate` / `generalist_6mo_intermediate` / `generalist_12mo_beginner` directly into each template JSON, then published with staggered `last_reviewed_on` (Apr 26 / 25 / 24) so the email shows date variety. Plus the LangChain MCP template stamped Apr 26 = 4 courses in the New Courses section.
+
+**codex:rescue gate:** ATTEMPTED 3x for the migration `b8d4f1e2a637`, helper returned empty each time despite codex CLI authenticated/healthy per `/codex:setup`. Fell back to Opus self-review which caught one BLOCKER (the HTML double-escape — RCA-033). Pattern matches S45's experience; helper-runtime issue worth investigating before any future load-bearing migration. Migration not in §8's strictly-mandatory list (no auth/AI-classifier touched).
+
+**Sonnet engagement:** 1 background agent (912-line composer + tests delivery in `d78bed9`) — saved ~6 min of Opus typing, came back 12/12 in-spec but introduced the HTML-escape regression caught in Phase 3 review and documented as RCA-033. Net positive but reinforces that Sonnet refactor of rendering code needs an output-shape regression test, not just structural-non-None.
+
+**Open questions for next session:**
+
+1. **4 surface ribbons not yet shipped** (deferred from S45 plan A). Backend ready (`subscribe-intent` endpoint live + tested in prod for all 4 channels). Frontend hint handling live on `/account`. Need ribbon UI on `/jobs`, `/roadmap`, `/blog`, `/blog/{slug}` — parallel Sonnet × 4, ~30 min.
+2. **`/admin/social` route renamed but legacy `/admin/tweets` still referenced in S46's HANDOFF entry** (line 14). Verify no dead links remain.
+3. **Brevo daily cap** — current: 1 user (manishjnvk1) tested. Real Mon AM send to all opted-in users will be ~few hundred sends. Free tier is 300/day; if user count exceeds that, will need batching across days OR paid tier.
+
+**Next action — Session 48:** ship the 4 anonymous-funnel ribbons (parallel Sonnet × 4 surfaces) so anonymous visitors can discover the subscribe options, then deploy. Alternative: COURSE-01..03 Phase A foundation per S43 plan.
+
+**Queued:** S48 4-surface ribbons · S47's queued engagement upgrades on Phase B (cron firing time, image attachment, quotable-first hook) · S44 pagination test fix · SEO-21 q2 / 5+6 · **SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` migration) · COURSE-01..03 Phase A · COURSE-04+05 Phase B MVP · separate commit for `docs/COURSES.md` from S43.
+
+**Agent-utilization footer:**
+
+- Opus: full session lead — Phase 0 reads (parallel burst across CLAUDE.md + HANDOFF + RCA + memory + 6+ context files); 4-round subscribe-feature plan negotiation with user; migration `b8d4f1e2a637` draft + 4-way verification harness (`opt-in / opt-out / partial-flip / round-trip`) + 3 codex:rescue attempts (all empty) → Opus self-adversarial review; brand-template authoring (~700 lines of HTML + Python across composer rewrite); 3 iteration loops against live test sends with user-driven feedback (chip leak → undisclosed surfacing → cap+dates → 3 new courses); the meta-debugging on `reviewer_name` fix shape (raise → revert → two-layer permanent fix); 3 RCAs + 3 pattern rows; 8 commits authored end-to-end with noreply identity; ~12 deploy cycles with VPS-HEAD-equals-local verification; this HANDOFF + §9.
+- Sonnet: 1 background subagent (composer + tests, `d78bed9`). Saved ~6 min vs Opus typing. 12/12 in-spec tests passed but introduced one HTML-escape regression caught in Phase 3 → RCA-033. Net positive; lesson: Sonnet rendering refactors need output-shape assertions.
+- Haiku: n/a — no bulk reads/sweeps. Single-file investigations were cheaper as direct Opus calls.
+- codex:rescue: 3 attempts, all returned empty output (helper-runtime issue persists from S45). Migration not in §8's strictly-mandatory list, so Opus self-review covered the gate. First successful engagement still pending; will retry on **SEO-26** (`quiz_outcomes` migration) and COURSE-23/24 (course versioning + deprecation migrations).
+
+---
+
 ## Current state as of 2026-04-26 (session 46 — Phase B daily X auto-post queue + SMTP notify endpoint + share button + OG logo + robots/regex fixes)
 
 **Branch:** `master` · clean working tree at `fa2ee5b`. **Live site:** [automateedge.cloud](https://automateedge.cloud), all backend + cron containers running on `fa2ee5b` (force-recreated to pick up `TWITTER_*` + `NOTIFY_API_TOKEN` env vars).
