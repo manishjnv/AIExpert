@@ -687,24 +687,44 @@ _BLOG_CSS = """
 """
 
 
-def _curate_share_copy(title: str, description: str, url: str) -> dict:
+def _curate_share_copy(
+    title: str,
+    description: str,
+    url: str,
+    quotable_lines: list | None = None,
+) -> dict:
     """Build default copy for the per-post share modal.
 
     Twitter/X cap is 280 chars. The intent URL pre-fills the textarea —
-    we keep the draft short so the user can extend, not trim.
+    we keep the draft short so the user can extend, not trim. If a
+    quotable line fits the budget (with URL + buffer), use it as the
+    hook — quotables outperform plain titles in feed engagement.
 
     LinkedIn's modern share-intent (`/sharing/share-offsite/?url=...`)
     no longer accepts pre-filled text — they pull title/description
     from OG tags. We still emit a curated draft so the user can copy it
-    into LinkedIn's compose box (the modal exposes a Copy button).
+    into LinkedIn's compose box. LinkedIn rewards a strong opening line:
+    when a quotable is available, lead with it; the title becomes the
+    second beat after the visual line break.
     """
-    twitter = f"{title}\n\n{url}"
-    linkedin = (
-        f"{title}\n\n"
-        f"{description}\n\n"
-        f"Read: {url}\n\n"
-        f"#AIEngineering #BuildInPublic"
-    )
+    quotable = ""
+    if quotable_lines and isinstance(quotable_lines, list):
+        first = next((q for q in quotable_lines if isinstance(q, str) and q.strip()), "")
+        quotable = first.strip()
+
+    # Twitter: prefer quotable hook when it fits. t.co wraps URLs to 23
+    # chars; reserve 23 + 4 (two newlines) = 27, leaving 253 for prose.
+    if quotable and len(quotable) <= 253:
+        twitter = f"{quotable}\n\n{url}"
+    else:
+        twitter = f"{title}\n\n{url}"
+
+    # LinkedIn: lead with the quotable; it's the first line readers see
+    # in the feed before the "see more" fold.
+    parts = [quotable] if quotable else []
+    parts.extend([title, description, f"Read: {url}", "#AIEngineering #BuildInPublic"])
+    linkedin = "\n\n".join(parts)
+
     return {"twitter": twitter, "linkedin": linkedin}
 
 
@@ -718,6 +738,7 @@ def _render_post(
     faqs: list | None = None,
     defined_terms: list | None = None,
     how_to: dict | None = None,
+    quotable_lines: list | None = None,
 ) -> str:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
@@ -725,7 +746,7 @@ def _render_post(
     og_image = f"{base}/og/blog/{slug}.png"
     post_nav_html = _render_post_nav(slug, base)
     sidebar_html = _render_post_sidebar(slug, title, url, base)
-    share_copy = _curate_share_copy(title, description, url)
+    share_copy = _curate_share_copy(title, description, url, quotable_lines)
     return _blog_template_env.get_template("blog/post.html").render(
         title=title,
         description=description,
@@ -1669,5 +1690,6 @@ async def post_dynamic(slug: str) -> HTMLResponse:
         faqs=payload.get("faqs") or None,
         defined_terms=payload.get("defined_terms") or None,
         how_to=payload.get("how_to") or None,
+        quotable_lines=payload.get("quotable_lines") or None,
     )
     return HTMLResponse(html)
