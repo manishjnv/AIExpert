@@ -434,7 +434,8 @@ def _card_html(j: Job) -> str:
     loc_chip = f'<span class="chip">📍 {esc(loc_str)}</span>' if loc_str else ""
     yrs_chip = f'<span class="chip">{esc(yrs_str)}</span>' if yrs_str else ""
     tldr = esc((d.get("tldr") or "")[:200])
-    return f"""<div class="card">
+    return f"""<div class="card" data-slug="{esc(j.slug)}">
+  <div class="match-ring" id="match-{esc(j.slug)}" style="display:none"></div>
   <h3><a href="/jobs/{esc(j.slug)}">{esc(j.title)}</a></h3>
   <div class="meta">{esc((d.get('company') or {}).get('name') or j.company_slug)} · Posted {esc(j.posted_on.isoformat() if j.posted_on else '')}</div>
   <div><span class="chip">{esc(j.designation)}</span> {loc_chip} {yrs_chip} {verified_chip}</div>
@@ -1091,11 +1092,10 @@ async function fetchMatch(j) {
 }
 
 $('apply').onclick = loadJobs;
-$('clear').onclick = () => {
-  FILTERS.forEach(k => { const el = $('f-' + k); if (el) el.value = ""; });
-  document.querySelectorAll('input[name=posted]').forEach(x => x.checked = x.value === "");
-  loadJobs();
-};
+// Clearing is a hard reset — full reload restores SSR pagination + the
+// authoritative empty-filter cards in one step instead of leaving the JS
+// view in a "no filters but limit=100" half-state.
+$('clear').onclick = () => { location.href = '/jobs'; };
 // Enter-to-apply in text inputs.
 ['f-city','f-company'].forEach(id => {
   $(id).addEventListener('keydown', e => { if (e.key === 'Enter') loadJobs(); });
@@ -1112,10 +1112,12 @@ $('f-q').addEventListener('input', () => {
 document.querySelectorAll('input[name=posted]').forEach(x => x.addEventListener('change', loadJobs));
 
 loadLocations();
-// SEO-10: when the URL already selects a paginated page (e.g. /jobs?page=3),
-// skip the auto-hydrate so the SSR-rendered page-N cards remain visible
-// until the user applies a filter. Filter interaction still calls loadJobs()
-// as before.
-if (!new URLSearchParams(location.search).has('page')) loadJobs();
+// The SSR cards + pagination ARE the authoritative initial view now that
+// the default filter set is empty. Don't auto-hydrate — only fire loadJobs
+// on user filter interaction. Match-rings still need fetching for the
+// SSR-rendered cards on logged-in sessions.
+document.querySelectorAll('.card[data-slug]').forEach(el => {
+  fetchMatch({slug: el.dataset.slug});
+});
 </script>
 """
