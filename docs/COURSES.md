@@ -103,6 +103,7 @@ These override any course-design "best practice" from outside sources. If a tact
 8. **Course-data privacy.** Public showcase pages only when learner opts in (`user.public_profile = True` per [reference_platform_config.md](../../.claude/projects/e--code-AIExpert/memory/reference_platform_config.md)). Streaks, progress, in-progress capstones — all private by default.
 9. **Reversibility.** Every catalog change (publish, deprecate, version bump) must be reversible without learner data loss.
 10. **The auto-curriculum stays as a "Custom / Explore" path**, not the marketing default. After Phase B, the visible default for new visitors is a flagship — auto-generated 3mo/6mo/12mo plans demote to "build a custom plan" mode.
+11. **Resources are the *top 3 best* for the subtopic, not arbitrary 3.** Each week ships exactly 3 video + 3 non-video resources, and each set of 3 is selected against a quality bar: authority of source (allowlist in §14), currency (≤24 months for AI topics; older only if foundational/canonical like Goodfellow et al.), practical applicability (has code/lab/exercise — not pure theory), and pedagogical fit (matches the week's level). The 1 primary per type is the *best of the 3* — the "if you only watch/read one." Generation prompt enforces this; AI review and the COURSE-03 capstone rubric gate on it; quality scorer adds a "Resource Quality" dimension.
 
 ## 3. Diagnosis — why current courses underperform
 
@@ -482,7 +483,10 @@ The full sequenced backlog. Each task has acceptance criteria. Status tracked in
 - [ ] [PlanTemplate Pydantic schema](../backend/app/curriculum/loader.py) updated; [PLAN_TEMPLATE_SCHEMA](../backend/app/ai/schemas.py) Gemini structured-output schema updated. Validator rejects weeks without exactly (3 video + 3 non-video) and exactly (1 primary video + 1 primary non-video).
 - [ ] `curriculum_generator.generate_curriculum()` accepts `format: Literal["flagship","short","sprint","micro"]` and selects the right prompt.
 - [ ] Backfill script: existing published templates need `type` field added. Heuristic: URL contains `youtube.com|youtu.be|vimeo.com|youtube-nocookie.com` → video; else non-video. First resource per type → `primary: true`. Idempotent.
-- **AC:** Generating a micro produces a 3-segment 1-2hr template. Generating a sprint produces a day-keyed 5-7d template. Existing flagship/short generation produces (3 video + 3 non-video) per week with (1 primary video + 1 primary non-video) marked. Backfill ran successfully on all existing templates. Schema rejects malformed mixes.
+- [ ] **Top-3-best selection criteria baked into the prompt**: each week's 3 video and 3 non-video resources must be selected against the quality bar from §2 constraint #11 — authority (prefer §14 allowlist sources), currency (≤24 months for AI topics; older only if canonical), practical applicability (code/lab/exercise required for at least 2 of 3 in each type), pedagogical fit (level-appropriate). Prompt explicitly references the §14 allowlists as preferred sources and instructs the model to reject Medium/dev.to/random-blog picks unless no allowlist alternative exists.
+- [ ] **"Resource Quality" dimension added to AI review** ([review_curriculum.txt](../backend/app/prompts/review_curriculum.txt)) — scored 1-10. Penalizes: stale URLs, non-allowlist sources where allowlist alternative exists, resources without code/exercise where applicable, choice paralysis (more than one resource doing essentially the same thing). Floor 7/10 to publish.
+- [ ] **Heuristic Resource Quality scorer** added to [quality_scorer.py](../backend/app/services/quality_scorer.py) — checks: (a) ≥ 60% of resources from §14 allowlist domains, (b) all URLs return HTTP 200 (existing link-health check), (c) no duplicates within a week, (d) primary-of-type is the highest-authority pick within its column.
+- **AC:** Generating a micro produces a 3-segment 1-2hr template. Generating a sprint produces a day-keyed 5-7d template. Existing flagship/short generation produces (3 video + 3 non-video) per week with (1 primary video + 1 primary non-video) marked AND ≥60% of resources from the §14 allowlists. Backfill ran successfully on all existing templates. Schema rejects malformed mixes. AI review's Resource Quality dimension scores ≥ 7/10 on a sample-published flagship.
 
 #### COURSE-03 — Capstone-rubric review checklist
 - [ ] New rubric section in admin Templates UI for flagship/sprint courses: "Capstone rubric pass/fail" checklist before publish
@@ -706,9 +710,100 @@ For each flagship, the rubric is a 6-point checklist that gates publication and 
 
 Each rubric must specify: (1) artifact type (deployed app / public repo / published writeup), (2) AI-evaluatable criteria via existing [evaluate.py](../backend/app/routers/evaluate.py) prompt, (3) minimum complexity / scope, (4) exclusions ("not just a tutorial fork"), (5) public-share requirement, (6) cert-eligibility threshold.
 
+**COURSE-03 capstone rubric — week-level resource quality gate (applies to all flagship / short / sprint courses):**
+
+Beyond the per-flagship capstone criteria above, every week of every course must pass these resource-quality gates before publish (per §2 constraint #11):
+
+- ✅ Exactly 3 video resources tagged `type: "video"` AND exactly 3 non-video tagged `type: "non-video"` (sprint courses: per-day 1-of-each instead of per-week 3-of-each).
+- ✅ Exactly 1 `primary: true` per type. Primary must be the highest-authority pick from that column (prefer §14 allowlist).
+- ✅ ≥ 60% of all resources sourced from the §14 allowlists. Free pass for canonical foundational picks (Goodfellow Deep Learning book, Bishop PRML, Russell-Norvig AIMA) even if not strictly on the allowlist.
+- ✅ All URLs return HTTP 200 at time of publish (existing link-health check).
+- ✅ No two resources in the same week teach essentially the same thing (heuristic: title overlap > 60% triggers manual review).
+- ✅ For AI/ML topics: published / updated within 24 months unless explicitly canonical. Stale resources auto-flagged in admin Templates UI.
+
+Failing any gate blocks publish; admin sees the specific failed gate in the Templates UI.
+
+## 14. Trusted-source allowlist for course resources
+
+This is the curated allowlist of domains/channels considered high-authority sources for course resources. Mirrors the [SEO-25 trusted_sources.json](../backend/data/trusted_sources.json) pattern — same suffix-matching logic (`endswith` not `contains`, to reject `fakemeta.com` while accepting `meta.com`).
+
+The generation prompt ([generate_curriculum.txt](../backend/app/prompts/generate_curriculum.txt) after COURSE-02) instructs the model to **prefer these sources** and **reject Medium/dev.to/random blog posts** unless no allowlist alternative covers the subtopic. The heuristic scorer in [quality_scorer.py](../backend/app/services/quality_scorer.py) gates on ≥ 60% of resources matching the allowlist.
+
+Implementation: a new `backend/data/course_resource_sources.json` file with same shape as `trusted_sources.json` — categories + domains/channels + canonical names. Backfilled from this list as part of COURSE-02.
+
+### 14.1 Video resources — trusted channels / instructors
+
+| Category | Channel / Instructor | URL pattern |
+|---|---|---|
+| Foundational explainers | 3Blue1Brown | `youtube.com/@3blue1brown` |
+| Foundational explainers | StatQuest with Josh Starmer | `youtube.com/@statquest` |
+| Build-from-scratch (highest authority) | Andrej Karpathy | `youtube.com/@AndrejKarpathy` |
+| Paper walkthroughs | Yannic Kilcher | `youtube.com/@YannicKilcher` |
+| Research summaries | Two Minute Papers | `youtube.com/@TwoMinutePapers` |
+| University courses | Stanford Online | `youtube.com/@stanfordonline` (CS229, CS224N, CS231N, CS336) |
+| University courses | MIT OpenCourseWare | `youtube.com/@mitocw` (6.S191, 6.034) |
+| University courses | UC Berkeley CS294 | university channels |
+| Research labs | DeepMind | `youtube.com/@Google_DeepMind` |
+| Research labs | OpenAI | `youtube.com/@OpenAI` |
+| Research labs | Anthropic | `youtube.com/@anthropic-ai` |
+| Industry pedagogy | DeepLearning.AI / Andrew Ng | `youtube.com/@Deeplearningai` |
+| Industry pedagogy | Hugging Face | `youtube.com/@HuggingFace` |
+| Industry pedagogy | fast.ai | `youtube.com/@howardjeremyp` |
+| Long-form depth | Lex Fridman (selective — interviews/depth, not introductions) | `youtube.com/@lexfridman` |
+| Long-form depth | Computerphile (selective) | `youtube.com/@Computerphile` |
+| Live coding (selective) | Sentdex / Two Minute Papers / Outlier (case-by-case) | various |
+
+**Excluded by default** (require explicit override + justification): general-tech YouTubers without AI credentials; bootcamp marketing channels; "10x your AI skills in 10 minutes" content-farm channels; courses behind paywalls when free equivalent exists on allowlist.
+
+### 14.2 Non-video resources — trusted domains / publishers
+
+| Category | Source | URL pattern |
+|---|---|---|
+| Papers | arXiv | `arxiv.org` |
+| Papers | Papers with Code | `paperswithcode.com` |
+| Lab / org docs | OpenAI | `openai.com/research`, `platform.openai.com/docs` |
+| Lab / org docs | Anthropic | `anthropic.com/research`, `docs.anthropic.com` |
+| Lab / org docs | Google DeepMind | `deepmind.google`, `deepmind.com` |
+| Lab / org docs | Meta AI | `ai.meta.com` |
+| Framework docs | Hugging Face | `huggingface.co/docs`, `huggingface.co/learn` |
+| Framework docs | PyTorch | `pytorch.org/docs`, `pytorch.org/tutorials` |
+| Framework docs | TensorFlow / JAX | `tensorflow.org`, `jax.readthedocs.io` |
+| Framework docs | LangChain | `python.langchain.com` |
+| Framework docs | LlamaIndex | `docs.llamaindex.ai` |
+| Framework docs | DSPy | `dspy.ai` |
+| Editorial / explainers | Distill.pub | `distill.pub` |
+| Editorial / explainers | The Gradient | `thegradient.pub` |
+| Editorial / explainers | DeepLearning.AI blog | `deeplearning.ai/the-batch` |
+| Practitioner blogs | Lilian Weng | `lilianweng.github.io` |
+| Practitioner blogs | Sebastian Raschka | `magazine.sebastianraschka.com` |
+| Practitioner blogs | Andrej Karpathy | `karpathy.github.io`, `karpathy.medium.com` (Karpathy-authored exception) |
+| Practitioner blogs | fast.ai | `fast.ai`, `course.fast.ai` |
+| Books (canonical, free PDFs preferred) | Deep Learning (Goodfellow et al.) | `deeplearningbook.org` |
+| Books | Pattern Recognition and Machine Learning (Bishop) | when free PDF available |
+| Books | AIMA (Russell-Norvig) | when free chapters available |
+| Books | fast.ai book | `course.fast.ai` |
+| University courses | Stanford CS229/CS224N/CS231N/CS336 | `cs229.stanford.edu`, `web.stanford.edu/class/cs224n`, etc. |
+| University courses | MIT OCW | `ocw.mit.edu` |
+| University courses | UC Berkeley CS294 / CS285 | university course pages |
+| Hands-on platforms | Kaggle Learn | `kaggle.com/learn` |
+| Hands-on platforms | Hugging Face Course / Spaces | `huggingface.co/learn`, `huggingface.co/spaces` |
+| Hands-on platforms | freeCodeCamp | `freecodecamp.org` (selective — AI/ML curriculum only) |
+| Code repositories | High-star GitHub repos | `github.com/{org}` where stars ≥ 5k AND last commit ≤ 12 months |
+| Code repositories | nanoGPT, micrograd, makemore (Karpathy) | `github.com/karpathy/*` |
+
+**Excluded by default**: Medium (except Karpathy-authored), dev.to, random WordPress sites, content-farm tutorial sites, paywalled tutorials when free equivalent exists, Stack Overflow answers (use as references only, not primary resources).
+
+### 14.3 Allowlist maintenance
+
+- Added to / removed from in same PR as a course generation that hits an edge case
+- Reviewed quarterly during the §8.3 quarterly refresh — sources that have gone stale or paywalled get removed
+- New entries require: ≥ 6 months of consistent quality output, ≥ 1 senior practitioner endorsement (admin judgment), no commercial / paywall / SEO-spam pattern
+- Tracked changes appended to the change log at the bottom of this doc
+
 ## Change log
 
 > Append a single entry per course-related commit. Include date, what changed, and link to commit / PR if applicable.
 
 - **2026-04-25** — COURSE-00 initial authoring of this strategy doc. Status board seeded with all 28 tasks across 6 phases. Capstone rubrics §13 left as placeholders to be filled by COURSE-04..COURSE-19. Memory pointer + MEMORY.md index entry committed alongside this file. Next action: COURSE-01 + COURSE-02 + COURSE-03 (foundation phase) — all three are parallel-safe and unblock Phase B.
 - **2026-04-25** — Plan additions in same session: (1) **COURSE-00.5** added — "Roadmap" top-nav + footer link to existing `/roadmap` hub (preserves SEO-24 equity; `/roadmap` URL stays stable). (2) **COURSE-02 expanded** — resources gain explicit `type: "video"|"non-video"` field and per-column `primary: true` marker (1 primary video + 1 primary non-video per week, replacing single global primary). PlanTemplate Pydantic + Gemini structured-output schemas updated; backfill script for existing templates. (3) **COURSE-29 added** — 2-column resource rendering on week cards (left = "🎥 Watch", right = "📖 Read & Build") with primary resource emphasized at top of each column; mobile stacks at ≤720px; sprints render per-day, micros stay linear. Format ladder table in §5.1 updated to reflect 2-column layout per format. Updated Next-action sequence: COURSE-00 → COURSE-00.5 → COURSE-01 → COURSE-02 → COURSE-03 → COURSE-29.
+- **2026-04-26** — **Top-3-best resource-quality bar** baked into the plan as a hard requirement. Each week's 3 video + 3 non-video resources must be the top 3 best for the subtopic, not arbitrary 3. Specifically: (1) **§2 constraint #11** added — quality bar (authority / currency / practical applicability / pedagogical fit) with the primary-of-type being the best of the 3. (2) **COURSE-02 AC expanded** — generation prompt enforces top-3 selection criteria + references §14 allowlists; new "Resource Quality" dimension in `review_curriculum.txt` AI rubric (floor 7/10); heuristic scorer in `quality_scorer.py` gates on ≥ 60% allowlist + no within-week duplicates + primary-of-type is highest-authority pick. (3) **COURSE-03 capstone rubric** — adds week-level resource-quality gates that block publish (3+3 count, 1+1 primary, ≥60% allowlist, all URLs 200, no duplicate teaching, ≤24-month currency unless canonical). (4) **§14 trusted-source allowlist** appended — 16 video channels (3Blue1Brown / Karpathy / Stanford / MIT / DeepMind / OpenAI / Anthropic / DeepLearning.AI / HF / fast.ai etc.) and ~25 non-video sources (arXiv / lab docs / framework docs / Distill / Lilian Weng / Sebastian Raschka / canonical books / university courses / Kaggle Learn / high-star GitHub). Implementation as `backend/data/course_resource_sources.json` (mirrors SEO-25 `trusted_sources.json` pattern + suffix-match logic). Allowlist maintained in same PR as course generation hitting edge cases; reviewed quarterly during §8.3 refresh.
