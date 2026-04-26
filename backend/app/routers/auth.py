@@ -221,6 +221,7 @@ async def me(user: User = Depends(get_current_user)):
         "notify_jobs": user.notify_jobs,
         "notify_roadmap": user.notify_roadmap,
         "notify_blog": user.notify_blog,
+        "notify_new_courses": user.notify_new_courses,
         "public_profile": user.public_profile,
         "learning_goal": user.learning_goal,
         "experience_level": user.experience_level,

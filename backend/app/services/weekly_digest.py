@@ -108,6 +108,7 @@ async def _eligible_users(db) -> list[User]:
         (User.notify_jobs == True)  # noqa: E712
         | (User.notify_roadmap == True)  # noqa: E712
         | (User.notify_blog == True)  # noqa: E712
+        | (User.notify_new_courses == True)  # noqa: E712
     )
     return list((await db.execute(stmt)).scalars().all())
 
@@ -291,6 +292,66 @@ async def _jobs_section(user: User, jobs_pool: list[Job], db) -> dict | None:
     }
 
 
+def _courses_section(recent_courses: list[dict]) -> dict | None:
+    """Build the new-courses section from templates published in the last 7 days.
+
+    ``recent_courses`` is a list of dicts produced by ``_recent_courses()``.
+    Returns None if no courses were published recently.
+    """
+    if not recent_courses:
+        return None
+
+    settings = get_settings()
+    base_url = (settings.public_base_url or "").rstrip("/")
+
+    items_html: list[str] = []
+    items_text: list[str] = []
+
+    for course in recent_courses:
+        title = course.get("title", "Untitled course")
+        summary = (course.get("summary") or "")[:200]
+        level = course.get("level", "")
+        duration = course.get("duration_months")
+        meta_bits = " · ".join(filter(None, [
+            level.title() if level else "",
+            f"{duration} months" if duration else "",
+        ]))
+        # Direct enroll/switch surface; account page hosts the plan switcher.
+        url = f"{base_url}/account"
+
+        items_html.append(f"""\
+<div style="border:1px solid #e4e4e4;border-radius:6px;padding:12px 16px;margin-bottom:10px;background:#fff">
+  <div style="font-size:15px;font-weight:600"><a href="{_esc_str(url)}" style="color:#1a1a1a;text-decoration:none">{_esc_str(title)}</a></div>
+  {f'<div style="color:#666;font-size:12px;margin-top:4px">{_esc_str(meta_bits)}</div>' if meta_bits else ""}
+  {f'<div style="color:#888;font-size:12px;margin-top:6px">{_esc_str(summary)}</div>' if summary else ""}
+</div>""")
+        items_text.append(
+            f"- {title}\n"
+            f"  {meta_bits}\n" if meta_bits else f"- {title}\n"
+        )
+        items_text.append(f"  {url}\n")
+
+    first_title = (recent_courses[0].get("title") or "New courses")[:80]
+
+    html = f"""\
+<div style="margin-bottom:24px">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#0a7;margin-bottom:6px">New Courses</div>
+  {"".join(items_html)}
+</div>"""
+
+    text = (
+        "[NEW COURSES]\n"
+        + "".join(items_text)
+    )
+
+    return {
+        "html": html,
+        "text": text,
+        "subject_hint": f"New course: {first_title}"[:80],
+        "score": 60,  # higher than blog (50), lower than a strong job/roadmap match
+    }
+
+
 def _blog_section(recent_posts: list[dict]) -> dict | None:
     """Build the blog section from recent posts (last 7 days).
 
@@ -384,6 +445,7 @@ def _compose_email(
     unsub_jobs_url = f"{base_url}/api/profile/digest/unsubscribe?t={unsub_tokens.get('jobs', '')}"
     unsub_roadmap_url = f"{base_url}/api/profile/digest/unsubscribe?t={unsub_tokens.get('roadmap', '')}"
     unsub_blog_url = f"{base_url}/api/profile/digest/unsubscribe?t={unsub_tokens.get('blog', '')}"
+    unsub_courses_url = f"{base_url}/api/profile/digest/unsubscribe?t={unsub_tokens.get('new_courses', '')}"
     unsub_all_url = f"{base_url}/api/profile/digest/unsubscribe?t={unsub_tokens.get('all', '')}"
 
     html_body = f"""\
@@ -395,6 +457,7 @@ def _compose_email(
   <p style="font-size:11px;color:#999;line-height:1.8">
     <a href="{_esc_str(unsub_jobs_url)}" style="color:#999">Unsubscribe from job alerts</a> &nbsp;·&nbsp;
     <a href="{_esc_str(unsub_roadmap_url)}" style="color:#999">Unsubscribe from progress reminders</a> &nbsp;·&nbsp;
+    <a href="{_esc_str(unsub_courses_url)}" style="color:#999">Unsubscribe from new course alerts</a> &nbsp;·&nbsp;
     <a href="{_esc_str(unsub_blog_url)}" style="color:#999">Unsubscribe from blog updates</a><br>
     <a href="{_esc_str(unsub_all_url)}" style="color:#999">Unsubscribe from all</a>
   </p>
@@ -406,6 +469,7 @@ def _compose_email(
         f"{combined_text}\n\n"
         f"Unsubscribe from job alerts: {unsub_jobs_url}\n"
         f"Unsubscribe from progress reminders: {unsub_roadmap_url}\n"
+        f"Unsubscribe from new course alerts: {unsub_courses_url}\n"
         f"Unsubscribe from blog updates: {unsub_blog_url}\n"
         f"Unsubscribe from all: {unsub_all_url}\n"
     )
@@ -438,6 +502,42 @@ def _recent_blog_posts(lookback_days: int = 7) -> list[dict]:
     return out
 
 
+def _recent_courses(lookback_days: int = 7) -> list[dict]:
+    """Return curriculum templates published (last_reviewed_on) within the
+    last ``lookback_days`` days. Reads from _meta.json on disk — call once
+    per run, not per user.
+    """
+    from app.curriculum.loader import _load_meta, load_template
+    cutoff = date.today() - timedelta(days=lookback_days)
+    out: list[dict] = []
+    meta = _load_meta()
+    for key, m in meta.items():
+        if not isinstance(m, dict) or m.get("status") != "published":
+            continue
+        last = m.get("last_reviewed_on", "")
+        if not last:
+            continue
+        try:
+            pub_date = date.fromisoformat(str(last)[:10])
+        except ValueError:
+            continue
+        if pub_date < cutoff:
+            continue
+        try:
+            tpl = load_template(key)
+        except Exception:
+            continue
+        out.append({
+            "key": key,
+            "title": tpl.title,
+            "summary": tpl.summary or "",
+            "duration_months": tpl.duration_months,
+            "level": tpl.level,
+            "published": str(last),
+        })
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Main cron entrypoint
 # ---------------------------------------------------------------------------
@@ -454,6 +554,7 @@ async def run_weekly_combined_digest() -> dict[str, int]:
 
     # Compute once per run (disk read, not per user).
     recent_posts = _recent_blog_posts()
+    recent_courses_list = _recent_courses()
 
     async with _db.async_session_factory() as db:
         users = await _eligible_users(db)
@@ -483,6 +584,12 @@ async def run_weekly_combined_digest() -> dict[str, int]:
                     if section is not None:
                         sections.append(section)
 
+                # New courses section.
+                if user.notify_new_courses:
+                    section = _courses_section(recent_courses_list)
+                    if section is not None:
+                        sections.append(section)
+
                 # Blog section.
                 if user.notify_blog:
                     section = _blog_section(recent_posts)
@@ -497,6 +604,7 @@ async def run_weekly_combined_digest() -> dict[str, int]:
                     "jobs": _unsub_token(user, "jobs"),
                     "roadmap": _unsub_token(user, "roadmap"),
                     "blog": _unsub_token(user, "blog"),
+                    "new_courses": _unsub_token(user, "new_courses"),
                     "all": _unsub_token(user),
                 }
 

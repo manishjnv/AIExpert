@@ -32,6 +32,7 @@ class ProfilePatch(BaseModel):
     notify_jobs: Optional[bool] = None
     notify_roadmap: Optional[bool] = None
     notify_blog: Optional[bool] = None
+    notify_new_courses: Optional[bool] = None
     public_profile: Optional[bool] = None
 
 
@@ -40,7 +41,7 @@ class DeleteConfirm(BaseModel):
 
 
 class SubscribeIntent(BaseModel):
-    channel: str  # "jobs" | "roadmap" | "blog" — validated in the handler
+    channel: str  # "jobs" | "roadmap" | "blog" | "new_courses" — validated in the handler
 
 
 # ---- Helpers ----
@@ -131,6 +132,7 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         "notify_jobs": user.notify_jobs,
         "notify_roadmap": user.notify_roadmap,
         "notify_blog": user.notify_blog,
+        "notify_new_courses": user.notify_new_courses,
         "public_profile": user.public_profile,
         "experience_level": user.experience_level,
         "is_admin": user.is_admin,
@@ -167,7 +169,7 @@ async def patch_profile(
     # Booleans are written as sent. For text fields, null is treated as
     # "leave alone" (not "clear") so a save with a blank input never wipes
     # a previously populated value. To clear, send an empty string.
-    BOOL_FIELDS = {"notify_jobs", "notify_roadmap", "notify_blog", "public_profile"}
+    BOOL_FIELDS = {"notify_jobs", "notify_roadmap", "notify_blog", "notify_new_courses", "public_profile"}
     updates = {}
     for field, value in raw.items():
         if field in BOOL_FIELDS:
@@ -293,7 +295,7 @@ async def export_profile(
 # Optional `c` claim names a single channel ("jobs"|"roadmap"|"blog") to flip
 # off; absence of `c` flips all three off (covers in-flight emails sent before
 # the per-channel toggle landed and the "Unsubscribe from all" link).
-_VALID_CHANNELS = {"jobs", "roadmap", "blog"}
+_VALID_CHANNELS = {"jobs", "roadmap", "blog", "new_courses"}
 
 
 @router.get("/digest/unsubscribe", response_class=Response)
@@ -323,6 +325,7 @@ async def digest_unsubscribe(t: str, db=Depends(get_db)):
         user.notify_jobs = False
         user.notify_roadmap = False
         user.notify_blog = False
+        user.notify_new_courses = False
         scope_label = "all email digests"
     elif channel in _VALID_CHANNELS:
         setattr(user, f"notify_{channel}", False)
@@ -330,6 +333,7 @@ async def digest_unsubscribe(t: str, db=Depends(get_db)):
             "jobs": "weekly job alerts",
             "roadmap": "weekly progress reminders",
             "blog": "new blog post alerts",
+            "new_courses": "new course alerts",
         }[channel]
     else:
         raise HTTPException(status_code=400, detail="Invalid channel claim")

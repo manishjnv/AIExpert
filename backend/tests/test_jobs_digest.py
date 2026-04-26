@@ -29,6 +29,7 @@ async def _mk_user(
     notify_jobs: bool = True,
     notify_roadmap: bool = True,
     notify_blog: bool = True,
+    notify_new_courses: bool = True,
     with_plan: bool = True,
 ) -> User:
     async with db_module.async_session_factory() as db:
@@ -37,6 +38,7 @@ async def _mk_user(
             notify_jobs=notify_jobs,
             notify_roadmap=notify_roadmap,
             notify_blog=notify_blog,
+            notify_new_courses=notify_new_courses,
             experience_level="advanced",
         )
         db.add(u)

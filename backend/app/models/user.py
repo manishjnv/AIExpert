@@ -28,6 +28,7 @@ class User(PrimaryKeyMixin, TimestampMixin, Base):
     notify_jobs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_roadmap: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_blog: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    notify_new_courses: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     public_profile: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_seen_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 

@@ -35,6 +35,7 @@ async def _mk_user(
     notify_jobs: bool = True,
     notify_roadmap: bool = True,
     notify_blog: bool = True,
+    notify_new_courses: bool = True,
     with_plan: bool = True,
     experience_level: str = "advanced",
 ) -> User:
@@ -45,6 +46,7 @@ async def _mk_user(
             notify_jobs=notify_jobs,
             notify_roadmap=notify_roadmap,
             notify_blog=notify_blog,
+            notify_new_courses=notify_new_courses,
             experience_level=experience_level,
         )
         db.add(u)
@@ -101,10 +103,11 @@ async def test_eligibility_includes_any_channel_on():
     """Any user with at least one channel on is eligible; all-off is not."""
     await _setup()
 
-    await _mk_user("jobs_only@t.com", notify_jobs=True, notify_roadmap=False, notify_blog=False)
-    await _mk_user("roadmap_only@t.com", notify_jobs=False, notify_roadmap=True, notify_blog=False)
-    await _mk_user("blog_only@t.com", notify_jobs=False, notify_roadmap=False, notify_blog=True)
-    await _mk_user("all_off@t.com", notify_jobs=False, notify_roadmap=False, notify_blog=False)
+    await _mk_user("jobs_only@t.com", notify_jobs=True, notify_roadmap=False, notify_blog=False, notify_new_courses=False)
+    await _mk_user("roadmap_only@t.com", notify_jobs=False, notify_roadmap=True, notify_blog=False, notify_new_courses=False)
+    await _mk_user("blog_only@t.com", notify_jobs=False, notify_roadmap=False, notify_blog=True, notify_new_courses=False)
+    await _mk_user("courses_only@t.com", notify_jobs=False, notify_roadmap=False, notify_blog=False, notify_new_courses=True)
+    await _mk_user("all_off@t.com", notify_jobs=False, notify_roadmap=False, notify_blog=False, notify_new_courses=False)
 
     async with db_module.async_session_factory() as db:
         users = await weekly_digest._eligible_users(db)
@@ -113,6 +116,7 @@ async def test_eligibility_includes_any_channel_on():
     assert "jobs_only@t.com" in emails
     assert "roadmap_only@t.com" in emails
     assert "blog_only@t.com" in emails
+    assert "courses_only@t.com" in emails
     assert "all_off@t.com" not in emails
     await close_db()
 
@@ -401,11 +405,12 @@ async def test_compose_email_has_four_unsub_links():
         "subject_hint": "Test",
         "score": 50,
     }
-    tokens = {"jobs": "TJ", "roadmap": "TR", "blog": "TB", "all": "TA"}
+    tokens = {"jobs": "TJ", "roadmap": "TR", "blog": "TB", "new_courses": "TC", "all": "TA"}
     _, _, html = weekly_digest._compose_email([section], user, "http://base", tokens)
 
     assert "Unsubscribe from job alerts" in html
     assert "Unsubscribe from progress reminders" in html
+    assert "Unsubscribe from new course alerts" in html
     assert "Unsubscribe from blog updates" in html
     assert "Unsubscribe from all" in html
     # Token values embedded in URLs.
@@ -413,3 +418,30 @@ async def test_compose_email_has_four_unsub_links():
         assert tok in html
 
     await close_db()
+
+
+def test_courses_section_renders_recent_courses():
+    """_courses_section includes title + summary + Enroll link."""
+    courses = [
+        {"key": "ai_eng_12wk", "title": "LLM Engineer Flagship",
+         "summary": "Production-grade LLM apps in 12 weeks.",
+         "duration_months": 3, "level": "intermediate",
+         "published": str(date.today())},
+        {"key": "mlops_4wk", "title": "MLOps Sprint",
+         "summary": "", "duration_months": 1, "level": "advanced",
+         "published": str(date.today() - timedelta(days=2))},
+    ]
+    with patch("app.services.weekly_digest.get_settings") as mock_settings:
+        s = MagicMock()
+        s.public_base_url = "https://automateedge.cloud"
+        mock_settings.return_value = s
+        result = weekly_digest._courses_section(courses)
+
+    assert result is not None
+    assert "LLM Engineer Flagship" in result["html"]
+    assert "MLOps Sprint" in result["html"]
+    assert "/account" in result["html"]  # enroll link
+    assert result["score"] == 60
+    assert "LLM Engineer Flagship" in result["subject_hint"]
+    # Empty list → None.
+    assert weekly_digest._courses_section([]) is None

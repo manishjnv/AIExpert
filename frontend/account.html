@@ -244,7 +244,11 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
           </div>
           <div class="toggle-row">
             <input type="checkbox" id="fNotifyRoadmap">
-            <label for="fNotifyRoadmap">Weekly course progress reminder</label>
+            <label for="fNotifyRoadmap">My course progress</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="fNotifyNewCourses">
+            <label for="fNotifyNewCourses">Newly added courses</label>
           </div>
           <div class="toggle-row">
             <input type="checkbox" id="fNotifyBlog">
@@ -353,6 +357,7 @@ function render() {
   document.getElementById('fLinkedin').value = profile.linkedin_url || '';
   document.getElementById('fNotifyJobs').checked = profile.notify_jobs !== false;
   document.getElementById('fNotifyRoadmap').checked = profile.notify_roadmap !== false;
+  document.getElementById('fNotifyNewCourses').checked = profile.notify_new_courses !== false;
   document.getElementById('fNotifyBlog').checked = profile.notify_blog !== false;
   document.getElementById('fPublicProfile').checked = profile.public_profile === true;
 
@@ -478,9 +483,14 @@ function copyVerifyLink(url) {
 function applySubscribeHint() {
   const params = new URLSearchParams(location.search);
   const hint = params.get('hint') || '';
-  const m = hint.match(/^subscribe-(jobs|roadmap|blog)$/);
+  const m = hint.match(/^subscribe-(jobs|roadmap|blog|new_courses)$/);
   if (!m) return;
-  const checkboxId = { jobs: 'fNotifyJobs', roadmap: 'fNotifyRoadmap', blog: 'fNotifyBlog' }[m[1]];
+  const checkboxId = {
+    jobs: 'fNotifyJobs',
+    roadmap: 'fNotifyRoadmap',
+    blog: 'fNotifyBlog',
+    new_courses: 'fNotifyNewCourses',
+  }[m[1]];
   const cb = document.getElementById(checkboxId);
   if (!cb) return;
   cb.checked = true;
@@ -515,6 +525,7 @@ async function saveProfile() {
     experience_level: document.getElementById('fLevel').value,
     notify_jobs: document.getElementById('fNotifyJobs').checked,
     notify_roadmap: document.getElementById('fNotifyRoadmap').checked,
+    notify_new_courses: document.getElementById('fNotifyNewCourses').checked,
     notify_blog: document.getElementById('fNotifyBlog').checked,
     public_profile: document.getElementById('fPublicProfile').checked,
   };
