@@ -29,12 +29,18 @@ class ProfilePatch(BaseModel):
     linkedin_url: Optional[str] = None
     learning_goal: Optional[str] = Field(None, max_length=200)
     experience_level: Optional[str] = None
-    email_notifications: Optional[bool] = None
+    notify_jobs: Optional[bool] = None
+    notify_roadmap: Optional[bool] = None
+    notify_blog: Optional[bool] = None
     public_profile: Optional[bool] = None
 
 
 class DeleteConfirm(BaseModel):
     confirm: str
+
+
+class SubscribeIntent(BaseModel):
+    channel: str  # "jobs" | "roadmap" | "blog" — validated in the handler
 
 
 # ---- Helpers ----
@@ -122,7 +128,9 @@ async def _profile_dict(user: User, db: AsyncSession) -> dict:
         "github_username": user.github_username,
         "linkedin_url": user.linkedin_url,
         "learning_goal": user.learning_goal,
-        "email_notifications": user.email_notifications,
+        "notify_jobs": user.notify_jobs,
+        "notify_roadmap": user.notify_roadmap,
+        "notify_blog": user.notify_blog,
         "public_profile": user.public_profile,
         "experience_level": user.experience_level,
         "is_admin": user.is_admin,
@@ -159,7 +167,7 @@ async def patch_profile(
     # Booleans are written as sent. For text fields, null is treated as
     # "leave alone" (not "clear") so a save with a blank input never wipes
     # a previously populated value. To clear, send an empty string.
-    BOOL_FIELDS = {"email_notifications", "public_profile"}
+    BOOL_FIELDS = {"notify_jobs", "notify_roadmap", "notify_blog", "public_profile"}
     updates = {}
     for field, value in raw.items():
         if field in BOOL_FIELDS:
@@ -279,9 +287,15 @@ async def export_profile(
     )
 
 
-# ---- Weekly jobs digest: one-click unsubscribe (no login) ----
+# ---- Weekly digest: one-click unsubscribe (no login) ----
 # Link comes from an email; user may not be signed in on this device.
-# The token is a short signed JWT (k=unsub) issued by services.jobs_digest.
+# The token is a short signed JWT (k=unsub) issued by services.weekly_digest.
+# Optional `c` claim names a single channel ("jobs"|"roadmap"|"blog") to flip
+# off; absence of `c` flips all three off (covers in-flight emails sent before
+# the per-channel toggle landed and the "Unsubscribe from all" link).
+_VALID_CHANNELS = {"jobs", "roadmap", "blog"}
+
+
 @router.get("/digest/unsubscribe", response_class=Response)
 async def digest_unsubscribe(t: str, db=Depends(get_db)):
     from jose import jwt, JWTError
@@ -303,13 +317,53 @@ async def digest_unsubscribe(t: str, db=Depends(get_db)):
     user = (await db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.email_notifications = False
+
+    channel = payload.get("c")
+    if channel is None:
+        user.notify_jobs = False
+        user.notify_roadmap = False
+        user.notify_blog = False
+        scope_label = "all email digests"
+    elif channel in _VALID_CHANNELS:
+        setattr(user, f"notify_{channel}", False)
+        scope_label = {
+            "jobs": "weekly job alerts",
+            "roadmap": "weekly progress reminders",
+            "blog": "new blog post alerts",
+        }[channel]
+    else:
+        raise HTTPException(status_code=400, detail="Invalid channel claim")
+
     await db.commit()
 
     html = ("<html><body style='font-family:sans-serif;max-width:500px;margin:60px auto;"
             "text-align:center;padding:24px'>"
             "<h2 style='color:#1a1a1a'>Unsubscribed</h2>"
-            f"<p style='color:#555'>{user.email} won't receive more jobs digests. "
-            "You can re-enable email notifications anytime on your "
+            f"<p style='color:#555'>{user.email} won't receive {scope_label}. "
+            "You can re-enable channels anytime on your "
             "<a href='/account' style='color:#0a7'>account page</a>.</p></body></html>")
     return Response(content=html, media_type="text/html")
+
+
+# ---- Anonymous subscribe-intent funnel ----
+# Anonymous visitors clicking a "Subscribe" CTA on /jobs / /roadmap / /blog
+# hit this endpoint. We don't capture their email here (login is the funnel),
+# we just redirect to login with a return URL that pre-checks the right
+# channel on /account after they sign in.
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+_limiter = Limiter(key_func=get_remote_address)
+
+
+@router.get("/subscribe-intent", response_class=Response)
+@_limiter.limit("20/hour")
+async def subscribe_intent(channel: str, request: Request):
+    if channel not in _VALID_CHANNELS:
+        raise HTTPException(status_code=400, detail="Invalid channel")
+    return RedirectResponse(
+        url=f"/?login=1&return=/account%3Fhint%3Dsubscribe-{channel}",
+        status_code=302,
+    )

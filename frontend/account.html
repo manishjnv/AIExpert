@@ -236,12 +236,24 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
       <div class="col-right">
 
         <!-- Notifications -->
-        <div class="section">
-          <div class="section-title">Preferences</div>
+        <div class="section" id="prefsSection">
+          <div class="section-title">Email subscriptions</div>
           <div class="toggle-row">
-            <input type="checkbox" id="fEmailNotif">
-            <label for="fEmailNotif">Weekly progress reminder emails</label>
+            <input type="checkbox" id="fNotifyJobs">
+            <label for="fNotifyJobs">New <a href="/jobs" style="color:var(--info)">job posts</a> matching your plan</label>
           </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="fNotifyRoadmap">
+            <label for="fNotifyRoadmap">Weekly course progress reminder</label>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="fNotifyBlog">
+            <label for="fNotifyBlog">New <a href="/blog" style="color:var(--info)">blog posts</a></label>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;line-height:1.5">
+            One combined email every Monday with a section per channel you've turned on.
+          </div>
+          <div class="section-title" style="margin-top:18px">Visibility</div>
           <div class="toggle-row">
             <input type="checkbox" id="fPublicProfile">
             <label for="fPublicProfile">Show my profile on the <a href="/leaderboard" style="color:var(--info)">public leaderboard</a></label>
@@ -339,8 +351,15 @@ function render() {
   document.getElementById('fLevel').value = profile.experience_level || 'intermediate';
   document.getElementById('fGithub').value = profile.github_username || '';
   document.getElementById('fLinkedin').value = profile.linkedin_url || '';
-  document.getElementById('fEmailNotif').checked = profile.email_notifications !== false;
+  document.getElementById('fNotifyJobs').checked = profile.notify_jobs !== false;
+  document.getElementById('fNotifyRoadmap').checked = profile.notify_roadmap !== false;
+  document.getElementById('fNotifyBlog').checked = profile.notify_blog !== false;
   document.getElementById('fPublicProfile').checked = profile.public_profile === true;
+
+  // Anonymous subscribe-funnel return: ?hint=subscribe-{jobs|roadmap|blog}.
+  // Pre-check the matching box, scroll the prefs section into view, and
+  // toast the user so the next "Save Changes" click subscribes them.
+  applySubscribeHint();
 
   // My Certificates — loaded async, rendered if any exist
   loadCertificates();
@@ -456,6 +475,24 @@ function copyVerifyLink(url) {
   );
 }
 
+function applySubscribeHint() {
+  const params = new URLSearchParams(location.search);
+  const hint = params.get('hint') || '';
+  const m = hint.match(/^subscribe-(jobs|roadmap|blog)$/);
+  if (!m) return;
+  const checkboxId = { jobs: 'fNotifyJobs', roadmap: 'fNotifyRoadmap', blog: 'fNotifyBlog' }[m[1]];
+  const cb = document.getElementById(checkboxId);
+  if (!cb) return;
+  cb.checked = true;
+  document.getElementById('prefsSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast('Click "Save Changes" to confirm your subscription');
+  // Strip the hint so a refresh doesn't re-flash the toast.
+  const cleanUrl = location.pathname + (params.toString() ? '?' + new URLSearchParams(
+    [...params.entries()].filter(([k]) => k !== 'hint')
+  ).toString() : '');
+  history.replaceState({}, '', cleanUrl);
+}
+
 async function saveProfile() {
   const ghUser = document.getElementById('fGithub').value.trim();
   const liUrl = document.getElementById('fLinkedin').value.trim();
@@ -476,7 +513,9 @@ async function saveProfile() {
     linkedin_url: liUrl || null,
     learning_goal: document.getElementById('fGoal').value || null,
     experience_level: document.getElementById('fLevel').value,
-    email_notifications: document.getElementById('fEmailNotif').checked,
+    notify_jobs: document.getElementById('fNotifyJobs').checked,
+    notify_roadmap: document.getElementById('fNotifyRoadmap').checked,
+    notify_blog: document.getElementById('fNotifyBlog').checked,
     public_profile: document.getElementById('fPublicProfile').checked,
   };
 

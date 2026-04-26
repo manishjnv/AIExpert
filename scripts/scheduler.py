@@ -3,7 +3,9 @@
 Runs three scheduled jobs in parallel asyncio tasks:
 
   - daily_jobs_sync      — every day 04:30 IST (23:00 UTC prior day)
-  - weekly_jobs_digest   — every Monday 09:00 IST (03:30 UTC Monday)
+  - weekly_digest        — every Monday 09:00 IST (03:30 UTC Monday).
+                           Sends one combined email per opted-in user with
+                           sections per opt-in channel (jobs / roadmap / blog).
   - quarterly_sync       — 1st of Jan/Apr/Jul/Oct at 02:00 UTC (unchanged)
 
 Each job runs in its own task so one slow run can't delay another. Failures
@@ -112,15 +114,18 @@ async def daily_jobs_loop() -> None:
 
 
 async def weekly_digest_loop() -> None:
-    # Mon 09:00 IST = Mon 03:30 UTC (weekday 0)
+    # Mon 09:00 IST = Mon 03:30 UTC (weekday 0). The combined composer
+    # consolidates the prior jobs-digest cron AND the prior Mon-08:00-UTC
+    # roadmap-reminder lifespan task — both ran weekly and produced
+    # disjoint emails before they were merged into one per-user send.
     while True:
         target = _next_weekly(0, 3, 30, datetime.now(timezone.utc))
-        await _sleep_until(target, "weekly_jobs_digest")
+        await _sleep_until(target, "weekly_digest")
         from app.db import close_db, init_db
-        from app.services.jobs_digest import run_weekly_digest
+        from app.services.weekly_digest import run_weekly_combined_digest
         await init_db()
         try:
-            await _run_guarded(run_weekly_digest, "weekly_jobs_digest")
+            await _run_guarded(run_weekly_combined_digest, "weekly_digest")
         finally:
             await close_db()
 
@@ -180,9 +185,9 @@ async def _test_mode_loop() -> None:
         await init_db()
         try:
             from app.services.jobs_ingest import run_daily_ingest
-            from app.services.jobs_digest import run_weekly_digest
+            from app.services.weekly_digest import run_weekly_combined_digest
             await _run_guarded(run_daily_ingest, "TEST daily_jobs_sync")
-            await _run_guarded(run_weekly_digest, "TEST weekly_jobs_digest")
+            await _run_guarded(run_weekly_combined_digest, "TEST weekly_digest")
         finally:
             await close_db()
 

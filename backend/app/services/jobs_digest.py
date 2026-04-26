@@ -47,10 +47,10 @@ def esc(s: object) -> str:
 
 
 async def _eligible_users(db) -> list[User]:
-    """Users with email notifications on AND ≥ 1 active plan."""
+    """Users with jobs notifications on AND ≥ 1 active plan."""
     stmt = (select(User).distinct()
             .join(UserPlan, UserPlan.user_id == User.id)
-            .where(User.email_notifications == True,
+            .where(User.notify_jobs == True,  # noqa: E712
                    UserPlan.status == "active"))
     return list((await db.execute(stmt)).scalars().all())
 

@@ -170,24 +170,25 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-26 (session 44 — `/jobs` filter + pagination consistency)
-**Last session summary (session 44):** User reported on `/jobs`: picking country `IN (45)` showed only 1 job, and clicking page 2 silently dropped the filter. RCA-032 — two coupled defects in the SSR-vs-JS state split. Fix shipped in two commits.
+**Last session date:** 2026-04-26 (session 45 — per-channel email subscriptions + combined weekly digest)
+**Last session summary (session 45):** Replaced single `User.email_notifications` boolean with three independent toggles (`notify_jobs / notify_roadmap / notify_blog`). New `weekly_digest.py` composer sends ONE combined Mon-AM email per opted-in user with a section per opt-in channel (course progress on top, then top job matches, then blog posts published in last 7 days). Empty section → omit silently. No-rendered-section → skip user. Subject = highest-`score` section's hint. New `/api/profile/subscribe-intent?channel={jobs|roadmap|blog}` redirects anonymous visitors to login → `/account?hint=subscribe-{channel}` (account JS pre-checks the right box, scrolls, toasts).
 
-- **Commit `6e2ea12` — hide SSR pagination once JS paints.** [jobs.py:1011-1015](backend/app/routers/jobs.py#L1011-L1015) — `loadJobs()` now hides `nav.pagination` whenever it runs. SSR markup still ships the links for Googlebot's crawl path (SEO-10); only the in-page UI affordance is suppressed. Considered Option B (filter-aware SSR pagination) — rejected: JS `limit=100` covers practically every filter combo; B duplicates filter logic across SSR and JS.
-- **Commit `fd60f63` — default `Any time` instead of `Last 7 days`.** [jobs.py:362-366](backend/app/routers/jobs.py#L362-L366) — flipped `checked` on the time radio. Location dropdown counts come from `/api/jobs/locations` which doesn't honor the time filter, so `IN (45)` advertised 45 while the page rendered 1. Verified live: `/api/jobs?country=IN&limit=200` returns 45.
-- **RCA-032 + 2 new patterns** in the watch table: (1) SSR pagination + JS-applied filter must round-trip filters or be hidden; (2) filter-option count must match the page's default filter set.
+- **Migration `b8d4f1e2a637`** — verified 4-way locally (opt-in/opt-out/partial-flip/round-trip via `.claude-tmp/verify_migration.py`). RCA-007 `server_default` applied. Dockerfile already runs `alembic upgrade head` before uvicorn, so the deploy-window race was a non-issue.
+- **codex:rescue gate** — attempted 3x, helper returned empty despite codex CLI authenticated. Fell back to Opus self-review which caught one BLOCKER (HTML double-escape in composer line 196 — see RCA-033) plus a deploy-window concern that turned out to be already mitigated.
+- **Sonnet** built ~525-line composer + 387-line tests in background; 12/12 in-spec tests passed. Phase 3 review caught the HTML escape regression (Sonnet wrapped a controlled `<strong>` literal in `_esc_str()`, would have rendered `&lt;strong&gt;` in users' inboxes). Fixed + regression test added.
+- **14 files changed** (4 new, 10 modified). Full backend suite: 813 passed, 1 skipped, 3 pre-existing pagination failures from S44 (verified via `git stash` round-trip — not introduced by this PR).
 
-**Deploy status:** Live at `fd60f63`. VPS HEAD `fd60f632e43b167b58cd9e3f57c4e360ad75e776` == local `fd60f63` ✓ (S41 rule). Container `Up (healthy)`. `/api/health` 200. `/jobs` page rendered with new JS confirmed via `curl | grep -c "JS view caps at limit=100"` → 1.
+**Deploy status:** uncommitted working tree on top of `fd60f63`. Per A-plan + playbook hard rule — no commit without user approval. The 4 anonymous-funnel ribbons (`/jobs`, `/roadmap`, `/blog`, `/blog/{slug}`) are deferred to S46.
 
-**Open questions:** (1) Filter-aware SSR pagination (Option B) deferred — wire filters through SSR URLs only when a single filter set produces >100 results. (2) "Showing N jobs" count indicator — defer until requested.
+**Open questions:** (1) 4 surface ribbons not yet shipped — backend ready, frontend hint handling live; need ribbon UI on each surface. (2) S44's pagination test failures need separate fix PR. (3) codex:rescue helper returned empty 3x — investigate before next load-bearing migration.
 
-**Next action — Session 45:** unchanged from S43 plan — **either** SEO-21 pillar cluster post 05 q2 **or** COURSE-01 + COURSE-02 + COURSE-03 Phase A foundation. The S43 suggestion flow + this session's `/jobs` UX fixes are independent.
+**Next action — Session 46:** ship the 4 surface ribbons (parallel Sonnet × 4), then deploy S45+S46 bundle together. Alternative: COURSE-01..03 Phase A.
 
-**Queued:** S45 SEO-21 q2 post · S46 SEO-21 posts 5+6 · **S47 SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` Alembic migration) · COURSE-01..COURSE-03 (Phase A foundation) · COURSE-04 + COURSE-05 (Phase B MVP — manual Opus authoring) · separate commit for `docs/COURSES.md` working-tree changes still pending from S43.
+**Queued:** S46 4-surface ribbons · pagination test fix · S47 SEO-21 q2 · S48 SEO-21 5+6 · **S49 SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` migration) · COURSE-01..03 Phase A · COURSE-04+05 Phase B MVP · separate commit for `docs/COURSES.md` from S43.
 
 **Agent-utilization footer:**
 
-- Opus: full session — Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + RCA + memory); bug investigation (re-read jobs.py end-to-end to identify SSR/JS split + SEO-10 hydration skip); two minimal edits (5 lines + 2 chars); pre-commit secret/TODO scans; commit + push with noreply env-vars (×2); SSH deploy + VPS-HEAD verification (×2); curl smoke + IN-jobs count verification; RCA-032 entry + pattern table updates; HANDOFF + §9 updates.
-- Sonnet: n/a — both edits ≤5 lines in a file already in Opus's hot read cache; subagent cold-start (~20-30s) + cache loss outweighed any token saving.
-- Haiku: n/a — no bulk sweep; deploy verification was 2 SSH calls, cheaper as direct Opus calls.
-- codex:rescue: n/a — frontend JS bug fix, no auth/AI-classifier/Alembic/jobs-classifier path touched. First engagement remains S47 (`quiz_outcomes` migration) and COURSE-23/COURSE-24 (course versioning + deprecation Alembic migrations).
+- Opus: full session lead — Phase 0 reads (parallel burst across 6 files); 4-round plan negotiation; migration draft + 4-way verification harness + 3 codex:rescue attempts (all empty) → Opus self-adversarial review; 8-file edit pass (model + profile router + auth /me + cleanup + main + scheduler + scripts/weekly_jobs_digest + account.html); stale-reference codebase sweep; Phase 3 line-by-line composer review (caught HTML-escape blocker); regression test authored; pytest + secrets/TODO scan; RCA-033 + pattern row + HANDOFF + this §9.
+- Sonnet: 1 background subagent · ~912-line delivery (composer 525 + tests 387) · cold-start + 5 min · 12/12 in-spec tests passed; one HTML-escape regression caught in Phase 3 + documented as RCA-033. Net: positive — saved ~6 min Opus typing across ~900 lines.
+- Haiku: n/a — no bulk sweep; verification ran via direct Opus pytest calls.
+- codex:rescue: 3 attempts, all returned empty output despite codex CLI authenticated/healthy per `/codex:setup`. Helper-runtime issue worth flagging. Migration not in §8's strictly-mandatory list, so Opus self-review covered the gate. First successful engagement still pending; will retry on S49 (`quiz_outcomes` migration) and COURSE-23/24 (course versioning + deprecation migrations).

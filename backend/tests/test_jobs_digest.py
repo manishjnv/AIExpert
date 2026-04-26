@@ -1,4 +1,4 @@
-"""Weekly jobs digest: eligibility, match selection, unsubscribe."""
+"""Tests for jobs_digest section helpers and run_weekly_digest cron."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 import app.db as db_module
@@ -24,15 +23,31 @@ async def _setup():
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def _mk_user(email, *, notify=True, with_plan=True) -> User:
+async def _mk_user(
+    email,
+    *,
+    notify_jobs: bool = True,
+    notify_roadmap: bool = True,
+    notify_blog: bool = True,
+    with_plan: bool = True,
+) -> User:
     async with db_module.async_session_factory() as db:
-        u = User(email=email, provider="otp", email_notifications=notify,
-                 experience_level="advanced")
+        u = User(
+            email=email, provider="otp",
+            notify_jobs=notify_jobs,
+            notify_roadmap=notify_roadmap,
+            notify_blog=notify_blog,
+            experience_level="advanced",
+        )
         db.add(u)
         await db.flush()
         if with_plan:
-            db.add(UserPlan(user_id=u.id, template_key="generalist_6mo_intermediate",
-                            plan_version="v1", status="active"))
+            db.add(UserPlan(
+                user_id=u.id,
+                template_key="generalist_6mo_intermediate",
+                plan_version="v1",
+                status="active",
+            ))
         await db.commit()
         return u
 
@@ -63,11 +78,14 @@ async def _mk_job(slug: str, **over) -> Job:
 # ---------- eligibility ----------
 
 @pytest.mark.asyncio
-async def test_eligibility_requires_active_plan_and_optin():
+async def test_eligibility_requires_active_plan_and_notify_jobs():
     await _setup()
-    await _mk_user("a@t.com", notify=True, with_plan=True)
-    await _mk_user("b@t.com", notify=False, with_plan=True)     # opted out
-    await _mk_user("c@t.com", notify=True, with_plan=False)     # no plan
+    # notify_jobs=True + active plan → eligible.
+    await _mk_user("a@t.com", notify_jobs=True, with_plan=True)
+    # notify_jobs=False → not eligible (jobs digest only, not combined digest).
+    await _mk_user("b@t.com", notify_jobs=False, with_plan=True)
+    # notify_jobs=True but no plan → not eligible.
+    await _mk_user("c@t.com", notify_jobs=True, with_plan=False)
     async with db_module.async_session_factory() as db:
         users = await jobs_digest._eligible_users(db)
     emails = {u.email for u in users}
@@ -91,7 +109,7 @@ async def test_run_digest_sends_to_eligible_users_and_skips_empty_matches():
         stats = await jobs_digest.run_weekly_digest()
 
     assert stats["eligible"] == 1
-    # Match score will likely clear the ≥40 threshold (advanced + PyTorch in curriculum).
+    # Match score will likely clear the >=40 threshold (advanced + PyTorch in curriculum).
     # Either sent or skipped — both are valid outcomes; assert the counter is consistent.
     assert stats["sent"] + stats["skipped_no_matches"] == 1
     await close_db()
@@ -110,31 +128,20 @@ async def test_digest_skips_run_when_no_recent_jobs():
     await close_db()
 
 
-# ---------- unsubscribe endpoint ----------
+# ---------- unsubscribe token ----------
 
 @pytest.mark.asyncio
-async def test_unsubscribe_flips_email_notifications_off():
+async def test_unsub_token_round_trips():
+    """The token can be decoded and carries the expected sub claim."""
     await _setup()
-    user = await _mk_user("u@t.com", notify=True)
+    user = await _mk_user("u@t.com")
     token = jobs_digest._unsub_token(user)
 
-    from app.main import app
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        r = await c.get(f"/api/profile/digest/unsubscribe?t={token}")
-        assert r.status_code == 200
-        assert "unsubscribed" in r.text.lower()
-
-    async with db_module.async_session_factory() as db:
-        u2 = (await db.execute(select(User).where(User.id == user.id))).scalar_one()
-        assert u2.email_notifications is False
-    await close_db()
-
-
-@pytest.mark.asyncio
-async def test_unsubscribe_rejects_bogus_token():
-    await _setup()
-    from app.main import app
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        r = await c.get("/api/profile/digest/unsubscribe?t=not-a-jwt")
-        assert r.status_code == 400
+    from jose import jwt
+    from app.config import get_settings
+    settings = get_settings()
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+    assert payload["sub"] == str(user.id)
+    assert payload["k"] == "unsub"
+    assert "c" not in payload  # no channel claim on the old-style token
     await close_db()

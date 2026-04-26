@@ -1,8 +1,9 @@
-"""Weekly jobs digest — Monday 09:00 IST cron entrypoint.
+"""Weekly combined digest — Monday cron entrypoint (manual fallback).
 
-Sends the top-5 match email to every user with email_notifications=True
-who has at least one active UserPlan. See app/services/jobs_digest.py
-and docs/JOBS.md §11.
+Sends one combined email per opted-in user with sections per opt-in
+channel (jobs / roadmap / blog). The canonical cron is
+[scripts/scheduler.py](./scheduler.py)::weekly_digest_loop; this script
+is the manual run fallback for ops.
 
 Run manually:
   docker compose exec backend python -m scripts.weekly_jobs_digest
@@ -18,10 +19,10 @@ import sys
 async def _main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     from app.db import close_db, init_db
-    from app.services.jobs_digest import run_weekly_digest
+    from app.services.weekly_digest import run_weekly_combined_digest
     await init_db()
     try:
-        stats = await run_weekly_digest()
+        stats = await run_weekly_combined_digest()
         print("digest stats:", stats)
     finally:
         await close_db()

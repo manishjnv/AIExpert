@@ -63,14 +63,15 @@ async def lifespan(app: FastAPI):
     from app.auth.google import register_google_oauth
     register_google_oauth()
 
-    # Start background cleanup tasks
+    # Start background cleanup tasks. The Monday weekly digest is now owned
+    # by scripts/scheduler.py (cron container), not the backend lifespan —
+    # see services/cleanup.py for the rationale.
     import asyncio
-    from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions, send_weekly_reminders
+    from app.services.cleanup import cleanup_expired_otps, cleanup_expired_sessions
     from app.services.pipeline_scheduler import pipeline_scheduler
     import app.db as _db
     otp_task = asyncio.create_task(cleanup_expired_otps(_db.async_session_factory))
     session_task = asyncio.create_task(cleanup_expired_sessions(_db.async_session_factory))
-    reminder_task = asyncio.create_task(send_weekly_reminders(_db.async_session_factory))
     pipeline_task = asyncio.create_task(pipeline_scheduler(_db.async_session_factory))
 
     yield
@@ -78,7 +79,6 @@ async def lifespan(app: FastAPI):
     # Cancel cleanup tasks
     otp_task.cancel()
     session_task.cancel()
-    reminder_task.cancel()
     pipeline_task.cancel()
     logger.info("Shutting down")
     await close_db()
