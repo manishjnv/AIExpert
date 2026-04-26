@@ -34,3 +34,7 @@ class TweetDraft(PrimaryKeyMixin, TimestampMixin, Base):
     posted_tweet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # X v1.1 media_id_string captured by the curator at queue time. NULL when
+    # the OG image was missing / fetch failed / X media upload failed —
+    # post still ships as text-only (graceful degradation).
+    media_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
