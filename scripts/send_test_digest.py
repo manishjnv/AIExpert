@@ -28,8 +28,9 @@ async def _main(email: str, dry_run: bool) -> int:
 
     from sqlalchemy import select
 
+    import app.db as _db
     from app.config import get_settings
-    from app.db import async_session_factory, close_db, init_db
+    from app.db import close_db, init_db
     from app.models.user import User
     from app.services.jobs_digest import _recent_published_jobs
     from app.services.weekly_digest import (
@@ -50,7 +51,7 @@ async def _main(email: str, dry_run: bool) -> int:
 
     await init_db()
     try:
-        async with async_session_factory() as db:
+        async with _db.async_session_factory() as db:
             user = (await db.execute(
                 select(User).where(User.email == email)
             )).scalar_one_or_none()
