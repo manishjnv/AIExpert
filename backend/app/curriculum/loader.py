@@ -239,14 +239,24 @@ def set_template_status(
 ) -> None:
     """Set publish status for a template ('draft' or 'published').
 
-    When status=='published' and reviewer_name is given, stamp
-    last_reviewed_on (UTC ISO date) + last_reviewed_by onto the meta entry.
+    When status=='published', reviewer_name is REQUIRED — both
+    last_reviewed_on (UTC ISO date) and last_reviewed_by are stamped onto
+    the meta entry. The "New courses" digest section depends on
+    last_reviewed_on; the prior contract (silently skip stamp if no name)
+    let publishers ship empty fields and silently drop the template from
+    user emails.
     """
+    if status == "published" and not reviewer_name:
+        raise ValueError(
+            "set_template_status: reviewer_name is required when status='published' "
+            "(otherwise last_reviewed_on is never stamped and the template is silently "
+            "excluded from the weekly digest 'New courses' section)"
+        )
     meta = _load_meta()
     entry = meta.get(key, {})
     entry["status"] = status
     entry["quality_score"] = quality_score
-    if status == "published" and reviewer_name:
+    if status == "published":
         entry["last_reviewed_on"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         entry["last_reviewed_by"] = reviewer_name
     meta[key] = entry

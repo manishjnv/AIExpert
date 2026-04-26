@@ -65,3 +65,17 @@ def test_update_quality_score_does_not_touch_stamp():
 def test_get_review_stamp_unknown_key():
     stamp = loader.get_review_stamp("nope")
     assert stamp == {"last_reviewed_on": None, "last_reviewed_by": None}
+
+
+def test_set_template_status_published_requires_reviewer_name():
+    """Direct call to set_template_status with status='published' must raise
+    when reviewer_name is missing — the prior contract silently skipped the
+    last_reviewed_on stamp, which excluded the template from the weekly
+    digest 'New courses' section. Closes the silent-empty-stamp hole."""
+    with pytest.raises(ValueError, match="reviewer_name is required"):
+        loader.set_template_status("k", "published", quality_score=95)
+    with pytest.raises(ValueError, match="reviewer_name is required"):
+        loader.set_template_status("k", "published", quality_score=95, reviewer_name="")
+    # Draft transitions don't need a reviewer (no audit trail at draft stage).
+    loader.set_template_status("k", "draft", quality_score=10)
+    assert loader.get_template_status("k")["status"] == "draft"

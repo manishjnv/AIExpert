@@ -341,6 +341,35 @@ async def test_send_sleeps_between_emails():
 # Test 7 — blog section renders recent posts
 # ---------------------------------------------------------------------------
 
+def test_blog_section_caps_at_max_and_renders_overflow_link():
+    """5 posts in → only 3 cards rendered + 'Read all 5 posts →' link."""
+    today = date.today()
+    posts = [
+        {"slug": f"post-{i}", "title": f"Post {i} title", "category": "ARTICLE",
+         "read_time": 5, "published": str(today - timedelta(days=i))}
+        for i in range(5)
+    ]
+    with patch("app.services.weekly_digest.get_settings") as mock_settings:
+        s = MagicMock()
+        s.public_base_url = "https://automateedge.cloud"
+        mock_settings.return_value = s
+        result = weekly_digest._blog_section(posts)
+
+    assert result is not None
+    html = result["html"]
+    # Top 3 visible
+    assert "Post 0 title" in html
+    assert "Post 1 title" in html
+    assert "Post 2 title" in html
+    # Beyond the cap → not rendered as cards
+    assert "Post 3 title" not in html
+    assert "Post 4 title" not in html
+    # Overflow link surfaces the surplus
+    assert "Read all 5 posts" in html
+    # Posted date appears in the meta line
+    assert today.strftime("%b") in html  # "Apr" or current month abbrev
+
+
 def test_blog_section_renders_recent_posts():
     """_blog_section includes post titles and links."""
     posts = [

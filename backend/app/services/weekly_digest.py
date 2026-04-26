@@ -43,7 +43,8 @@ logger = logging.getLogger("roadmap.digest.combined")
 
 MAX_EMAILS_PER_RUN = 400
 BATCH_SIZE = 50
-MAX_JOBS_IN_EMAIL = 3  # cap inbox fatigue; surplus links to /jobs
+MAX_JOBS_IN_EMAIL = 3   # cap inbox fatigue; surplus links to /jobs
+MAX_BLOG_IN_EMAIL = 3   # cap inbox fatigue; surplus links to /blog
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +72,19 @@ _BRAND = {
 
 def _esc_str(s: object) -> str:
     return _esc("" if s is None else str(s))
+
+
+def _short_date(raw: str | None) -> str:
+    """Parse an ISO date (YYYY-MM-DD or longer) and return 'Mon DD' format
+    (e.g. 'Apr 25'). Returns "" if the input is empty or unparseable —
+    callers should branch on truthiness before rendering."""
+    if not raw:
+        return ""
+    try:
+        d = date.fromisoformat(str(raw)[:10])
+    except ValueError:
+        return ""
+    return f"{d.strftime('%b')} {d.strftime('%d').lstrip('0')}"
 
 
 # ---------------------------------------------------------------------------
@@ -372,6 +386,7 @@ async def _jobs_section(user: User, jobs_pool: list[Job], db) -> dict | None:
         ])) or "—"
         url = _utm(f"{base_url}/jobs/{job.slug}", "jobs")
         score_pct = m["score"]
+        posted_str = _short_date(job.posted_on.isoformat()) if job.posted_on else ""
         # Match badge uses brand-success for high (>=70), brand-danger for medium.
         badge_bg = "#e3eee5" if score_pct >= 70 else "#f5e0d6"
         badge_fg = _BRAND["success"] if score_pct >= 70 else _BRAND["danger"]
@@ -436,6 +451,7 @@ async def _jobs_section(user: User, jobs_pool: list[Job], db) -> dict | None:
           <td valign="top">
             <div style="font-size:15px;font-weight:600;color:{_BRAND["navy"]};font-family:Georgia,'Times New Roman',serif">{_esc_str(job.title)}</div>
             <div style="font-size:13px;color:{_BRAND["ink_soft"]};margin-top:4px">{_esc_str(company_name)} &nbsp;·&nbsp; {_esc_str(loc_str)}</div>
+            {f'<div style="font-size:11px;color:{_BRAND["ink_mute"]};margin-top:4px">Posted {_esc_str(posted_str)}</div>' if posted_str else ""}
           </td>
           <td align="right" valign="top" style="white-space:nowrap;padding-left:8px">
             <span style="display:inline-block;padding:4px 10px;background:{badge_bg};color:{badge_fg};font-size:11px;font-weight:700;border-radius:999px">{score_pct}% match</span>
@@ -513,6 +529,7 @@ def _courses_section(recent_courses: list[dict]) -> dict | None:
         summary = (course.get("summary") or "")[:200]
         level = (course.get("level") or "").lower()
         duration = course.get("duration_months")
+        added_str = _short_date(course.get("published"))
         meta_bits = " · ".join(filter(None, [
             level.title() if level else "",
             f"{duration} months" if duration else "",
@@ -527,7 +544,7 @@ def _courses_section(recent_courses: list[dict]) -> dict | None:
       <span style="font-size:34px">{icon}</span>
     </td>
     <td style="padding:16px">
-      <div style="font-size:11px;color:{_BRAND["accent_soft"]};font-weight:700;letter-spacing:1px;text-transform:uppercase">{_esc_str(meta_bits)}</div>
+      <div style="font-size:11px;color:{_BRAND["accent_soft"]};font-weight:700;letter-spacing:1px;text-transform:uppercase">{_esc_str(meta_bits)}{f' &nbsp;·&nbsp; Added {_esc_str(added_str)}' if added_str else ''}</div>
       <div style="font-size:15px;font-weight:600;color:{_BRAND["navy"]};margin:4px 0;font-family:Georgia,'Times New Roman',serif">{_esc_str(title)}</div>
       <div style="font-size:13px;color:{_BRAND["ink_soft"]};line-height:1.5">{_esc_str(summary)}</div>
       <a href="{_esc_str(url)}" style="display:inline-block;margin-top:10px;font-size:13px;color:{_BRAND["accent_soft"]};font-weight:600;text-decoration:none">Enroll now →</a>
@@ -571,31 +588,41 @@ def _courses_section(recent_courses: list[dict]) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def _blog_section(recent_posts: list[dict]) -> dict | None:
-    """Build the blog section from posts published in the last 7 days."""
+    """Build the blog section from posts published in the last 7 days.
+
+    Caps display at MAX_BLOG_IN_EMAIL to reduce inbox fatigue; surplus is
+    surfaced via a "Read all N posts →" link to /blog.
+    """
     if not recent_posts:
         return None
 
     settings = get_settings()
     base_url = (settings.public_base_url or "").rstrip("/")
 
+    total = len(recent_posts)
+    visible = recent_posts[:MAX_BLOG_IN_EMAIL]
+
     items_html: list[str] = []
     items_text: list[str] = []
 
-    for i, post in enumerate(recent_posts):
+    for i, post in enumerate(visible):
         slug = post.get("slug", "")
         title = post.get("title", "Untitled")
         excerpt = (post.get("excerpt") or post.get("summary") or "")[:200]
         category = (post.get("category") or post.get("pillar_tier") or "ARTICLE").upper()
         read_time = post.get("read_time") or post.get("read_minutes")
+        date_str = _short_date(post.get("published"))
         meta_parts = [category]
         if read_time:
             meta_parts.append(f"{read_time} min read")
+        if date_str:
+            meta_parts.append(date_str)
         meta = " · ".join(meta_parts)
         url = _utm(f"{base_url}/blog/{slug}", "blog")
 
         # Last item — no bottom border
         border = (
-            "" if i == len(recent_posts) - 1
+            "" if i == len(visible) - 1
             else f"border-bottom:1px solid {_BRAND['line']}"
         )
 
@@ -617,7 +644,13 @@ def _blog_section(recent_posts: list[dict]) -> dict | None:
             f"  {url}\n"
         )
 
-    first_title = (recent_posts[0].get("title") or "New posts")[:60]
+    all_blog_url = _utm(f"{base_url}/blog", "blog_all")
+    overflow_link = ""
+    if total > MAX_BLOG_IN_EMAIL:
+        overflow_link = f"""\
+<a href="{_esc_str(all_blog_url)}" style="display:block;text-align:center;padding:14px;font-size:13px;color:{_BRAND["info"]};font-weight:600;text-decoration:none">Read all {total} posts →</a>"""
+
+    first_title = (visible[0].get("title") or "New posts")[:60]
 
     header = _section_header(
         icon="📝",
@@ -629,9 +662,11 @@ def _blog_section(recent_posts: list[dict]) -> dict | None:
 
     html = f"""\
 <tr><td style="padding:20px 28px 4px"><div style="height:1px;background:{_BRAND["line"]};margin-bottom:24px"></div>{header}</td></tr>
-<tr><td style="padding:16px 28px 20px">{"".join(items_html)}</td></tr>"""
+<tr><td style="padding:16px 28px 20px">{"".join(items_html)}{overflow_link}</td></tr>"""
 
     text = "[FROM THE BLOG]\n" + "".join(items_text)
+    if total > MAX_BLOG_IN_EMAIL:
+        text += f"\n+ {total - MAX_BLOG_IN_EMAIL} more — read all: {all_blog_url}\n"
 
     return {
         "html": html,
