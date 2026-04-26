@@ -164,7 +164,134 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/nav.css">
   {{ blog_css | safe }}
-</head>
+  <style>
+    /* Share button + modal — vanilla, scoped to .share-* classes. */
+    .share-bar {
+      display: flex; gap: 8px; align-items: center;
+      margin: 0 0 24px;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    }
+    .share-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; font-size: 13px;
+      background: transparent; color: #e8a849;
+      border: 1px solid #e8a84940; border-radius: 6px;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .share-btn:hover { background: #e8a84915; border-color: #e8a849; }
+    .share-btn svg { width: 14px; height: 14px; }
+
+    .share-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .share-overlay[data-open="1"] { display: flex; }
+    .share-modal {
+      background: #1a2029; color: #e8e4d8;
+      border: 1px solid #2a323d; border-radius: 10px;
+      width: 100%; max-width: 540px; max-height: 90vh;
+      overflow-y: auto;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      font-size: 14px;
+    }
+    .share-modal-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid #2a323d;
+    }
+    .share-modal-head h3 {
+      margin: 0; font-size: 15px; font-weight: 600; color: #e8a849;
+      font-family: inherit; letter-spacing: 0.02em;
+    }
+    .share-close {
+      background: transparent; border: 0; color: #94a3b8;
+      font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
+    }
+    .share-close:hover { color: #e8e4d8; }
+
+    .share-tabs {
+      display: flex; border-bottom: 1px solid #2a323d;
+    }
+    .share-tab {
+      flex: 1; padding: 12px 16px; background: transparent;
+      border: 0; border-bottom: 2px solid transparent;
+      color: #94a3b8; cursor: pointer; font-family: inherit;
+      font-size: 13px; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .share-tab[aria-selected="true"] {
+      color: #e8a849; border-bottom-color: #e8a849;
+    }
+    .share-tab:hover:not([aria-selected="true"]) { color: #c0c4cc; }
+
+    .share-panel { padding: 20px; display: none; }
+    .share-panel[data-active="1"] { display: block; }
+
+    .share-preview {
+      background: #0f1419; border: 1px solid #2a323d;
+      border-radius: 6px; padding: 12px;
+      display: flex; gap: 12px; margin-bottom: 14px;
+      font-size: 12px;
+    }
+    .share-preview img {
+      width: 80px; height: 80px; object-fit: cover;
+      border-radius: 4px; flex-shrink: 0; background: #2a323d;
+    }
+    .share-preview-meta { min-width: 0; }
+    .share-preview-meta .ttl {
+      font-size: 13px; font-weight: 600; color: #e8e4d8;
+      margin: 0 0 4px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .share-preview-meta .desc {
+      color: #94a3b8; margin: 0;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .share-textarea {
+      width: 100%; min-height: 130px; resize: vertical;
+      padding: 10px 12px; font-size: 13px; line-height: 1.5;
+      background: #0f1419; color: #e8e4d8;
+      border: 1px solid #2a323d; border-radius: 6px;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      box-sizing: border-box;
+    }
+    .share-textarea:focus { outline: none; border-color: #e8a849; }
+
+    .share-meta-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 8px; font-size: 11px; color: #94a3b8;
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+    .share-count.over { color: #fca5a5; }
+
+    .share-note {
+      font-size: 11px; color: #94a3b8;
+      margin: 12px 0 0; line-height: 1.5;
+    }
+
+    .share-actions {
+      display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+    }
+    .share-action {
+      flex: 1; min-width: 120px;
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 10px 14px; font-size: 13px; font-weight: 500;
+      background: #e8a849; color: #0f1419; border: 0; border-radius: 6px;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .share-action:hover { background: #f0b860; }
+    .share-action.secondary {
+      background: transparent; color: #c0c4cc; border: 1px solid #2a323d;
+    }
+    .share-action.secondary:hover { border-color: #e8a849; color: #e8a849; }
+    .share-action.copied { background: #16a34a; color: #fff; }
+  </style>
 <body>
   <main>
     <article class="post-article">
@@ -173,6 +300,16 @@
       </nav>
       <h1>{{ title }}</h1>
       <div class="meta-line">Published {{ published }} · Manish Kumar · Build in Public</div>
+      <div class="share-bar">
+        <button type="button" class="share-btn" data-share-open aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+            <polyline points="16 6 12 2 8 6"/>
+            <line x1="12" y1="2" x2="12" y2="15"/>
+          </svg>
+          Share
+        </button>
+      </div>
       {{ body_html | safe }}
       {{ post_nav_html | safe }}
     </article>
@@ -180,6 +317,72 @@
       {{ sidebar_html | safe }}
     </aside>
   </main>
+  {# Share modal — opened by the .share-btn in the article header. Two
+     tabs (LinkedIn, X), each with an editable curated draft and a
+     platform-specific action button. LinkedIn's modern share-intent
+     does not accept pre-filled text (they pull title/description from
+     OG tags), so the LinkedIn tab also exposes a Copy button — the
+     user pastes the curated text into LinkedIn's compose box.
+
+     Curated copy is delivered as a JSON island (`tojson` filter ensures
+     every quote / `</` / control char is escaped — no value can break
+     the JSON or close the <script> tag, see RCA-024 / RCA-027). #}
+  <div class="share-overlay" id="shareOverlay" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle" data-open="0">
+    <div class="share-modal">
+      <div class="share-modal-head">
+        <h3 id="shareModalTitle">Share this post</h3>
+        <button type="button" class="share-close" data-share-close aria-label="Close">×</button>
+      </div>
+      <div class="share-tabs" role="tablist">
+        <button type="button" class="share-tab" role="tab" data-share-tab="linkedin" aria-selected="true">LinkedIn</button>
+        <button type="button" class="share-tab" role="tab" data-share-tab="twitter" aria-selected="false">X (Twitter)</button>
+      </div>
+
+      <div class="share-panel" data-share-panel="linkedin" data-active="1" role="tabpanel">
+        <div class="share-preview">
+          <img src="{{ og_image }}" alt="" loading="lazy">
+          <div class="share-preview-meta">
+            <p class="ttl">{{ title }}</p>
+            <p class="desc">{{ description }}</p>
+          </div>
+        </div>
+        <textarea class="share-textarea" id="shareTextLinkedin" rows="7" maxlength="3000"></textarea>
+        <div class="share-meta-row">
+          <span>LinkedIn pulls the link card from this page</span>
+          <span class="share-count" id="shareCountLinkedin">0</span>
+        </div>
+        <p class="share-note">
+          LinkedIn's share dialog doesn't accept pre-filled text. Copy the draft below, then
+          click <strong>Open LinkedIn</strong> and paste it into the compose box.
+        </p>
+        <div class="share-actions">
+          <button type="button" class="share-action secondary" data-share-copy="linkedin">Copy text</button>
+          <button type="button" class="share-action" data-share-go="linkedin">Open LinkedIn ↗</button>
+        </div>
+      </div>
+
+      <div class="share-panel" data-share-panel="twitter" data-active="0" role="tabpanel">
+        <div class="share-preview">
+          <img src="{{ og_image }}" alt="" loading="lazy">
+          <div class="share-preview-meta">
+            <p class="ttl">{{ title }}</p>
+            <p class="desc">{{ description }}</p>
+          </div>
+        </div>
+        <textarea class="share-textarea" id="shareTextTwitter" rows="5" maxlength="280"></textarea>
+        <div class="share-meta-row">
+          <span>X limits posts to 280 characters</span>
+          <span class="share-count" id="shareCountTwitter">0</span>
+        </div>
+        <div class="share-actions">
+          <button type="button" class="share-action secondary" data-share-copy="twitter">Copy text</button>
+          <button type="button" class="share-action" data-share-go="twitter">Post on X ↗</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script id="shareCopyData" type="application/json">{{ share_copy | tojson }}</script>
   <script src="/nav.js" defer></script>
   <script>
     // Auto-build Contents TOC from the article's H2s, and scroll-spy to
@@ -209,6 +412,132 @@
       }
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
+    })();
+  </script>
+
+  <script>
+    // Share modal — read curated drafts from the JSON island, wire up
+    // open/close, tab switching, char counter, copy-to-clipboard, and
+    // platform share-intent URL builders.
+    (function() {
+      var dataNode = document.getElementById('shareCopyData');
+      if (!dataNode) return;
+      var copy;
+      try { copy = JSON.parse(dataNode.textContent); }
+      catch (e) { return; }
+
+      var overlay = document.getElementById('shareOverlay');
+      var taLinkedin = document.getElementById('shareTextLinkedin');
+      var taTwitter = document.getElementById('shareTextTwitter');
+      var countLinkedin = document.getElementById('shareCountLinkedin');
+      var countTwitter = document.getElementById('shareCountTwitter');
+      if (!overlay || !taLinkedin || !taTwitter) return;
+
+      // Seed initial drafts. Reset on every open so the user always
+      // gets the curated default unless they're mid-edit (we preserve
+      // edits within the same modal session — only the next page load
+      // resets to the default).
+      function seed() {
+        if (!taLinkedin.value) taLinkedin.value = copy.linkedin || '';
+        if (!taTwitter.value) taTwitter.value = copy.twitter || '';
+        updateCount('linkedin');
+        updateCount('twitter');
+      }
+
+      function updateCount(which) {
+        if (which === 'linkedin') {
+          countLinkedin.textContent = taLinkedin.value.length + ' / 3000';
+          countLinkedin.classList.toggle('over', taLinkedin.value.length > 3000);
+        } else {
+          countTwitter.textContent = taTwitter.value.length + ' / 280';
+          countTwitter.classList.toggle('over', taTwitter.value.length > 280);
+        }
+      }
+
+      taLinkedin.addEventListener('input', function() { updateCount('linkedin'); });
+      taTwitter.addEventListener('input', function() { updateCount('twitter'); });
+
+      function openModal() {
+        seed();
+        overlay.dataset.open = '1';
+        document.body.style.overflow = 'hidden';
+      }
+      function closeModal() {
+        overlay.dataset.open = '0';
+        document.body.style.overflow = '';
+      }
+
+      document.querySelectorAll('[data-share-open]').forEach(function(btn) {
+        btn.addEventListener('click', openModal);
+      });
+      document.querySelectorAll('[data-share-close]').forEach(function(btn) {
+        btn.addEventListener('click', closeModal);
+      });
+      // Click backdrop to dismiss; click inside modal does not bubble.
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal();
+      });
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.dataset.open === '1') closeModal();
+      });
+
+      // Tab switching
+      document.querySelectorAll('[data-share-tab]').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          var which = tab.dataset.shareTab;
+          document.querySelectorAll('[data-share-tab]').forEach(function(t) {
+            t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+          });
+          document.querySelectorAll('[data-share-panel]').forEach(function(p) {
+            p.dataset.active = (p.dataset.sharePanel === which) ? '1' : '0';
+          });
+        });
+      });
+
+      // Copy-to-clipboard with visual feedback
+      document.querySelectorAll('[data-share-copy]').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+          var which = btn.dataset.shareCopy;
+          var text = (which === 'linkedin') ? taLinkedin.value : taTwitter.value;
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              // Fallback for older browsers / non-secure contexts
+              var ta = (which === 'linkedin') ? taLinkedin : taTwitter;
+              ta.select();
+              document.execCommand('copy');
+            }
+            var orig = btn.textContent;
+            btn.textContent = 'Copied ✓';
+            btn.classList.add('copied');
+            setTimeout(function() {
+              btn.textContent = orig;
+              btn.classList.remove('copied');
+            }, 1800);
+          } catch (e) { /* clipboard failed silently — user can still select+copy */ }
+        });
+      });
+
+      // Open platform share dialog
+      document.querySelectorAll('[data-share-go]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var which = btn.dataset.shareGo;
+          var url = {{ url | tojson }};
+          var shareUrl;
+          if (which === 'twitter') {
+            shareUrl = 'https://twitter.com/intent/tweet?text='
+              + encodeURIComponent(taTwitter.value);
+          } else {
+            // LinkedIn share-offsite ignores text — only consumes URL
+            // and pulls OG metadata. The Copy button (above) is how
+            // the curated text travels.
+            shareUrl = 'https://www.linkedin.com/sharing/share-offsite/?url='
+              + encodeURIComponent(url);
+          }
+          window.open(shareUrl, '_blank', 'noopener,width=640,height=720');
+        });
+      });
     })();
   </script>
 </body>

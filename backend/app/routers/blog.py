@@ -687,6 +687,27 @@ _BLOG_CSS = """
 """
 
 
+def _curate_share_copy(title: str, description: str, url: str) -> dict:
+    """Build default copy for the per-post share modal.
+
+    Twitter/X cap is 280 chars. The intent URL pre-fills the textarea —
+    we keep the draft short so the user can extend, not trim.
+
+    LinkedIn's modern share-intent (`/sharing/share-offsite/?url=...`)
+    no longer accepts pre-filled text — they pull title/description
+    from OG tags. We still emit a curated draft so the user can copy it
+    into LinkedIn's compose box (the modal exposes a Copy button).
+    """
+    twitter = f"{title}\n\n{url}"
+    linkedin = (
+        f"{title}\n\n"
+        f"{description}\n\n"
+        f"Read: {url}\n\n"
+        f"#AIEngineering #BuildInPublic"
+    )
+    return {"twitter": twitter, "linkedin": linkedin}
+
+
 def _render_post(
     slug: str,
     title: str,
@@ -704,6 +725,7 @@ def _render_post(
     og_image = f"{base}/og/blog/{slug}.png"
     post_nav_html = _render_post_nav(slug, base)
     sidebar_html = _render_post_sidebar(slug, title, url, base)
+    share_copy = _curate_share_copy(title, description, url)
     return _blog_template_env.get_template("blog/post.html").render(
         title=title,
         description=description,
@@ -718,6 +740,7 @@ def _render_post(
         faqs=faqs or [],
         defined_terms=defined_terms or [],
         how_to=how_to or {},
+        share_copy=share_copy,
     )
 
 
