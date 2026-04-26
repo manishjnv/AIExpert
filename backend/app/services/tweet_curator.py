@@ -31,13 +31,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tweet_draft import TweetDraft
+from app.services import twitter_client
 from app.services.blog_publisher import PUBLISHED_DIR
 
 logger = logging.getLogger(__name__)
+
+# OG image fetch budget. The card is generated server-side and served by
+# nginx; 10s is generous and bounds the cron run time when the route is
+# slow (e.g., on an edge cache miss with the Python OG renderer cold).
+OG_FETCH_TIMEOUT_S = 10.0
 
 # IST = UTC+05:30. The cron fires once per UTC day; we resolve "what day is it
 # in IST" so the slot weekday matches the admin's local calendar.
@@ -162,28 +169,37 @@ def _truncate(text: str, limit: int) -> str:
 def compose_draft(slot_type: str, post: dict, base_url: str) -> str:
     """Build the tweet body for a given slot from a published post.
 
-    Falls back to title + URL when the slot's preferred source is missing
-    (e.g. quotable slot but post has no quotable_lines) — never returns ""."""
+    Both slots prefer quotable_lines[0] when it fits the prose budget — the
+    pattern validated by the per-post Share button (routers/blog.py
+    _curate_share_copy). Quotable hooks consistently outperform plain
+    titles in feed engagement, so blog_teaser shouldn't be different.
+    Falls back to title + URL when no usable quotable exists (or it's too
+    long for the budget); falls back further to a truncated title if the
+    title itself overflows. Never returns "".
+    """
     slug = post.get("slug", "")
     url = f"{base_url.rstrip('/')}/blog/{slug}"
     title = (post.get("title") or "").strip()
 
     hook = ""
-    if slot_type == "quotable":
-        quotables = post.get("quotable_lines") or []
-        if isinstance(quotables, list):
-            for q in quotables:
-                if isinstance(q, str) and q.strip():
-                    hook = q.strip()
-                    break
+    quotables = post.get("quotable_lines") or []
+    if isinstance(quotables, list):
+        for q in quotables:
+            if isinstance(q, str) and q.strip():
+                hook = q.strip()
+                break
 
-    # Fallback to title for either slot when the preferred hook is missing
-    # OR too long for the prose budget.
+    # Fallback to title when the quotable is missing OR exceeds the budget.
     if not hook or len(hook) > PROSE_BUDGET:
         hook = title
 
     if len(hook) > PROSE_BUDGET:
         hook = _truncate(hook, PROSE_BUDGET)
+
+    # slot_type kept in the signature — it drives dedupe at the row level
+    # (a Mon blog_teaser doesn't block the same post from being a Tue
+    # quotable), and a future slot type may want different framing.
+    _ = slot_type
 
     return f"{hook}\n\n{url}"
 
@@ -208,6 +224,64 @@ async def pick_source(
     return None
 
 
+async def _fetch_og_image(
+    base_url: str,
+    slug: str,
+    *,
+    timeout: float = OG_FETCH_TIMEOUT_S,
+) -> Optional[bytes]:
+    """Fetch the OG card PNG for a blog post.
+
+    Returns the raw bytes on 2xx with non-empty body, None on any failure
+    (404, 5xx, timeout, network, malformed). Image attachment is a
+    best-effort engagement upgrade; a missing or broken image must NEVER
+    propagate up into queue_today — text-only posts still ship.
+    """
+    url = f"{base_url.rstrip('/')}/og/blog/{slug}.png"
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(url)
+    except (httpx.HTTPError, OSError) as e:
+        logger.info(
+            "tweet_curator: og image fetch errored for slug=%s: %s",
+            slug, type(e).__name__,
+        )
+        return None
+    if resp.status_code != 200 or not resp.content:
+        logger.info(
+            "tweet_curator: og image fetch slug=%s status=%s len=%s — text-only fallback",
+            slug, resp.status_code, len(resp.content) if resp.content else 0,
+        )
+        return None
+    return resp.content
+
+
+async def _attach_og_media(base_url: str, slug: str) -> Optional[str]:
+    """Attempt to fetch the OG card and upload it to X v1.1. Returns the
+    media_id_string on full success; None if creds are unset, image fetch
+    fails, or upload fails. NEVER raises — image attachment is best-effort.
+    """
+    creds = twitter_client.credentials_from_env()
+    if creds is None:
+        # Same posture as the admin UI: no creds means "X not configured";
+        # we still queue the draft so the admin sees it on /admin/social.
+        return None
+    image_bytes = await _fetch_og_image(base_url, slug)
+    if image_bytes is None:
+        return None
+    try:
+        return await twitter_client.upload_media(creds, image_bytes)
+    except (twitter_client.TwitterAPIError, ValueError) as e:
+        # Auth-side failures (4xx) and validation issues both land here;
+        # both must drop us into the text-only fallback path, not crash
+        # the curator.
+        logger.info(
+            "tweet_curator: media upload failed for slug=%s: %s",
+            slug, type(e).__name__,
+        )
+        return None
+
+
 async def queue_today(
     session: AsyncSession,
     base_url: str,
@@ -221,6 +295,10 @@ async def queue_today(
       - today's slot is None (Sat/Sun)
       - all eligible sources are deduped
       - PUBLISHED_DIR is empty
+
+    On a successful pick, attempts to fetch the post's OG card and upload
+    it to X for inline display. Image upload is best-effort: failures
+    leave media_id NULL on the row, and the post still ships as text-only.
     """
     now_utc = now_utc or datetime.now(timezone.utc)
     slot = slot_for_today(now_utc)
@@ -234,19 +312,24 @@ async def queue_today(
         return None
 
     text = compose_draft(slot, post, base_url)
+    slug = post.get("slug", "")
+    media_id = await _attach_og_media(base_url, slug)
+
     ist = now_utc + IST_OFFSET
     draft = TweetDraft(
         scheduled_date=ist.strftime("%Y-%m-%d"),
         slot_type=slot,
         source_kind="blog",
-        source_ref=post.get("slug", ""),
+        source_ref=slug,
         draft_text=text,
         status="pending",
+        media_id=media_id,
     )
     session.add(draft)
     await session.flush()  # populate draft.id without committing
     logger.info(
-        "tweet_curator: queued draft id=%s slot=%s source=%s len=%s",
+        "tweet_curator: queued draft id=%s slot=%s source=%s len=%s media=%s",
         draft.id, slot, draft.source_ref, len(text),
+        "yes" if media_id else "no",
     )
     return draft

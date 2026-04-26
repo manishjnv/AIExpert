@@ -3242,7 +3242,10 @@ async def post_tweet_now(
     # Refresh to see the post-claim state (status='posting').
 
     try:
-        data = await _twitter.post_tweet(creds, draft.draft_text)
+        media_ids = [draft.media_id] if draft.media_id else None
+        data = await _twitter.post_tweet(
+            creds, draft.draft_text, media_ids=media_ids,
+        )
     except _twitter.TwitterAPIError as e:
         if e.status is not None:
             # Server returned a definitive non-2xx — tweet did NOT post.

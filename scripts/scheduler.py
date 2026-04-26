@@ -151,11 +151,16 @@ async def weekly_audit_select_loop() -> None:
 
 
 async def daily_tweet_queue_loop() -> None:
-    """Daily 08:00 IST = 02:30 UTC — pick a slot per weekday, queue a pending
-    TweetDraft. Mon/Wed/Fri = blog_teaser, Tue/Thu = quotable, Sat/Sun = skip.
+    """Daily 19:00 IST = 13:30 UTC — pick a slot per weekday, queue a pending
+    TweetDraft. 13:30 UTC = 09:30 ET, the peak engagement window for the US
+    tech feed; the prior 02:30 UTC slot fired at 22:30 ET, well past the
+    median engagement floor for new accounts. The IST weekday math is the
+    same either way (13:30 UTC = 19:00 IST, mid-workday, same day-of-week
+    as the early-morning fire).
+    Mon/Wed/Fri = blog_teaser, Tue/Thu = quotable, Sat/Sun = skip.
     Admin reviews and clicks Post on /admin/social to ship."""
     while True:
-        target = _next_daily(2, 30, datetime.now(timezone.utc))
+        target = _next_daily(13, 30, datetime.now(timezone.utc))
         await _sleep_until(target, "daily_tweet_queue")
         from app.config import get_settings
         from app.db import async_session_factory, close_db, init_db
