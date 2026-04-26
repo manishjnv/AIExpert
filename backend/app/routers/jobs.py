@@ -233,7 +233,7 @@ _BASE_CSS = """
 """
 
 
-JOBS_PAGE_SIZE = 50
+JOBS_PAGE_SIZE = 20
 
 
 def _paginate_numbers(page: int, total: int, window: int = 2) -> list[int | None]:
