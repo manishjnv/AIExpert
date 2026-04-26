@@ -431,15 +431,16 @@ async def test_jobs_section_chips_never_render_dict_repr():
     await _setup()
     user = await _mk_user("dictsalary@t.com", experience_level="advanced")
 
-    # Salary as dict with only min:None (the production shape that broke).
-    # exp_y has a real min, so a chip should still render for it.
+    # Production shape: salary as dict with disclosed=false (an explicit
+    # signal from the source that the role hides comp). exp_y has a real
+    # min so its chip should still render.
     job = await _mk_job("dict-salary-job", data={
         "tldr": "x",
         "must_have_skills": ["PyTorch"],
         "company": {"name": "Sarvam AI", "slug": "sarvam-ai"},
         "location": {"country": "IN", "city": "Bengaluru", "remote_policy": "Onsite"},
         "employment": {
-            "salary": {"min": None, "max": None, "currency": "INR"},
+            "salary": {"min": None, "max": None, "currency": None, "disclosed": False},
             "experience_years": {"min": 3, "max": 8},
         },
     })
@@ -456,8 +457,42 @@ async def test_jobs_section_chips_never_render_dict_repr():
     # The fix: dict reprs never reach the email.
     assert "{'min'" not in html, "dict repr leaked into HTML"
     assert "&#x27;min&#x27;" not in html, "escaped dict repr also leaked"
+    # disclosed=false should surface as a chip, not silent omission.
+    assert "Salary undisclosed" in html
     # The exp_y chip should still render (proves we didn't over-filter).
     assert "3+ years" in html
+    await close_db()
+
+
+@pytest.mark.asyncio
+async def test_jobs_section_omits_salary_chip_when_truly_empty():
+    """When salary dict has no numeric values AND no disclosed flag, the
+    chip is omitted entirely (no leak, no false 'undisclosed' label)."""
+    await _setup()
+    user = await _mk_user("emptysalary@t.com")
+    job = await _mk_job("empty-salary-job", data={
+        "tldr": "x",
+        "must_have_skills": ["PyTorch"],
+        "company": {"name": "TestCo", "slug": "testco"},
+        "location": {"country": "IN", "city": "Bengaluru", "remote_policy": "Remote"},
+        "employment": {
+            "salary": {"min": None, "max": None, "currency": None},
+            "experience_years": {"min": 5},
+        },
+    })
+
+    async def fake_top_matches(u, jobs_pool, db):
+        return [(job, {"score": 60})]
+
+    async with db_module.async_session_factory() as db:
+        with patch.object(weekly_digest, "_top_matches", new=fake_top_matches):
+            section = await weekly_digest._jobs_section(user, [job], db)
+
+    assert section is not None
+    html = section["html"]
+    assert "Salary undisclosed" not in html, "shouldn't claim undisclosed without explicit flag"
+    assert "{'min'" not in html
+    assert "5+ years" in html
     await close_db()
 
 

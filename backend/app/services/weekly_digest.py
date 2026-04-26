@@ -396,6 +396,10 @@ async def _jobs_section(user: User, jobs_pool: list[Job], db) -> dict | None:
                     return f"{cur_prefix}{lo}+"
                 if hi:
                     return f"{cur_prefix}up to {hi}"
+                # No numeric values. If the source explicitly flagged
+                # disclosed=False, surface it — better UX than a silent omission.
+                if s.get("disclosed") is False:
+                    return "Salary undisclosed"
             return ""
 
         def _fmt_emp_type(t) -> str:
