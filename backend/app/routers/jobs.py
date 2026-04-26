@@ -1008,6 +1008,11 @@ async function loadJobs() {
   if (!r.ok) { $('list').innerHTML = '<p class="empty">Load failed.</p>'; return; }
   const items = await r.json();
   renderChips(f);
+  // SSR pagination links go to /jobs?page=N with no filter params, so once
+  // JS has rendered a filtered view the footer numbers would drop the user
+  // back to an unfiltered set. Hide it; JS view caps at limit=100.
+  const _pag = document.querySelector('.results nav.pagination');
+  if (_pag) _pag.style.display = 'none';
   if (!items.length) {
     $('list').innerHTML = '<p class="empty">No matching jobs. Try removing a filter.</p>';
     return;
