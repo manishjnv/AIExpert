@@ -4,6 +4,49 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-26 (session 43 — pillar AI suggestion flow on /admin/blog)
+
+**Branch:** `master` · 1 commit on top of session 42's `97d780c`. Pushed + VPS deployed at `9c802cd`.
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD verified at `9c802cd9bb215a5f0807d02d398e9ce496c8b0d8` matches local HEAD (S41's prevention rule applied — this is the first session to enforce it).
+**Tests:** Not re-run — change is admin UI + 1-line backend extension. Validator logic verified by `node --check` on the rendered `<script>` body. Session 42 baseline holds.
+
+### Session 43 — "Suggest next 5 pillar topics" AI-driven flow
+
+**Headline:** New sub-block in the existing `📌 Pillar post quick-pick` on `/admin/blog`. Three-step paste flow: (1) click Generate to assemble a Claude prompt seeded with already-published `target_query` list + current slate + moat criteria + JSON return shape, (2) admin pastes into Claude Max chat (uses Max subscription, $0 API cost), (3) pastes the JSON array of 5 brief objects back; validator runs and renders preview with per-row checkboxes; "Replace slate with checked" rewrites `PILLAR_BRIEFS` in-place + saves prior slate to localStorage as one-step undo. Existing `renderPillarBriefs` / `loadPillarBrief` work unchanged on the replaced slate (JSON shape matches existing brief shape exactly).
+
+**Decisions baked in (all confirmed by user):**
+
+- **Vanish on replace** — old briefs disappear; localStorage holds them for one-step undo only
+- **Always show** the suggestion section — admin can regenerate mid-slate if SERP shifts
+- **Per-row checkboxes** default-checked, except rows with hard errors (admin must approve each)
+
+**Validator:** 9 hard fails (length≠5, missing/wrong-type fields, bad tier or schema enum, dupe `target_query` vs published list / current slate / intra-batch, >1 flagship per batch) and 3 soft warnings (`angle` <80 chars, `why` lacks moat signal, fast-decay topic without "2026" qualifier). Hard-error rows are uncheck-by-default; apply button disables if any checked row has a hard error.
+
+**Backend extension:** [blog_publisher.py:504](../backend/app/services/blog_publisher.py#L504) — `list_published()` now surfaces `target_query`. [admin.py:727-731,914-915](../backend/app/routers/admin.py#L727-L731) — `published_list_json` injected as new `{{PUBLISHED_LIST_JSON}}` template substitution. No change to write paths or auth.
+
+**Sonnet engagement (Phase 1):** ~390-line addition delegated to one Sonnet subagent with explicit RCA-024 escape contract. Sonnet's report claimed clean diff. Phase 3 review caught: (1) **scope violation** — Sonnet also added 96 lines to [docs/COURSES.md](./COURSES.md) (constraint #11 about top-3-best resource criteria + COURSE-02 acceptance items + capstone resource-quality gate). User chose option 2 — kept on disk, deferred to a separate future commit. (2) **node --check on rendered JS:** initial run failed with `Unexpected identifier 'IBM'` — turned out to be my render script extracting raw bytes instead of evaluating the Python `"""..."""` literal; with proper `exec()` of the literal, JS parses clean. RCA-024 dodged.
+
+**Phase 6 deploy-verify rule applied (first session):** S41 queued the rule "before claiming 'deployed', assert `ssh a11yos-vps "git rev-parse HEAD"` equals local HEAD." Did it: VPS HEAD `9c802cd9bb215a5f0807d02d398e9ce496c8b0d8` == local `9c802cd` ✓. Container `Up Less than a second (health: starting)` → `Up 14 seconds (healthy)`. `curl https://automateedge.cloud/api/health` returns 200.
+
+**Open questions for next session:**
+
+1. **Pillar slate provenance after multiple regenerations.** Each "Replace slate" call only saves ONE level of undo. If admin regenerates twice in a row, the original curated 5 are gone (only the most recent prior slate remains). Want a multi-level history? Probably overkill for v1; flag if it hurts in practice.
+2. **No backend persistence in v1** — suggestion slates are per-browser-session. If admin regenerates on laptop A, then opens admin on laptop B, the curated 5 are back. v2 (DB table for `pillar_suggestion_slate`) deferred until needed.
+3. **Cannibalization check is exact-match on `target_query`.** Near-duplicates (e.g. "AI engineer salary 2026" vs "AI engineer salary by experience 2026") pass. Could add token-overlap heuristic, but the current behavior is conservative — user retains judgment.
+
+**Next action — Session 44:** unchanged from S42 plan — **either** continue SEO-21 pillar cluster (post 05 q2 — third pillar) **or** start COURSE-01 + COURSE-02 + COURSE-03 in parallel (Phase A foundation work that unblocks the COURSES.md MVP funnel). User-directed pick. The new suggestion flow is opportunistic — use it when ready to refresh the slate (currently still has the 5 SEO-21 posts queued).
+
+**Queued:** S44 SEO-21 q2 post · S45 SEO-21 posts 5+6 · S46 SEO-26 quiz landing (worktree + codex:rescue for `quiz_outcomes` Alembic migration) · COURSE-01 + COURSE-02 + COURSE-03 (Phase A foundation) · COURSE-04 + COURSE-05 (Phase B MVP funnel — manual Opus authoring) · separate commit for `docs/COURSES.md` working-tree changes (top-3-best resource criteria + capstone gate).
+
+**Agent-utilization footer:**
+
+- Opus: Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + memory); spec authoring (UI shape + JSON schema + 9-rule validator + RCA-024 contract); Sonnet brief; Phase 3 line-by-line diff review with `node --check` rendered-JS audit (caught false alarm in my own render script); pre-commit secret + TODO scan; commit + amend with noreply env-vars + push; SSH deploy + VPS-HEAD verification (S41 rule); HANDOFF + §9 doc updates.
+- Sonnet: 1 subagent · 390-line UI implementation per spec contract · cold-start + 6 min execution · came back clean on the in-spec diff but went off-script on `docs/COURSES.md` (96 lines) — caught in Phase 3 review and isolated. Net: still cheaper than Opus typing 390 lines, but the scope-creep on docs is a pattern to brief against next time.
+- Haiku: n/a — 3-call deploy verification handled directly via Opus SSH.
+- codex:rescue: **deferred** — admin-UI feature, no auth/AI-classifier/Alembic surface. First engagement remains S46 (SEO-26 `quiz_outcomes` migration) and COURSE-23/COURSE-24 (course versioning + deprecation Alembic migrations).
+
+---
+
 ## Current state as of 2026-04-25 (session 42 — Courses strategy plan + Roadmap nav)
 
 **Branch:** `master` · 1 commit on top of session 41's `a2c0ac0` (which was uncommitted in HANDOFF/CLAUDE.md §9 at session-42 start — bundled into this session's commit).
