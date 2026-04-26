@@ -3285,6 +3285,68 @@ async def post_tweet_now(
     }
 
 
+# ---- Programmatic notification endpoint (for scheduled remote agents) -------
+#
+# Token-gated SMTP-send endpoint. Designed for the claude.ai routine
+# infrastructure (or any other automated client) that can't use the Gmail
+# MCP connector — Google's OAuth blocked re-auth on this account, and the
+# MCP-token-expiry semantics are unreliable across days.
+#
+# Recipient is HARDCODED to settings.maintainer_email. A leaked token can
+# only spam the maintainer (irritating but not abusive); it can't be used
+# to email arbitrary recipients via our SMTP transport.
+
+import os as _os
+
+
+@router.post("/api/notify")
+@_tweet_limiter.limit("10/hour")
+async def admin_notify(
+    request: Request,
+    payload: dict,
+):
+    """Send a plain-text email to the maintainer via SMTP. Auth is a
+    Bearer token in Authorization header, checked against env var
+    NOTIFY_API_TOKEN. No cookie/session — programmatic clients only.
+
+    503 when NOTIFY_API_TOKEN isn't set (endpoint disabled).
+    401 when the token is missing or wrong.
+    400 when subject/body missing.
+    502 on SMTP failure (e.g. Brevo down).
+    """
+    expected = _os.environ.get("NOTIFY_API_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(503, "notification endpoint disabled — set NOTIFY_API_TOKEN")
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer ") or auth[7:].strip() != expected:
+        raise HTTPException(401, "invalid token")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "JSON body required")
+    subject = (payload.get("subject") or "").strip()
+    body = (payload.get("body") or "").strip()
+    if not subject:
+        raise HTTPException(400, "subject required")
+    if not body:
+        raise HTTPException(400, "body required")
+    # Don't echo arbitrary HTML — keep this plain text only. The recipient
+    # is fixed (maintainer_email); we don't accept a `to` field on purpose
+    # so a leaked token can only spam one inbox.
+    if len(subject) > 300:
+        raise HTTPException(400, "subject too long (max 300)")
+    if len(body) > 20000:
+        raise HTTPException(400, "body too long (max 20000)")
+
+    from app.services.email_sender import send_admin_notification
+    try:
+        await send_admin_notification(subject=subject, body=body)
+    except Exception as e:
+        # Don't echo SMTP error verbatim — could leak SMTP creds in
+        # rare auth-failure error strings.
+        raise HTTPException(502, f"email send failed: {type(e).__name__}")
+    return {"ok": True}
+
+
 @router.post("/api/tweets/queue-now")
 async def queue_now(
     request: Request,

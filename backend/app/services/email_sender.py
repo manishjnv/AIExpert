@@ -51,3 +51,34 @@ async def send_otp_email(to_email: str, code: str) -> None:
         use_tls=settings.smtp_use_tls,
     )
     logger.info("OTP email sent to %s", to_email)
+
+
+async def send_admin_notification(subject: str, body: str) -> None:
+    """Send a plain-text admin notification to settings.maintainer_email
+    via the same SMTP transport as OTP. Used by the /api/admin/notify
+    endpoint (called from scheduled remote agents that can't use the
+    Gmail MCP connector). In dev mode (smtp_host empty), logs instead."""
+    settings = get_settings()
+    to_email = settings.maintainer_email
+
+    if not settings.smtp_host:
+        logger.info("DEV MODE — admin notification to %s: %s\n%s",
+                    to_email, subject, body)
+        return
+
+    msg = EmailMessage()
+    msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_from}>"
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    await aiosmtplib.send(
+        msg,
+        hostname=settings.smtp_host,
+        port=settings.smtp_port,
+        username=settings.smtp_user,
+        password=settings.smtp_password,
+        start_tls=not settings.smtp_use_tls,
+        use_tls=settings.smtp_use_tls,
+    )
+    logger.info("admin notification sent to %s subject=%r", to_email, subject)
