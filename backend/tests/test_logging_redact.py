@@ -46,3 +46,32 @@ def test_filter_scrubs_percent_args(caplog):
         logger.info("url=%s status=%s", "https://x.com/api?key=LEAK-XYZ", 200)
     combined = " ".join(r.getMessage() for r in caplog.records)
     assert "LEAK-XYZ" not in combined
+
+
+def test_redact_oauth1_authorization_header():
+    """OAuth 1.0a header — every parameter is sensitive (nonce, token,
+    signature). Redact the whole comma-separated value, not just the first
+    component."""
+    s = (
+        'Authorization: OAuth oauth_consumer_key="ABC123", '
+        'oauth_nonce="N0NC3", oauth_signature="SIG_SECRET"'
+    )
+    out = _redact(s)
+    assert "ABC123" not in out
+    assert "N0NC3" not in out
+    assert "SIG_SECRET" not in out
+    assert "[REDACTED]" in out
+
+
+def test_filter_handles_lowercase_authorization_header(caplog):
+    """httpx and similar libs emit `authorization:` (lowercase). The early-
+    out gate must be case-insensitive — previously it required capital
+    'Authorization' so OAuth headers logged in lowercase bypassed redaction
+    entirely."""
+    install_redacting_filter()
+    logger = logging.getLogger("httpx")
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        logger.info('authorization: OAuth oauth_signature="LIVE_LEAK_SIG"')
+    combined = " ".join(r.getMessage() for r in caplog.records)
+    assert "LIVE_LEAK_SIG" not in combined
+    assert "[REDACTED]" in combined

@@ -6,3 +6,4 @@ from app.models.certificate import Certificate  # noqa: F401
 from app.models.plan import UserPlan, Progress, RepoLink, Evaluation  # noqa: F401
 from app.models.curriculum import PlanVersion, CurriculumProposal, LinkHealth, CurriculumSettings, DiscoveredTopic  # noqa: F401
 from app.models.job import Job, JobSource, JobCompany  # noqa: F401
+from app.models.tweet_draft import TweetDraft  # noqa: F401

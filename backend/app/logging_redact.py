@@ -27,10 +27,18 @@ _AUTH_HEADER_RE = re.compile(
     r"(Authorization:\s*(?:Bearer|Token)\s+)[A-Za-z0-9._\-]+", re.I
 )
 
+# OAuth 1.0a "Authorization: OAuth oauth_consumer_key="...", ..." — every
+# parameter (nonce, signature, token) is sensitive. Redact the entire
+# parameter list rather than each field individually.
+_OAUTH1_HEADER_RE = re.compile(
+    r"(Authorization:\s*OAuth\s+)[^\r\n]+", re.I
+)
+
 
 def _redact(text: str) -> str:
     text = _QS_SECRET_RE.sub(r"\1[REDACTED]", text)
     text = _AUTH_HEADER_RE.sub(r"\1[REDACTED]", text)
+    text = _OAUTH1_HEADER_RE.sub(r"\1[REDACTED]", text)
     return text
 
 
@@ -42,9 +50,14 @@ class RedactingFilter(logging.Filter):
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        # Pre-format path — message still has %s placeholders.
-        if isinstance(record.msg, str) and ("key=" in record.msg or "Authorization" in record.msg):
-            record.msg = _redact(record.msg)
+        # Pre-format path — message still has %s placeholders. Early-out
+        # gating is case-insensitive: httpx and similar libs frequently emit
+        # `authorization:` (lowercase) which previously bypassed the regex
+        # path entirely, leaving OAuth headers visible in logs.
+        if isinstance(record.msg, str):
+            lower = record.msg.lower()
+            if "key=" in lower or "authorization" in lower or "token=" in lower:
+                record.msg = _redact(record.msg)
         if record.args:
             record.args = tuple(
                 _redact(a) if isinstance(a, str) else a for a in record.args

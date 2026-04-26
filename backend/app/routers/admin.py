@@ -3069,3 +3069,414 @@ async def admin_jobs_guide(_user: User = Depends(get_current_admin)):
     return HTMLResponse(html)
 
 
+# ---- Tweet drafts (Phase B daily X auto-post queue) --------------------------
+#
+# Daily 8am IST cron queues a draft per slot rotation (Mon/Wed/Fri blog teaser,
+# Tue/Thu quotable line). Admin reviews on /admin/tweets, optionally edits the
+# text, and clicks Post — that calls twitter_client and updates the row.
+#
+# When TWITTER_* env vars aren't set, "Post" returns a 503 with "not configured"
+# so the admin can verify the queue + UI flow before connecting credentials.
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.models.tweet_draft import TweetDraft
+from app.services import twitter_client as _twitter
+from app.services.tweet_curator import (
+    PROSE_BUDGET as _TWEET_PROSE_BUDGET,
+    TWITTER_HARD_LIMIT as _TWEET_HARD_LIMIT,
+    queue_today as _queue_today,
+)
+
+# Per-IP rate limit on the X post endpoint. X free tier is 50 posts/24h
+# total — a hijacked admin session shouldn't be able to burn that in
+# seconds. 5/hour = 120/day per IP, plenty for legitimate manual review,
+# tight enough to limit damage. Layered on top of existing admin auth.
+_tweet_limiter = Limiter(key_func=get_remote_address)
+
+
+@router.get("/api/tweets")
+async def list_tweets(
+    limit: int = Query(40, ge=1, le=200),
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """30-ish most recent drafts, newest first. Single JSON payload — the
+    /admin/tweets page renders rows from this."""
+    stmt = (
+        select(TweetDraft)
+        .order_by(TweetDraft.created_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "configured": _twitter.is_configured(),
+        "drafts": [
+            {
+                "id": r.id,
+                "scheduled_date": r.scheduled_date,
+                "slot_type": r.slot_type,
+                "source_kind": r.source_kind,
+                "source_ref": r.source_ref,
+                "draft_text": r.draft_text,
+                "status": r.status,
+                "posted_tweet_id": r.posted_tweet_id,
+                "posted_url": (
+                    _twitter.tweet_url(r.posted_tweet_id) if r.posted_tweet_id else None
+                ),
+                "posted_at": iso_utc_z(r.posted_at) if r.posted_at else None,
+                "error_message": r.error_message,
+                "created_at": iso_utc_z(r.created_at),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.patch("/api/tweets/{draft_id}")
+async def edit_tweet(
+    draft_id: int,
+    payload: dict,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edit draft_text before posting. Only valid while status='pending'."""
+    _check_origin(request)
+    draft = await db.get(TweetDraft, draft_id)
+    if not draft:
+        raise HTTPException(404, "draft not found")
+    if draft.status != "pending":
+        raise HTTPException(409, f"cannot edit draft in status={draft.status}")
+    text = (payload.get("draft_text") or "").strip()
+    if not text:
+        raise HTTPException(400, "draft_text required")
+    if len(text) > _TWEET_HARD_LIMIT:
+        raise HTTPException(
+            400, f"draft_text is {len(text)} chars, X limit is {_TWEET_HARD_LIMIT}"
+        )
+    draft.draft_text = text
+    await db.commit()
+    return {"ok": True, "id": draft.id, "draft_text": draft.draft_text}
+
+
+@router.post("/api/tweets/{draft_id}/skip")
+async def skip_tweet(
+    draft_id: int,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a draft as skipped — no posting, but the row stays for audit."""
+    _check_origin(request)
+    draft = await db.get(TweetDraft, draft_id)
+    if not draft:
+        raise HTTPException(404, "draft not found")
+    if draft.status != "pending":
+        raise HTTPException(409, f"cannot skip draft in status={draft.status}")
+    draft.status = "skipped"
+    await db.commit()
+    return {"ok": True, "id": draft.id, "status": draft.status}
+
+
+@router.post("/api/tweets/{draft_id}/post")
+@_tweet_limiter.limit("5/hour")
+async def post_tweet_now(
+    draft_id: int,
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Post the draft to X via the OAuth 1.0a client.
+
+    Concurrency: the X API call is non-idempotent — two concurrent admin
+    requests racing on the same draft would post twice. We guard with an
+    atomic UPDATE that flips status pending|failed → 'posting'; the loser
+    sees 0 rows updated and gets 409.
+
+    Failure semantics:
+      - 4xx/5xx from X (TwitterAPIError with status set) → known failure,
+        flip status to 'failed' so admin can edit + retry.
+      - Network error before the X server saw the request (or with no
+        status info) → status STAYS 'posting'. We don't know whether the
+        post actually landed, so an automatic retry could double-post.
+        Admin investigates the X timeline and either re-flags pending
+        (via /skip then /queue-now or a manual DB tweak) or accepts the
+        ambiguity. Fail-safe over fail-fast.
+
+    503 when env credentials are not set so the admin sees a clear
+    'not configured' state instead of a cryptic API error."""
+    _check_origin(request)
+
+    creds = _twitter.credentials_from_env()
+    if creds is None:
+        raise HTTPException(
+            503,
+            "X API not configured — set TWITTER_API_KEY / TWITTER_API_SECRET / "
+            "TWITTER_ACCESS_TOKEN / TWITTER_ACCESS_TOKEN_SECRET in .env",
+        )
+
+    # Atomic claim — only one request wins the pending|failed → posting
+    # transition. Subsequent concurrent requests see the row already in
+    # 'posting' and can't claim it.
+    from sqlalchemy import update
+    claim_stmt = (
+        update(TweetDraft)
+        .where(
+            TweetDraft.id == draft_id,
+            TweetDraft.status.in_(("pending", "failed")),
+        )
+        .values(status="posting", error_message=None)
+    )
+    result = await db.execute(claim_stmt)
+    await db.commit()
+    if result.rowcount == 0:
+        # Either the draft doesn't exist, or another request already claimed it.
+        existing = await db.get(TweetDraft, draft_id)
+        if existing is None:
+            raise HTTPException(404, "draft not found")
+        raise HTTPException(409, f"cannot post draft in status={existing.status}")
+
+    draft = await db.get(TweetDraft, draft_id)
+    # Refresh to see the post-claim state (status='posting').
+
+    try:
+        data = await _twitter.post_tweet(creds, draft.draft_text)
+    except _twitter.TwitterAPIError as e:
+        if e.status is not None:
+            # Server returned a definitive non-2xx — tweet did NOT post.
+            # Safe to mark failed and let admin retry.
+            body = (e.body_excerpt or "")[:400]
+            draft.status = "failed"
+            draft.error_message = f"{e}{(' — ' + body) if body else ''}"
+            await db.commit()
+            return {"ok": False, "id": draft.id, "error": str(e), "body": body}
+        # No status → network/transport ambiguity. The tweet MAY have landed.
+        # Don't auto-retry; surface the ambiguity to the admin.
+        draft.error_message = (
+            f"{e} — tweet status unknown. Check the X timeline before retrying."
+        )
+        await db.commit()  # status stays 'posting'
+        raise HTTPException(
+            502,
+            f"X API transport error — draft is now in 'posting' state with "
+            f"unknown post outcome. Check the X account before any retry. "
+            f"Underlying: {e}",
+        )
+    except ValueError as e:
+        # Pre-flight validation failure (empty text, > 280). The X API was
+        # never called. Roll back the claim so admin can fix and retry.
+        draft.status = "pending"
+        draft.error_message = f"validation: {e}"
+        await db.commit()
+        raise HTTPException(400, str(e))
+
+    draft.status = "posted"
+    draft.posted_tweet_id = data["id"]
+    draft.posted_at = datetime.now(timezone.utc)
+    draft.error_message = None
+    await db.commit()
+    return {
+        "ok": True,
+        "id": draft.id,
+        "posted_tweet_id": draft.posted_tweet_id,
+        "posted_url": _twitter.tweet_url(draft.posted_tweet_id),
+    }
+
+
+@router.post("/api/tweets/queue-now")
+async def queue_now(
+    request: Request,
+    _user: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger today's curator (instead of waiting for 8am IST).
+    Useful for testing the rotation + previewing the day's draft."""
+    _check_origin(request)
+    from app.config import get_settings
+    base = get_settings().public_base_url.rstrip("/")
+    draft = await _queue_today(db, base)
+    if draft is None:
+        return {"ok": True, "queued": False, "reason": "no eligible source for today"}
+    await db.commit()
+    return {
+        "ok": True, "queued": True,
+        "id": draft.id, "slot_type": draft.slot_type,
+        "draft_text": draft.draft_text,
+    }
+
+
+_TWEETS_ADMIN_HTML = """<!doctype html><html><head>
+<meta charset="utf-8"><title>Tweet drafts · Admin</title>
+<style>{{ADMIN_CSS}}</style></head><body>
+{{ADMIN_NAV}}
+<div class="page">
+  <h1>Tweet drafts</h1>
+  <div class="subtitle">Daily X queue · curator picks at 8am IST · click Post to ship</div>
+
+  <div id="cfgBanner" style="display:none;margin:16px 0;padding:12px 16px;
+       background:rgba(217,119,87,0.1);border:1px solid rgba(217,119,87,0.4);
+       border-radius:6px;color:#d97757;font-size:13px;">
+    ⚠ X API not configured. Drafts will queue but Post will return 503 until
+    you set <code>TWITTER_API_KEY / TWITTER_API_SECRET / TWITTER_ACCESS_TOKEN /
+    TWITTER_ACCESS_TOKEN_SECRET</code> in <code>.env</code>.
+  </div>
+
+  <div style="margin:16px 0">
+    <button class="btn" id="queueBtn">Queue today's draft now</button>
+    <button class="btn" id="refreshBtn">Refresh</button>
+  </div>
+
+  <table id="tweetsTable">
+    <thead><tr>
+      <th>Date</th><th>Slot</th><th>Source</th><th style="width:36%">Draft</th>
+      <th>Status</th><th style="width:20%">Actions</th>
+    </tr></thead>
+    <tbody id="tweetsTbody"></tbody>
+  </table>
+
+</div>
+<script>
+const HARD_LIMIT = {{TWEET_HARD_LIMIT}};
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+function statusPill(status) {
+  const colors = {
+    pending: ['#e8a849', 'rgba(232,168,73,0.15)'],
+    posting: ['#67a5d1', 'rgba(103,165,209,0.15)'],
+    posted:  ['#6db585', 'rgba(109,181,133,0.15)'],
+    skipped: ['#94a3b8', 'rgba(148,163,184,0.15)'],
+    failed:  ['#d97757', 'rgba(217,119,87,0.15)'],
+  };
+  const [fg, bg] = colors[status] || ['#94a3b8', 'rgba(148,163,184,0.15)'];
+  return `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;
+    letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:10px;
+    color:${fg};background:${bg};border:1px solid ${fg}40">${status}</span>`;
+}
+
+function row(d) {
+  const sourceLink = d.source_kind === 'blog'
+    ? `<a href="/blog/${escapeHtml(d.source_ref)}" target="_blank">${escapeHtml(d.source_ref)}</a>`
+    : escapeHtml(d.source_ref);
+  let actions = '';
+  if (d.status === 'pending' || d.status === 'failed') {
+    actions = `<button class="btn" data-act="edit" data-id="${d.id}">Edit</button>
+               <button class="btn success" data-act="post" data-id="${d.id}">Post</button>
+               <button class="btn danger" data-act="skip" data-id="${d.id}">Skip</button>`;
+  } else if (d.status === 'posted' && d.posted_url) {
+    actions = `<a class="btn" href="${escapeHtml(d.posted_url)}" target="_blank">View on X ↗</a>`;
+  }
+  const errLine = d.error_message
+    ? `<div style="color:#d97757;font-size:11px;margin-top:6px;font-family:'IBM Plex Mono',monospace">${escapeHtml(d.error_message)}</div>`
+    : '';
+  return `<tr data-id="${d.id}">
+    <td>${escapeHtml(d.scheduled_date)}</td>
+    <td><code style="font-size:11px;color:#94a3b8">${escapeHtml(d.slot_type)}</code></td>
+    <td>${sourceLink}</td>
+    <td>
+      <textarea data-edit-for="${d.id}" rows="3" maxlength="${HARD_LIMIT}"
+        style="width:100%;background:#0f1419;color:#e8e4d8;border:1px solid #2a323d;
+        border-radius:4px;padding:6px 8px;font:inherit;font-size:12px;line-height:1.5;
+        ${d.status === 'pending' || d.status === 'failed' ? '' : 'pointer-events:none;opacity:0.7'}"
+      >${escapeHtml(d.draft_text)}</textarea>
+      <div style="font-size:10px;color:#6a7280;margin-top:2px;font-family:'IBM Plex Mono',monospace"
+           data-count-for="${d.id}">${d.draft_text.length} / ${HARD_LIMIT}</div>
+      ${errLine}
+    </td>
+    <td>${statusPill(d.status)}</td>
+    <td>${actions}</td>
+  </tr>`;
+}
+
+async function load() {
+  const r = await fetch('/admin/api/tweets', { credentials: 'include' });
+  if (!r.ok) { document.getElementById('tweetsTbody').innerHTML =
+    '<tr><td colspan="6" style="color:#d97757">Failed to load</td></tr>'; return; }
+  const j = await r.json();
+  document.getElementById('cfgBanner').style.display = j.configured ? 'none' : 'block';
+  const tb = document.getElementById('tweetsTbody');
+  tb.innerHTML = j.drafts.length
+    ? j.drafts.map(row).join('')
+    : '<tr><td colspan="6" style="color:#6a7280;text-align:center;padding:32px">No drafts yet — try "Queue today\\'s draft now".</td></tr>';
+  // Char counters on each editable textarea
+  document.querySelectorAll('textarea[data-edit-for]').forEach(ta => {
+    ta.addEventListener('input', () => {
+      const counter = document.querySelector(`[data-count-for="${ta.dataset.editFor}"]`);
+      if (counter) {
+        counter.textContent = `${ta.value.length} / ${HARD_LIMIT}`;
+        counter.style.color = ta.value.length > HARD_LIMIT ? '#d97757' : '#6a7280';
+      }
+    });
+  });
+}
+
+async function jsonReq(url, opts={}) {
+  const r = await fetch(url, {
+    method: opts.method || 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    alert(`${url} → ${r.status}\\n${j.detail || j.error || JSON.stringify(j)}`);
+    return null;
+  }
+  return j;
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button.btn[data-act]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const act = btn.dataset.act;
+  if (act === 'edit') {
+    const ta = document.querySelector(`textarea[data-edit-for="${id}"]`);
+    if (!ta) return;
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const ok = await jsonReq(`/admin/api/tweets/${id}`,
+      { method: 'PATCH', body: { draft_text: ta.value } });
+    btn.disabled = false; btn.textContent = 'Edit';
+    if (ok) btn.style.borderColor = '#6db585';
+  } else if (act === 'post') {
+    if (!confirm('Post this tweet to X right now?')) return;
+    btn.disabled = true; btn.textContent = 'Posting…';
+    await jsonReq(`/admin/api/tweets/${id}/post`);
+    await load();
+  } else if (act === 'skip') {
+    if (!confirm('Skip this draft? It stays on file but is not posted.')) return;
+    btn.disabled = true;
+    await jsonReq(`/admin/api/tweets/${id}/skip`);
+    await load();
+  }
+});
+
+document.getElementById('queueBtn').addEventListener('click', async (e) => {
+  e.target.disabled = true; e.target.textContent = 'Queueing…';
+  await jsonReq('/admin/api/tweets/queue-now');
+  e.target.disabled = false; e.target.textContent = "Queue today's draft now";
+  await load();
+});
+document.getElementById('refreshBtn').addEventListener('click', load);
+
+load();
+</script></body></html>"""
+
+
+@router.get("/tweets", response_class=HTMLResponse)
+async def admin_tweets_page(_user: User = Depends(get_current_admin)):
+    """Admin UI for the daily tweet queue. Reads /admin/api/tweets and posts
+    via /admin/api/tweets/{id}/post."""
+    html = (_TWEETS_ADMIN_HTML
+            .replace("{{ADMIN_CSS}}", ADMIN_CSS)
+            .replace("{{ADMIN_NAV}}", ADMIN_NAV)
+            .replace("{{TWEET_HARD_LIMIT}}", str(_TWEET_HARD_LIMIT)))
+    return HTMLResponse(html)
+
+

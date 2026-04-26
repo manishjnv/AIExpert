@@ -145,6 +145,29 @@ async def weekly_audit_select_loop() -> None:
         await _run_guarded(_go, "weekly_audit_select")
 
 
+async def daily_tweet_queue_loop() -> None:
+    """Daily 08:00 IST = 02:30 UTC — pick a slot per weekday, queue a pending
+    TweetDraft. Mon/Wed/Fri = blog_teaser, Tue/Thu = quotable, Sat/Sun = skip.
+    Admin reviews and clicks Post on /admin/tweets to ship."""
+    while True:
+        target = _next_daily(2, 30, datetime.now(timezone.utc))
+        await _sleep_until(target, "daily_tweet_queue")
+        from app.config import get_settings
+        from app.db import async_session_factory, close_db, init_db
+        from app.services.tweet_curator import queue_today
+        await init_db()
+        try:
+            async def _go():
+                base = get_settings().public_base_url.rstrip("/")
+                async with async_session_factory() as session:
+                    draft = await queue_today(session, base)
+                    if draft is not None:
+                        await session.commit()
+            await _run_guarded(_go, "daily_tweet_queue")
+        finally:
+            await close_db()
+
+
 # ---------- test-mode override ----------
 # Set JOBS_SCHEDULER_TEST=1 to run every job once on a 60-second cycle —
 # useful for smoke-testing the container without waiting 24h.
@@ -174,6 +197,7 @@ async def main() -> None:
         weekly_digest_loop(),
         quarterly_sync_loop(),
         weekly_audit_select_loop(),
+        daily_tweet_queue_loop(),
     )
 
 
