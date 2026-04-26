@@ -136,9 +136,17 @@ HARD GATES — THE POST WILL FAIL VALIDATION IF ANY OF THESE MISS
 8. If comparative = true, body_html contains at least one <table>
    rendering the comparison (semantic <thead>/<tbody>/<tr>/<th>/<td>).
 9. og_image = "/og/blog/{{SLUG}}.png" — do not override.
-10. body_html does NOT contain: repo paths (github.com/manishjnv/…),
-    session numbers ("session 12"), commit hashes, internal file paths,
-    API field names. These are operational leaks — banned all tiers.
+10. body_html does NOT contain ANY github.com/* URL — not the project
+    repo (github.com/manishjnv/…), not a third-party repo, not the
+    GitHub homepage, not a profile link, nothing. The validator regex
+    `github\.com/\S+` rejects every variant. If you need to reference
+    a code source, name the project in prose (e.g. "the LangChain repo")
+    without linking, OR cite its docs/blog page from the trusted list.
+    The ONLY github.* domains that are citable are `octoverse.github.com`
+    and `github.blog` — both appear in TRUSTED SOURCES below.
+11. body_html does NOT contain: session numbers ("session 12"), commit
+    hashes, internal file paths, API field names. These are operational
+    leaks — banned all tiers.
 
 BODY STRUCTURE (body_html contract)
 ====================================
@@ -398,7 +406,8 @@ Before you write the artifact, confirm in your head:
   [ ] schemas array matches input
   [ ] If comparative=true, at least one <table>
   [ ] og_image = "/og/blog/{{SLUG}}.png"
-  [ ] No repo paths, session/commit references, internal file paths
+  [ ] No github.com/* URL anywhere in body_html (not even github.com homepage)
+  [ ] No session/commit references, internal file paths, API field names
 
 When every box is checked, emit the JSON artifact. No commentary, no
 preamble, no afterword. The admin pipeline parses the artifact bytes

@@ -298,6 +298,9 @@ NEVER mention (platform-wide ban — rewriting will be required)
   XP weights, env-var names, file paths like `app/services/...`, field
   names from JSON or DB schemas, internal session numbers, commit
   hashes, internal Git / GitHub links.
+- ANY github.com/* URL — project repo, third-party repo, GitHub
+  homepage, profile, anything. Validator regex `github\.com/\S+`
+  rejects every variant. Name the project in prose without linking.
 - The phrase "source code" or any repo URL.
 - Specific credit balances, per-call costs, or VPS pricing.
 
