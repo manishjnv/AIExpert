@@ -1056,6 +1056,7 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
           <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d">Title (target query)</th>
           <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:90px">Tier</th>
           <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:140px">Schema satisfier</th>
+          <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:100px">Status</th>
           <th style="text-align:right;padding:6px 8px;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #2a323d;width:130px">Action</th>
         </tr>
       </thead>
@@ -1349,6 +1350,12 @@ function renderPillarBriefs() {
     if (t === 'flagship') return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(217,119,87,0.22);color:#f5a58a;border:1px solid rgba(217,119,87,0.55)">Flagship</span>';
     return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(232,168,73,0.22);color:#f5c06a;border:1px solid rgba(232,168,73,0.55)">Pillar</span>';
   };
+  const statusBadge = (tq) => {
+    const norm = (tq || '').trim().toLowerCase();
+    const hit = norm && PUBLISHED_POSTS.some(p => (p.target_query || '').trim().toLowerCase() === norm);
+    if (hit) return '<span title="A published post already targets this query" style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(143,208,165,0.18);color:#8fd0a5;border:1px solid rgba(143,208,165,0.45)">Published</span>';
+    return '<span title="Not yet published" style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.35)">Queued</span>';
+  };
   tbody.innerHTML = PILLAR_BRIEFS.map((b, i) => {
     const extra = b.schema_extra
       ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">+ ' + _esc(b.schema_extra) + ' (add in editor)</div>'
@@ -1370,6 +1377,7 @@ function renderPillarBriefs() {
       +   extra
       +   '<div style="margin-top:4px">' + cmp + '</div>'
       + '</td>'
+      + '<td style="padding:10px 8px;vertical-align:top">' + statusBadge(b.target_query) + '</td>'
       + '<td style="padding:10px 8px;text-align:right;vertical-align:top">'
       +   '<button class="btn primary" onclick="loadPillarBrief(' + i + ')" title="Auto-fill the Generate form below with this brief">Load brief</button>'
       + '</td>'
