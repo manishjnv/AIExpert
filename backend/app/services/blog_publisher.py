@@ -501,6 +501,7 @@ def list_published() -> list[dict]:
                 "pillar_tier": str(d.get("pillar_tier") or "").strip().lower(),
                 "last_reviewed_by": d.get("last_reviewed_by", "—"),
                 "last_reviewed_on": d.get("last_reviewed_on", ""),
+                "target_query": d.get("target_query", ""),
             })
         except Exception:
             continue

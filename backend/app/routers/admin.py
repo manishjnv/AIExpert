@@ -724,9 +724,14 @@ async def admin_blog_delete_draft(request: Request, _user: User = Depends(get_cu
 async def admin_blog_page(_user: User = Depends(get_current_admin)):
     """Admin-only page: generate a ready-to-paste Claude blog prompt
     from a title + optional angle. Matches the manual template workflow."""
+    import json as _json
     from app.services.blog_publisher import list_drafts, list_published
     drafts = list_drafts()
     published = list_published()
+    published_list_json = _json.dumps(
+        [{"slug": p["slug"], "title": p["title"], "target_query": p.get("target_query", "")} for p in published],
+        ensure_ascii=False,
+    )
 
     # Unified list, newest slug first (slugs are NN-prefixed, so lexical
     # reverse sort matches publication order). Each row knows its status
@@ -906,7 +911,8 @@ async def admin_blog_page(_user: User = Depends(get_current_admin)):
     html = _BLOG_ADMIN_HTML.replace("{{ADMIN_CSS}}", ADMIN_CSS) \
                             .replace("{{ADMIN_NAV}}", ADMIN_NAV) \
                             .replace("{{POSTS_ROWS}}", posts_html) \
-                            .replace("{{COUNTS_LINE}}", counts_line)
+                            .replace("{{COUNTS_LINE}}", counts_line) \
+                            .replace("{{PUBLISHED_LIST_JSON}}", published_list_json)
     return HTMLResponse(html)
 
 
@@ -952,6 +958,25 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
   .type-picker .tpl small { display:block; color:#94a3b8; font-size:11px; font-family:'IBM Plex Mono',ui-monospace,monospace; letter-spacing:0.02em; line-height:1.45; }
   #bpPillarFields { margin-top:12px; padding-top:14px; border-top:1px dashed #2a323d; }
   #bpPillarFields select { width:100%; padding:9px 11px; background:#0f1419; border:1px solid #2a323d; color:#f5f1e8; border-radius:3px; font-family:inherit; font-size:14px; }
+  .suggest-block { margin-top:16px; padding:14px 16px; background:rgba(232,168,73,0.04); border:1px solid rgba(232,168,73,0.2); border-radius:4px; }
+  .suggest-block h3 { margin:0 0 8px; font-size:13px; color:#e8a849; font-family:'IBM Plex Mono',ui-monospace,monospace; letter-spacing:0.04em; font-weight:600; }
+  .suggest-block p { font-size:12px; color:#94a3b8; margin:0 0 12px; line-height:1.55; }
+  .suggest-step { margin-bottom:14px; }
+  .suggest-step label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:5px; }
+  #suggestionPrompt { width:100%; min-height:160px; padding:9px 10px; background:#0f1419; border:1px solid #2a323d; color:#e8e2d3; border-radius:3px; font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:11px; line-height:1.5; resize:vertical; box-sizing:border-box; }
+  #suggestionsJsonInput { width:100%; min-height:90px; padding:9px 10px; background:#0f1419; border:1px solid #2a323d; color:#e8e2d3; border-radius:3px; font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:11px; line-height:1.5; resize:vertical; box-sizing:border-box; }
+  #suggestionsPreview { margin-top:12px; }
+  .sug-row { padding:9px 10px; border:1px solid #2a323d; border-radius:3px; margin-bottom:7px; background:#0f1419; }
+  .sug-row-head { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+  .sug-row-title { font-size:13px; color:#f5f1e8; line-height:1.4; flex:1 1 200px; }
+  .sug-row-meta { font-size:11px; color:#94a3b8; font-family:'IBM Plex Mono',ui-monospace,monospace; margin-top:3px; }
+  .sug-row-why { font-size:11px; color:#7a8290; font-style:italic; margin-top:3px; line-height:1.4; }
+  .sug-err { font-size:11px; color:#fca5a5; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:3px; padding:5px 8px; margin-top:6px; line-height:1.5; }
+  .sug-warn { font-size:11px; color:#f5c06a; background:rgba(232,168,73,0.06); border:1px solid rgba(232,168,73,0.25); border-radius:3px; padding:5px 8px; margin-top:4px; line-height:1.5; }
+  .sug-apply-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px solid #2a323d; }
+  .sug-count { font-size:12px; color:#94a3b8; margin-left:auto; }
+  .sug-confirm { font-size:12px; color:#8fd0a5; margin-top:8px; }
+  .pillar-divider { border:none; border-top:1px dashed rgba(232,168,73,0.3); margin:16px 0 10px; }
 </style>
 </head>
 <body>
@@ -997,6 +1022,33 @@ _BLOG_ADMIN_HTML = """<!DOCTYPE html>
       <strong>Generate prompt</strong>. Execute in order — priority reflects commercial
       intent + SERP beatability + product-fit moat.
     </div>
+    <div class="suggest-block">
+      <h3>🔮 Suggest next 5 pillar topics</h3>
+      <p>Generate a Claude prompt that encodes published posts and the current slate as context,
+         paste it into Claude Max chat, then load Claude&apos;s JSON back here to preview and
+         selectively replace the slate below.</p>
+      <div class="suggest-step">
+        <label>Step 1 — generate the suggestion prompt</label>
+        <button class="btn primary" onclick="buildSuggestionPrompt()">Generate suggestion prompt</button>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start">
+          <textarea id="suggestionPrompt" readonly placeholder="Click Generate suggestion prompt to build the Claude prompt."></textarea>
+        </div>
+        <div style="margin-top:6px">
+          <button class="btn" onclick="copySuggestionPrompt()">Copy prompt</button>
+          <span id="suggestionCopyMsg" style="font-size:11px;color:#8fd0a5;margin-left:8px"></span>
+        </div>
+      </div>
+      <div class="suggest-step">
+        <label>Step 2 — paste Claude&apos;s JSON return</label>
+        <textarea id="suggestionsJsonInput" placeholder='Paste the JSON array of 5 suggestion objects Claude returned.'></textarea>
+        <div style="margin-top:6px">
+          <button class="btn primary" onclick="parseAndValidateSuggestions()">Validate &amp; preview</button>
+        </div>
+      </div>
+      <div id="suggestionsPreview"></div>
+    </div>
+    <hr class="pillar-divider">
+    <p style="font-size:11px;color:#94a3b8;margin:0 0 6px">Pre-curated slate — load a brief directly or replace via the AI suggestion flow above.</p>
     <table class="admin" style="margin-top:12px">
       <thead>
         <tr>
@@ -1217,12 +1269,17 @@ function clearBlogPrompt() {
 }
 
 // --------------- Pillar quick-pick briefs ---------------
+// Published posts injected server-side for duplicate-query detection in the
+// AI suggestion flow. Shape: [{slug, title, target_query}, ...].
+const PUBLISHED_POSTS = {{PUBLISHED_LIST_JSON}};
+
 // Curated SEO-21 pillar slate (posts 06-10). Schema satisfier picks the
 // 3rd schema beyond the mandatory Article + FAQPage — must match the
 // dropdown values in #bpSchemaStack (HowTo / DefinedTerm / VideoObject / ItemList).
 // Posts that need an extra schema (e.g. Dataset for the salary post) get a
 // "extra" note shown in the row; the admin adds it to schemas[] in the editor.
-const PILLAR_BRIEFS = [
+// `let` so the AI suggestion flow can replace the slate in-place.
+let PILLAR_BRIEFS = [
   {
     n: 1,
     tier: 'flagship',
@@ -1339,6 +1396,335 @@ function loadPillarBrief(idx) {
   meta.textContent = '✓ Loaded brief #' + b.n + ' — review fields and click Generate prompt.';
   document.querySelector('.section-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// --------------- AI suggestion flow ---------------
+
+function buildSuggestionPrompt() {
+  const publishedLines = PUBLISHED_POSTS.map(function(p) {
+    return p.target_query ? ('- ' + p.title + '  (target: ' + p.target_query + ')') : ('- ' + p.title);
+  });
+  const queuedLines = PILLAR_BRIEFS.map(function(b) {
+    return b.target_query ? ('- ' + b.title + '  (target: ' + b.target_query + ')') : ('- ' + b.title);
+  });
+  const lines = [
+    'You are picking the next 5 pillar/flagship blog topics for automateedge.cloud,',
+    'an AI learning platform with: a live AI-jobs DB (25 sources, refreshed daily),',
+    'GitHub-eval that scores learner repos against real hiring-response data,',
+    'and an auto-refreshing AI curriculum.',
+    '',
+    'ALREADY PUBLISHED (do not propose anything that cannibalizes these target queries):',
+  ].concat(publishedLines).concat([
+    '',
+    'CURRENTLY QUEUED IN SLATE (do not propose duplicates of these either):',
+  ]).concat(queuedLines).concat([
+    '',
+    'NON-NEGOTIABLE TOPIC CRITERIA — every suggestion MUST satisfy at least ONE:',
+    '  (a) primary-source data moat — uses the jobs DB, GitHub-eval, or learner-cohort data',
+    '      that competitor SEO sites cannot replicate',
+    '  (b) year-qualified gap — "<topic> 2026" / "from scratch 2026" where SERP top-3',
+    '      is stale (2024 / Llama-3 era / pre-tool-use) and refreshable annually',
+    '  (c) ancestor for programmatic pages — a hub that legitimately spawns 10+',
+    '      child /vs/ or /how-to/ pages without thin-content risk',
+    '',
+    'REJECT topics that are:',
+    '  - generic LLM comparisons without a data hook (e.g. "GPT-4 vs Claude")',
+    '  - listicle-bait without a primary-source angle (e.g. "10 best AI tools")',
+    '  - already saturated by Towards Data Science / Medium / vendor blogs',
+    '',
+    'Return EXACTLY this JSON shape (an array of 5 objects, no prose, no code fence):',
+    '[',
+    '  {',
+    '    "n": 1,',
+    '    "tier": "flagship" | "pillar",',
+    '    "title": "Full post title, year-qualified where natural",',
+    '    "target_query": "lowercase SEO query, 2-5 words",',
+    '    "angle": "1-2 sentences. Names the competitor the post beats AND the moat used.",',
+    '    "schema": "HowTo" | "DefinedTerm" | "VideoObject" | "ItemList",',
+    '    "schema_extra": "Optional 4th schema, empty string if none",',
+    '    "comparative": true | false,',
+    '    "why": "Short why-now. Names the moat criterion (a/b/c) and the SERP gap."',
+    '  }',
+    ']',
+    '',
+    'Schema enum mapping (the `schema` field must be exactly one of these):',
+    '  - HowTo          (step-by-step build / setup posts)',
+    '  - DefinedTerm    (concept / vs-comparison posts)',
+    '  - VideoObject    (posts that ship with a paired video)',
+    '  - ItemList       (ranked / curated lists)',
+    '',
+    'Set `comparative: true` ONLY if the post is X-vs-Y or a ranked comparison —',
+    'this triggers a hard validator gate requiring at least one <table> in body.',
+    '',
+    'Order the 5 by descending priority: commercial intent x SERP beatability x',
+    'which moat criterion (a/b/c) it leans on. Tier "flagship" only for topics',
+    'where the moat is exclusive — at most 1 flagship per batch of 5.',
+  ]);
+  document.getElementById('suggestionPrompt').value = lines.join('\\n');
+}
+
+function copySuggestionPrompt() {
+  const ta = document.getElementById('suggestionPrompt');
+  const msg = document.getElementById('suggestionCopyMsg');
+  const text = ta.value;
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      msg.textContent = '✓ Copied.';
+      setTimeout(function() { msg.textContent = ''; }, 2000);
+    });
+  } else {
+    ta.select();
+    document.execCommand('copy');
+    msg.textContent = '✓ Copied.';
+    setTimeout(function() { msg.textContent = ''; }, 2000);
+  }
+}
+
+function parseAndValidateSuggestions() {
+  const raw = document.getElementById('suggestionsJsonInput').value.trim();
+  if (!raw) { _renderSuggestionsError('Paste Claude\\'s JSON first.'); return; }
+  const stripped = raw.replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim();
+  var suggestions;
+  try { suggestions = JSON.parse(stripped); }
+  catch (e) { _renderSuggestionsError('Invalid JSON: ' + e.message); return; }
+
+  var errors = {};   // rowIndex -> [msg, ...]
+  var warnings = {}; // rowIndex -> [msg, ...]
+  var globalErrs = [];
+
+  if (!Array.isArray(suggestions)) { _renderSuggestionsError('Expected a JSON array.'); return; }
+  if (suggestions.length !== 5) { _renderSuggestionsError('Expected exactly 5 items, got ' + suggestions.length + '.'); return; }
+
+  var REQUIRED_STR = ['tier', 'title', 'target_query', 'angle', 'schema', 'why'];
+  var seenQueries = {};
+  var flagshipCount = 0;
+  var publishedQueries = {};
+  var slateQueries = {};
+  PUBLISHED_POSTS.forEach(function(p) { if (p.target_query) publishedQueries[p.target_query.trim().toLowerCase()] = true; });
+  PILLAR_BRIEFS.forEach(function(b) { if (b.target_query) slateQueries[b.target_query.trim().toLowerCase()] = true; });
+
+  suggestions.forEach(function(s, i) {
+    var rowErrs = [];
+    var rowWarns = [];
+
+    // Missing required fields
+    REQUIRED_STR.forEach(function(k) {
+      if (s[k] === undefined || s[k] === null) rowErrs.push('Missing field: ' + k);
+      else if (typeof s[k] !== 'string') rowErrs.push('Field ' + k + ' must be a string, got ' + typeof s[k]);
+    });
+    if (s.n === undefined || s.n === null) rowErrs.push('Missing field: n');
+    else if (typeof s.n !== 'number') rowErrs.push('Field n must be a number');
+    if (s.comparative === undefined || s.comparative === null) rowErrs.push('Missing field: comparative');
+    else if (typeof s.comparative !== 'boolean') rowErrs.push('Field comparative must be a boolean, got ' + typeof s.comparative);
+    if (s.schema_extra === undefined) s.schema_extra = '';
+
+    // Enum checks (only if field is a string)
+    if (typeof s.tier === 'string' && s.tier !== 'flagship' && s.tier !== 'pillar')
+      rowErrs.push('tier must be "flagship" or "pillar", got: ' + _esc(s.tier));
+    if (typeof s.schema === 'string' && ['HowTo','DefinedTerm','VideoObject','ItemList'].indexOf(s.schema) === -1)
+      rowErrs.push('schema must be HowTo / DefinedTerm / VideoObject / ItemList, got: ' + _esc(s.schema));
+
+    // Duplicate target_query checks
+    if (typeof s.target_query === 'string') {
+      var tq = s.target_query.trim().toLowerCase();
+      if (publishedQueries[tq]) rowErrs.push('target_query duplicates an already-published post: ' + _esc(tq));
+      if (slateQueries[tq]) rowErrs.push('target_query duplicates current slate entry: ' + _esc(tq));
+      if (seenQueries[tq]) rowErrs.push('target_query duplicates another suggestion in this batch: ' + _esc(tq));
+      seenQueries[tq] = true;
+    }
+
+    // Flagship count (only count if tier is valid string)
+    if (typeof s.tier === 'string' && s.tier === 'flagship') flagshipCount++;
+
+    // Soft warnings
+    if (typeof s.angle === 'string' && s.angle.length < 80) rowWarns.push('angle is short (' + s.angle.length + ' chars) — aim for 80+ chars naming competitor + moat');
+    if (typeof s.why === 'string' && !/moat|primary[- ]source|jobs|github|data/i.test(s.why)) rowWarns.push('why does not mention a moat signal (moat / primary-source / jobs / github / data)');
+    if (typeof s.title === 'string' && typeof s.target_query === 'string' &&
+        s.title.indexOf('2026') === -1 && /rag|agent|llm|gpt|claude|gemini/i.test(s.target_query))
+      rowWarns.push('fast-decay topic — consider year-qualifying the title (add "2026")');
+
+    if (rowErrs.length) errors[i] = rowErrs;
+    if (rowWarns.length) warnings[i] = rowWarns;
+  });
+
+  if (flagshipCount > 1) {
+    for (var j = 0; j < suggestions.length; j++) {
+      if (suggestions[j].tier === 'flagship') {
+        if (!errors[j]) errors[j] = [];
+        if (j > 0) errors[j].push('Only 1 flagship allowed per batch — this is the 2nd+');
+      }
+    }
+  }
+
+  renderSuggestionsPreview({ suggestions: suggestions, errors: errors, warnings: warnings });
+}
+
+function _renderSuggestionsError(msg) {
+  var el = document.getElementById('suggestionsPreview');
+  el.innerHTML = '<div class="sug-err" style="margin-top:8px">' + _esc(msg) + '</div>';
+}
+
+function renderSuggestionsPreview(result) {
+  var suggestions = result.suggestions;
+  var errors = result.errors || {};
+  var warnings = result.warnings || {};
+  var el = document.getElementById('suggestionsPreview');
+  el.innerHTML = '';
+
+  var TIER_BADGE_FN = function(t) {
+    if (t === 'flagship')
+      return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(217,119,87,0.22);color:#f5a58a;border:1px solid rgba(217,119,87,0.55)">Flagship</span>';
+    return '<span style="display:inline-block;font-family:\\'IBM Plex Mono\\',ui-monospace,monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:rgba(232,168,73,0.22);color:#f5c06a;border:1px solid rgba(232,168,73,0.55)">Pillar</span>';
+  };
+
+  var headerDiv = document.createElement('div');
+  headerDiv.id = 'sugCountLine';
+  headerDiv.style.cssText = 'font-size:12px;color:#94a3b8;margin-bottom:8px';
+  el.appendChild(headerDiv);
+
+  suggestions.forEach(function(s, i) {
+    var hasErr = !!errors[i];
+    var hasWarn = !!warnings[i];
+    var rowDiv = document.createElement('div');
+    rowDiv.className = 'sug-row';
+    if (hasErr) rowDiv.style.borderColor = 'rgba(239,68,68,0.4)';
+    else if (hasWarn) rowDiv.style.borderColor = 'rgba(232,168,73,0.35)';
+
+    var checked = hasErr ? '' : 'checked';
+    var cmpTag = s.comparative
+      ? '<span style="font-size:10px;color:#f5c06a">comparative</span>'
+      : '<span style="font-size:10px;color:#94a3b8">non-comparative</span>';
+    var schemaStr = 'Article + FAQPage + ' + _esc(s.schema || '') + (s.schema_extra ? ' + ' + _esc(s.schema_extra) : '');
+    var angleHtml = s.angle ? '<div style="font-size:11px;color:#d0cbc2;margin-top:3px;line-height:1.4"><em>' + _esc(s.angle) + '</em></div>' : '';
+
+    var inner = ''
+      + '<div class="sug-row-head">'
+      +   '<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">'
+      +     '<input type="checkbox" class="sug-chk" data-idx="' + i + '" ' + checked + ' style="margin-top:3px" onchange="_updateSugApply()">'
+      +     '<div>'
+      +       '<div class="sug-row-title">' + _esc(s.title || '') + '</div>'
+      +       '<div class="sug-row-meta">target: <code>' + _esc(s.target_query || '') + '</code> &nbsp; ' + TIER_BADGE_FN(s.tier) + ' &nbsp; ' + cmpTag + '</div>'
+      +       '<div class="sug-row-meta" style="margin-top:2px">schema: ' + schemaStr + '</div>'
+      +       '<div class="sug-row-why">why: ' + _esc(s.why || '') + '</div>'
+      +       angleHtml
+      +     '</div>'
+      +   '</label>'
+      + '</div>';
+
+    if (hasErr) {
+      inner += '<div class="sug-err">' + errors[i].map(function(e) { return '✗ ' + _esc(e); }).join('<br>') + '</div>';
+    }
+    if (hasWarn) {
+      inner += '<div class="sug-warn">' + warnings[i].map(function(w) { return '⚠ ' + _esc(w); }).join('<br>') + '</div>';
+    }
+
+    rowDiv.innerHTML = inner;
+    el.appendChild(rowDiv);
+  });
+
+  var applyRow = document.createElement('div');
+  applyRow.className = 'sug-apply-row';
+  applyRow.id = 'sugApplyRow';
+  applyRow.innerHTML = ''
+    + '<button class="btn primary" id="sugApplyBtn" onclick="applyCheckedSuggestions()">Replace slate with checked</button>'
+    + '<button class="btn" id="sugUndoBtn" onclick="undoSuggestionsReplace()">Undo last replace</button>'
+    + '<span class="sug-count" id="sugCountBadge"></span>';
+  el.appendChild(applyRow);
+
+  var confirmDiv = document.createElement('div');
+  confirmDiv.className = 'sug-confirm';
+  confirmDiv.id = 'sugConfirmMsg';
+  el.appendChild(confirmDiv);
+
+  _updateSugApply();
+}
+
+function _updateSugApply() {
+  var chks = document.querySelectorAll('.sug-chk');
+  if (!chks.length) return;
+  var checked = 0;
+  var checkedHasErr = false;
+  chks.forEach(function(chk) {
+    if (chk.checked) {
+      checked++;
+      // check if this row has a hard error by looking at its sibling .sug-err
+      var row = chk.closest('.sug-row');
+      if (row && row.querySelector('.sug-err')) checkedHasErr = true;
+    }
+  });
+  var badge = document.getElementById('sugCountBadge');
+  if (badge) badge.textContent = checked + ' checked / ' + chks.length;
+  var applyBtn = document.getElementById('sugApplyBtn');
+  if (applyBtn) applyBtn.disabled = (checked === 0 || checkedHasErr);
+  var undoBtn = document.getElementById('sugUndoBtn');
+  if (undoBtn) undoBtn.disabled = !localStorage.getItem('_pillarBriefsBackup');
+  var hdr = document.getElementById('sugCountLine');
+  if (hdr) hdr.textContent = checked + ' checked / ' + chks.length + ' ready';
+}
+
+function applyCheckedSuggestions() {
+  var chks = document.querySelectorAll('.sug-chk');
+  var chosen = [];
+  chks.forEach(function(chk) {
+    if (chk.checked) {
+      var idx = parseInt(chk.getAttribute('data-idx'), 10);
+      var s = _lastSuggestions && _lastSuggestions[idx];
+      if (s) chosen.push(s);
+    }
+  });
+  if (!chosen.length) return;
+  localStorage.setItem('_pillarBriefsBackup', JSON.stringify(PILLAR_BRIEFS));
+  PILLAR_BRIEFS = chosen.map(function(s, i) {
+    return {
+      n: i + 1,
+      tier: s.tier,
+      title: s.title,
+      target_query: s.target_query,
+      angle: s.angle || '',
+      schema: s.schema,
+      schema_extra: s.schema_extra || '',
+      comparative: !!s.comparative,
+      why: s.why || '',
+    };
+  });
+  renderPillarBriefs();
+  var tbl = document.getElementById('pillarBriefsTbody');
+  if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  var msg = document.getElementById('sugConfirmMsg');
+  if (msg) msg.textContent = '\\u2713 Replaced slate with ' + chosen.length + ' brief' + (chosen.length !== 1 ? 's' : '') + ' \\u00b7 old slate saved (Undo available)';
+  document.getElementById('suggestionsPreview').innerHTML = '';
+  document.getElementById('suggestionsJsonInput').value = '';
+  _lastSuggestions = null;
+}
+
+function undoSuggestionsReplace() {
+  var backup = localStorage.getItem('_pillarBriefsBackup');
+  if (!backup) return;
+  try { PILLAR_BRIEFS = JSON.parse(backup); }
+  catch (e) { alert('Could not restore backup: ' + e.message); return; }
+  localStorage.removeItem('_pillarBriefsBackup');
+  renderPillarBriefs();
+  var msg = document.getElementById('sugConfirmMsg');
+  if (msg) { msg.textContent = '\\u21a9 Restored previous slate'; }
+  _updateSugApply();
+}
+
+// Holds last parsed suggestions so applyCheckedSuggestions() can read them.
+// Set inside parseAndValidateSuggestions() after renderSuggestionsPreview().
+var _lastSuggestions = null;
+// Patch parseAndValidateSuggestions to store _lastSuggestions after render.
+(function() {
+  var _orig = parseAndValidateSuggestions;
+  parseAndValidateSuggestions = function() {
+    _orig();
+    // After render, extract suggestions from rendered checkboxes index map
+    // by re-reading the JSON (already validated above). Simpler: re-parse here.
+    var raw = document.getElementById('suggestionsJsonInput').value.trim();
+    if (!raw) return;
+    var stripped = raw.replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim();
+    try { _lastSuggestions = JSON.parse(stripped); } catch (e) { _lastSuggestions = null; }
+  };
+})();
 
 document.addEventListener('DOMContentLoaded', renderPillarBriefs);
 
