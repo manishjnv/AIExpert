@@ -4,6 +4,40 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-26 (session 44 — `/jobs` filter + pagination consistency)
+
+**Branch:** `master` · 2 commits on top of session 43's `9c802cd`. Pushed + VPS deployed at `fd60f63`.
+**Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `fd60f632e43b167b58cd9e3f57c4e360ad75e776` matches local HEAD `fd60f63` (S41 prevention rule applied). Container healthy, `/api/health` 200.
+**Tests:** Not re-run — bug fix is two small frontend changes inside the SSR-rendered `<script>` block in [backend/app/routers/jobs.py](../backend/app/routers/jobs.py); no backend logic, no DB, no auth path touched. Session 43 baseline (65 blog tests) holds.
+
+### Session 44 — `/jobs` filter dropped on pagination + dropdown count mismatch (RCA-032)
+
+**Headline:** User reported on `/jobs`: picking country `IN (45)` showed only 1 job, and clicking page 2 silently dropped the filter and showed 50 unfiltered jobs. Two coupled defects in the SSR-vs-JS state split. Fix shipped in two commits.
+
+**Commit `6e2ea12` — hide SSR pagination once JS paints a filtered view.** [backend/app/routers/jobs.py:1011-1015](../backend/app/routers/jobs.py#L1011-L1015) — `loadJobs()` now hides `nav.pagination` whenever it runs. The footer markup still ships in the HTML for Googlebot's crawl path (SEO-10), but the in-page UI no longer offers a link that silently drops user-applied filters. Considered the bigger Option B (filter-aware SSR pagination, ~40 lines across both surfaces) — rejected: the JS-filter path with `limit=100` already covers practically every filter combo, and B duplicates filter logic across SSR and JS for marginal benefit.
+
+**Commit `fd60f63` — default time filter to "Any time".** [backend/app/routers/jobs.py:362-366](../backend/app/routers/jobs.py#L362-L366) — flipped `checked` from `Last 7 days` to `Any time`. The location dropdown counts come from `/api/jobs/locations` which doesn't honor the time filter, so the previous default of `posted=7` advertised `IN (45)` while displaying 1 card. Verified live: `/api/jobs?country=IN&limit=200` returns 45 jobs.
+
+**RCA-032 added** + 2 new patterns in the watch table: (1) SSR pagination + JS-applied filter, (2) filter-option count vs default filter set. Both are "any control that advertises a result set must round-trip with the actual filter state" — a generalization of this exact failure mode.
+
+**Open questions for next session:**
+
+1. **Filter-aware SSR pagination (Option B) deferred.** If a single filter set ever produces >100 results and users want to browse, we'll need to wire filters through SSR pagination URLs. Current ceiling is 100 (the JS `limit`); none of the current 730 published jobs filter combos hit it.
+2. **Result count indicator.** The chips row shows active filters but no "Showing N jobs" line. Low-priority polish — defer until a user complains.
+
+**Next action — Session 45:** unchanged from S43 plan — **either** SEO-21 pillar cluster post 05 q2 **or** COURSE-01 + COURSE-02 + COURSE-03 Phase A foundation. The session-43 suggestion flow + this session's `/jobs` UX fixes are independent — both can ship into a busy backlog without blocking.
+
+**Queued:** S45 SEO-21 q2 post · S46 SEO-21 posts 5+6 · **S47 SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` Alembic migration) · COURSE-01..COURSE-03 (Phase A foundation) · COURSE-04 + COURSE-05 (Phase B MVP — manual Opus authoring) · separate commit for `docs/COURSES.md` working-tree changes still pending from S43.
+
+**Agent-utilization footer:**
+
+- Opus: full session — Phase 0 reads (CLAUDE.md §8 + §9 + HANDOFF + RCA + memory); bug investigation (re-read [jobs.py](../backend/app/routers/jobs.py) end-to-end to find the SSR/JS split and the SEO-10 hydration skip); two minimal edits (5 lines + 2 chars); pre-commit secret/TODO scans; commit + push with noreply env-vars (×2); SSH deploy + VPS-HEAD verification (×2); curl smoke + IN-jobs count verification; RCA-032 entry + 2 new pattern-table rows; HANDOFF + §9 updates.
+- Sonnet: n/a — both edits were ≤5 lines in a file already in Opus's hot read cache; subagent cold-start (~20-30s) + cache loss outweighed any token saving.
+- Haiku: n/a — no bulk sweep, no multi-file grep; deploy verification was 2 SSH calls, cheaper as direct Opus calls.
+- codex:rescue: n/a — frontend JS bug fix, no auth/AI-classifier/Alembic/jobs-classifier path touched. First engagement remains S47 (`quiz_outcomes` migration) and COURSE-23/COURSE-24 (course versioning + deprecation Alembic migrations).
+
+---
+
 ## Current state as of 2026-04-26 (session 43 — pillar AI suggestion flow on /admin/blog)
 
 **Branch:** `master` · 1 commit on top of session 42's `97d780c`. Pushed + VPS deployed at `9c802cd`.
