@@ -1003,6 +1003,11 @@ async function loadJobs() {
   for (const k of FILTERS) if (f[k]) q.set(k, f[k]);
   if (f.posted_within_days) q.set("posted_within_days", f.posted_within_days);
   q.set("limit", "100");
+  // Filtered/JS view doesn't paginate. Strip a stale ?page= so the address
+  // bar isn't lying about page-N while we render a filter-driven set.
+  if (new URLSearchParams(location.search).has('page')) {
+    history.replaceState(null, '', '/jobs');
+  }
 
   const r = await fetch("/api/jobs?" + q.toString());
   if (!r.ok) { $('list').innerHTML = '<p class="empty">Load failed.</p>'; return; }
