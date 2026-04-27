@@ -182,33 +182,59 @@ The orchestration playbook is partly enforced by Claude Code hooks and skills ch
 
 **When to use them.** Always invoke `/aiexpert-phase0` at session start instead of recalling the §8 read list manually. Always invoke `/deploy-vps` when deploying to `a11yos-vps` instead of running the seven steps by hand. Hooks fire automatically on every `git commit` and `git push` — no opt-in.
 
+### Agent teams (Day-2, shipped 2026-04-28)
+
+Three named orchestration patterns checked into `.claude/skills/`. Each is a markdown skill that main session invokes when the work matches the trigger; the skill body tells main session which subagents to spawn in parallel, with what contracts, and how to synthesize results.
+
+- **`/research-team <question>`** — 3 parallel Explore agents + main-session synthesis. Use for cross-cutting investigations spanning >2 files (audit-style sweeps, convention checks, drift discovery). Returns a single synthesized answer; raw file content stays in subagents. Main-context savings ~4-5× vs reading directly.
+- **`/build-team <contract>`** — N parallel Sonnet implementers + 1 Sonnet test-writer + Opus review (main session). Use for implementation contracts that split cleanly across N files (template rollouts, decorator sweeps, cron clones for Phase B of `AI_PIPELINE_PLAN.md`). Mandatory: every prompt must include exact paths + contract + acceptance test + output format. Refuses to spawn if contract is incomplete.
+- **`/adversarial-team <ref>`** — 3 uncorrelated reviewers in parallel: Opus structural + `codex:rescue` adversarial + Sonnet bug-hunt. Mandatory before merge on diffs touching load-bearing paths (see list below). Synthesizes into a numbered concern list with severity rules; logs accept/revise/reject outcome per `CLAUDE.md` §8 Phase 3.
+
+### Trigger map (when each artifact fires)
+
+| Signal | Lever |
+|---|---|
+| Session start | `/aiexpert-phase0 <area>` |
+| Read-only research touching >2 files | `/research-team` |
+| Implementation contract splits across ≥2 independent files | `/build-team` |
+| Diff touches `backend/app/ai/`, `backend/app/auth/`, `jobs_ingest/`, `jobs_enrich/`, `backend/alembic/versions/`, or any AI prompt | `/adversarial-team` (mandatory before merge) |
+| About to push code that needs to land on VPS runtime | `/deploy-vps` |
+| Pre-`git commit` (every commit) | hook auto-fires |
+| Pre-`git push` (every push) | hook auto-fires |
+| Tool-call count >60 OR approach pivoted mid-session | `/clear` and restart from `docs/HANDOFF.md` |
+
+### Cost discipline
+
+The cheap levers (Phase 0 reads, hooks, deploy skill, research-team) fire **always** when the trigger matches — they pay for themselves in seconds. The expensive levers (`build-team` for small work, `adversarial-team` for non-load-bearing diffs) fire only on the strict triggers above; firing them outside trigger conditions is a tuning bug. Main session may invoke any team directly via `Skill(skill: "<name>", args: "...")` — no need to wait for user typing the slash command.
+
 ## 9. Session state (update at end of each session)
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-27 (session 50 — Claude Code harness Day-1 + centralized AI pipeline plan)
-**Last session summary (session 50):** Two-part dev-tooling session. (1) Consolidated three loose AI strategy docs (`AI_INTEGRATION.md` + `AI_QUALITY_PIPELINE.md` + `AI_Enrichment_Architecture_Blueprint.html`) plus the dormant `PLAN_TIERED_CLAUDE_ROUTING.md` into a single source of truth at [docs/AI_PIPELINE_PLAN.md](docs/AI_PIPELINE_PLAN.md). Maps every AI surface to Track 1 (VPS Claude Code via Max OAuth = $0 marginal) or Track 2 (Anthropic API = paid + cached); commits the four blueprint invariants; encodes the repo-eval design recommendation (Option D: Gemini Flash default + Sonnet 4.6 opt-in + composite free-signal scoring). (2) Shipped Day-1 of the Claude Code harness tuning: 2 PreToolUse hooks (`pre_commit_secrets.py`, `pre_push_noreply.py`) + 2 skills (`/aiexpert-phase0 [area]`, `/deploy-vps`) under `.claude/` (gitignored, local-only) + CLAUDE.md §8.4 reference so future-me can recreate them.
+**Last session date:** 2026-04-28 (session 50 continued — audit merge + Day-2 agent-team skills)
+**Last session summary (S50 + S50-cont):** Three-part dev-tooling session. **(1)** Consolidated three loose AI strategy docs into single source of truth at [docs/AI_PIPELINE_PLAN.md](docs/AI_PIPELINE_PLAN.md). **(2)** Shipped Day-1 harness: 2 PreToolUse hooks (pre_commit_secrets, pre_push_noreply) + 2 skills (`/aiexpert-phase0`, `/deploy-vps`) — first-fired live on the S50 commit, both passed silently. **(3)** Merged the two orphan audit files (`AUDIT_2026-04.md` + `AUDIT_TASKS.md`) into one canonical [docs/AUDIT_TASKS.md](docs/AUDIT_TASKS.md) with only unique unimplemented tasks; deleted the source narrative + the now-superseded `PLAN_TIERED_CLAUDE_ROUTING.md`; surfaced 3 new tasks (P2-13, P3-19, P3-20) + added D8 (repo-eval Option pick from `AI_PIPELINE_PLAN.md` §7); marked P1-08 / F5 🟢 partial. Shipped Day-2 harness: 3 agent-team orchestration skills (`/research-team`, `/build-team`, `/adversarial-team`) + CLAUDE.md §8 Day-2 subsection + trigger map.
 
-- **One commit this session.** `<S50-SHA>` — docs(s50): centralized AI pipeline plan + harness §8.4. 3 files: `docs/AI_PIPELINE_PLAN.md` new (~340 lines), `CLAUDE.md` +25 lines, `docs/HANDOFF.md` rewritten top section.
-- **Phase 2 gates green:** hook scripts compile · settings.json valid · pre-commit smoke (non-trigger / empty / AKIA-pattern blocked / TODO warned) ✓ · pre-push smoke (non-trigger / empty / noreply allowed) ✓.
-- **Sonnet:** n/a — doc + tooling work all hot-cached on Opus, no contracts to delegate.
-- **codex:rescue:** n/a — none of the touched paths in §8's strictly-mandatory list (continues empty 10× in a row across S45-50).
+- **Two commits this session.** `ac0227b` (S50 base — AI Pipeline Plan + Day-1 harness §8.4) + S50-cont (audit merge + Day-2 teams + CLAUDE.md §8 trigger map).
+- **Phase 2 gates green** on S50 base; S50-cont is pure docs + gitignored skills, no runtime risk.
+- **Hooks first-fired live** on S50 base — both pre-commit-secrets and pre-push-noreply passed silently (no false positives, allowed legitimate noreply-identity push). First proven-in-prod test of the harness.
+- **Sonnet:** n/a — design + doc + tooling, no implementation contracts to delegate. Day-2 teams authored proactively; first real fire expected in Session 51 Phase B (cron clones).
+- **codex:rescue:** n/a — touched paths not in §8's strictly-mandatory list. Continues empty 10× across S45-S50 — escalating to D7 in P0.
 - **No RCA** — no bug fixed.
 
-**Deploy status:** `<S50-SHA>` pushed to origin/master. VPS `git pull` completed; HEAD parity confirmed. **No rebuild done** — this session's changes are docs + `.claude/*` only, nothing affects backend runtime. Backend container untouched, healthy.
+**Deploy status:** `ac0227b` pushed to origin/master. VPS HEAD parity confirmed. **No rebuild done** — entire S50 is docs + `.claude/*` only, nothing affects backend runtime. Backend container untouched, healthy. S50-cont push pending (this commit).
 
-**Open questions:** (1) **Repo eval Option D pending founder approval** before Phase E of AI_PIPELINE_PLAN.md ships. (2) **Three orphan untracked docs** (`AUDIT_2026-04.md`, `AUDIT_TASKS.md`, `PLAN_TIERED_CLAUDE_ROUTING.md` — last is now superseded). Founder decides commit / delete / leave. (3) **S49 browser smoke** still pending. (4) **Day-2 harness levers** (agent-team definitions) deferred until Phase B starts.
+**Open questions:** (1) **D8 — Repo evaluation Option A/B/D/E pick** with per-user submission cap if E. Recommended: Option E (async cron, $0 marginal Opus). (2) **All other 7 P0 decisions** still pending (D1 brand, D2 monetization, D3 cert credibility, D4 cohort, D5 backup destination, D6 CSRF, D7 codex:rescue). Founder lands all 8 in ~20 min sitting. (3) **S49 browser smoke** still pending. (4) **Two non-mine orphan files** (`backend/app/services/share_copy.py` + test) sit untracked from another session.
 
-**Next action — Session 51:** founder decides repo-eval + orphan-doc commits (~5 min), then either browser smoke for S49 or start Phase B (4 cron clones for blog / course metadata / topic discovery / email digest).
+**Next action — Session 51:** founder lands the 8 P0 decisions, then either P1-04 (Brevo cap, ~30 min) or Phase B of `AI_PIPELINE_PLAN.md` (4 cron clones — first real user of `/build-team`).
 
-**Queued:** S49 browser smoke · audit P0 decisions × 7 + P1 × 8 (`docs/AUDIT_TASKS.md`) · S47 Phase B engagement upgrades · pagination test fix · SEO-21 q2 / 5+6 · **SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` migration) · COURSE-01..03 Phase A · COURSE-04+05 Phase B MVP · separate commit for `docs/COURSES.md` from S43 · AI_PIPELINE_PLAN.md Phase B–E sequenced sessions.
+**Queued:** S49 browser smoke · 8 P0 decisions · P1-01..08 (Coursera affiliate / cert reframe / chat personalization / Brevo cap / Gemini cost cap / CSRF / doc-vs-code reconciliation / CI security gates) · P2-01..13 · P3-01..20 · AI_PIPELINE_PLAN.md Phase B–E sequenced sessions.
 
-**Agent-utilization footer:**
+**Agent-utilization footer (combined S50 + S50-cont):**
 
-- Opus: full session — Phase 0 reads (CLAUDE.md + HANDOFF + RCA + memory parallel); read three AI strategy docs (`AI_INTEGRATION.md` + `AI_QUALITY_PIPELINE.md` + `AI_Enrichment_Architecture_Blueprint.html`); audit current `.claude/` config (settings.json + ls hooks/skills/agents); draft `docs/AI_PIPELINE_PLAN.md` (~340 lines, 13 sections, supersedes prior routing plan); author the 11-lever Claude Code tuning proposal with current-vs-proposed comparison table + impact axes; write 2 PreToolUse hook scripts (Python, ~140 lines combined); write 2 skill markdown files; update `CLAUDE.md` §8 with new subsection and §9 with this entry; rewrite top section of `docs/HANDOFF.md`; smoke-test both hooks (non-trigger / empty / block / warn paths); plan the S50 deploy as docs-push-no-rebuild.
+- Opus: full session — Phase 0 reads parallel; read three AI strategy docs; audit `.claude/` config; draft `docs/AI_PIPELINE_PLAN.md` (~340 lines); author 11-lever Claude Code tuning proposal; write 2 PreToolUse hook scripts + 5 skill files (Day-1: `/aiexpert-phase0`, `/deploy-vps`; Day-2: `/research-team`, `/build-team`, `/adversarial-team`); update `CLAUDE.md` §8 with Day-1 subsection + Day-2 subsection + trigger map + §9 entries; rewrite top section of `docs/HANDOFF.md`; smoke-test both hooks; first-real-fire of pre-commit + pre-push hooks live on S50 commit; execute `/deploy-vps` sequence (commit → push → ssh pull → HEAD parity → no-rebuild docs-only → /api/health smoke); read both audit files (296+229 lines); merge into canonical `docs/AUDIT_TASKS.md` adding 3 surfaced tasks + D8; delete merged-source + superseded routing plan.
 - Sonnet: n/a — design + doc + tooling, no implementation contracts to delegate.
-- Haiku: n/a — VPS embedding-usage SQL ran via single direct backend-container exec, not a Haiku agent (faster than round-trip).
-- codex:rescue: n/a — touched paths not in §8's strictly-mandatory list.
+- Haiku: n/a — VPS embedding-usage SQL via direct backend-container exec, faster than Haiku round-trip.
+- codex:rescue: n/a — touched paths not in §8's strictly-mandatory list. **10/10 empty across S45-S50** — escalating to P0-D7 (fix-or-drop) for Session 51 founder decision.
 
 ---
 
