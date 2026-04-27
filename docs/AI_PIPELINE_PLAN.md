@@ -21,8 +21,9 @@
 | **D** | Reasoning trail (schema field) + quarantine table | not started | session +2 |
 | **E** | Repo evaluation MVP (after §7 decision) | not started | session +3 |
 | **F** | Observability: cache hit-rate dashboard + per-user token budget | partial | piecemeal across B–E |
+| **G** | Social post curation (admin-only) — Opus 4.7 cron + `/admin/social` UI | not started · v1 scope locked 2026-04-28 | 2 sessions; backend slice load-bearing per §8 (Alembic + AI prompt) |
 
-**Next action:** Founder confirms the repo evaluation decision in §7, then start Phase B.
+**Next action:** Founder confirms the repo evaluation decision in §7, then start Phase B (which can absorb Phase G's cron as a 5th cron clone).
 
 ---
 
@@ -182,6 +183,55 @@ Maturity: **Manual (0/5) for non-flagship** → **Defined (3/5)**. Flagship inte
 | Use | dedup + post-refine guardrail | unchanged |
 
 Maturity: **Defined (3/5)**. The path is wired but dormant. Volume rises naturally as Track 1 crons activate.
+
+### 3.11 Social post curation (admin-only)
+
+**Status:** designed 2026-04-28 · v1 scope locked by founder · awaiting build session.
+
+| Aspect | Current | Target |
+|---|---|---|
+| Surface | n/a — only `tweet_curator.py` exists (deterministic templates, daily auto-tweet from blog backlog, Twitter only) | New admin surface at `/admin/social` for AI-curated drafts |
+| Sources for v1 | n/a | **blog + course only** (jobs / weekly digest / cohort milestones deferred to v2) |
+| Platforms | Twitter only via daily cron | Twitter + LinkedIn drafts per source |
+| Generation model | deterministic templates | **Opus 4.7 via Track 1 (`claude -p` Max OAuth)** — $0 marginal |
+| Trigger | 8am IST daily cron picks freshest unused blog | **Daily 06:30 IST cron** scans for blogs/courses without active `social_posts` row → generates draft for both platforms in one Opus call. No on-publish event coupling — cron handles backfill. |
+| Admin UX | n/a (admin posts manually) | `/admin/social` page: Drafts (default) / Published / Archived tabs. Per row: source, platform, draft body editable, hashtags, reasoning trail collapsible. Actions: Edit · Publish · Re-publish · Discard. |
+| Twitter publish | n/a | Reuses existing `twitter_client.py.post_tweet()`. Direct API post on admin click. |
+| LinkedIn publish (v1) | n/a | **Manual:** `📋 Copy + Open LinkedIn` button copies body to clipboard + opens LinkedIn share intent in new tab. Admin posts manually, returns, clicks `Mark as posted` with the LinkedIn URL. **No LinkedIn API integration in v1.** Defer to v2 when founder applies for LinkedIn Marketing Developer Platform. |
+| Auto-archive | n/a | **Drafts older than 30 days that admin never published auto-archive.** UI shows a banner "N stale drafts ready to archive" with one-click cleanup. Archived rows preserved in DB for analytics; hidden from default UI. |
+| State machine | n/a | `pending → draft → published` (terminal) · `draft → archived` (admin discard) · `pending → archived` (validation failed 3×) · `published → pending` (Re-publish spawns new row, old `published` row preserved as history). UNIQUE index on `(source_kind, source_slug, platform) WHERE status IN ('pending', 'draft')` prevents double-queueing. |
+| Schema | n/a | New `social_posts` table (Alembic migration, **load-bearing**). Pydantic output schema enforces Twitter ≤ 280, LinkedIn ≤ 3000, hashtags well-formed, **mandatory reasoning trail** (per invariant #4). |
+| Re-publish prompt | n/a | Opus prompt for re-publish includes prior draft text with instruction "find a different angle, different hook, different framing — do not duplicate phrasing." Different angle, not regeneration. |
+| Hashtag canonicality | n/a | Reuses `_TAG_DISPLAY` lookup from `share_copy.py`. Opus prompt includes the brand-canonical hashtag map; never invents `#prompt-engineering`, always emits `#PromptEngineering`. |
+| User-facing share modal | unchanged ([per S50 commit `0d4a45f`](../docs/HANDOFF.md#current-state-as-of-2026-04-28-session-50-continued--audit-merge--day-2-agent-team-skills)) | unchanged. The `build_share_copy()` deterministic templates that drive `/blog/{slug}` Share button stay untouched. This admin surface is purely additive. |
+
+**Cost shape:** ~5-20 sources/month at typical solo cadence × 2 platforms = 10-40 Opus drafts/month. One Opus call generates both Twitter + LinkedIn in a single structured response. Track 1 = $0 marginal. Trivial volume, no Max plan rate-limit concern (700 messages/5h cap is far above this).
+
+**v1 scope explicitly out:** jobs as a source, weekly digest as a source, cohort milestone as a source, LinkedIn API integration, recommendation engine ("which post to publish first"), engagement-rate tracking back into the system, A/B testing of angles. All deferred to v2 once v1 proves the loop.
+
+**Model choice:** **Opus 4.7** — confirmed founder pick 2026-04-28. Editorial work (per `feedback_opus_for_editorial.md`); Sonnet/Haiku not considered because Track 1 is $0 marginal anyway, so quality dominates. Same model already proven on the 2026-04-26 jobs editorial cron.
+
+**Voice & tone (v1, locked 2026-04-28):**
+
+Three rules baked into the `prompts/social_curate.txt` prompt — these will be the prompt's tightest constraints, with concrete do/don't examples drawn from the founder's existing blog voice:
+
+1. **Humane.** Sounds like a person who learned this the hard way, not an enterprise marketing channel. First-person plural ("we", "let's") and second-person ("you") OK; third-person corporate ("our platform offers") never. No buzzwords (synergy, leverage, empower, unlock). No emoji-overload — one purposeful emoji max per post, often zero. No exclamation marks unless genuinely warranted (max one per post).
+2. **Simple.** Plain English. If a 12-year-old who's interested in coding wouldn't follow the sentence, rewrite it. Sentences ≤ 18 words median. Active voice. Avoid "leverage" / "utilize" / "facilitate" / "robust" / "comprehensive" / "robust solution" entirely. Concrete numbers > vague claims ("50 questions mined from 25 live job loops" beats "extensive interview prep").
+3. **Slightly humorous.** One light beat per post — a wry observation, a self-deprecating aside, a pattern-name that pokes at the obvious. Not stand-up jokes, not memes. Aim for the tone of a senior engineer's Slack message to a friend, not a LinkedIn motivation poster. Twitter posts can be 10-20% funnier than LinkedIn (LinkedIn audience expects more measured tone, but flat is the failure mode there).
+
+**Voice samples (drawn from existing blog voice — fed into Opus prompt as few-shot anchors):**
+
+- ✅ "Stop your LLM from hallucinating." (lede from RAG post — humane, simple, no fluff)
+- ✅ "Pattern matching to a 2022 interview list is the fastest way to fail a 2026 AI engineer loop." (lede from interview-prep post — slight humor in "fastest way to fail," precise verb)
+- ❌ "Unlock your AI engineering potential with our comprehensive guide!" (corporate, vague, exclamation, "unlock")
+- ❌ "We're excited to announce…" (anti-pattern: every word adds zero signal)
+- ❌ "Discover the secrets of…" (clickbait register; not the audience)
+
+These samples become the few-shot anchors in `prompts/social_curate.txt`. Voice will be spec-checked in admin reviews — if drafts drift toward LinkedIn-corporate over time, founder updates the prompt rather than editing each draft.
+
+**Hashtag voice rule:** hashtags exist for discovery, not punctuation. Twitter ≤ 2 mapped tags. LinkedIn 3-5 including `#AutomateEdge` last. Never inline mid-sentence (`#AI is changing #everything` — banned). Always end-of-post block.
+
+Maturity now: **Manual (0/5)** (admin writes posts by hand or uses the daily auto-tweet cron). Target after build: **Defined (3/5)**.
 
 ---
 
@@ -386,6 +436,8 @@ Mirrors the Gemini-default + Claude-premium shape that chat already runs (and th
 | Blog summaries | new — Opus via cron | Track 1 | B | OAuth token only |
 | Course metadata (non-flagship) | new — Opus via cron | Track 1 | B | OAuth token only |
 | Course metadata (flagship) | unchanged manual paste | manual | — | per memory |
+| Social post curation (admin /admin/social) | new — Opus drafts both Twitter + LinkedIn from blog/course publishes; daily cron backfill; admin reviews + publishes when convenient | Track 1 | G | OAuth token; 5.1 reasoning trail (recommended); existing `twitter_client.py` for X publish; LinkedIn manual copy-paste in v1 |
+| User-facing share modal (/blog Share button) | unchanged ([shipped 2026-04-28 in commit `0d4a45f`](../docs/HANDOFF.md)) — `build_share_copy()` deterministic templates | Track 0 (no AI) | done | — |
 
 ---
 
