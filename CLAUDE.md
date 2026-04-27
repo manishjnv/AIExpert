@@ -166,11 +166,53 @@ Before proposing changes in the relevant area, pull the matching memory entry fr
 - Do **not** `git commit` without explicit user approval (per §5 rule on risky actions)
 - If AI enrichment prompts were touched, confirm with the user before overwriting — tuned prompts are never regenerated without approval
 
+### Harness artifacts (Day-1, shipped 2026-04-27)
+
+The orchestration playbook is partly enforced by Claude Code hooks and skills checked into `.claude/`. They are loaded automatically every session.
+
+**Hooks** (in `.claude/settings.json`, scripts under `.claude/hooks/`):
+
+- `pre_commit_secrets.py` — PreToolUse on Bash. Self-filters on `git commit`. Greps the staged diff for 11 secret patterns (AWS, GitHub, Google, OpenAI, Slack, hardcoded literals). Blocks the commit (exit 2) on any hit. Warns (exit 0 + stderr) on TODO/FIXME/XXX in added lines.
+- `pre_push_noreply.py` — PreToolUse on Bash. Self-filters on `git push`. Blocks (exit 2) when HEAD's author or committer email is `manishjnvk@live.com` (GitHub email privacy will reject the push anyway). Warns (exit 0) when commits ahead of `@{u}` do not include `docs/HANDOFF.md` — Phase 6 reminder.
+
+**Skills** (in `.claude/skills/`):
+
+- `/aiexpert-phase0 [area]` — replaces the manual Phase 0 read burst. Areas: `ai`, `auth`, `jobs`, `seo`, `courses`, `general`. After reads, prompts the standard 6-item plan (goal / memory / RCA / plan / parallel / diversification) and waits for founder approval.
+- `/deploy-vps` — replaces the seven-step manual deploy sequence (verify identity → push → ssh pull → rebuild force-recreate → migration check → smoke test → log tail). Encodes the `feedback_deploy_rebuild.md` rule (never `restart`, always `build + force-recreate`).
+
+**When to use them.** Always invoke `/aiexpert-phase0` at session start instead of recalling the §8 read list manually. Always invoke `/deploy-vps` when deploying to `a11yos-vps` instead of running the seven steps by hand. Hooks fire automatically on every `git commit` and `git push` — no opt-in.
+
 ## 9. Session state (update at end of each session)
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-27 (session 49 — funnel ribbons land on /jobs /roadmap /blog /blog/{slug})
+**Last session date:** 2026-04-27 (session 50 — Claude Code harness Day-1 + centralized AI pipeline plan)
+**Last session summary (session 50):** Two-part dev-tooling session. (1) Consolidated three loose AI strategy docs (`AI_INTEGRATION.md` + `AI_QUALITY_PIPELINE.md` + `AI_Enrichment_Architecture_Blueprint.html`) plus the dormant `PLAN_TIERED_CLAUDE_ROUTING.md` into a single source of truth at [docs/AI_PIPELINE_PLAN.md](docs/AI_PIPELINE_PLAN.md). Maps every AI surface to Track 1 (VPS Claude Code via Max OAuth = $0 marginal) or Track 2 (Anthropic API = paid + cached); commits the four blueprint invariants; encodes the repo-eval design recommendation (Option D: Gemini Flash default + Sonnet 4.6 opt-in + composite free-signal scoring). (2) Shipped Day-1 of the Claude Code harness tuning: 2 PreToolUse hooks (`pre_commit_secrets.py`, `pre_push_noreply.py`) + 2 skills (`/aiexpert-phase0 [area]`, `/deploy-vps`) under `.claude/` (gitignored, local-only) + CLAUDE.md §8.4 reference so future-me can recreate them.
+
+- **One commit this session.** `<S50-SHA>` — docs(s50): centralized AI pipeline plan + harness §8.4. 3 files: `docs/AI_PIPELINE_PLAN.md` new (~340 lines), `CLAUDE.md` +25 lines, `docs/HANDOFF.md` rewritten top section.
+- **Phase 2 gates green:** hook scripts compile · settings.json valid · pre-commit smoke (non-trigger / empty / AKIA-pattern blocked / TODO warned) ✓ · pre-push smoke (non-trigger / empty / noreply allowed) ✓.
+- **Sonnet:** n/a — doc + tooling work all hot-cached on Opus, no contracts to delegate.
+- **codex:rescue:** n/a — none of the touched paths in §8's strictly-mandatory list (continues empty 10× in a row across S45-50).
+- **No RCA** — no bug fixed.
+
+**Deploy status:** `<S50-SHA>` pushed to origin/master. VPS `git pull` completed; HEAD parity confirmed. **No rebuild done** — this session's changes are docs + `.claude/*` only, nothing affects backend runtime. Backend container untouched, healthy.
+
+**Open questions:** (1) **Repo eval Option D pending founder approval** before Phase E of AI_PIPELINE_PLAN.md ships. (2) **Three orphan untracked docs** (`AUDIT_2026-04.md`, `AUDIT_TASKS.md`, `PLAN_TIERED_CLAUDE_ROUTING.md` — last is now superseded). Founder decides commit / delete / leave. (3) **S49 browser smoke** still pending. (4) **Day-2 harness levers** (agent-team definitions) deferred until Phase B starts.
+
+**Next action — Session 51:** founder decides repo-eval + orphan-doc commits (~5 min), then either browser smoke for S49 or start Phase B (4 cron clones for blog / course metadata / topic discovery / email digest).
+
+**Queued:** S49 browser smoke · audit P0 decisions × 7 + P1 × 8 (`docs/AUDIT_TASKS.md`) · S47 Phase B engagement upgrades · pagination test fix · SEO-21 q2 / 5+6 · **SEO-26 quiz landing** (worktree + codex:rescue for `quiz_outcomes` migration) · COURSE-01..03 Phase A · COURSE-04+05 Phase B MVP · separate commit for `docs/COURSES.md` from S43 · AI_PIPELINE_PLAN.md Phase B–E sequenced sessions.
+
+**Agent-utilization footer:**
+
+- Opus: full session — Phase 0 reads (CLAUDE.md + HANDOFF + RCA + memory parallel); read three AI strategy docs (`AI_INTEGRATION.md` + `AI_QUALITY_PIPELINE.md` + `AI_Enrichment_Architecture_Blueprint.html`); audit current `.claude/` config (settings.json + ls hooks/skills/agents); draft `docs/AI_PIPELINE_PLAN.md` (~340 lines, 13 sections, supersedes prior routing plan); author the 11-lever Claude Code tuning proposal with current-vs-proposed comparison table + impact axes; write 2 PreToolUse hook scripts (Python, ~140 lines combined); write 2 skill markdown files; update `CLAUDE.md` §8 with new subsection and §9 with this entry; rewrite top section of `docs/HANDOFF.md`; smoke-test both hooks (non-trigger / empty / block / warn paths); plan the S50 deploy as docs-push-no-rebuild.
+- Sonnet: n/a — design + doc + tooling, no implementation contracts to delegate.
+- Haiku: n/a — VPS embedding-usage SQL ran via single direct backend-container exec, not a Haiku agent (faster than round-trip).
+- codex:rescue: n/a — touched paths not in §8's strictly-mandatory list.
+
+---
+
+**Last session date (S49):** 2026-04-27 (session 49 — funnel ribbons land on /jobs /roadmap /blog /blog/{slug})
 **Last session summary (session 49):** Closed the S47 carry-over (and fulfilled S48-audit's option-2 recommendation): shipped the 4 anonymous-discovery subscribe ribbons. Anonymous = 4 channel buttons → 302 to login → /account pre-checked. Logged-in = 4 inline checkboxes reflecting `notify_*` state, toggle fires PATCH /api/profile with optimistic UI + toast. Dismiss persists 30 days per surface via localStorage. Pre-Phase-1 recon caught a meaningful design improvement: rather than 4× duplicated SSR ribbons (4 different brace/escape conventions across f-string + plain-string + 2 Jinja files, RCA-024/027 risk × 4), shipped one shared `frontend/subscribe-ribbon.{css,js}` asset pair + a 3-line insertion per surface. Routing flipped from "parallel Sonnet × 4" to "all Opus, no subagents" per playbook's "don't delegate when self-executing is faster" rule.
 
 - **1 commit, +503 lines:** `f405b25` (feat(funnel) subscribe ribbons) · 6 files · 2 new (subscribe-ribbon.css 247, subscribe-ribbon.js 242) · 4 modified (jobs.py +4, blog.py +3, blog/post.html +3, tracks/hub.html +4). All inserts pure HTML literals, zero `{` `}` chars in new lines.

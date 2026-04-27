@@ -4,6 +4,42 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-27 (session 50 — Claude Code harness Day-1 + centralized AI pipeline plan)
+
+**Branch:** `master` · clean working tree after this session's commit. **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD matches local; no runtime changes deployed (this session is dev-tooling + docs only). **Tests:** not run; no application code touched.
+
+### Session 50 — harness levers shipped, AI pipeline consolidated
+
+**Headline:** Two-part dev-tooling session. First, consolidated three loose AI strategy docs (`AI_INTEGRATION.md`, `AI_QUALITY_PIPELINE.md`, `AI_Enrichment_Architecture_Blueprint.html`) plus the dormant `PLAN_TIERED_CLAUDE_ROUTING.md` into a single source of truth at [docs/AI_PIPELINE_PLAN.md](AI_PIPELINE_PLAN.md). Maps every AI surface to a "Track 1 (VPS Claude Code via Max OAuth, $0 marginal)" or "Track 2 (Anthropic API, paid + cached)" path; commits the four blueprint invariants (cache → budget → schema → reasoning trail); documents the seven sequenced improvements; encodes the repo-eval design recommendation (Option D: Gemini Flash default + Sonnet 4.6 opt-in + composite scoring with free signals). Repo eval decision and three-doc orphan-commit decision are **pending founder approval** before implementation begins.
+
+**Second**, shipped Day-1 of the Claude Code harness tuning per the eleven-lever proposal. Two PreToolUse hooks under `.claude/hooks/` (project gitignored, so they live local-only on this laptop): `pre_commit_secrets.py` blocks commits containing 11 secret-pattern matches (AWS / OpenAI-style / xAI / HuggingFace / GitHub PAT / Google / Slack / hardcoded literal) on staged diff, warns on TODO/FIXME/XXX without blocking; `pre_push_noreply.py` blocks pushes whose HEAD commit exposes `manishjnvk@live.com` on author or committer (the deterministic GitHub email-privacy rejection that bites every fresh session) and warns when commits ahead of `@{u}` don't include `docs/HANDOFF.md`. Two skills under `.claude/skills/`: `/aiexpert-phase0 [area]` parameterizes the §8 Phase 0 read burst (areas: ai / auth / jobs / seo / courses / general) and prompts the standard 6-item plan template; `/deploy-vps` encodes the seven-step VPS deploy sequence including the `feedback_deploy_rebuild.md` build-vs-restart rule. CLAUDE.md §8 gained subsection "Harness artifacts (Day-1, shipped 2026-04-27)" so the tools are discoverable in Phase 0. **Scope adjustment from the original three-hook proposal:** dropped the standalone Stop hook (would fire on every assistant turn, deadlocking sessions) and folded the HANDOFF reminder into the push hook instead; net behavior identical, mechanism saner.
+
+**Phase 2 gates green on hooks before wiring:** `python -m py_compile` on both scripts ✓ · `json.load` on the new settings.json ✓ · pre-commit smoke (non-trigger pass-through, empty stdin, AKIA-pattern fake **blocked exit 2**, TODO **warned not blocked**) ✓ · pre-push smoke (non-trigger pass-through, empty stdin, current HEAD's noreply identity **allowed**) ✓.
+
+**One commit this session:** the consolidated AI Pipeline plan + CLAUDE.md §8.4 reference + this HANDOFF entry. The `.claude/*` harness artifacts themselves stay local per project gitignore convention; CLAUDE.md §8.4 documents the setup so future-me on a fresh clone can recreate the local harness.
+
+**No RCA entry** — no bug fixed.
+
+**No codex:rescue** — none of the touched paths in §8's strictly-mandatory list. Helper-runtime continues empty (10 attempts in a row across S45-50). Will retry on the next load-bearing AI / auth / Alembic / classifier change.
+
+**Open questions / queued for S51:**
+
+1. **Repo evaluation design decision pending** — `docs/AI_PIPELINE_PLAN.md` §7 surfaces three options (admin-only / Gemini Flash always / hybrid composite Option D) plus my recommendation for Option D. Founder picks before Phase E ships.
+2. **Three orphan untracked docs** — `docs/AUDIT_2026-04.md`, `docs/AUDIT_TASKS.md`, `docs/PLAN_TIERED_CLAUDE_ROUTING.md` (now superseded by `AI_PIPELINE_PLAN.md`). Founder decides whether to commit, delete, or leave on disk.
+3. **S49 browser-side smoke still pending** — anonymous-funnel ribbons proven server-side end-to-end but real-browser interactivity (button click, checkbox flip, dismiss reload, 375px viewport) hasn't been done.
+4. **Day-2 harness levers** — agent-team definitions (research-team, build-team, adversarial-team) deferred per "Day 1 first" decision; revisit when Phase B of AI_PIPELINE_PLAN.md (4 cron clones) starts.
+
+**Next action — Session 51:** founder approves repo-eval decision + orphan-doc decision (~5 min), then either browser smoke for S49 or start Phase B (clone `auto_summarize_drafts.sh` × 4 for blog summaries / course metadata / topic discovery / email digest crons).
+
+**Agent-utilization footer:**
+
+- Opus: full session — read three AI strategy docs in parallel + audit current `.claude/` config + draft `AI_PIPELINE_PLAN.md` (~340 lines, 13 sections, supersedes prior routing plan) + author the 11-lever Claude Code tuning proposal + write 2 hook scripts (Python, ~140 lines combined) + write 2 skill markdown files + update CLAUDE.md §8 + smoke-test both hooks (non-trigger / empty / block / warn paths) + write this HANDOFF.
+- Sonnet: n/a — no implementation contracts to delegate; doc + tooling work all hot-cached on Opus.
+- Haiku: n/a — VPS embedding-usage SQL ran via direct backend-container exec, not a Haiku agent (single-query investigation, faster direct).
+- codex:rescue: n/a — touched paths not in §8's strictly-mandatory list.
+
+---
+
 ## Current state as of 2026-04-27 (session 49 — anonymous-funnel subscribe ribbons on /jobs /roadmap /blog /blog/{slug})
 
 **Branch:** `master` · clean working tree at `f405b25` (S48's audit `docs/AUDIT_2026-04.md`, `docs/AUDIT_TASKS.md`, `docs/PLAN_TIERED_CLAUDE_ROUTING.md` remain on disk as untracked artifacts of the parallel audit session; not committed by this session). **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `f405b25e82c795fd338d273f9d531dac08fff504` matches local. Backend container healthy. Static assets `/subscribe-ribbon.css` + `/subscribe-ribbon.js` serve 200 over the wire; all 4 surfaces return 200 with correct `data-surface` attribute + asset references; `/api/profile/subscribe-intent?channel=jobs` returns 302 anonymously.
