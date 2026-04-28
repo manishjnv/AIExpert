@@ -168,3 +168,13 @@ open('$OUTPUT_FILE', 'w').write(json.dumps(d))
 done
 
 echo "$(date -Iseconds) INFO: auto_curate_social.sh finished (${ROUND} round(s))"
+
+# ---- Auto-archive sweep -------------------------------------------------------
+# Flip drafts older than 30 days to archived. Single cron, no second wrapper.
+# The export script already gives priority to re-publish-marked pending pairs,
+# so this sweep only touches stale drafts that admin never published or
+# discarded.
+echo "$(date -Iseconds) INFO: starting auto-archive sweep (30d cutoff)"
+docker compose exec -T backend python -m scripts.auto_archive_stale --days 30 \
+    || echo "$(date -Iseconds) WARNING: auto_archive_stale failed (non-fatal)"
+echo "$(date -Iseconds) INFO: auto-archive sweep done"

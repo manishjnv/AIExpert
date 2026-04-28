@@ -422,6 +422,34 @@
     });
   }
 
+  // ─── Action: re-publish (queues a fresh pending pair) ────────────────────
+  async function handleRePublish(button) {
+    const postId = button.dataset.postId;
+    if (!confirm(
+      'Queue a fresh draft pair for this source? Opus will be asked for a different angle on the next cron pass.'
+    )) return;
+    try {
+      await apiFetch('/admin/social/re-publish/' + postId, 'POST');
+      showToast('Re-publish queued. New drafts appear after the next cron pass.', 'success');
+    } catch (err) {
+      showToast(err.detail || err.message || 'Re-publish failed', 'error');
+    }
+  }
+
+  // ─── Action: archive-stale-now (manual sweep trigger) ─────────────────────
+  async function handleArchiveStaleNow() {
+    if (!confirm('Archive all drafts older than 30 days now?')) return;
+    try {
+      const result = await apiFetch('/admin/social/archive-stale-now', 'POST');
+      const n = (result && result.archived) || 0;
+      showToast(`Archived ${n} stale draft(s).`, 'success');
+      // Reload so the banner disappears + drafts refresh
+      setTimeout(function () { window.location.reload(); }, 800);
+    } catch (err) {
+      showToast(err.detail || err.message || 'Sweep failed', 'error');
+    }
+  }
+
   // ─── Delegated click handler ───────────────────────────────────────────────
   function onDocClick(e) {
     const btn = e.target.closest('[data-action]');
@@ -429,11 +457,13 @@
 
     const action = btn.dataset.action;
     switch (action) {
-      case 'edit':        handleEdit(btn);        break;
-      case 'publish':     handlePublish(btn);     break;
-      case 'copy-open':   handleCopyOpen(btn);    break;
-      case 'mark-posted': handleMarkPosted(btn);  break;
-      case 'discard':     handleDiscard(btn);     break;
+      case 'edit':               handleEdit(btn);              break;
+      case 'publish':            handlePublish(btn);           break;
+      case 'copy-open':          handleCopyOpen(btn);          break;
+      case 'mark-posted':        handleMarkPosted(btn);        break;
+      case 'discard':            handleDiscard(btn);           break;
+      case 're-publish':         handleRePublish(btn);         break;
+      case 'archive-stale-now':  handleArchiveStaleNow();      break;
       default: break;
     }
   }

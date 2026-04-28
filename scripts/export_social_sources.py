@@ -35,6 +35,115 @@ from datetime import datetime, timezone, timedelta
 logger = logging.getLogger("roadmap.social.export")
 
 
+async def _pickup_repub_pair() -> dict | None:
+    """Pick the oldest pair of pending rows with `_re_publish` markers.
+
+    Returns a source_payload dict (same shape as the fresh-source path) with
+    the parent's body attached as `prior_drafts`. Returns None if no
+    re-publish pair is queued.
+
+    The marker is a JSON object stored in reasoning_json on each pending row.
+    Volume is small (rows from admin clicks only) so we parse in Python rather
+    than crafting SQLite JSON-path queries.
+    """
+    import app.db as _db
+    from sqlalchemy import select
+    from app.models.social import SocialPost
+
+    async with _db.async_session_factory() as db:
+        # Oldest pending rows first
+        rows = (
+            await db.execute(
+                select(SocialPost)
+                .where(SocialPost.status == "pending")
+                .order_by(SocialPost.created_at.asc(), SocialPost.id.asc())
+            )
+        ).scalars().all()
+
+        # Group rows by (source_kind, source_slug, created_at) to find pairs
+        # inserted by the same Re-publish click. Keep only rows whose
+        # reasoning_json carries `_re_publish: true`.
+        candidates: dict[tuple, dict] = {}
+        for row in rows:
+            try:
+                meta = json.loads(row.reasoning_json or "{}")
+            except Exception:
+                continue
+            if not isinstance(meta, dict) or not meta.get("_re_publish"):
+                continue
+            key = (row.source_kind, row.source_slug, row.created_at)
+            slot = candidates.setdefault(key, {})
+            slot[row.platform] = row
+            slot["_parent_id"] = meta.get("_parent_post_id")
+
+        # Find the oldest pair (both twitter + linkedin present)
+        for key, slot in candidates.items():
+            if "twitter" in slot and "linkedin" in slot:
+                return await _build_repub_payload(db, slot)
+
+    return None
+
+
+async def _build_repub_payload(db, slot: dict) -> dict:
+    """Build the source_payload for a re-publish round. Fetches the parent
+    published row's body to attach as `prior_drafts`."""
+    from app.models.social import SocialPost
+    from sqlalchemy import select
+
+    twitter_row = slot["twitter"]
+    linkedin_row = slot["linkedin"]
+    parent_id = slot.get("_parent_id")
+
+    kind = twitter_row.source_kind
+    slug = twitter_row.source_slug
+
+    # Build the source meta exactly like a fresh-source export
+    source_payload: dict = {"kind": kind, "slug": slug}
+    if kind == "blog":
+        try:
+            from app.services.blog_publisher import load_published
+            full = load_published(slug) or {}
+            source_payload.update({
+                "title": full.get("title", ""),
+                "lede": full.get("lede", ""),
+                "tags": full.get("tags", []),
+                "url": f"/blog/{slug}",
+            })
+        except Exception:
+            source_payload.update({"title": slug, "url": f"/blog/{slug}"})
+    else:
+        try:
+            from app.curriculum.loader import load_template
+            tpl = load_template(slug)
+            source_payload.update({
+                "title": tpl.title,
+                "tagline": tpl.goal,
+                "description": tpl.goal,
+                "tags": [tpl.level, f"{tpl.duration_months}mo"],
+                "url": f"/roadmap/{slug}",
+            })
+        except Exception:
+            source_payload.update({"title": slug, "url": f"/roadmap/{slug}"})
+
+    # Attach prior_drafts — the published body Opus must NOT echo
+    prior_drafts: list[dict] = []
+    if parent_id:
+        parent = (
+            await db.execute(
+                select(SocialPost).where(SocialPost.id == int(parent_id))
+            )
+        ).scalar_one_or_none()
+        if parent and parent.body:
+            prior_drafts.append({
+                "platform": parent.platform,
+                "body": parent.body[:2000],  # sanity cap; LinkedIn is 3000
+            })
+    source_payload["prior_drafts"] = prior_drafts
+    source_payload["twitter_post_id"] = twitter_row.id
+    source_payload["linkedin_post_id"] = linkedin_row.id
+    return source_payload
+
+
 async def _main() -> int:
     logging.basicConfig(
         level=logging.INFO,
@@ -51,6 +160,20 @@ async def _main() -> int:
 
     await init_db()
     try:
+        # ---- Re-publish pickup (priority over fresh sources) ----------------
+        # When admin clicks Re-publish on a published row, two pending rows
+        # are queued with reasoning_json={"_re_publish": true,
+        # "_parent_post_id": N}. Pick those up first so the cron Opus call
+        # gets the prior body in `prior_drafts` and writes a different-angle
+        # draft.
+        repub_payload = await _pickup_repub_pair()
+        if repub_payload is not None:
+            sys.stdout.write(json.dumps(
+                {"count": 1, "source": repub_payload}, ensure_ascii=False
+            ))
+            sys.stdout.flush()
+            return 0
+
         # Collect candidates from both sources (blogs + courses)
         candidates: list[dict] = []
 

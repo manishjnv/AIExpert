@@ -21,15 +21,15 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape as esc
 from typing import Any, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_admin
@@ -263,6 +263,12 @@ def _status_badge(status: str) -> str:
             'padding:2px 8px;border-radius:3px;font-family:\'IBM Plex Mono\',monospace;'
             'font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Draft</span>'
         )
+    if status == "published":
+        return (
+            '<span style="background:#0d2a3a;color:#4ab0f0;border:1px solid #1d4060;'
+            'padding:2px 8px;border-radius:3px;font-family:\'IBM Plex Mono\',monospace;'
+            'font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Published</span>'
+        )
     if status == "archived":
         return (
             '<span style="background:#2a1510;color:#d97757;border:1px solid #4a3025;'
@@ -270,6 +276,73 @@ def _status_badge(status: str) -> str:
             'font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Archived</span>'
         )
     return esc(status)
+
+
+def _render_tab_nav(active: str, drafts_count: int = 0, pub_count: int = 0,
+                    arch_count: int = 0) -> str:
+    """Tab nav between Drafts / Published / Archived. `active` is the slug
+    matching the current route (drafts | published | archived)."""
+    tabs = [
+        ("drafts", "Drafts", drafts_count),
+        ("published", "Published", pub_count),
+        ("archived", "Archived", arch_count),
+    ]
+    items: list[str] = []
+    for slug, label, count in tabs:
+        is_active = (slug == active)
+        bg = "#1d242e" if is_active else "transparent"
+        color = "#e8a849" if is_active else "#6a7280"
+        border = "2px solid #e8a849" if is_active else "2px solid transparent"
+        count_html = (
+            f' <span style="opacity:0.7;font-size:10px">({count})</span>'
+        ) if count > 0 else ""
+        items.append(
+            f'<a href="/admin/social/{slug}" '
+            f'style="padding:10px 18px;background:{bg};color:{color};'
+            f'border-bottom:{border};text-decoration:none;'
+            f"font-family:'IBM Plex Mono',monospace;font-size:12px;"
+            f'text-transform:uppercase;letter-spacing:0.1em">{label}{count_html}</a>'
+        )
+    return (
+        '<div style="display:flex;gap:0;margin-bottom:24px;'
+        'border-bottom:1px solid #2a323d">' + "".join(items) + '</div>'
+    )
+
+
+def _render_filter_form(source_kind: str, platform: str, action: str) -> str:
+    """Render filter dropdowns for Published/Archived tabs. `action` is the
+    GET action URL (already begins with /admin/social/...)."""
+    def _opt(value: str, label: str, current: str) -> str:
+        sel = " selected" if value == current else ""
+        return f'<option value="{esc(value)}"{sel}>{esc(label)}</option>'
+
+    sk = source_kind or ""
+    pl = platform or ""
+    return f'''
+<form method="get" action="{esc(action)}" style="display:flex;gap:8px;margin-bottom:20px;
+            font-family:'IBM Plex Mono',monospace;font-size:12px;align-items:center">
+  <label style="color:#6a7280">Source:
+    <select name="source_kind" style="background:#1a2030;color:#d0cbc2;
+            border:1px solid #2a323d;padding:4px 8px;margin-left:6px">
+      {_opt("", "All", sk)}
+      {_opt("blog", "Blog", sk)}
+      {_opt("course", "Course", sk)}
+    </select>
+  </label>
+  <label style="color:#6a7280">Platform:
+    <select name="platform" style="background:#1a2030;color:#d0cbc2;
+            border:1px solid #2a323d;padding:4px 8px;margin-left:6px">
+      {_opt("", "All", pl)}
+      {_opt("twitter", "Twitter", pl)}
+      {_opt("linkedin", "LinkedIn", pl)}
+    </select>
+  </label>
+  <button type="submit" style="background:#e8a849;color:#0f1419;border:none;
+          padding:6px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;
+          text-transform:uppercase;letter-spacing:0.1em;cursor:pointer">Filter</button>
+  <a href="{esc(action)}" style="color:#6a7280;text-decoration:underline;
+          font-size:11px;margin-left:8px">Clear</a>
+</form>'''
 
 
 def _source_link(source_kind: str, source_slug: str) -> str:
@@ -302,7 +375,18 @@ def _render_post_card(row: Any, *, x_publish_enabled: bool = False) -> str:
             f'</div>'
         )
 
-    # Action buttons — only rendered for draft rows (archived is terminal).
+    published_note = ""
+    if row.status == "published" and row.published_url:
+        published_note = (
+            f'<div style="font-size:12px;color:#4ab0f0;margin-top:6px">'
+            f'Published <a href="{esc(row.published_url)}" target="_blank" rel="noopener"'
+            f' style="color:#4ab0f0;text-decoration:underline">'
+            f'↗ {esc(fmt_ist(row.published_at) if row.published_at else "")}</a>'
+            f'</div>'
+        )
+
+    # Action buttons — draft rows OR published rows (Re-publish).
+    # Archived is terminal — no buttons.
     action_row_html = ""
     if row.status == "draft":
         pid = esc(str(row.id))
@@ -351,6 +435,23 @@ def _render_post_card(row: Any, *, x_publish_enabled: bool = False) -> str:
 
         action_row_html = f'<div class="action-row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">{buttons}</div>'
 
+    elif row.status == "published":
+        pid = esc(str(row.id))
+        plat = esc(row.platform)
+        sk = esc(row.source_kind)
+        ss = esc(row.source_slug)
+        # Re-publish queues a fresh pending pair with prior-draft markers so
+        # the cron's repub-mode pickup can inject the prior body into the
+        # next Opus prompt for a different-angle take.
+        rep_btn = (
+            f'<button type="button" class="action-btn"'
+            f' data-action="re-publish" data-post-id="{pid}"'
+            f' data-platform="{plat}"'
+            f' data-source-kind="{sk}"'
+            f' data-source-slug="{ss}">Re-publish (different angle)</button>'
+        )
+        action_row_html = f'<div class="action-row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">{rep_btn}</div>'
+
     return f"""
 <div class="draft-card" data-post-id="{esc(str(row.id))}"
      style="background:#1a2030;border-radius:6px;padding:16px;margin-bottom:12px;
@@ -368,6 +469,7 @@ def _render_post_card(row: Any, *, x_publish_enabled: bool = False) -> str:
     Hashtags: <span class="draft-hashtags">{hashtags_html}</span>
   </div>
   {archive_note}
+  {published_note}
   {reasoning_html}
   <div style="margin-top:10px;border-top:1px solid #2a323d;padding-top:8px;
               font-size:11px;color:#5a6472;font-family:'IBM Plex Mono',monospace">
@@ -378,72 +480,62 @@ def _render_post_card(row: Any, *, x_publish_enabled: bool = False) -> str:
 </div>"""
 
 
-# ---- Route -------------------------------------------------------------------
+# ---- Route helpers -----------------------------------------------------------
 
 
-@router.get("/drafts", response_class=HTMLResponse)
-async def admin_social_drafts(
-    _admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """Listing of social_posts with status in (draft, archived).
+_STALE_DRAFT_AGE_DAYS = 30
 
-    Grouped by (source_kind, source_slug) — Twitter and LinkedIn side-by-side.
-    Includes action buttons for draft rows (publish / copy-open / mark-posted /
-    discard / edit) wired via /admin-social.js.
-    """
-    from app.models.social import SocialPost  # slice-1 symbol
 
-    settings = get_settings()
-    x_enabled = settings.x_publish_enabled
+def _utcnow() -> datetime:
+    """Return a UTC-naive datetime to match the migration's TIMESTAMP storage."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
-    stmt = (
-        select(SocialPost)
-        .where(SocialPost.status.in_(["draft", "archived"]))
-        .order_by(
-            SocialPost.source_kind,
-            SocialPost.source_slug,
-            SocialPost.platform,
-            SocialPost.id.desc(),
+
+async def _status_counts(db: AsyncSession) -> dict[str, int]:
+    """Single query to populate the tab-nav row counts."""
+    from sqlalchemy import func
+    from app.models.social import SocialPost
+
+    rows = (
+        await db.execute(
+            select(SocialPost.status, func.count())
+            .group_by(SocialPost.status)
         )
-    )
-    rows = (await db.execute(stmt)).scalars().all()
+    ).all()
+    counts = {"draft": 0, "published": 0, "archived": 0, "pending": 0}
+    for status, count in rows:
+        counts[status] = count
+    return counts
 
-    # Group by (source_kind, source_slug)
+
+def _render_grouped_sections(rows: list[Any], x_enabled: bool) -> str:
+    """Group rows by (source_kind, source_slug) with Twitter/LinkedIn columns."""
     groups: dict[tuple[str, str], list[Any]] = {}
     for row in rows:
         key = (row.source_kind, row.source_slug)
         groups.setdefault(key, []).append(row)
 
     if not groups:
-        content = (
-            '<div style="background:#1d242e;border-radius:8px;padding:32px;'
-            'text-align:center;color:#6a7280;margin-top:24px">'
-            '<p style="font-size:16px;margin:0">No social drafts yet.</p>'
-            '<p style="font-size:13px;margin:8px 0 0">Run <code>auto_curate_social.sh</code> '
-            'to generate drafts.</p>'
-            '</div>'
+        return ""
+
+    sections: list[str] = []
+    for (kind, slug), post_rows in groups.items():
+        source_link = _source_link(kind, slug)
+        twitter_rows = [r for r in post_rows if r.platform == "twitter"]
+        linkedin_rows = [r for r in post_rows if r.platform == "linkedin"]
+
+        twitter_html = "".join(
+            _render_post_card(r, x_publish_enabled=x_enabled) for r in twitter_rows
+        ) or (
+            '<div style="color:#5a6472;font-size:13px;padding:12px">No Twitter row</div>'
         )
-    else:
-        sections: list[str] = []
-        for (kind, slug), post_rows in groups.items():
-            source_link = _source_link(kind, slug)
-            # Split by platform for side-by-side layout
-            twitter_rows = [r for r in post_rows if r.platform == "twitter"]
-            linkedin_rows = [r for r in post_rows if r.platform == "linkedin"]
+        linkedin_html = "".join(
+            _render_post_card(r, x_publish_enabled=x_enabled) for r in linkedin_rows
+        ) or (
+            '<div style="color:#5a6472;font-size:13px;padding:12px">No LinkedIn row</div>'
+        )
 
-            twitter_html = "".join(
-                _render_post_card(r, x_publish_enabled=x_enabled) for r in twitter_rows
-            ) or (
-                '<div style="color:#5a6472;font-size:13px;padding:12px">No Twitter draft</div>'
-            )
-            linkedin_html = "".join(
-                _render_post_card(r, x_publish_enabled=x_enabled) for r in linkedin_rows
-            ) or (
-                '<div style="color:#5a6472;font-size:13px;padding:12px">No LinkedIn draft</div>'
-            )
-
-            sections.append(f"""
+        sections.append(f"""
 <div style="margin-bottom:32px;border:1px solid #2a323d;border-radius:8px;overflow:hidden">
   <div style="background:#1d242e;padding:14px 18px;border-bottom:1px solid #2a323d;
               display:flex;align-items:center;gap:12px">
@@ -471,53 +563,244 @@ async def admin_social_drafts(
     </div>
   </div>
 </div>""")
+    return "\n".join(sections)
 
-        content = "\n".join(sections)
 
-    total_count = len(rows)
-    draft_count = sum(1 for r in rows if r.status == "draft")
-    archived_count = sum(1 for r in rows if r.status == "archived")
-
+def _render_page(*, title: str, subtitle: str, tab_html: str, body_html: str) -> str:
+    """Outer page layout shared by drafts/published/archived."""
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Social Drafts — Admin</title>
+<title>{esc(title)} &mdash; Admin</title>
 <style>{ADMIN_CSS}</style>
 <link rel="stylesheet" href="/admin-social.css">
 <script src="/admin-social.js" defer></script>
 </head><body>
 {ADMIN_NAV}
 <div class="page">
-<h1>Social Drafts</h1>
-<div class="subtitle">Opus-curated drafts &bull; publish / edit / discard via action buttons</div>
-<div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
-  <div class="stat">
-    <div class="num">{total_count}</div>
-    <div class="lbl">Total rows</div>
-  </div>
-  <div class="stat">
-    <div class="num" style="color:#6db585">{draft_count}</div>
-    <div class="lbl">Draft</div>
-  </div>
-  <div class="stat">
-    <div class="num" style="color:#d97757">{archived_count}</div>
-    <div class="lbl">Archived</div>
-  </div>
-</div>
-{content}
+<h1>{esc(title)}</h1>
+<div class="subtitle">{subtitle}</div>
+{tab_html}
+{body_html}
 </div>
 </body></html>"""
+
+
+# ---- Route -------------------------------------------------------------------
+
+
+@router.get("/drafts", response_class=HTMLResponse)
+async def admin_social_drafts(
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Listing of pending publish — only status='draft' rows newer than the
+    auto-archive cutoff (default 30 days).
+
+    Includes action buttons for draft rows (publish / copy-open / mark-posted /
+    discard / edit) wired via /admin-social.js.
+    """
+    from app.models.social import SocialPost  # slice-1 symbol
+
+    settings = get_settings()
+    x_enabled = settings.x_publish_enabled
+
+    counts = await _status_counts(db)
+    cutoff = _utcnow() - timedelta(days=_STALE_DRAFT_AGE_DAYS)
+
+    # Visible drafts: created_at within the last 30 days. Stale drafts hide
+    # by default; the cron's auto-archive sweep will flip them to archived
+    # on the next pass.
+    stmt = (
+        select(SocialPost)
+        .where(SocialPost.status == "draft", SocialPost.created_at >= cutoff)
+        .order_by(
+            SocialPost.source_kind,
+            SocialPost.source_slug,
+            SocialPost.platform,
+            SocialPost.id.desc(),
+        )
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    # Stale-draft banner — count drafts older than the cutoff so admin knows
+    # what's queued for the next auto-archive pass.
+    stale_count_stmt = (
+        select(func.count()).select_from(SocialPost)
+        .where(SocialPost.status == "draft", SocialPost.created_at < cutoff)
+    )
+    stale_count = (await db.execute(stale_count_stmt)).scalar_one() or 0
+
+    stale_banner = ""
+    if stale_count > 0:
+        stale_banner = (
+            f'<div style="background:#2a1510;border:1px solid #4a3025;border-radius:6px;'
+            f'padding:12px 16px;margin-bottom:24px;color:#d97757;font-size:13px;'
+            f"font-family:'IBM Plex Mono',monospace\">"
+            f'<strong>{esc(str(stale_count))} stale draft(s) ≥ {_STALE_DRAFT_AGE_DAYS} days old</strong> '
+            f'&mdash; auto-archive runs after the daily cron. '
+            f'<button type="button" class="action-btn"'
+            f' data-action="archive-stale-now" style="margin-left:12px;'
+            f'background:#4a3025;color:#d97757;border:1px solid #d97757;'
+            f"font-family:'IBM Plex Mono',monospace;font-size:11px\">"
+            f'Run sweep now</button>'
+            f'</div>'
+        )
+
+    if not rows:
+        body_html = stale_banner + (
+            '<div style="background:#1d242e;border-radius:8px;padding:32px;'
+            'text-align:center;color:#6a7280;margin-top:24px">'
+            '<p style="font-size:16px;margin:0">No social drafts to review.</p>'
+            '<p style="font-size:13px;margin:8px 0 0">The daily cron <code>auto_curate_social.sh</code> '
+            'generates new drafts at 06:30 IST.</p>'
+            '</div>'
+        )
+    else:
+        body_html = stale_banner + _render_grouped_sections(rows, x_enabled)
+
+    tab_html = _render_tab_nav(
+        "drafts",
+        drafts_count=counts.get("draft", 0),
+        pub_count=counts.get("published", 0),
+        arch_count=counts.get("archived", 0),
+    )
+    return _render_page(
+        title="Social Drafts",
+        subtitle="Opus-curated drafts &bull; publish / edit / discard via action buttons",
+        tab_html=tab_html,
+        body_html=body_html,
+    )
+
+
+@router.get("/published", response_class=HTMLResponse)
+async def admin_social_published(
+    source_kind: Optional[str] = Query(default=None),
+    platform: Optional[str] = Query(default=None),
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Published rows — admin can Re-publish for a different angle."""
+    from app.models.social import SocialPost
+
+    settings = get_settings()
+    x_enabled = settings.x_publish_enabled
+
+    counts = await _status_counts(db)
+
+    # Normalize empty-string query params (the filter form's "All" option
+    # submits as `?source_kind=` not by omitting the key) and constrain to
+    # the known enum to avoid silently filtering on garbage input.
+    source_kind = source_kind if source_kind in ("blog", "course") else None
+    platform = platform if platform in ("twitter", "linkedin") else None
+
+    where = [SocialPost.status == "published"]
+    if source_kind:
+        where.append(SocialPost.source_kind == source_kind)
+    if platform:
+        where.append(SocialPost.platform == platform)
+
+    stmt = (
+        select(SocialPost)
+        .where(*where)
+        .order_by(
+            SocialPost.published_at.desc(),
+            SocialPost.id.desc(),
+        )
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    filter_html = _render_filter_form(source_kind or "", platform or "",
+                                      "/admin/social/published")
+    if not rows:
+        body_html = filter_html + (
+            '<div style="background:#1d242e;border-radius:8px;padding:32px;'
+            'text-align:center;color:#6a7280;margin-top:24px">'
+            '<p style="font-size:16px;margin:0">No published posts yet.</p>'
+            '</div>'
+        )
+    else:
+        body_html = filter_html + _render_grouped_sections(rows, x_enabled)
+
+    tab_html = _render_tab_nav(
+        "published",
+        drafts_count=counts.get("draft", 0),
+        pub_count=counts.get("published", 0),
+        arch_count=counts.get("archived", 0),
+    )
+    return _render_page(
+        title="Social Published",
+        subtitle="Live posts &bull; Re-publish for a different angle",
+        tab_html=tab_html,
+        body_html=body_html,
+    )
+
+
+@router.get("/archived", response_class=HTMLResponse)
+async def admin_social_archived(
+    source_kind: Optional[str] = Query(default=None),
+    platform: Optional[str] = Query(default=None),
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Archived rows — terminal. Includes admin discards, max-retry archives,
+    and the 30-day stale-draft sweep."""
+    from app.models.social import SocialPost
+
+    settings = get_settings()
+    x_enabled = settings.x_publish_enabled
+
+    counts = await _status_counts(db)
+
+    source_kind = source_kind if source_kind in ("blog", "course") else None
+    platform = platform if platform in ("twitter", "linkedin") else None
+
+    where = [SocialPost.status == "archived"]
+    if source_kind:
+        where.append(SocialPost.source_kind == source_kind)
+    if platform:
+        where.append(SocialPost.platform == platform)
+
+    stmt = (
+        select(SocialPost)
+        .where(*where)
+        .order_by(
+            SocialPost.archived_at.desc(),
+            SocialPost.id.desc(),
+        )
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    filter_html = _render_filter_form(source_kind or "", platform or "",
+                                      "/admin/social/archived")
+    if not rows:
+        body_html = filter_html + (
+            '<div style="background:#1d242e;border-radius:8px;padding:32px;'
+            'text-align:center;color:#6a7280;margin-top:24px">'
+            '<p style="font-size:16px;margin:0">No archived rows.</p>'
+            '</div>'
+        )
+    else:
+        body_html = filter_html + _render_grouped_sections(rows, x_enabled)
+
+    tab_html = _render_tab_nav(
+        "archived",
+        drafts_count=counts.get("draft", 0),
+        pub_count=counts.get("published", 0),
+        arch_count=counts.get("archived", 0),
+    )
+    return _render_page(
+        title="Social Archived",
+        subtitle="Terminal rows &bull; admin discards, max-retry archives, stale-30d",
+        tab_html=tab_html,
+        body_html=body_html,
+    )
 
 
 # ============================================================================
 # POST endpoints — publish loop (slice 1 of session b)
 # ============================================================================
-
-
-def _utcnow() -> datetime:
-    """Return a UTC-naive datetime to match the migration's TIMESTAMP storage."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 @router.post("/publish/{post_id}")
@@ -736,3 +1019,162 @@ async def edit_draft(
         raise HTTPException(status_code=409, detail="Row was concurrently modified")
     await db.commit()
     return {"id": post_id, "body": validated_body, "hashtags": validated_tags}
+
+
+# ============================================================================
+# Slice 2 — Re-publish + auto-archive sweep
+# ============================================================================
+
+
+@router.post("/re-publish/{post_id}")
+async def re_publish_post(
+    post_id: int,
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Queue a fresh pending pair for the source of an already-published row.
+
+    The new rows carry markers in reasoning_json (`_re_publish: true`,
+    `_parent_post_id: N`) so the cron's repub-mode pickup can fetch the prior
+    body and inject it into the next Opus prompt as `prior_drafts` context —
+    asking Opus for a different angle, not a regeneration.
+
+    The old `published` row is preserved as-is for history.
+
+    Returns 409 if the source already has active pending/draft rows (the
+    partial UNIQUE index `uq_social_posts_active` blocks double-queueing).
+    """
+    _csrf_check(request)
+
+    from app.models.social import SocialPost
+
+    parent = (await db.execute(
+        select(SocialPost).where(
+            SocialPost.id == post_id, SocialPost.status == "published"
+        )
+    )).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=409, detail="Row not found or not in published state"
+        )
+
+    # Block if any pending/draft rows already exist for this source — the
+    # partial UNIQUE index would also block, but a friendly 409 is nicer than
+    # a 500.
+    blocker = (await db.execute(
+        select(func.count()).select_from(SocialPost)
+        .where(
+            SocialPost.source_kind == parent.source_kind,
+            SocialPost.source_slug == parent.source_slug,
+            SocialPost.status.in_(["pending", "draft"]),
+        )
+    )).scalar_one() or 0
+    if blocker > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Source already has {blocker} active pending/draft row(s); "
+                "discard or publish them first before re-queuing."
+            ),
+        )
+
+    now = _utcnow()
+    marker = json.dumps({
+        "_re_publish": True,
+        "_parent_post_id": parent.id,
+    })
+    twitter_row = SocialPost(
+        source_kind=parent.source_kind,
+        source_slug=parent.source_slug,
+        platform="twitter",
+        status="pending",
+        body=None,
+        hashtags_json=None,
+        reasoning_json=marker,
+        retry_count=0,
+        published_url=None,
+        created_at=now,
+        updated_at=now,
+    )
+    linkedin_row = SocialPost(
+        source_kind=parent.source_kind,
+        source_slug=parent.source_slug,
+        platform="linkedin",
+        status="pending",
+        body=None,
+        hashtags_json=None,
+        reasoning_json=marker,
+        retry_count=0,
+        published_url=None,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(twitter_row)
+    db.add(linkedin_row)
+    try:
+        await db.commit()
+    except Exception as exc:
+        # The partial UNIQUE index uq_social_posts_active catches the rare
+        # race where two re-publish clicks land within microseconds of each
+        # other (between blocker check and commit). Surface a friendly 409
+        # rather than a 500.
+        await db.rollback()
+        msg = str(exc).lower()
+        if "unique" in msg or "constraint" in msg:
+            raise HTTPException(
+                status_code=409,
+                detail="Source already has an active pending/draft row (race) — refresh and try again",
+            )
+        raise
+
+    return {
+        "id": post_id,
+        "queued": [twitter_row.id, linkedin_row.id],
+        "status": "pending",
+    }
+
+
+@router.post("/archive-stale-now")
+async def archive_stale_now(
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger the 30-day stale-draft sweep. Same logic as the cron's
+    auto_archive_stale.py — flips drafts ≥ _STALE_DRAFT_AGE_DAYS old to
+    archived with reason='stale_30d'."""
+    _csrf_check(request)
+
+    from app.models.social import SocialPost
+
+    cutoff = _utcnow() - timedelta(days=_STALE_DRAFT_AGE_DAYS)
+    rows = (await db.execute(
+        select(SocialPost).where(
+            SocialPost.status == "draft",
+            SocialPost.created_at < cutoff,
+        )
+    )).scalars().all()
+
+    archived = 0
+    now = _utcnow()
+    for row in rows:
+        existing = _parse_json_field(row.reasoning_json, {}) or {}
+        if not isinstance(existing, dict):
+            existing = {"_legacy": existing}
+        existing["archive_reason"] = "stale_30d"
+        existing["archived_at"] = now.isoformat()
+        result = await db.execute(
+            update(SocialPost)
+            .where(SocialPost.id == row.id, SocialPost.status == "draft")
+            .values(
+                status="archived",
+                archived_at=now,
+                updated_at=now,
+                reasoning_json=json.dumps(existing),
+            )
+        )
+        if result.rowcount == 1:
+            archived += 1
+    await db.commit()
+    return {"archived": archived}
