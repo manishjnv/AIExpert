@@ -207,7 +207,16 @@ async def main() -> None:
         weekly_digest_loop(),
         quarterly_sync_loop(),
         weekly_audit_select_loop(),
-        daily_tweet_queue_loop(),
+        # daily_tweet_queue_loop(),
+        #   ^ disabled 2026-04-28 — X API write auth 403s with current credentials
+        #   (token has read scope only despite portal showing Read+Write+DM).
+        #   Continuing to queue draft rows that can't post just creates noise on
+        #   /admin/social. Held until Phase G of AI_PIPELINE_PLAN.md §3.11 ships
+        #   the Opus-driven social_curator pipeline (which uses the same
+        #   twitter_client.post_tweet path — fixing X auth at that point becomes
+        #   the prerequisite, not blocking the rest of the AI pipeline work).
+        #   Re-enable: uncomment + restart cron container after Phase G + X
+        #   write scope confirmed via the post-then-delete probe.
     )
 
 
