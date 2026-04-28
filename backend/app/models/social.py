@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Integer, String, Text, TIMESTAMP
+from sqlalchemy import CheckConstraint, Index, Integer, String, Text, TIMESTAMP, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -38,6 +38,36 @@ class SocialPost(PrimaryKeyMixin, Base):
     """ORM model for the social_posts table."""
 
     __tablename__ = "social_posts"
+
+    # __table_args__ mirrors the migration's CHECK constraints + partial
+    # unique index so Base.metadata.create_all (used by integration tests)
+    # honors them — without this, tests cannot exercise unique-violation or
+    # check-constraint behavior and the cron's "no double-active row per
+    # source × platform" invariant has zero test coverage.
+    __table_args__ = (
+        CheckConstraint(
+            "source_kind IN ('blog', 'course')",
+            name="ck_social_posts_source_kind",
+        ),
+        CheckConstraint(
+            "platform IN ('twitter', 'linkedin')",
+            name="ck_social_posts_platform",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'draft', 'published', 'archived')",
+            name="ck_social_posts_status",
+        ),
+        Index(
+            "ix_social_posts_status_created",
+            "status", "created_at",
+        ),
+        Index(
+            "uq_social_posts_active",
+            "source_kind", "source_slug", "platform",
+            unique=True,
+            sqlite_where=text("status IN ('pending', 'draft')"),
+        ),
+    )
 
     # Source identity — loose-coupled by slug string, no FK.
     source_kind: Mapped[str] = mapped_column(

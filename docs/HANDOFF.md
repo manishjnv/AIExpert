@@ -4,6 +4,58 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-28 (session 51 — Phase G(a) social draft pipeline)
+
+**Branch:** `master` · clean working tree after this session's commit `8c41a0e` (and a small follow-up for `chmod +x` on the cron script). **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `8c41a0e` matches local; backend rebuilt + force-recreated; migration `20260428000000` applied. **Tests:** 17/17 schema unit tests green; static integration check (migration + ORM + Pydantic + prompt loader + admin router all importing together) passes.
+
+### Session 51 — first of two Phase G sessions: read-only build slice for /admin/social
+
+**Headline:** Shipped the schema + Opus prompt + daily cron + read-only admin page so Opus 4.7 generates Twitter + LinkedIn drafts daily (06:30 IST) from blog/course publishes; admin reviews them at `/admin/social/drafts`. Session (b) will add publish actions, LinkedIn copy-to-clipboard flow, and the 30-day time-based auto-archive sweep.
+
+**What ships in 8c41a0e** (13 files, 1707 insertions):
+
+- **Alembic migration `20260428_add_social_posts.py`** — `social_posts` table with CHECK constraints (source_kind / platform / status) + composite index on `(status, created_at)` + **partial UNIQUE index** `uq_social_posts_active` `WHERE status IN ('pending','draft')` preventing double-queueing. Round-trip-clean downgrade. Server-defaults on every NOT NULL column per RCA-007 defense-in-depth.
+- **Pydantic schemas** appended to `backend/app/ai/schemas.py` (+89 lines): `ReasoningTrail` enforces non-empty `evidence_sources` (invariant #4); `SocialDraftSchema.model_validator` dispatches by `platform` (twitter ≤280 + 1-2 hashtags + no `#AutomateEdge` vs linkedin ≤3000 + 3-5 hashtags + brand-last); `SocialCurateOutput` cross-validates platform consistency; per-hashtag regex `^#[A-Z][A-Za-z0-9]+$`; no `#` in body (closes inline-hashtag attack surface).
+- **`backend/app/prompts/social_curate.txt`** (164 lines) — Opus editorial prompt with §3.11 voice rules verbatim (humane / simple / slightly humorous), 3 ✅ + 5 ❌ samples as few-shot anchors, brand-canonical `{{TAG_MAP}}` placeholder. **Founder-approved before Sonnet pair fired** — load-bearing tuned asset, never regenerate.
+- **`backend/app/ai/social_curate.py`** — module-load lru_cached prompt loader: substitutes `{{TAG_MAP}}` ONCE at first call from `share_copy._TAG_DISPLAY` (cache-clean per invariant #1, only `{{SOURCE_JSON}}` varies per call).
+- **`scripts/auto_curate_social.sh`** — daily VPS cron (`0 1 * * *` = 06:30 IST) cloning the proven `auto_summarize_drafts.sh` pattern; 30/7d OAuth token-expiry warnings; flock-gated; one-source-per-Opus-call; cleanup tmp files between rounds.
+- **`scripts/export_social_sources.py`** + **`scripts/import_social_drafts.py`** — helpers (init_db/close_db, redacting log filter, commit-per-row); export finds blog/course candidate published in last 30 days w/o active social_posts row + INSERTs 2 pending rows atomically; import validates against `SocialCurateOutput` + UPDATEs to `draft` (or increments retry → archives at 3rd failure).
+- **`backend/app/routers/admin_social.py`** (329 lines) — read-only `GET /admin/social/drafts` behind `get_current_admin`; sources grouped with Twitter/LinkedIn side-by-side; reasoning trail in collapsible `<details>`; archive callout with retry_count + IST last-attempt timestamp; "Actions ship in session (b)" placeholder. **Every DB-sourced interpolation passes `html.escape()`** per RCA-008.
+- **`cron.d/auto_curate_social`** + **`cron.d/logrotate-auto_curate_social`** — repo-tracked source-of-truth for `/etc/cron.d/` + `/etc/logrotate.d/` (weekly rotate 8 retention).
+- **17 schema unit tests** covering happy + every reject path (empty evidence, overlength per platform, hashtag count bounds, brand-last enforcement, lowercase/hyphenated rejection, inline-hashtag rejection, platform mismatch).
+
+**Phase 2 gates (all green):** secrets scan clean · TODO/FIXME scan clean · ast.parse clean on every .py · bash -n clean · 17/17 pytest · static integration check (migration loads, ORM imports, Pydantic imports, prompt loader renders 13311 chars with TAG_MAP substituted, admin router imports).
+
+**Phase 3 Opus diff review** caught + fixed 2 blocking bugs in main session (don't-delegate-when-self-executing-faster rule):
+
+1. **`auto_curate_social.sh`** lines 87-95: quoted heredoc `<<'PYEOF'` prevented bash `$VAR` expansion; the `''"$VAR"''` break-out idiom doesn't work inside a quoted heredoc (passes through as literal text). Every cron round would have died at the prompt-build step. Fix: converted to inline `python3 -c "..."` matching the proven `auto_summarize_drafts.sh` pattern.
+2. **`import_social_drafts.py`** lines 214-223: was reading `twitter_post_id` / `linkedin_post_id` from Opus output, but the founder-approved prompt doesn't ask Opus to emit those fields (and shouldn't — they're internal IDs). Fix: added `--twitter-id` / `--linkedin-id` CLI flags driven by the shell from `EXPORT_FILE` plus a most-recent-pending-pair fallback.
+
+**Phase 4 codex:rescue:** founder real-time override mid-invocation ("continue, takeover opus"). Now **11/11 empty across S45-S51**. New memory entry `feedback_codex_rescue_skip.md` captures the pattern + recommended action (drop §8 mandatory rule, keep helper for explicit invocation only). D7 decision urgency escalated.
+
+**Deploy status (live):** `8c41a0e` pushed → VPS git pull HEAD parity → docker compose build backend → docker compose up -d --force-recreate backend → health: starting → up. Migration applied: `alembic current` returns `20260428000000 (head)`; SQLite `.schema social_posts` confirms 14-column table + composite index `ix_social_posts_status_created` + partial UNIQUE index `uq_social_posts_active` with intact `WHERE status IN ('pending', 'draft')` clause. Smoke through docker internal `localhost:8000`: `/api/health` 200; `/admin/social/drafts` anon 401 (auth gate working). Prompt loader verified inside deployed container renders 13311 chars with `#RAG` + `#AutomateEdge` both present (TAG_MAP substitution proven end-to-end). Cron + logrotate copied to `/etc/cron.d/auto_curate_social` + `/etc/logrotate.d/auto_curate_social`, both `-rw-r--r-- root root`. Cron script `chmod +x` applied on VPS (Sonnet wrote it in a Windows worktree where git doesn't preserve execute bits) + locally staged via `git update-index --chmod=+x`.
+
+**No RCA entry** — the 2 Phase-3 finds were caught pre-commit, not post-commit, so don't qualify per the "after fixing a bug" rule. They live in this HANDOFF as the diff-review record instead.
+
+**Cron dry-run completed end-to-end during this session (live verification, not a deferral).** Manually triggered `sudo flock -n /tmp/auto_curate_social.lock /srv/roadmap/scripts/auto_curate_social.sh`. Final: **14 rounds, 13 productive sources, 22 draft rows persisted (Twitter + LinkedIn per source), 4 pending; queue empty in ~14 minutes total runtime.** Of the 4 pending: 2 hit retry_count=1 from invalid JSON shape from Opus in round 10 (retry+archive mechanism working correctly per §3.11 spec — 2 more failures will flip to `archived`); 2 are mid-flight from sources processed near the end. Editorial spot-check: drafts hit §3.11 voice rules cleanly — concrete first-person openings ("Bookmarked an AI roadmap in January"; "Same LinkedIn title, different jobs"), precise verbs, no buzzwords, hooks in first 15 chars/words, lengths within budget. Soft Opus drift on 1 of 22: `/blog` rendered instead of full slug URL — surface for admin review, not blocking. The Phase G(a) pipeline is **live in production and producing publishable drafts at scale**.
+
+**Open questions / queued for S52:**
+
+1. **All 8 P0 decisions still pending** — D1-D6 from prior audit, D7 (`codex:rescue` fix-or-drop, escalated), D8 (repo-eval option). Founder lands in one ~20-min sitting.
+2. **S49 browser smoke** still pending (anonymous-funnel ribbons real-browser checks).
+3. **Three orphan modifications** (`backend/app/services/jobs_ingest.py` + `backend/tests/test_jobs_cost_opt.py` + `docs/AI_PIPELINE_PLAN.md`) sit unstaged from a prior session — not from S51. Founder decides when to commit/discard.
+
+**Next action — Session 52 (Phase G session b):** review the ~20 drafts now sitting at `/admin/social/drafts`, validate editorial voice across the full set + identify any prompt-tuning needed, then ship publish flow + auto-archive: `twitter_client.post_tweet` direct integration once X 403 is cleared + LinkedIn copy-to-clipboard `📋 Open LinkedIn` button + `Mark as posted` capturing the LinkedIn URL + Discard + Re-publish "different angle" prompt + 30-day time-based auto-archive sweep + Published + Archived tabs.
+
+**Agent-utilization footer (S51):**
+
+- Opus: full session — Phase 0 parallel reads (CLAUDE.md + RCA + MEMORY + AI_PIPELINE_PLAN + share_copy + nginx); recon for slice contracts (schemas.py existing shape + admin_jobs.py pattern + admin auth dep + fmt_ist location); SSH to VPS for canonical `auto_summarize_drafts.sh` + cron entry + logrotate config (the proven pattern Sonnet had to clone); authored `prompts/social_curate.txt` (164 lines, founder-approved before any Sonnet fire); 2 detailed Sonnet contracts (~5K tokens each, with locked names + acceptance criteria + output format); Phase 3 line-by-line diff review on 13-file changeset; identified + fixed 2 blocking bugs (heredoc + ID-extraction); Phase 2 gates; commit with noreply env-var override + `--author=`; deploy 7-step sequence (pull → build → force-recreate → alembic check → smoke through docker internal → cron install); this HANDOFF rewrite + §9.
+- Sonnet: 2 parallel worktree-isolated subagents — slice 1 (Alembic + ORM + Pydantic + 17 tests, all green; ~89K tokens, 201s) + slice 2 (cron + scripts + admin router + cron.d entries; ~101K tokens, 373s). Both reported clean. Both required Opus-level fixes in Phase 3 (not subagent re-spawns; main-session direct edits per don't-delegate-when-self-executing-faster rule).
+- Haiku: n/a — no bulk grep / verification sweep large enough; targeted Opus reads + SSH execs cheaper.
+- codex:rescue: founder real-time override during invocation. **11/11 empty across S45-S51.** Memory entry `feedback_codex_rescue_skip.md` saved; D7 decision urgency escalated.
+
+---
+
 ## Current state as of 2026-04-28 (session 50 continued — audit merge + Day-2 agent-team skills)
 
 **Branch:** `master` · clean working tree after this session's commits (S50 base `ac0227b` + S50-cont commit). **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD matches local; no runtime changes deployed (entire S50 is dev-tooling + docs only). **Tests:** not run; no application code touched.

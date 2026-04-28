@@ -211,30 +211,30 @@ The cheap levers (Phase 0 reads, hooks, deploy skill, research-team) fire **alwa
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
-**Last session date:** 2026-04-28 (session 50 continued — audit merge + Day-2 agent-team skills)
-**Last session summary (S50 + S50-cont):** Three-part dev-tooling session. **(1)** Consolidated three loose AI strategy docs into single source of truth at [docs/AI_PIPELINE_PLAN.md](docs/AI_PIPELINE_PLAN.md). **(2)** Shipped Day-1 harness: 2 PreToolUse hooks (pre_commit_secrets, pre_push_noreply) + 2 skills (`/aiexpert-phase0`, `/deploy-vps`) — first-fired live on the S50 commit, both passed silently. **(3)** Merged the two orphan audit files (`AUDIT_2026-04.md` + `AUDIT_TASKS.md`) into one canonical [docs/AUDIT_TASKS.md](docs/AUDIT_TASKS.md) with only unique unimplemented tasks; deleted the source narrative + the now-superseded `PLAN_TIERED_CLAUDE_ROUTING.md`; surfaced 3 new tasks (P2-13, P3-19, P3-20) + added D8 (repo-eval Option pick from `AI_PIPELINE_PLAN.md` §7); marked P1-08 / F5 🟢 partial. Shipped Day-2 harness: 3 agent-team orchestration skills (`/research-team`, `/build-team`, `/adversarial-team`) + CLAUDE.md §8 Day-2 subsection + trigger map.
+**Last session date:** 2026-04-28 (session 51 — Phase G(a) social draft pipeline)
+**Last session summary (S51):** First of two Phase G sessions. Shipped the read-only build slice of `/admin/social`: Alembic `social_posts` table (CHECK constraints + partial UNIQUE index `WHERE status IN ('pending','draft')`) + Pydantic `ReasoningTrail`/`SocialDraftSchema`/`SocialCurateOutput` enforcing §4 invariant #4 + §3.11 hashtag rules + Opus prompt with §3.11 voice rules + ✅/❌ samples + lru_cached `{{TAG_MAP}}` substitution from `share_copy._TAG_DISPLAY` (cache-clean per invariant #1) + `auto_curate_social.sh` daily 06:30 IST cron cloning the proven `auto_summarize_drafts.sh` pattern + read-only `GET /admin/social/drafts` admin page with `html.escape()` defense + 17 schema unit tests (all green).
 
-- **Two commits this session.** `ac0227b` (S50 base — AI Pipeline Plan + Day-1 harness §8.4) + S50-cont (audit merge + Day-2 teams + CLAUDE.md §8 trigger map).
-- **Phase 2 gates green** on S50 base; S50-cont is pure docs + gitignored skills, no runtime risk.
-- **Hooks first-fired live** on S50 base — both pre-commit-secrets and pre-push-noreply passed silently (no false positives, allowed legitimate noreply-identity push). First proven-in-prod test of the harness.
-- **Sonnet:** n/a — design + doc + tooling, no implementation contracts to delegate. Day-2 teams authored proactively; first real fire expected in Session 51 Phase B (cron clones).
-- **codex:rescue:** n/a — touched paths not in §8's strictly-mandatory list. Continues empty 10× across S45-S50 — escalating to D7 in P0.
-- **No RCA** — no bug fixed.
+- **One commit `8c41a0e`** — 13 files / 1707 insertions / 1 deletion. Plus `chmod +x` follow-up for the cron script.
+- **Phase 2 gates green:** secrets clean · TODO clean · ast.parse clean · bash -n clean · 17/17 pytest · static integration check across new modules clean.
+- **Phase 3 Opus diff review** caught + fixed 2 blocking bugs in main session: (a) shell quoted-heredoc broke `$VAR` expansion → converted to inline `python3 -c "..."`; (b) import script read row IDs from Opus output but prompt doesn't emit them → added `--twitter-id`/`--linkedin-id` CLI flags + most-recent-pending-pair fallback.
+- **Phase 4 codex:rescue:** founder real-time override during invocation ("continue, takeover opus"). Now 11/11 empty across S45-S51 — saved memory `feedback_codex_rescue_skip.md`. Escalates urgency on D7 fix-or-drop decision.
+- **Sonnet:** 2 parallel worktree-isolated subagents (slice 1 schema + slice 2 cron/router); both reported clean; merged + Phase 3 review caught the 2 bugs above.
+- **No RCA** — no bug fixed in committed code; the 2 Phase-3 finds were caught pre-commit so don't qualify per HANDOFF "after fixing a bug" rule.
 
-**Deploy status:** `ac0227b` pushed to origin/master. VPS HEAD parity confirmed. **No rebuild done** — entire S50 is docs + `.claude/*` only, nothing affects backend runtime. Backend container untouched, healthy. S50-cont push pending (this commit).
+**Deploy status (verified LIVE):** `8c41a0e` pushed + deployed. Backend rebuilt + force-recreated. Migration applied. Cron + logrotate installed. Smoke clean. **Cron dry-run completed end-to-end on VPS: 14 rounds, 13 productive, queue empty, ~14 min runtime; 22 draft rows persisted (11 sources × 2 platforms), 4 pending (2 hit retry_count=1 from invalid JSON in round 10 — retry mechanism working correctly per spec; 2 mid-flight when log emitted).** Editorial spot-check: drafts hit §3.11 voice rules cleanly. Soft Opus drift on 1 of 22: `/blog` rendered instead of full slug URL — surface for admin review, not blocking.
 
-**Open questions:** (1) **D8 — Repo evaluation Option A/B/D/E pick** with per-user submission cap if E. Recommended: Option E (async cron, $0 marginal Opus). (2) **All other 7 P0 decisions** still pending (D1 brand, D2 monetization, D3 cert credibility, D4 cohort, D5 backup destination, D6 CSRF, D7 codex:rescue). Founder lands all 8 in ~20 min sitting. (3) **S49 browser smoke** still pending. (4) **Two non-mine orphan files** (`backend/app/services/share_copy.py` + test) sit untracked from another session.
+**Open questions:** (1) **All 8 P0 decisions still pending** including D7 (codex:rescue fix-or-drop, now 11/11 empty) and D8 (repo-eval option pick). (2) **S49 browser smoke** still pending. (3) **Three orphan modifications** (`backend/app/services/jobs_ingest.py` + `backend/tests/test_jobs_cost_opt.py` + `docs/AI_PIPELINE_PLAN.md`) sit unstaged — not from this session.
 
-**Next action — Session 51:** founder lands the 8 P0 decisions, then either P1-04 (Brevo cap, ~30 min) or Phase B of `AI_PIPELINE_PLAN.md` (4 cron clones — first real user of `/build-team`).
+**Next action — Session 52 (Phase G session b):** review the ~20 drafts now live at `/admin/social/drafts`; ship publish flow (Twitter direct via `twitter_client.post_tweet` once X 403 cleared) + LinkedIn copy-to-clipboard + Mark-as-posted + Discard + Re-publish + 30-day auto-archive sweep + Published + Archived tabs.
 
-**Queued:** S49 browser smoke · 8 P0 decisions · P1-01..08 (Coursera affiliate / cert reframe / chat personalization / Brevo cap / Gemini cost cap / CSRF / doc-vs-code reconciliation / CI security gates) · P2-01..13 · P3-01..20 · AI_PIPELINE_PLAN.md Phase B–E sequenced sessions.
+**Queued:** S49 browser smoke · 8 P0 decisions · P1-01..08 · P2-01..13 · P3-01..20 · `AI_PIPELINE_PLAN.md` Phase B–F sequenced sessions.
 
-**Agent-utilization footer (combined S50 + S50-cont):**
+**Agent-utilization footer (S51):**
 
-- Opus: full session — Phase 0 reads parallel; read three AI strategy docs; audit `.claude/` config; draft `docs/AI_PIPELINE_PLAN.md` (~340 lines); author 11-lever Claude Code tuning proposal; write 2 PreToolUse hook scripts + 5 skill files (Day-1: `/aiexpert-phase0`, `/deploy-vps`; Day-2: `/research-team`, `/build-team`, `/adversarial-team`); update `CLAUDE.md` §8 with Day-1 subsection + Day-2 subsection + trigger map + §9 entries; rewrite top section of `docs/HANDOFF.md`; smoke-test both hooks; first-real-fire of pre-commit + pre-push hooks live on S50 commit; execute `/deploy-vps` sequence (commit → push → ssh pull → HEAD parity → no-rebuild docs-only → /api/health smoke); read both audit files (296+229 lines); merge into canonical `docs/AUDIT_TASKS.md` adding 3 surfaced tasks + D8; delete merged-source + superseded routing plan.
-- Sonnet: n/a — design + doc + tooling, no implementation contracts to delegate.
-- Haiku: n/a — VPS embedding-usage SQL via direct backend-container exec, faster than Haiku round-trip.
-- codex:rescue: n/a — touched paths not in §8's strictly-mandatory list. **10/10 empty across S45-S50** — escalating to P0-D7 (fix-or-drop) for Session 51 founder decision.
+- Opus: full session — Phase 0 reads parallel; read 8 supporting files for design (share_copy, schemas, prompts dir, admin routers, nginx, jobs_summary_claude.txt, claude_blog_manual.txt, etc); SSH-fetched canonical `auto_summarize_drafts.sh` pattern from VPS; authored `prompts/social_curate.txt` (164 lines, founder-approved before Sonnet fired); wrote 2 detailed Sonnet contracts (one per worktree); Phase 3 line-by-line diff review on 13-file changeset; identified + fixed 2 blocking bugs in main session (don't-delegate-when-self-executing-faster rule); Phase 2 gates; commit with noreply identity; deploy 7-step sequence + cron/logrotate install; this HANDOFF + §9; saved `feedback_codex_rescue_skip.md` memory.
+- Sonnet: 2 parallel worktree-isolated subagents (~88K + ~101K tokens, ~200s + ~373s) — slice 1 (Alembic + ORM + Pydantic + tests, all 17 green) + slice 2 (cron + router + scripts + cron entry + logrotate); both reported clean; both required Opus-level fixes in Phase 3.
+- Haiku: n/a — no bulk sweeps; targeted Opus reads + SSH execs cheaper.
+- codex:rescue: founder real-time override during invocation. **11/11 empty across S45-S51.** Memory entry saved; D7 decision urgency escalated.
 
 ---
 
