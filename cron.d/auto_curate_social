@@ -1,0 +1,6 @@
+# Daily auto-curate social drafts at 01:00 UTC = 06:30 IST
+# (per AI_PIPELINE_PLAN.md §3.11 + §6 schedule table)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 1 * * * root flock -n /tmp/auto_curate_social.lock /srv/roadmap/scripts/auto_curate_social.sh >> /var/log/auto_curate_social.log 2>&1

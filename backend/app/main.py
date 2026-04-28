@@ -225,7 +225,7 @@ async def learner_count():
 
 
 # ----- Router registration -----
-from app.routers import auth, plans, profile, repos, evaluate, chat, share, admin, contact, public_profile, templates, pipeline, certificates, verify, blog, jobs, admin_jobs, og, seo, compare, track_pages
+from app.routers import auth, plans, profile, repos, evaluate, chat, share, admin, contact, public_profile, templates, pipeline, certificates, verify, blog, jobs, admin_jobs, admin_social, og, seo, compare, track_pages
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(plans.router, prefix="/api", tags=["plans"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
@@ -243,6 +243,7 @@ app.include_router(verify.router, tags=["verify"])
 app.include_router(blog.router, tags=["blog"])
 app.include_router(jobs.router, tags=["jobs"])
 app.include_router(admin_jobs.router, prefix="/admin/jobs", tags=["admin-jobs"])
+app.include_router(admin_social.router, prefix="/admin/social", tags=["admin-social"])
 app.include_router(og.router, tags=["og"])
 app.include_router(seo.router, tags=["seo"])
 app.include_router(compare.router, tags=["compare"])
