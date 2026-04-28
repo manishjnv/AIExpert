@@ -4,6 +4,63 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-04-29 (session 52 — Phase G(b) publish loop + auto-archive)
+
+**Branch:** `master` · clean working tree after `656f70a` + `2add329`. **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `2add329`; backend rebuilt + force-recreated; alembic head `20260428000000` (no new migrations this session). **Smoke:** all 5 new GET routes 401 to anon, all 6 new POST routes 401, both new frontend assets 200 over the wire (nginx `\.(js|css)$` regex auto-served — no nginx config changes needed).
+
+### Session 52 — second of two Phase G sessions: publish loop + Published/Archived tabs
+
+**Headline:** Closed the publish loop on `/admin/social`. Admin can now Edit / Publish (Twitter direct, X-gated) / 📋 Copy + Open + Mark-as-posted (LinkedIn + Twitter fallback) / Discard / Re-publish (different angle). New Drafts / Published / Archived tabs with `source_kind` + `platform` filters. The 30-day stale-draft auto-archive sweep landed as a cron tail step (single cron, no second wrapper). Phase G is **done**; AI_PIPELINE_PLAN.md §0 status board flipped to ✅ shipped.
+
+**What ships in `656f70a` + `2add329`** (10 files touched, ~2150 insertions):
+
+- **Slice 1 `656f70a` (1295 ins):** new config flag `x_publish_enabled` (default False — X portal write-auth still 403); 4 new POST endpoints in `admin_social.py` (`publish` / `mark-posted` / `discard` / `edit`) — all CSRF-checked + atomic `UPDATE WHERE status='draft'` for race-condition guard; new `frontend/admin-social.{js,css}` (vanilla IIFE, delegated click on `[data-action]`, modal + toast helpers, three-tier clipboard fallback). Card lookup via `.draft-card` class so `closest()` doesn't return the button itself.
+- **Slice 2 `2add329` (848 ins):** `POST /admin/social/re-publish/{id}` queues a fresh pending pair carrying `reasoning_json={"_re_publish": true, "_parent_post_id": N}`; `export_social_sources.py` gains a `_pickup_repub_pair` priority path that runs BEFORE fresh-source scan, fetches the parent body, and attaches it to source payload as `prior_drafts`; `social_curate.txt` gains an additive RE-PUBLISH MODE section instructing Opus to lead with a different hook / verb / emphasis when `prior_drafts` is present (additive only, voice rules unchanged); `scripts/auto_archive_stale.py` (new, 118 lines) — standalone, init_db/close_db, commit-per-row, flips drafts ≥ 30 days → archived with reason='stale_30d'; `auto_curate_social.sh` tail step calls it (one cron, no second wrapper); `GET /admin/social/published` + `GET /admin/social/archived` with `source_kind` + `platform` filters; tab nav with row counts on every page; Drafts page now filters `status='draft' AND age<30d` and shows a stale-banner with manual-sweep button when any drafts ≥ 30d exist; `POST /admin/social/archive-stale-now` for that manual trigger.
+
+**Phase 2 gates green:** secrets clean · TODO/FIXME clean · ast.parse clean across all 3 touched .py files (admin_social.py, auto_archive_stale.py, export_social_sources.py) · `node --check` clean on admin-social.js · `bash -n` clean on auto_curate_social.sh.
+
+**Phase 3 Opus diff review** caught + fixed 4 bugs in main session (don't-delegate-when-self-executing-faster):
+
+1. **Slice 1 — `getCard(button)` returned the button itself.** Backend rendered `data-post-id` on buttons but not the card div; `closest('[data-post-id]')` matches the element first. Impact: `card.remove()` would have orphaned the rest of the card after publish/discard. Fix: backend adds `class="draft-card"` to outer card div + `data-post-id`; frontend `getCard` switches to `closest('.draft-card')`.
+2. **Slice 1 — Edit save in-place re-render targeted classes that didn't exist** on the rendered HTML. Fix: backend adds `class="draft-body"` and `class="draft-hashtags"`.
+3. **Slice 2 — FastAPI `Query(regex=...)` deprecated in 0.115** (only emits warning); switched to `pattern=...`. Then realized the form's "All" option submits `?source_kind=` which fails the pattern and 422s. Final fix: drop `pattern=`, normalize empty-string to None inside the route, constrain to known enum.
+4. **Slice 2 — re-publish endpoint had no IntegrityError handler** for the partial UNIQUE index race (between blocker check and commit two clicks could collide). Wrapped commit in try/except and surface 409 instead of letting it 500.
+
+**Phase 4 codex:rescue:** n/a per memory `feedback_codex_rescue_skip` (12/12 empty across S45-S52); no diff touched the strictly-mandatory load-bearing list (no auth / no Alembic / no jobs-classifier). The prompt edit IS in load-bearing `backend/app/prompts/` but per §8 hard rule on tuned prompts, founder approval is the gate, and slice 2 is additive only — no voice-rule rewriting. Founder approved the additive shape in the Phase 0 plan-confirmation message ("go").
+
+**Sonnet:** 2 parallel non-isolated subagents (slice 1 backend ~70K tokens, ~213s + slice 1 frontend ~46K tokens, ~144s). Both reported clean. Both required main-session Phase 3 fixes (the 2 selector bugs above). Slice 2 was self-executed — fewer than 30 lines per file in any single Edit, paths hot-cached, faster to type than spawn.
+
+**Pre-flight orphan triage (resolved automatically):** at session start the working tree showed 5 orphan files (jobs_ingest.py + test_jobs_cost_opt.py + AI_PIPELINE_PLAN.md + worktree-only deltas on CLAUDE.md / HANDOFF.md / scripts/auto_curate_social.sh) and `MM CLAUDE.md` / `MM HANDOFF.md` staged content. Stash command targeted only the jobs-tier-promotion 3-file feature; meanwhile remote pulled `3dfe01f` + `de6f32e` (post-S51 polish: ORM `__table_args__` + chmod + HANDOFF revisions) which absorbed the rest. Stash now holds ONLY `perrow-tier-promotion-pre-S52` (jobs_ingest `should_full_enrich()` per-row tier promotion + matching tests + an unrelated AI_PIPELINE_PLAN formatting cleanup) — ship it as its own session under `/adversarial-team` or `codex:rescue` per §8 (jobs_ingest is load-bearing).
+
+**No RCA entry** — all 4 Phase-3 finds were caught pre-commit. They live in this HANDOFF as the diff-review record.
+
+**Deploy verified live:** push 656f70a..2add329 → VPS git pull HEAD parity → `docker compose up -d --build --force-recreate backend` → health: starting → up healthy in ~16s. `alembic current` returns `20260428000000 (head)` (slice 2 added no migrations). Smoke matrix through nginx port 8090 (and confirmed identical via public Cloudflare [automateedge.cloud](https://automateedge.cloud)):
+
+- `/admin/social/drafts` 401 · `/admin/social/published` 401 · `/admin/social/archived` 401
+- `POST /publish/1` 401 · `/mark-posted/1` 401 · `/discard/1` 401 · `/edit/1` 401 · `/re-publish/1` 401 · `/archive-stale-now` 401
+- `/admin-social.js` 200 · `/admin-social.css` 200
+
+The auth gate works on every new endpoint. `POST` routes return 401 to anon (CSRF gate runs after admin gate which short-circuits to 401 first — acceptable; both layers wired).
+
+**Open questions / queued for S53:**
+
+1. **Browser smoke pending** — every endpoint exercised via curl returns the right HTTP code, but the actual flows (Edit modal save → optimistic UI; Publish 503 fallback path; Copy + Open LinkedIn → window.open; Mark-as-posted modal → URL validation; Discard with reason; Re-publish queues a pair; stale-banner appears + Run-sweep-now flow) need a real browser as admin. Founder owns this.
+2. **X API write-auth 403 still unresolved** (the S51 blocker). When fixed: `x_publish_enabled=true` env flip is the only thing required for direct Twitter publish to start working. No code changes.
+3. **Re-publish cron pickup needs first live test.** The repub priority path in `export_social_sources.py` is correct under static review but has not yet been exercised end-to-end (no admin has clicked Re-publish on a published row, since X is dormant and LinkedIn manual flow needs admin to mark a post as published first).
+4. **8 P0 decisions still pending** (D1-D6 from prior audit + D7 codex:rescue fix-or-drop + D8 repo-eval). D7 has now accumulated 12/12 empty calls — meaningful drop signal.
+5. **Stash `perrow-tier-promotion-pre-S52`** holds the jobs_ingest tier-promotion feature waiting for its own session under `/adversarial-team` or `codex:rescue` (load-bearing path).
+
+**Next action — Session 53:** founder browser-smoke the Phase G(b) flows on the live site, identify any UX nits for a quick polish PR, then either D1-D8 P0 decisions sitting (~20 min) OR Phase B (`AI_PIPELINE_PLAN.md` — clone the now 5×-proven cron pattern across 4 more surfaces — first real fire of `/build-team`).
+
+**Agent-utilization footer (S52):**
+
+- Opus: full session — Phase 0 reads in parallel (CLAUDE.md + HANDOFF + RCA + MEMORY + AI_PIPELINE_PLAN + admin_social.py + social.py + social_schema.py + social_curate.py + auto_curate_social.sh, with secondary reads on twitter_client.py + share_copy.py + nginx.conf during contract design); pre-flight orphan triage + targeted git-stash; 2 detailed Sonnet contracts (~3K + ~3K tokens, locked paths + Pydantic shapes + acceptance criteria + output format); Phase 3 line-by-line diff review on the 4-file slice-1 changeset (caught 2 selector bugs, fixed inline); slice 2 entirely self-executed across 6 files (~850 lines); Phase 2 gates after each slice + Phase 3 review of slice 2 (caught 2 more bugs, fixed inline); 2 commits with noreply env-var override; Phase 5 deploy 7-step sequence + smoke matrix on 11 endpoints via nginx + Cloudflare; this HANDOFF rewrite + CLAUDE.md §9 + AI_PIPELINE_PLAN §0 status board flip + memory entry update.
+- Sonnet: 2 parallel non-isolated subagents for slice 1 only (backend POST endpoints + Pydantic models + card render + nginx audit; frontend admin-social.{js,css}). Both clean reports; both required Opus Phase-3 fixes (selector + missing classes). Slice 2 deliberately self-executed per don't-delegate-when-self-executing-faster (≤30 lines per Edit, hot-cached files).
+- Haiku: n/a — no bulk grep / verification sweep large enough to amortize cold start.
+- codex:rescue: n/a per `feedback_codex_rescue_skip` (12/12 empty across S45-S52). Diff didn't touch strictly-mandatory load-bearing paths; the prompt edit was additive-only with founder pre-approval per §8 hard rule.
+
+---
+
 ## Current state as of 2026-04-28 (session 51 — Phase G(a) social draft pipeline)
 
 **Branch:** `master` · clean working tree after this session's commit `8c41a0e` (and a small follow-up for `chmod +x` on the cron script). **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `8c41a0e` matches local; backend rebuilt + force-recreated; migration `20260428000000` applied. **Tests:** 17/17 schema unit tests green; static integration check (migration + ORM + Pydantic + prompt loader + admin router all importing together) passes.

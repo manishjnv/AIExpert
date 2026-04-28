@@ -21,9 +21,9 @@
 | **D** | Reasoning trail (schema field) + quarantine table | not started | session +2 |
 | **E** | Repo evaluation MVP (after §7 decision) | not started | session +3 |
 | **F** | Observability: cache hit-rate dashboard + per-user token budget | partial | piecemeal across B–E |
-| **G** | Social post curation (admin-only) — Opus 4.7 cron + `/admin/social` UI | not started · v1 scope locked 2026-04-28 | 2 sessions; backend slice load-bearing per §8 (Alembic + AI prompt) |
+| **G** | Social post curation (admin-only) — Opus 4.7 cron + `/admin/social` UI | ✅ **shipped (sessions a `8c41a0e` + b `656f70a`+`2add329`)** 2026-04-29 — daily 06:30 IST cron drafts both platforms; admin reviews/edits/publishes via Drafts/Published/Archived tabs; LinkedIn manual flow (X gated by `x_publish_enabled` until 403 cleared); Re-publish queues different-angle pending pair; 30-day stale sweep appended to cron | done |
 
-**Next action:** Founder confirms the repo evaluation decision in §7, then start Phase B (which can absorb Phase G's cron as a 5th cron clone).
+**Next action:** Founder confirms the repo evaluation decision in §7 (Option A is locked but downstream Phase E still queued), then start Phase B (which can now absorb the Phase G cron pattern as the 6th proven Track 1 wrapper).
 
 ---
 
