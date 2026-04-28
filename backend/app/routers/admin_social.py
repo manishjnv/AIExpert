@@ -6,7 +6,11 @@ GET /admin/social/drafts — read-only listing of social_posts rows with
   status IN ('draft', 'archived'), grouped by (source_kind, source_slug)
   with Twitter and LinkedIn side-by-side per source.
 
-Actions (publish, edit, discard) ship in session (b).
+POST /admin/social/publish/{id}    — publish Twitter draft via X API v2
+POST /admin/social/mark-posted/{id} — record external publish URL (LinkedIn
+                                       or Twitter fallback)
+POST /admin/social/discard/{id}    — archive a draft with optional reason
+POST /admin/social/edit/{id}       — update body + hashtags on a draft
 
 RCA-008 caution: body content comes from DB as plain text. We always pass it
 through html.escape() before embedding in HTML. No f-string body interpolation
@@ -16,23 +20,140 @@ without escaping — use the esc() alias throughout.
 from __future__ import annotations
 
 import json
+import re
+from datetime import datetime, timezone
 from html import escape as esc
-from typing import Any
+from typing import Any, Optional
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_admin
+from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
+from app.services import twitter_client
+from app.services.share_copy import _TAG_DISPLAY
 from app.utils.time_fmt import fmt_ist, FMT_SHORT
 
 router = APIRouter()
 
 # Import shared admin UI constants from admin.py
 from app.routers.admin import ADMIN_CSS, ADMIN_NAV
+
+# Hashtag input validation. Mirrors SocialDraftSchema rules from ai/schemas.py
+# but keyed on _TAG_DISPLAY for additional brand-canonicality enforcement on
+# admin edits (an admin should not be able to invent #SomeNewTag).
+_BRAND_TAG = "#AutomateEdge"
+_VALID_TAGS: frozenset[str] = frozenset(_TAG_DISPLAY.values()) | {_BRAND_TAG}
+_HASHTAG_RE = re.compile(r"^#[A-Z][A-Za-z0-9]+$")
+_TWITTER_BODY_MAX = 280
+_LINKEDIN_BODY_MAX = 3000
+
+
+def _csrf_check(request: Request) -> None:
+    """Strict-equality origin check per RCA-012.
+
+    Rejects when neither Origin nor Referer is present, AND when their
+    parsed hostname does not exactly match the request Host header.
+    """
+    origin = request.headers.get("origin", "").strip()
+    referer = request.headers.get("referer", "").strip()
+    host = request.headers.get("host", "").strip()
+    if not (origin or referer):
+        raise HTTPException(status_code=403, detail="Origin or Referer required")
+    src = origin or referer
+    src_host = (urlparse(src).hostname or "").lower()
+    expected = (urlparse(f"http://{host}").hostname or "").lower()
+    if not src_host or not expected or src_host != expected:
+        raise HTTPException(status_code=403, detail="Origin mismatch")
+
+
+def _validate_published_url(url: str) -> str:
+    """Validate a Mark-as-posted URL: http(s), real hostname, ≤500 chars.
+
+    Note: we do NOT fetch the URL (per RCA-011 SSRF principles), only
+    structurally validate it. The admin is trusted to paste a legit URL.
+    """
+    url = (url or "").strip()
+    if not url or len(url) > 500:
+        raise ValueError("published_url must be 1-500 chars")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("published_url must be http(s)")
+    if not parsed.hostname:
+        raise ValueError("published_url must have a hostname")
+    return url
+
+
+def _validate_hashtags(hashtags: list[str], platform: str) -> list[str]:
+    """Validate platform-specific hashtag rules. Raise ValueError on any failure."""
+    if not isinstance(hashtags, list) or not all(isinstance(t, str) for t in hashtags):
+        raise ValueError("hashtags must be a list of strings")
+    cleaned = [t.strip() for t in hashtags]
+    for tag in cleaned:
+        if tag == _BRAND_TAG:
+            continue
+        if not _HASHTAG_RE.match(tag):
+            raise ValueError(
+                f"hashtag {tag!r} is not canonical form ^#[A-Z][A-Za-z0-9]+$"
+            )
+        if tag not in _VALID_TAGS:
+            raise ValueError(
+                f"hashtag {tag!r} is not in the brand-canonical _TAG_DISPLAY map"
+            )
+    if platform == "twitter":
+        if not (1 <= len(cleaned) <= 2):
+            raise ValueError(f"Twitter requires 1-2 hashtags, got {len(cleaned)}")
+        if _BRAND_TAG in cleaned:
+            raise ValueError("Twitter must not include #AutomateEdge")
+    elif platform == "linkedin":
+        if not (3 <= len(cleaned) <= 5):
+            raise ValueError(f"LinkedIn requires 3-5 hashtags, got {len(cleaned)}")
+        if cleaned[-1] != _BRAND_TAG:
+            raise ValueError(f"LinkedIn hashtags must end with #AutomateEdge, got {cleaned[-1]!r}")
+    else:
+        raise ValueError(f"unknown platform: {platform!r}")
+    return cleaned
+
+
+def _validate_body(body: str, platform: str) -> str:
+    """Validate body length per platform + reject inline '#' (hashtags must live
+    in hashtags field per §3.11 voice rules)."""
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("body must be non-empty")
+    if "#" in body:
+        raise ValueError("body must not contain '#' (hashtags belong in hashtags field)")
+    cap = _TWITTER_BODY_MAX if platform == "twitter" else _LINKEDIN_BODY_MAX
+    if len(body) > cap:
+        raise ValueError(f"{platform} body {len(body)} chars exceeds {cap}")
+    return body
+
+
+# ---- Request models ----------------------------------------------------------
+
+
+class _MarkAsPostedRequest(BaseModel):
+    published_url: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("published_url")
+    @classmethod
+    def _v(cls, v: str) -> str:
+        return _validate_published_url(v)
+
+
+class _DiscardRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=200)
+
+
+class _EditDraftRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=3500)
+    hashtags: list[str] = Field(..., min_length=1, max_length=5)
 
 
 # ---- Helpers -----------------------------------------------------------------
@@ -164,7 +285,7 @@ def _source_link(source_kind: str, source_slug: str) -> str:
     )
 
 
-def _render_post_card(row: Any) -> str:
+def _render_post_card(row: Any, *, x_publish_enabled: bool = False) -> str:
     """Render a single social_posts row as a card."""
     platform_html = _platform_badge(row.platform)
     status_html = _status_badge(row.status)
@@ -181,8 +302,58 @@ def _render_post_card(row: Any) -> str:
             f'</div>'
         )
 
+    # Action buttons — only rendered for draft rows (archived is terminal).
+    action_row_html = ""
+    if row.status == "draft":
+        pid = esc(str(row.id))
+        plat = esc(row.platform)
+        sk = esc(row.source_kind)
+        ss = esc(row.source_slug)
+        # body and hashtags passed as data-attrs so JS can read without re-fetch
+        body_attr = esc(row.body or "")
+        hashtags_raw = _parse_json_field(row.hashtags_json, [])
+        hashtags_attr = esc(json.dumps(hashtags_raw if isinstance(hashtags_raw, list) else []))
+
+        def _btn(action: str, label: str) -> str:
+            return (
+                f'<button type="button" class="action-btn"'
+                f' data-action="{esc(action)}" data-post-id="{pid}"'
+                f' data-platform="{plat}"'
+                f' data-source-kind="{sk}"'
+                f' data-source-slug="{ss}"'
+                f' data-body="{body_attr}"'
+                f' data-hashtags-json="{hashtags_attr}"'
+                f'>{label}</button>'
+            )
+
+        if row.platform == "twitter" and x_publish_enabled:
+            buttons = (
+                _btn("edit", "Edit")
+                + _btn("publish", "Publish to X")
+                + _btn("discard", "Discard")
+            )
+        elif row.platform == "twitter":
+            # x_publish_enabled=False: fallback copy-open flow
+            buttons = (
+                _btn("edit", "Edit")
+                + _btn("copy-open", "📋 Copy + Open X")
+                + _btn("mark-posted", "Mark as posted")
+                + _btn("discard", "Discard")
+            )
+        else:
+            # linkedin (always copy-open + mark-posted)
+            buttons = (
+                _btn("edit", "Edit")
+                + _btn("copy-open", "📋 Copy + Open LinkedIn")
+                + _btn("mark-posted", "Mark as posted")
+                + _btn("discard", "Discard")
+            )
+
+        action_row_html = f'<div class="action-row" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">{buttons}</div>'
+
     return f"""
-<div style="background:#1a2030;border-radius:6px;padding:16px;margin-bottom:12px;
+<div class="draft-card" data-post-id="{esc(str(row.id))}"
+     style="background:#1a2030;border-radius:6px;padding:16px;margin-bottom:12px;
             border:1px solid #2a323d">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     {platform_html}
@@ -190,11 +361,11 @@ def _render_post_card(row: Any) -> str:
     <span style="color:#5a6472;font-size:11px;font-family:'IBM Plex Mono',monospace;
                  margin-left:auto">#{esc(str(row.id))}</span>
   </div>
-  <div style="background:#0f1419;border-radius:4px;padding:12px;margin-bottom:10px;
+  <div class="draft-body" style="background:#0f1419;border-radius:4px;padding:12px;margin-bottom:10px;
               white-space:pre-wrap;font-size:13px;color:#d0cbc2;
               font-family:'IBM Plex Sans',system-ui,sans-serif;line-height:1.6">{body_safe}</div>
   <div style="margin-bottom:6px;font-size:12px;color:#6a7280">
-    Hashtags: {hashtags_html}
+    Hashtags: <span class="draft-hashtags">{hashtags_html}</span>
   </div>
   {archive_note}
   {reasoning_html}
@@ -203,8 +374,7 @@ def _render_post_card(row: Any) -> str:
     created: {esc(fmt_ist(row.created_at))} &nbsp;&bull;&nbsp;
     updated: {esc(fmt_ist(row.updated_at))}
   </div>
-  <p style="color:#5a6472;font-size:11px;margin-top:8px;margin-bottom:0;
-            font-style:italic">Actions ship in session (b)</p>
+  {action_row_html}
 </div>"""
 
 
@@ -216,11 +386,16 @@ async def admin_social_drafts(
     _admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Read-only listing of social_posts with status in (draft, archived).
+    """Listing of social_posts with status in (draft, archived).
 
     Grouped by (source_kind, source_slug) — Twitter and LinkedIn side-by-side.
+    Includes action buttons for draft rows (publish / copy-open / mark-posted /
+    discard / edit) wired via /admin-social.js.
     """
     from app.models.social import SocialPost  # slice-1 symbol
+
+    settings = get_settings()
+    x_enabled = settings.x_publish_enabled
 
     stmt = (
         select(SocialPost)
@@ -257,10 +432,14 @@ async def admin_social_drafts(
             twitter_rows = [r for r in post_rows if r.platform == "twitter"]
             linkedin_rows = [r for r in post_rows if r.platform == "linkedin"]
 
-            twitter_html = "".join(_render_post_card(r) for r in twitter_rows) or (
+            twitter_html = "".join(
+                _render_post_card(r, x_publish_enabled=x_enabled) for r in twitter_rows
+            ) or (
                 '<div style="color:#5a6472;font-size:13px;padding:12px">No Twitter draft</div>'
             )
-            linkedin_html = "".join(_render_post_card(r) for r in linkedin_rows) or (
+            linkedin_html = "".join(
+                _render_post_card(r, x_publish_enabled=x_enabled) for r in linkedin_rows
+            ) or (
                 '<div style="color:#5a6472;font-size:13px;padding:12px">No LinkedIn draft</div>'
             )
 
@@ -305,11 +484,13 @@ async def admin_social_drafts(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Social Drafts — Admin</title>
 <style>{ADMIN_CSS}</style>
+<link rel="stylesheet" href="/admin-social.css">
+<script src="/admin-social.js" defer></script>
 </head><body>
 {ADMIN_NAV}
 <div class="page">
 <h1>Social Drafts</h1>
-<div class="subtitle">Opus-curated drafts pending publish &bull; session (b) adds publish actions</div>
+<div class="subtitle">Opus-curated drafts &bull; publish / edit / discard via action buttons</div>
 <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap">
   <div class="stat">
     <div class="num">{total_count}</div>
@@ -327,3 +508,231 @@ async def admin_social_drafts(
 {content}
 </div>
 </body></html>"""
+
+
+# ============================================================================
+# POST endpoints — publish loop (slice 1 of session b)
+# ============================================================================
+
+
+def _utcnow() -> datetime:
+    """Return a UTC-naive datetime to match the migration's TIMESTAMP storage."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+@router.post("/publish/{post_id}")
+async def publish_post(
+    post_id: int,
+    request: Request,
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Publish a Twitter draft directly via X API v2.
+
+    Race-condition guard: only proceeds if the row is currently in 'draft'
+    status. Concurrent publishes on the same row collide on the WHERE clause.
+
+    Returns 200 with {"id", "published_url", "published_at", "tweet_id"} on success.
+    Returns 503 if x_publish_enabled is False.
+    Returns 400 for non-Twitter rows (LinkedIn uses Mark-as-posted only).
+    Returns 409 if the row is missing or not in draft status.
+    Returns 502 + body excerpt if the X API call fails.
+    """
+    _csrf_check(request)
+    settings = get_settings()
+    if not settings.x_publish_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="X publishing disabled — use Mark-as-posted flow instead",
+        )
+
+    from app.models.social import SocialPost
+
+    row = (await db.execute(
+        select(SocialPost).where(SocialPost.id == post_id, SocialPost.status == "draft")
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Row not found or not in draft state")
+    if row.platform != "twitter":
+        raise HTTPException(
+            status_code=400,
+            detail="Publish endpoint is Twitter-only; use /mark-posted for LinkedIn",
+        )
+    if not row.body:
+        raise HTTPException(status_code=400, detail="Row has no body to publish")
+
+    creds = twitter_client.credentials_from_env()
+    if creds is None:
+        raise HTTPException(status_code=503, detail="Twitter credentials not configured")
+
+    try:
+        data = await twitter_client.post_tweet(creds, row.body)
+    except twitter_client.TwitterAPIError as exc:
+        excerpt = (exc.body_excerpt or "")[:200]
+        raise HTTPException(
+            status_code=502,
+            detail=f"X API error (status={exc.status}): {excerpt}",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    tweet_id = data.get("id")
+    if not tweet_id:
+        raise HTTPException(status_code=502, detail="X API returned no tweet id")
+    published_url = twitter_client.tweet_url(str(tweet_id))
+    now = _utcnow()
+
+    # Atomic state flip — only updates if still in draft (defense in depth)
+    result = await db.execute(
+        update(SocialPost)
+        .where(SocialPost.id == post_id, SocialPost.status == "draft")
+        .values(
+            status="published",
+            published_at=now,
+            published_url=published_url,
+            updated_at=now,
+        )
+    )
+    if result.rowcount == 0:
+        # Row was concurrently modified; tweet is already posted but state lost
+        # — log loudly so admin can manually reconcile.
+        import logging
+        logging.getLogger(__name__).error(
+            "publish_post: tweet posted (id=%s) but row %s no longer in draft — manual reconcile needed",
+            tweet_id, post_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tweet posted at {published_url} but DB state was concurrently modified — reconcile manually",
+        )
+    await db.commit()
+    return {
+        "id": post_id,
+        "published_url": published_url,
+        "published_at": now.isoformat(),
+        "tweet_id": str(tweet_id),
+    }
+
+
+@router.post("/mark-posted/{post_id}")
+async def mark_posted(
+    post_id: int,
+    request: Request,
+    payload: _MarkAsPostedRequest = Body(...),
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manual flow: admin posted the draft externally (LinkedIn or Twitter
+    when x_publish_enabled=False), now records the live URL.
+
+    Race-condition guard: only proceeds if status='draft'.
+    """
+    _csrf_check(request)
+
+    from app.models.social import SocialPost
+
+    now = _utcnow()
+    result = await db.execute(
+        update(SocialPost)
+        .where(SocialPost.id == post_id, SocialPost.status == "draft")
+        .values(
+            status="published",
+            published_at=now,
+            published_url=payload.published_url,
+            updated_at=now,
+        )
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=409, detail="Row not found or not in draft state")
+    await db.commit()
+    return {
+        "id": post_id,
+        "published_url": payload.published_url,
+        "published_at": now.isoformat(),
+    }
+
+
+@router.post("/discard/{post_id}")
+async def discard_post(
+    post_id: int,
+    request: Request,
+    payload: _DiscardRequest = Body(...),
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin discards a draft. Status flips draft → archived; reason recorded
+    in reasoning_json under archive_reason."""
+    _csrf_check(request)
+
+    from app.models.social import SocialPost
+
+    row = (await db.execute(
+        select(SocialPost).where(SocialPost.id == post_id, SocialPost.status == "draft")
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Row not found or not in draft state")
+
+    # Append archive metadata to reasoning_json (preserve existing fields)
+    existing = _parse_json_field(row.reasoning_json, {}) or {}
+    if not isinstance(existing, dict):
+        existing = {"_legacy": existing}
+    now = _utcnow()
+    existing["archive_reason"] = (payload.reason or "admin_discard")
+    existing["archived_at"] = now.isoformat()
+
+    result = await db.execute(
+        update(SocialPost)
+        .where(SocialPost.id == post_id, SocialPost.status == "draft")
+        .values(
+            status="archived",
+            archived_at=now,
+            updated_at=now,
+            reasoning_json=json.dumps(existing),
+        )
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=409, detail="Row was concurrently modified")
+    await db.commit()
+    return {"id": post_id, "status": "archived", "archived_at": now.isoformat()}
+
+
+@router.post("/edit/{post_id}")
+async def edit_draft(
+    post_id: int,
+    request: Request,
+    payload: _EditDraftRequest = Body(...),
+    _admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist body + hashtag edits on a draft row. Validates against
+    platform-specific length + brand-canonical hashtag rules."""
+    _csrf_check(request)
+
+    from app.models.social import SocialPost
+
+    row = (await db.execute(
+        select(SocialPost).where(SocialPost.id == post_id, SocialPost.status == "draft")
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Row not found or not in draft state")
+
+    try:
+        validated_body = _validate_body(payload.body, row.platform)
+        validated_tags = _validate_hashtags(payload.hashtags, row.platform)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    now = _utcnow()
+    result = await db.execute(
+        update(SocialPost)
+        .where(SocialPost.id == post_id, SocialPost.status == "draft")
+        .values(
+            body=validated_body,
+            hashtags_json=json.dumps(validated_tags),
+            updated_at=now,
+        )
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=409, detail="Row was concurrently modified")
+    await db.commit()
+    return {"id": post_id, "body": validated_body, "hashtags": validated_tags}

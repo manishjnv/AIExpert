@@ -113,6 +113,14 @@ class Settings(BaseSettings):
     # affiliate context).
     coursera_affiliate_id: str = ""
 
+    # ----- X (Twitter) publish gating -----
+    # When False (default), the Publish button on Twitter rows in /admin/social
+    # is hidden client-side and the /publish endpoint returns 503. The
+    # LinkedIn-style copy-to-clipboard + Mark-as-posted flow is the fallback.
+    # Flip to True only after the X portal write-auth flow is confirmed
+    # working (see HANDOFF S51 — the X 403 issue is unresolved).
+    x_publish_enabled: bool = False
+
     # ----- IndexNow (search engine ping on publish) -----
     # 32-char random hex. The file <key>.txt must be served at /<key>.txt with
     # the key as content so Bing/Yandex can verify ownership. Empty = disabled.
