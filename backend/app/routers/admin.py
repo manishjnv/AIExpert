@@ -13,7 +13,7 @@ from app.utils.time_fmt import fmt_ist, FMT_SHORT, FMT_DATE, iso_utc_z
 from app.utils.admin_ui import workflow_steps
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -3534,11 +3534,27 @@ load();
 </script></body></html>"""
 
 
-@router.get("/social", response_class=HTMLResponse)
-async def admin_social_page(_user: User = Depends(get_current_admin)):
-    """Admin UI for the daily social-post queue. Reads /admin/api/tweets and
-    posts via /admin/api/tweets/{id}/post (API paths stay tweet-named until
-    additional channels land)."""
+@router.get("/social", include_in_schema=False)
+async def admin_social_redirect(_user: User = Depends(get_current_admin)):
+    """The bare /admin/social URL now belongs to the Phase G AI-curated
+    drafts UI. Redirect to /admin/social/drafts so cached nav links,
+    bookmarks, and old internal references all resolve to the live
+    system. The legacy tweet_drafts UI moved to /admin/social/legacy
+    (the daily_tweet_queue cron has been disabled since 73566ce, so the
+    table is dead-data; legacy UI preserved only for direct-URL audit)."""
+    return RedirectResponse(url="/admin/social/drafts", status_code=302)
+
+
+@router.get("/social/legacy", response_class=HTMLResponse)
+async def admin_social_legacy_page(_user: User = Depends(get_current_admin)):
+    """Legacy admin UI for the S46 daily-X-queue (tweet_drafts table).
+
+    Reads /admin/api/tweets and posts via /admin/api/tweets/{id}/post
+    (API paths kept tweet-named to avoid breaking the inline JS — they
+    operate on the tweet_drafts table, separate from social_posts).
+    The underlying daily_tweet_queue cron is disabled since 73566ce;
+    this page remains accessible by direct URL for inspecting any
+    legacy rows that already exist."""
     html = (_TWEETS_ADMIN_HTML
             .replace("{{ADMIN_CSS}}", ADMIN_CSS)
             .replace("{{ADMIN_NAV}}", ADMIN_NAV)
