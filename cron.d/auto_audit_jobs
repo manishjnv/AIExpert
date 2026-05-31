@@ -1,0 +1,9 @@
+# Weekly Opus classification audit — Monday 04:30 UTC = 10:00 IST.
+# Layer 10 of the jobs classifier defense (docs/JOBS_CLASSIFICATION.md): runs the
+# audit prompt over the scheduler-stamped pending sample via Claude Max (no API
+# spend), records verdicts, and flags mismatches into admin_notes for human
+# review. Wrapped in flock to prevent overlapping runs.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+30 4 * * 1 root flock -n /tmp/auto_audit_jobs.lock /srv/roadmap/scripts/auto_audit_jobs.sh >> /var/log/auto_audit_jobs.log 2>&1
