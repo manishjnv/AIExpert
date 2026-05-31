@@ -33,7 +33,11 @@ from app.services.jobs_sources.workday import WORKDAY_BOARDS, fetch_all as wd_fe
 logger = logging.getLogger("roadmap.jobs.ingest")
 
 # Default lifespan before a job auto-expires, per docs/JOBS.md §7.6.
-VALID_FOR_DAYS = 45
+# Raised 45 → 90 on 2026-06-01: 45d auto-closed roles still open on the ATS
+# (jobs routinely stay open >45d), draining the live board faster than review
+# refilled it. The source-removed missing-streak check still expires roles that
+# actually disappear from the feed, so 90d only affects still-listed roles.
+VALID_FOR_DAYS = 90
 
 # Max new jobs enriched per source per run. Anthropic + Databricks alone list
 # 1200+ roles combined; enriching all in one run (~7s/Gemini call) would take
