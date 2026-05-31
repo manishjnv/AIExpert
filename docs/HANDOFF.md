@@ -4,6 +4,24 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-06-01 (session 53 cont. — job lifespan 45→90 + board revival)
+
+**Branch:** `master` · `94a70dc` deployed (rebuild — `jobs_ingest.py` is baked). Backend healthy, `VALID_FOR_DAYS=90` confirmed live.
+
+### Session 53 (cont.) — fixed the draining jobs board
+
+**Symptom found:** the live `/jobs` board was collapsing — **77 jobs expired on 2026-05-30**, only 108 of 162 published were still valid, and **153 of 162 were set to expire within 7 days**. Root cause: the board was built from mid-April postings on a **45-day** `VALID_FOR_DAYS`, so they all aged out end-of-May; jobs that stay open >45d on the ATS auto-closed even while still hiring (e.g. #1242 Cerebras, published but past `valid_through` → public page showed "This role has closed"). New jobs weren't refilling because review had stalled (~5 published in 7d).
+
+**Fix shipped `94a70dc`:** `VALID_FOR_DAYS` **45 → 90** ([jobs_ingest.py:36](../backend/app/services/jobs_ingest.py#L36)) + `scripts/backfill_valid_through.py` (extend-only on draft+published, never shortens a manual extension; then rejects drafts still stale past 90d). The source-removed missing-streak check still expires roles that actually leave the feed, so 90d only affects still-listed roles.
+
+**Backfill applied (dry-run → --apply):** extended 850 draft+published rows to `posted_on+90`; **54 published jobs revived closed→live**; **136 still-stale drafts rejected** `expired` (note: under 90d the stale set shrank from 288→136, so ~152 drafts the naive cleanup would have wrongly killed are now publishable). **Result: published 162, all 162 valid, 0 expiring within 7d (was 153); drafts 688→552; #1242 LIVE again (valid_through 2026-07-14).**
+
+**Phase 2 gates:** py_compile + secrets clean. **codex:rescue n/a** — lifespan constant + data backfill, no classifier logic. Minor doc-sync follow-up: `docs/JOBS.md §7.6` still cites 45d.
+
+**Still pending:** review/publish from the 552 drafts to refresh inventory (manual); job 937 missing summary; optional weekly review-reminder cron.
+
+---
+
 ## Current state as of 2026-05-31 (session 53 cont. — weekly Opus audit automation)
 
 **Branch:** `master` · commit `e496e9a` pushed + deployed (scripts are volume-mounted `./scripts:/app/scripts:ro` → live on pull, no rebuild). Follows the Workday work below in the same session.
