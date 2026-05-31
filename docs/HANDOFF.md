@@ -4,6 +4,32 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-05-31 (session 53 cont. — weekly Opus audit automation)
+
+**Branch:** `master` · commit `e496e9a` pushed + deployed (scripts are volume-mounted `./scripts:/app/scripts:ro` → live on pull, no rebuild). Follows the Workday work below in the same session.
+
+### Session 53 (cont.) — automated the one un-automated classifier layer
+
+**Why:** Reviewing the `/admin/jobs` queue surfaced that Layer 10 (weekly Opus classification audit) was the only un-automated step — the unified scheduler stamps ~1% of Tier-1 published jobs `audit.status=pending` weekly, but the Opus *review* was a manual COPY-PROMPT (last run **2026-04-16**, 45 days stale; 25 jobs pending). Also diagnosed the "everything is 0" question: ingest + summarize are already cron'd (00:30 / 23:00); the zeros were **admin review stalled 33 days** (most recent `last_reviewed_on` = 2026-04-28) — publish/reject is manual by design and can't be automated. The audit was the one task that genuinely could.
+
+**What ships in `e496e9a`** (5 files, +303, clones the `auto_curate_social` cron pattern):
+- `scripts/export_audit_jobs.py` — emits a ready-to-run prompt for the pending sample; **imports `_AUDIT_PROMPT_TEMPLATE` from the router** (single source of truth, never duplicated) + payload keys mirror `/api/audit-pending` exactly.
+- `scripts/import_audit_results.py` — tolerant-parses Opus verdicts, applies per-row (WAL rule), replicates `submit_audit_results`. **SAFE: mismatches only flag `admin_notes`; never auto-reclassify/unpublish.**
+- `scripts/auto_audit_jobs.sh` — single Opus pass via `claude -p` on Max ($0); flock; token-expiry guard. Exec bit tracked (100755).
+- `cron.d/auto_audit_jobs` (Mon 04:30 UTC = Layer-10 spec) + `cron.d/logrotate-auto_audit_jobs`.
+
+**Phase 2 gates green:** py_compile + secrets + `bash -n` all clean. **Phase 3 self-review:** audit-dict shape, admin_notes stamp, and export payload keys verified identical to the router.
+
+**Deploy verified:** pull → cron.d + logrotate installed (`/etc/cron.d/auto_audit_jobs`, `/etc/logrotate.d/auto_audit_jobs`, root:root 644). In-container import check passed. **Export dry-run (read-only): count=25, 76KB prompt with template header + ALLOWED_TOPIC + all 25 job IDs.** Imports resolve in prod. *Not yet run end-to-end* — the actual Opus pass + verdict-write was left for founder go (uses Max quota, writes 25 rows) or the Mon 04:30 cron.
+
+**Known cosmetic:** `logrotate -d` warns on `/var/log` perms (root:syslog, group-writable) — **pre-existing, identical on `auto_curate_social`, which rotates fine**. Not introduced here.
+
+**codex:rescue: n/a** per `feedback_codex_rescue_skip` — touches load-bearing jobs paths but adds **zero classifier logic** (records verdicts only). Phase-3 Opus review is the gate.
+
+**Open for S54:** (1) trigger the first audit run (clears 45-day backlog) or let Mon 04:30 fire it. (2) The 688-draft review + 7d-published=0 remain — manual by design; consider a weekly "drafts pending" reminder if the queue stalls again. (3) job 937 (published, missing summary) still needs `/summarize-jobs --status published`.
+
+---
+
 ## Current state as of 2026-05-31 (session 53 — Workday ATS source + Broadcom India jobs)
 
 **Branch:** `master` · commit `3d61b57` pushed + **deployed live**. Pre-existing uncommitted orphans left untouched (`backend/app/ai/stream.py` chat-flip per `project_track1_default_routing`, `docs/AI_PIPELINE_PLAN.md`, `.claude-tmp/`). **Live site:** VPS HEAD `3d61b57`, backend rebuilt + force-recreated, healthy; alembic `20260428000000` (head, no new migration).
