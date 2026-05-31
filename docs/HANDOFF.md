@@ -4,6 +4,51 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-05-31 (session 53 — Workday ATS source + Broadcom India jobs)
+
+**Branch:** `master` · commit `3d61b57` pushed + **deployed live**. Pre-existing uncommitted orphans left untouched (`backend/app/ai/stream.py` chat-flip per `project_track1_default_routing`, `docs/AI_PIPELINE_PLAN.md`, `.claude-tmp/`). **Live site:** VPS HEAD `3d61b57`, backend rebuilt + force-recreated, healthy; alembic `20260428000000` (head, no new migration).
+
+### Session 53 — 4th ATS provider (Workday), seeded with Broadcom India
+
+**Headline:** The jobs pipeline gains a **Workday** source (alongside Greenhouse/Lever/Ashby), seeded with **Broadcom India** as Tier-2. Founder asked to add a job source they'd provide (Broadcom careers); live probing showed Broadcom runs Workday (`broadcom.wd1` / `External_Career`), which we didn't support — so this is a new, reusable ATS module, not a one-line board append.
+
+**What ships in `3d61b57`** (3 files, +291/-1):
+
+- **`backend/app/services/jobs_sources/workday.py` (new, ~230 lines).** Generic Workday CXS client. Workday boards need tenant+site (not a bare slug), so `_BOARDS_CONFIG` maps slug → `(host_subdomain, cxs_tenant, site, country_label_prefixes)` while `WORKDAY_BOARDS` stays `(slug, name)` shape-compatible with the registry/probe loops. **List (POST)** `…/wday/cxs/{tenant}/{site}/jobs` returns title+location+reqid only, so each kept posting takes a **detail (GET)** `…{externalPath}` call for JD/startDate/externalUrl. **No country facet exists** in Workday — country scoping reads the `locations` facet labels (prefix `IND-`/`India`), collects their IDs dynamically per run, applies them server-side; a **safety guard fetches nothing rather than the company's global board** if no facet matches. Per-board fail-isolation (never raises). `_matches_country` belt-and-suspenders post-filter against multi-location bleed.
+- **`jobs_ingest.py`** — 4 wiring edits: import (`wd_fetch_all`), `TIER2_SOURCES += "workday:broadcom"`, registry tuple, fetcher tuple. **Workday cos are mixed enterprises → always Tier-2 (admin-review, never bulk-approve).**
+- **`probe.py`** — Workday liveness probe wired into `_all_boards` + `_probe_one` (GET the site landing page, which 200s; CXS `/jobs` is POST-only so can't reuse the GET template).
+
+**No migration** — `JobSource.kind` is an open string (verified against the model; `Job.source` comment anticipates new kinds).
+
+**Routing:** self-executed in main Opus per "don't-delegate-when-self-executing-faster" — I'd just learned the Workday API live (2-call flow, dynamic facet, exact field names) and had all 3 sibling modules + every wiring seam hot-cached; a Sonnet handoff would have re-discovered all of it lossy. Load-bearing path → rigorous Phase-3 self-review instead of subagent.
+
+**Phase 2 gates green:** py_compile (3 files) · secrets scan clean on new module · **25/25 relevant jobs tests pass**. The lone failure (`test_ashby_skips_unlisted_jobs`) is **pre-existing + environmental** — uses `asyncio.get_event_loop().run_until_complete()` (removed in local Py-3.14), tests untouched `ashby.py`, 0 workday refs, fails identically in isolation on the current tree; passes under canonical `docker compose … pytest` (Py-3.12).
+
+**Phase 3 self-review caught + fixed 2 robustness nits pre-commit:** (1) `external_id` fallback `bulletFields[0]` → IndexError when `bulletFields` is an *empty* list (the `.get` default only fires when the key is missing) — rewritten to guard. (2) `source_url` fallback dropped the site segment → 404 deep-link — rebuilt as `https://<host>/<site><externalPath>`. Both unit-verified (empty-bullets path + fallback-URL correctness) plus a 2nd live smoke.
+
+**Deploy verified live:** push → VPS `git pull` HEAD parity → `docker compose up -d --build --force-recreate backend` → healthy ~12s. Prod-container smoke: dry `fetch_board('broadcom','Broadcom')` = **18 India rows**, `workday:broadcom` in `TIER2_SOURCES`, `ensure_source_rows` created `JobSource(tier=2, bulk_approve=0, enabled=1, label="Broadcom (Workday)")`, `/api/health` 200. No full ingest triggered (no enrichment spend) — the daily cron does that.
+
+**codex:rescue: n/a** — touches load-bearing `jobs_ingest.py` but adds **zero classifier logic** (data source + wiring only; the 10-layer defense is untouched). Per `feedback_codex_rescue_skip` (12/12 empty) the Phase-3 Opus diff review is the gate.
+
+**No RCA** — both Phase-3 finds caught pre-commit; no bug shipped.
+
+**Open questions / queued for S54:**
+
+1. **First real ingest of Broadcom India pending** — the daily cron will fetch+enrich+stage rows as Tier-2 drafts. Expect **few rows on `/admin/jobs`**: Broadcom is mostly hardware/semiconductor/infra; the classifier + admin gate reject the non-AI majority by design (RCA-026 / `feedback_classification_bias`). Not a bug.
+2. **Adding more Workday companies = one `WORKDAY_BOARDS` tuple + one `_BOARDS_CONFIG` entry + a `TIER2_SOURCES` line** (Adobe / Salesforce / NVIDIA etc. all run Workday). Country filter generalizes via `country_label_prefixes`.
+3. All prior S52 open items still stand (browser smoke, X 403, 8 P0 decisions, `perrow-tier-promotion-pre-S52` stash).
+
+**Next action — Session 54:** founder reviews the first Broadcom India drafts on `/admin/jobs` after the next ingest; add more Workday cos on request; otherwise resume queued S52/S49 items.
+
+**Agent-utilization footer (S53):**
+
+- Opus: full session — Phase 0 parallel reads (CLAUDE.md + HANDOFF + RCA 150 + MEMORY + JOBS_CLASSIFICATION); live API reconnaissance (probed Broadcom across GH/Lever/Ashby/Workday, confirmed Workday tenant/site, mapped CXS list+detail + the dynamic India `locations` facet, verified detail field names); read 3 sibling source modules + `jobs_sources/__init__` + `probe.py` + `models/job.py` + all 4 wiring seams; authored `workday.py`; 4 + 3 wiring edits; Phase-2 gates + live smoke; Phase-3 self-review (2 fixes) + 2nd smoke; commit with noreply identity; push; manual VPS deploy + prod-container smoke; this HANDOFF + CLAUDE.md §9 + memory update.
+- Sonnet: n/a — self-executed per "don't-delegate-when-self-executing-faster".
+- Haiku: n/a — probing via direct main-session curl (faster than agent round-trip).
+- codex:rescue: n/a per `feedback_codex_rescue_skip` — no classifier logic touched.
+
+---
+
 ## Current state as of 2026-04-29 (session 52 — Phase G(b) publish loop + auto-archive)
 
 **Branch:** `master` · clean working tree after `656f70a` + `2add329`. **Live site:** [automateedge.cloud](https://automateedge.cloud) — VPS HEAD `2add329`; backend rebuilt + force-recreated; alembic head `20260428000000` (no new migrations this session). **Smoke:** all 5 new GET routes 401 to anon, all 6 new POST routes 401, both new frontend assets 200 over the wire (nginx `\.(js|css)$` regex auto-served — no nginx config changes needed).

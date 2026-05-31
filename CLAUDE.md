@@ -211,6 +211,19 @@ The cheap levers (Phase 0 reads, hooks, deploy skill, research-team) fire **alwa
 
 > Claude Code: rewrite everything below this line at the end of every session. Keep it under 30 lines. This is what the next session reads to know where you left off.
 
+**Last session date:** 2026-05-31 (session 53 — Workday ATS source + Broadcom India jobs)
+**Last session summary (S53):** Added a **4th ATS provider — Workday** to the jobs pipeline (`backend/app/services/jobs_sources/workday.py`), seeded with **Broadcom India** (Tier-2). Workday boards need tenant+site (not a bare slug), so connection details live in `_BOARDS_CONFIG` while `WORKDAY_BOARDS` stays `(slug,name)` shape-compatible with the registry/probe loops. CXS list(POST)+detail(GET) flow; India scoped server-side via the dynamic `locations` facet (no hardcoded GUIDs) with a guard that fetches nothing rather than the global board if the facet stops matching. Wired into `jobs_ingest.py` (import + `TIER2_SOURCES` + registry + fetcher) and the liveness probe (site landing GET). No migration (`JobSource.kind` is an open string). **To add another Workday co = one `WORKDAY_BOARDS` tuple + one `_BOARDS_CONFIG` entry + `TIER2_SOURCES` line.**
+
+- **1 commit `3d61b57`** (+291 / -1, 3 files) — `feat(jobs): add Workday ATS source + Broadcom India (Tier-2)`. Self-executed in main Opus (deep live-API context + 3 sibling modules hot-cached → faster than Sonnet handoff); Phase-3 self-review caught + fixed 2 robustness nits pre-commit (empty-`bulletFields` IndexError; fallback URL dropping the site segment).
+- **Phase 2 gates green:** py_compile (3 files) · secrets clean · 25/25 relevant jobs tests pass. The 1 failure (`test_ashby_skips_unlisted_jobs`) is pre-existing + environmental (Py-3.14 `get_event_loop()` removal; untouched ashby; fails on current tree in isolation; passes under docker Py-3.12).
+- **Live-verified, prod (commit `3d61b57`):** local + prod-container dry-fetch both 18 India rows, 0 contract violations, real req-ids/dates/JDs/apply-URLs. VPS pulled → build + force-recreate → healthy ~12s; alembic `20260428000000` (head, no new migration); `ensure_source_rows` registered `workday:broadcom` (tier 2 / bulk_approve 0 / enabled 1); `/api/health` 200.
+- **codex:rescue: n/a** — touches load-bearing `jobs_ingest.py` but adds **zero classifier logic** (new data source + wiring only; 10-layer defense untouched). Per `feedback_codex_rescue_skip`, Phase-3 Opus review is the gate.
+- **No RCA** — both Phase-3 finds caught pre-commit; no bug shipped.
+
+**Next action — Session 54:** next daily ingest cron will fetch+enrich+stage Broadcom India AI roles as Tier-2 drafts → founder reviews on `/admin/jobs` (expect few rows — Broadcom is mostly non-AI hardware/infra; classifier rejects the rest, by design). Add more Workday companies as founder provides them (one tuple each). Otherwise resume queued S52/S49 items.
+
+---
+
 **Last session date:** 2026-04-29 (session 52 — Phase G(b) publish loop + auto-archive)
 **Last session summary (S52):** Closed Phase G. `/admin/social` now has Drafts / Published / Archived tabs with `source_kind` + `platform` filters; admin can Edit / Publish (Twitter direct, X-gated by `x_publish_enabled=False` until 403 cleared) / 📋 Copy + Open + Mark-as-posted (LinkedIn + Twitter fallback) / Discard / Re-publish (different angle). 30-day stale-draft auto-archive sweep landed as the cron tail step (single cron, no second wrapper). Re-publish queues a fresh pending pair carrying `_re_publish` + `_parent_post_id` markers; the `export_social_sources` priority path picks them up first and feeds Opus the prior body as `prior_drafts` so the new post uses a different hook / verb / emphasis (additive RE-PUBLISH MODE section in `social_curate.txt`, no voice-rule changes).
 
