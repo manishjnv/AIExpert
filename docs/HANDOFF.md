@@ -26,6 +26,8 @@
 
 **Known cosmetic:** `logrotate -d` warns on `/var/log` perms (root:syslog, group-writable) — **pre-existing, identical on `auto_curate_social`, which rotates fine**. Not introduced here.
 
+**Follow-up shipped `4d5a19f` (rebuild deployed, healthy):** added an **Unpublish button to published rows** on `/admin/jobs`. The audit flags misclassified *published* jobs, but the queue UI only rendered Publish/Reject for drafts (published rows = status text, checkbox disabled) — no way to act on a flagged live job. Now published rows get an Unpublish button reusing the status-agnostic `rej()` → `POST /api/{id}/reject` (reason picker) → moves to Rejected + off the public board. UI-only (endpoint already supported any status). So the 4 audit over-classifications (#341/#535/#805/#1039) are now one-click rejectable from the UI. Smoke: `/admin/jobs` 401 anon (module loads), button present in deployed image.
+
 **codex:rescue: n/a** per `feedback_codex_rescue_skip` — touches load-bearing jobs paths but adds **zero classifier logic** (records verdicts only). Phase-3 Opus review is the gate.
 
 **Open for S54:** (1) trigger the first audit run (clears 45-day backlog) or let Mon 04:30 fire it. (2) The 688-draft review + 7d-published=0 remain — manual by design; consider a weekly "drafts pending" reminder if the queue stalls again. (3) job 937 (published, missing summary) still needs `/summarize-jobs --status published`.
