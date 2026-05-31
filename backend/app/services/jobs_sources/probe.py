@@ -25,6 +25,7 @@ from app.models import JobSource
 from app.services.jobs_sources.ashby import ASHBY_BOARDS
 from app.services.jobs_sources.greenhouse import GREENHOUSE_BOARDS
 from app.services.jobs_sources.lever import LEVER_BOARDS
+from app.services.jobs_sources.workday import WORKDAY_BOARDS, probe_url as workday_probe_url
 
 logger = logging.getLogger("roadmap.jobs.probe")
 
@@ -42,7 +43,15 @@ DISABLE_AFTER_FAILS = 3
 
 
 async def _probe_one(source_key: str, kind: str, slug: str) -> tuple[str, bool, str]:
-    url = PROBES[kind].format(slug=slug)
+    # Workday boards aren't a single slug (tenant + site), and the CXS /jobs
+    # endpoint is POST-only — so the workday module hands us a GET-able liveness
+    # URL (the public site landing page) instead of a PROBES template.
+    if kind == "workday":
+        url = workday_probe_url(slug)
+        if not url:
+            return source_key, False, "no workday config"
+    else:
+        url = PROBES[kind].format(slug=slug)
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(url, headers={"Accept": "application/json"})
@@ -60,6 +69,8 @@ def _all_boards() -> Iterable[tuple[str, str, str]]:
         yield f"lever:{slug}", "lever", slug
     for slug, _ in ASHBY_BOARDS:
         yield f"ashby:{slug}", "ashby", slug
+    for slug, _ in WORKDAY_BOARDS:
+        yield f"workday:{slug}", "workday", slug
 
 
 async def probe_all() -> dict[str, dict]:

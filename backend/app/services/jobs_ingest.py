@@ -28,6 +28,7 @@ from app.services.jobs_sources import RawJob
 from app.services.jobs_sources.ashby import ASHBY_BOARDS, fetch_all as ash_fetch_all
 from app.services.jobs_sources.greenhouse import GREENHOUSE_BOARDS, fetch_all as gh_fetch_all
 from app.services.jobs_sources.lever import LEVER_BOARDS, fetch_all as lv_fetch_all
+from app.services.jobs_sources.workday import WORKDAY_BOARDS, fetch_all as wd_fetch_all
 
 logger = logging.getLogger("roadmap.jobs.ingest")
 
@@ -140,6 +141,9 @@ TIER2_SOURCES: set[str] = {
     "greenhouse:phonepe", "greenhouse:groww",
     "lever:cred", "lever:mindtickle",
     "ashby:notion", "ashby:replit",
+    # Workday boards are large mixed enterprises — AI/ML roles are a minority,
+    # so every row goes through admin review (never bulk-approved).
+    "workday:broadcom",
 }
 
 
@@ -554,6 +558,7 @@ async def ensure_source_rows() -> None:
         ("greenhouse", "Greenhouse", GREENHOUSE_BOARDS),
         ("lever", "Lever", LEVER_BOARDS),
         ("ashby", "Ashby", ASHBY_BOARDS),
+        ("workday", "Workday", WORKDAY_BOARDS),
     ]
 
     async def _op() -> None:
@@ -953,6 +958,7 @@ async def run_daily_ingest() -> dict[str, int]:
             ("greenhouse", GREENHOUSE_BOARDS, gh_fetch_all),
             ("lever", LEVER_BOARDS, lv_fetch_all),
             ("ashby", ASHBY_BOARDS, ash_fetch_all),
+            ("workday", WORKDAY_BOARDS, wd_fetch_all),
         ]
         sem = asyncio.Semaphore(ENRICH_CONCURRENCY)
 
