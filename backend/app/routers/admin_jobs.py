@@ -1327,6 +1327,9 @@ function renderList(items) {
     const actions = j.status === "draft"
       ? `<button class="btn primary" onclick="pub(${j.id}, ${j.has_summary?1:0})">Publish</button>
          <button class="btn danger" onclick="rej(${j.id})">Reject</button>`
+      : j.status === "published"
+      ? `<span class="chip" style="background:#16331f;color:#6db585">published</span>
+         <button class="btn danger" onclick="rej(${j.id})" title="Reject this live job — removes it from the public board and moves it to Rejected" style="margin-left:8px">Unpublish</button>`
       : `<span>${esc(j.status)}${j.reject_reason?" ("+esc(j.reject_reason)+")":""}</span>`;
     const previewUrl = `/jobs/${encodeURIComponent(j.slug)}?preview=1`;
     // Derive surface flags (were previously buried inside Details).
