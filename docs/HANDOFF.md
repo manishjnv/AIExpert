@@ -20,7 +20,9 @@
 
 **Phase 2 gates green:** py_compile + secrets + `bash -n` all clean. **Phase 3 self-review:** audit-dict shape, admin_notes stamp, and export payload keys verified identical to the router.
 
-**Deploy verified:** pull → cron.d + logrotate installed (`/etc/cron.d/auto_audit_jobs`, `/etc/logrotate.d/auto_audit_jobs`, root:root 644). In-container import check passed. **Export dry-run (read-only): count=25, 76KB prompt with template header + ALLOWED_TOPIC + all 25 job IDs.** Imports resolve in prod. *Not yet run end-to-end* — the actual Opus pass + verdict-write was left for founder go (uses Max quota, writes 25 rows) or the Mon 04:30 cron.
+**Deploy verified:** pull → cron.d + logrotate installed (`/etc/cron.d/auto_audit_jobs`, `/etc/logrotate.d/auto_audit_jobs`, root:root 644). In-container import check passed. Export dry-run (read-only): count=25, 76KB prompt with template header + ALLOWED_TOPIC + all 25 job IDs.
+
+**First run executed (founder go, 2026-05-31 17:52 UTC) via the real cron script** — `flock … auto_audit_jobs.sh`. Result: **25 reviewed, 25 updated, 0 skipped, 11 mismatches** in ~2.5 min. `audit.status` pending 25 → **0** (45-day backlog cleared); banner now shows last audit 2026-05-31. The 11 mismatches are flagged in `admin_notes` ("OPUS-AUDIT mismatch …") for founder action — split into **4 genuine over-classifications to demote/reject** (#341 SambaNova NPI, #535 Databricks Unity Catalog auth, #805 ScaleAI Engagement Mgr, #1039 Databricks Resident SA — all `Other/[]` per Opus) + ~3 topic trims (#164, #1049, #1251) + 4 under-classifications to optionally enrich (#1242, #1690, #1740, #1765). Pipeline proven E2E; Mon 04:30 cron will run unattended henceforth.
 
 **Known cosmetic:** `logrotate -d` warns on `/var/log` perms (root:syslog, group-writable) — **pre-existing, identical on `auto_curate_social`, which rotates fine**. Not introduced here.
 
