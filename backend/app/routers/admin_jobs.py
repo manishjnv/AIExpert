@@ -1064,6 +1064,52 @@ function pickRejectReason(title, sub) {
     sel().focus();
   });
 }
+
+// In-app modal helpers — replace native alert()/confirm() so every dialog
+// matches the app shell instead of browser chrome. Reuse the .modal-overlay /
+// .modal-card styling from pickRejectReason.
+function modalDialog(title, body, actions) {
+  // actions: [{label, value, cls}]. Resolves the clicked value; null on
+  // Escape or backdrop click.
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    const btns = actions.map((a, i) =>
+      `<button class="btn ${a.cls || ''}" data-i="${i}">${a.label}</button>`).join("");
+    overlay.innerHTML =
+      `<div class="modal-card">` +
+      (title ? `<h3></h3>` : "") +
+      `<div class="modal-sub" style="white-space:pre-wrap"></div>` +
+      `<div class="modal-actions">${btns}</div></div>`;
+    if (title) overlay.querySelector("h3").textContent = title;
+    overlay.querySelector(".modal-sub").textContent = body;  // textContent: XSS-safe + keeps newlines
+    const close = (val) => { document.body.removeChild(overlay); document.removeEventListener("keydown", onKey); resolve(val); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); close(null); }
+      if (e.key === "Enter")  { e.preventDefault(); close(actions[actions.length - 1].value); }
+    };
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
+    overlay.querySelectorAll("[data-i]").forEach(b =>
+      b.onclick = () => close(actions[+b.getAttribute("data-i")].value));
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(overlay);
+    const last = overlay.querySelector(".modal-actions .btn:last-child");
+    if (last) last.focus();
+  });
+}
+function notify(body, opts) {
+  opts = opts || {};
+  return modalDialog(opts.title || "Notice", body,
+    [{label: "OK", value: "ok", cls: opts.danger ? "danger" : "primary"}]);
+}
+function confirmModal(body, opts) {
+  opts = opts || {};
+  return modalDialog(opts.title || "Confirm", body, [
+    {label: "Cancel", value: false},
+    {label: opts.okLabel || "OK", value: true, cls: opts.danger ? "danger" : "primary"},
+  ]).then(v => v === true);
+}
+
 let currentStatus = "draft";
 let currentFlag = "";           // quick-filter: "", "non_ai", "tier2_lite", "enrichment_failed"
 let duplicateHashes = new Set(); // hashes appearing in 2+ jobs — flagged with a dup chip
@@ -1272,16 +1318,16 @@ async function loadSummaryStats() {
 async function copyAuditPrompt() {
   try {
     const r = await fetch('/admin/jobs/api/audit-pending', {credentials:'include'});
-    if (!r.ok) { alert('Failed to load audit list: ' + r.status); return; }
+    if (!r.ok) { await notify('Failed to load audit list: ' + r.status, {title:'Audit', danger:true}); return; }
     const data = await r.json();
-    if (!data.count) { alert('No jobs pending audit.'); return; }
+    if (!data.count) { await notify('No jobs pending audit.', {title:'Audit'}); return; }
     await navigator.clipboard.writeText(data.claude_code_prompt);
-    alert(`Copied prompt for ${data.count} job${data.count===1?'':'s'}.\n\n` +
+    await notify(`Copied prompt for ${data.count} job${data.count===1?'':'s'}.\n\n` +
           `Next steps:\n` +
           `  1. Paste into Claude Code in VS Code (Claude Max — no API spend)\n` +
           `  2. Save Claude's JSON response\n` +
-          `  3. POST to /admin/jobs/api/audit-submit as { "results": [...] }`);
-  } catch(e) { alert('Error: ' + e.message); }
+          `  3. POST to /admin/jobs/api/audit-submit as { "results": [...] }`, {title:'Audit prompt copied'});
+  } catch(e) { await notify('Error: ' + e.message, {title:'Audit', danger:true}); }
 }
 
 async function loadStats() {
@@ -1391,14 +1437,14 @@ function renderList(items) {
 async function pub(id, hasSummary) {
   // Guardrail: publishing without a summary renders a degraded public page
   // (tldr + skills fallback, no card). Warn before proceeding.
-  if (!hasSummary && !confirm(
+  if (!hasSummary && !await confirmModal(
     "This job has no Opus summary card yet.\\n\\n" +
     "Publishing now will render a degraded public page (tldr + skills only, no summary card).\\n\\n" +
     "Recommended: run /summarize-jobs --id " + id + " first.\\n\\n" +
-    "Publish anyway?"
+    "Publish anyway?", {title:"Publish without summary?", okLabel:"Publish anyway", danger:true}
   )) return;
   const r = await fetch(`/admin/jobs/api/${id}/publish`, {method:"POST", credentials:"include"});
-  if (!r.ok) { alert("Failed: " + r.status); return; }
+  if (!r.ok) { await notify("Failed: " + r.status, {title:"Publish failed", danger:true}); return; }
   load();
 }
 
@@ -1410,7 +1456,7 @@ async function rej(id) {
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({reason}),
   });
-  if (!r.ok) { alert("Failed: " + r.status); return; }
+  if (!r.ok) { await notify("Failed: " + r.status, {title:"Reject failed", danger:true}); return; }
   load();
 }
 
@@ -1436,47 +1482,61 @@ function updateBulkCapNote() {
 
 async function bulkPub() {
   const selected = [...document.querySelectorAll(".sel:checked")];
-  const ids = selected.map(x => +x.value);
-  if (!ids.length) { alert("Select some rows."); return; }
-  if (ids.length > BULK_LIMIT) {
-    alert(`Selected ${ids.length} rows but server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`);
+  if (!selected.length) { await notify("Select some rows first.", {title:"Nothing selected"}); return; }
+  // Bulk-publish is Tier-1 only — Tier-2 sources require individual review
+  // (false-positive guard). Split client-side so a Tier-2 row in the selection
+  // no longer fails the whole batch; Tier-2 are skipped with a clear note.
+  const t1 = selected.filter(cb => cb.closest("tr").querySelector(".chip.tier1"));
+  const t2 = selected.filter(cb => cb.closest("tr").querySelector(".chip.tier2"));
+  const ids = t1.map(x => +x.value);
+  const skipNote = t2.length
+    ? `\n\n${t2.length} Tier-2 job${t2.length===1?'':'s'} can't be bulk-published — publish those one at a time with each row's Publish button.`
+    : "";
+  if (!ids.length) {
+    await notify(`No Tier-1 jobs selected.${skipNote}`, {title:"Nothing to bulk-publish"});
     return;
   }
-  // Count how many of the selected drafts are missing a summary. We read
-  // this off the row by walking up to the <tr> and looking for the
-  // no-summary chip we emitted during render.
-  const missing = selected.filter(cb =>
-    cb.closest("tr").querySelector(".chip.flag-nosummary")
-  ).length;
+  if (ids.length > BULK_LIMIT) {
+    await notify(`Selected ${ids.length} Tier-1 rows but the server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`, {title:"Too many selected", danger:true});
+    return;
+  }
+  // Count selected Tier-1 drafts missing a summary (degraded public page).
+  const missing = t1.filter(cb => cb.closest("tr").querySelector(".chip.flag-nosummary")).length;
   const warn = missing
-    ? `\n\n⚠  ${missing} of ${ids.length} jobs have no Opus summary — their public pages will render degraded.`
+    ? `\n\n⚠ ${missing} of ${ids.length} have no Opus summary — their public pages will render degraded.`
     : "";
-  if (!confirm(`Publish ${ids.length} jobs?${warn}`)) return;
+  if (!await confirmModal(`Publish ${ids.length} Tier-1 job${ids.length===1?'':'s'}?${skipNote}${warn}`,
+                          {title:"Bulk publish", okLabel:"Publish"})) return;
   const r = await fetch(`/admin/jobs/api/bulk-publish`, {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ids}),
   });
-  if (!r.ok) { const msg = await r.text(); alert("Failed: " + msg); return; }
+  if (!r.ok) { const msg = await r.text(); await notify("Failed: " + msg, {title:"Bulk publish failed", danger:true}); return; }
+  const data = await r.json();
+  await notify(`Published ${data.published} Tier-1 job${data.published===1?'':'s'}.` +
+               (t2.length ? `\n${t2.length} Tier-2 skipped — publish individually.` : ""), {title:"Done"});
   load();
 }
 
 async function bulkRej() {
   const ids = [...document.querySelectorAll(".sel:checked")].map(x => +x.value);
-  if (!ids.length) { alert("Select some rows."); return; }
+  if (!ids.length) { await notify("Select some rows first.", {title:"Nothing selected"}); return; }
   if (ids.length > BULK_LIMIT) {
-    alert(`Selected ${ids.length} rows but server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`);
+    await notify(`Selected ${ids.length} rows but the server caps bulk actions at ${BULK_LIMIT}. Untick the extras and try again.`, {title:"Too many selected", danger:true});
     return;
   }
   const reason = await pickRejectReason(`Reject ${ids.length} jobs`, "Pick the reason. This will be applied to every selected row.");
   if (!reason || !REJECT_REASONS.includes(reason)) return;
-  if (!confirm(`Reject ${ids.length} jobs as "${reason}"?`)) return;
+  if (!await confirmModal(`Reject ${ids.length} job${ids.length===1?'':'s'} as "${reason}"?`, {title:"Bulk reject", okLabel:"Reject", danger:true})) return;
   const r = await fetch(`/admin/jobs/api/bulk-reject`, {
     method:"POST", credentials:"include",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ids, reason}),
   });
-  if (!r.ok) { const msg = await r.text(); alert("Failed: " + msg); return; }
+  if (!r.ok) { const msg = await r.text(); await notify("Failed: " + msg, {title:"Bulk reject failed", danger:true}); return; }
+  const data = await r.json();
+  await notify(`Rejected ${data.rejected != null ? data.rejected : ids.length} job(s) as "${reason}".`, {title:"Done"});
   load();
 }
 
@@ -1564,10 +1624,10 @@ document.querySelectorAll(".tabs button[data-status]").forEach(b => {
 })();
 
 document.getElementById("run-ingest").onclick = async () => {
-  if (!confirm("Run ingest now? May take ~30s.")) return;
+  if (!await confirmModal("Run ingest now? May take ~30s.", {title:"Run ingest", okLabel:"Run"})) return;
   const r = await fetch("/admin/jobs/api/ingest/run", {method:"POST", credentials:"include"});
   const data = await r.json();
-  alert("Ingest: " + JSON.stringify(data.stats || data));
+  await notify("Ingest: " + JSON.stringify(data.stats || data), {title:"Ingest complete"});
   load();
 };
 
