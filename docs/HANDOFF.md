@@ -4,6 +4,34 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-06-01 (session 53 cont. — per-company job alerts, Phase 1)
+
+**Branch:** `master` · `d7b43b8` deployed. Backend rebuilt + healthy; **migration `20260601000000` applied (alembic head)**; daily cron installed. Live + smoke-verified.
+
+### Session 53 (cont.) — per-company job-alert subscriptions + daily email digest
+
+**Feature:** logged-in users follow a company from any job page (or manage in `/account` → "Companies you follow"); a daily cron emails each subscriber the new published jobs from companies they follow. First slice of the channel-agnostic plan (Email now; Telegram = Phase 2, WhatsApp = Phase 3 env-gated — founder chose free-first + daily-digest).
+
+**Shipped in `d7b43b8`** (13 files, +842):
+- **Migration** `job_alert_subscriptions` (FK users CASCADE, `UNIQUE(user,company_slug,channel)`, CHECK channel IN email/telegram/whatsapp, 2 indexes). Additive, clean downgrade.
+- **Model** `models/job_alert.py` (`__table_args__` mirrors migration) + registered in `models/__init__`.
+- **Router** `routers/job_alerts.py` — `POST /api/jobs/subscribe|unsubscribe`, `GET /api/jobs/subscriptions`, all `get_current_user`-gated; **check-then-insert idempotent** (avoids async-SQLAlchemy `MissingGreenlet` from post-IntegrityError attribute access — the one bug Phase-3/tests caught). Registered in `main.py`.
+- **Digest** `services/job_alerts_digest.py` (clones `jobs_digest` send/render) — published jobs `updated_at >= since` grouped by company → one email per subscriber. `scripts/send_job_alerts.py` (tz-aware UTC watermark on `/data/job_alerts_state.json`, advances only on success) + `cron.d/send_job_alerts` (02:00 UTC) + logrotate.
+- **UI** shared `frontend/job-subscribe.js` (auth-aware toggle + optimistic + toast; anon → `/api/auth/google/login`) mounted on the job detail page; "Companies you follow" manage list in `account.html`.
+- **nginx unchanged** — `/api/` blanket proxy + `\.(js|css)$` regex already cover the routes + asset.
+
+**Gates:** py_compile + node --check + secrets clean · **7 new tests pass · 37 across jobs suites green (no regression)**. `create_all` round-trip confirmed table + indexes.
+
+**Deploy smoke (public nginx+CF):** `/job-subscribe.js` 200 · job detail renders `id="job-subscribe" data-company=…` + script · `POST /api/jobs/subscribe` anon 401 · table present · digest dry-run 500-job window / 0 subscribers / 0 sent (watermark initialized — no backlog spam).
+
+**Note:** the first digest window saw 500 jobs only because the 90-day backfill bumped `updated_at` recently; 0 subscribers existed so nothing sent, and the watermark now gates future runs. **Brevo 300/day cap (audit B4)** applies as subscribers grow — daily alerts + weekly digest share it.
+
+**codex:rescue n/a** — additive migration (lowest-risk class, clean downgrade) + reused `get_current_user` (no new auth/classifier logic). Phase-3 Opus self-review + tests are the gate.
+
+**Pending:** founder browser-smoke the logged-in toggle (click → subscribe → row → next-day email); Phase 2 (Telegram) + Phase 3 (WhatsApp) when ready; job 937 missing summary.
+
+---
+
 ## Current state as of 2026-06-01 (session 53 cont. — job lifespan 45→90 + board revival)
 
 **Branch:** `master` · `94a70dc` deployed (rebuild — `jobs_ingest.py` is baked). Backend healthy, `VALID_FOR_DAYS=90` confirmed live.
