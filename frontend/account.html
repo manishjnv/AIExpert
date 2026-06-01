@@ -257,12 +257,48 @@ h1 { font-family: var(--serif); color: var(--accent); font-size: 28px; font-weig
           <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;line-height:1.5">
             One combined email every Monday with a section per channel you've turned on.
           </div>
+          <div class="section-title" style="margin-top:18px">Companies you follow</div>
+          <div id="companyAlerts" style="font-size:13px;color:var(--ink-soft)">Loading…</div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;line-height:1.5">
+            Subscribe from any job page. You'll get a daily email when a company you follow posts new AI roles.
+          </div>
           <div class="section-title" style="margin-top:18px">Visibility</div>
           <div class="toggle-row">
             <input type="checkbox" id="fPublicProfile">
             <label for="fPublicProfile">Show my profile on the <a href="/leaderboard" style="color:var(--info)">public leaderboard</a></label>
           </div>
         </div>
+        <script>
+        (function(){
+          var box = document.getElementById('companyAlerts');
+          if (!box) return;
+          function esc(s){ var d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+          async function load(){
+            try {
+              var r = await fetch('/api/jobs/subscriptions', {credentials:'same-origin'});
+              if (!r.ok) { box.textContent = 'Sign in to manage company alerts.'; return; }
+              var subs = ((await r.json()).subscriptions) || [];
+              if (!subs.length) { box.textContent = "You're not following any companies yet."; return; }
+              box.innerHTML = subs.map(function(s){
+                return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)">'
+                  + '<span><a href="/jobs?company=' + encodeURIComponent(s.company_slug) + '" style="color:var(--info)">' + esc(s.company_name) + '</a></span>'
+                  + '<button data-slug="' + esc(s.company_slug) + '" style="background:none;border:1px solid var(--line);color:var(--ink-soft);padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">Unfollow</button>'
+                  + '</div>';
+              }).join('');
+              box.querySelectorAll('button[data-slug]').forEach(function(b){
+                b.onclick = async function(){
+                  b.disabled = true; b.textContent = '…';
+                  try {
+                    var rr = await fetch('/api/jobs/unsubscribe', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify({company_slug: b.getAttribute('data-slug'), channel:'email'})});
+                    if (rr.ok) { load(); } else { b.disabled=false; b.textContent='Unfollow'; }
+                  } catch(e){ b.disabled=false; b.textContent='Unfollow'; }
+                };
+              });
+            } catch(e){ box.textContent = 'Could not load alerts.'; }
+          }
+          load();
+        })();
+        </script>
 
         <!-- My Certificates -->
         <div class="section" id="certsSection">

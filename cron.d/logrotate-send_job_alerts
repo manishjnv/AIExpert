@@ -1,0 +1,9 @@
+/var/log/send_job_alerts.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

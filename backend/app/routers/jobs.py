@@ -726,6 +726,8 @@ async def job_detail(
 {expired_banner}
 {f'<div class="tldr">{esc(d.get("tldr") or "")}</div>' if d.get("tldr") else ""}
 <p><a class="apply" href="{esc(apply_url)}" rel="nofollow sponsored" target="_blank">Apply on {esc(company.get('name') or 'company site')} →</a></p>
+<div id="job-subscribe" data-company="{esc(company.get('slug') or job.company_slug)}" data-company-name="{esc(company.get('name') or job.company_slug)}"></div>
+<script src="/job-subscribe.js" defer></script>
 
 <div class="hl-grid">{highlights_html}</div>
 

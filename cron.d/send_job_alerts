@@ -1,0 +1,8 @@
+# Daily per-company job-alert digest at 02:00 UTC = 07:30 IST.
+# Runs after the nightly ingest (~23:00) + draft-summarize (00:30) so the day's
+# newly published jobs are included. Pure Python + SMTP (no Claude token).
+# flock prevents overlapping runs.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 2 * * * root flock -n /tmp/send_job_alerts.lock bash -c 'cd /srv/roadmap && docker compose exec -T backend python -m scripts.send_job_alerts' >> /var/log/send_job_alerts.log 2>&1
