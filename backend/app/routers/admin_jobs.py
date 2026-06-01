@@ -120,7 +120,7 @@ async def list_queue(
     expired_reason: str | None = None,
     flag: str | None = None,
     q: str | None = None,
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, le=1000),
     offset: int = 0,
     _admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -334,8 +334,8 @@ async def bulk_publish(
     ids = (payload or {}).get("ids") or []
     if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
         raise HTTPException(400, "ids must be a non-empty int list")
-    if len(ids) > 100:
-        raise HTTPException(400, "max 100 per bulk action (see docs/JOBS.md §10.7)")
+    if len(ids) > 1000:
+        raise HTTPException(400, "max 1000 per bulk action (see docs/JOBS.md §10.7)")
 
     rows = (await db.execute(select(Job).where(Job.id.in_(ids)))).scalars().all()
     by_source = {r.source for r in rows}
@@ -373,8 +373,8 @@ async def bulk_reject(
     reason = (payload or {}).get("reason")
     if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
         raise HTTPException(400, "ids must be a non-empty int list")
-    if len(ids) > 100:
-        raise HTTPException(400, "max 100 per bulk action (see docs/JOBS.md §10.7)")
+    if len(ids) > 1000:
+        raise HTTPException(400, "max 1000 per bulk action (see docs/JOBS.md §10.7)")
     if reason not in VALID_REJECT_REASONS:
         raise HTTPException(400, f"reason must be one of {sorted(VALID_REJECT_REASONS)}")
 
@@ -1117,7 +1117,7 @@ let duplicateHashes = new Set(); // hashes appearing in 2+ jobs — flagged with
 function qfilterParams() {
   const p = new URLSearchParams();
   p.set("status", currentStatus);
-  p.set("limit", "200");
+  p.set("limit", "1000");
   const q = document.getElementById("qf-q").value.trim();
   const co = document.getElementById("qf-company").value.trim();
   const des = document.getElementById("qf-designation").value.trim();
@@ -1460,9 +1460,9 @@ async function rej(id) {
   load();
 }
 
-// Server caps every bulk action at 100 ids (admin_jobs.py:337). Keep the
-// client cap in lockstep or admin hits a 400 after hand-selecting >100.
-const BULK_LIMIT = 100;
+// Server caps every bulk action at 1000 ids (admin_jobs.py bulk endpoints).
+// Keep the client cap in lockstep or admin hits a 400 after selecting >1000.
+const BULK_LIMIT = 1000;
 
 function updateBulkCapNote() {
   const note = document.getElementById("bulk-cap-note");
