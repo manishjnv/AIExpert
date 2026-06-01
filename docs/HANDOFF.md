@@ -18,7 +18,9 @@
 
 **Phase 2 gates:** py_compile + secrets clean. **codex:rescue n/a** — lifespan constant + data backfill, no classifier logic. Minor doc-sync follow-up: `docs/JOBS.md §7.6` still cites 45d.
 
-**Still pending:** review/publish from the 552 drafts to refresh inventory (manual); job 937 missing summary; optional weekly review-reminder cron.
+**Follow-up shipped `c8628bd` (rebuild deployed, healthy):** admin/jobs UX — (1) replaced every native `alert()`/`confirm()` with **in-app modals** (`modalDialog`/`notify`/`confirmModal`, reusing `.modal-*` styling; `textContent` = XSS-safe + keeps newlines). (2) **Tier-aware bulk-publish:** selecting Tier-2 rows (e.g. Broadcom) no longer 400s the whole batch — `bulkPub()` splits by tier chip, sends only Tier-1 ids, and shows an in-app result noting how many Tier-2 were skipped (Tier-2 still needs individual Publish — **server contract + `test_bulk_publish_tier1_only` unchanged**). Triggered by founder hitting "bulk_approve not permitted for [Tier-2 ids]" in a browser alert.
+
+**Still pending:** review/publish from the 552 drafts to refresh inventory (manual; bulk-publish Tier-1, individually publish Tier-2 like Broadcom #2547); job 937 missing summary; optional weekly review-reminder cron.
 
 ---
 
