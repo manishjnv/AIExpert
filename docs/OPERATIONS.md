@@ -152,6 +152,9 @@ docker compose up -d --force-recreate backend   # Restart required to pick up ch
 
 ## 5. OTP Email Setup
 
+> **Update 2026-09-20:** production mail moved from Resend to **Brevo**. `/srv/roadmap/.env` now has `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_USE_TLS=false` (587 is STARTTLS), the Brevo SMTP login and key, `SMTP_FROM=connect@automateedge.cloud`, `SMTP_FROM_NAME=AutomateEdge`. `backend` and `cron` were recreated with `up -d --no-deps --force-recreate` (no rebuild) and a live `send_admin_notification` succeeded. Rollback file: `/srv/roadmap/.env.bak-20260919-200013`. The owner's convention is `connect@<domain>` for every product, so read every `contact@automateedge.cloud` below as `connect@`. Cloudflare Email Routing forwards both `connect@` and the old `contact@` to Gmail. Brevo blocks SMTP from unknown IPs and has one 300/day quota shared by all products. Full reference: `E:\code\Foxfiber\docs\email-setup.md`. The steps below are kept as history.
+
+
 ### Prerequisites
 - Gmail account with 2FA enabled
 - Google App Password generated
