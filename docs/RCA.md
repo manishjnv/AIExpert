@@ -285,6 +285,16 @@
 
 ---
 
+### 037 — Daily content refresh crashed on the first failed check of a NEW link: `None += 1` (2026-09-20) [ORM defaults / silent cron failure]
+
+- **Symptom:** `roadmap.pipeline_scheduler` logged `Pipeline scheduler error: unsupported operand type(s) for +=: 'NoneType' and 'int'` on every content-refresh run, from [content_refresh.py](../backend/app/services/content_refresh.py) `check_link_health`. The exception aborted the whole refresh (link health plus everything `run_content_refresh` does after it), not just the one link. `/api/health` stayed 200, so nothing surfaced it; found while reading the log for RCA-036.
+- **Root cause:** `LinkHealth.consecutive_failures` is declared `mapped_column(Integer, nullable=False, default=0)`. SQLAlchemy applies a column `default` when the row is INSERTed, not when the Python object is constructed, so a brand-new `LinkHealth(...)` holds `None` until flush. The code does `health.consecutive_failures += 1` before any flush. It only breaks when a resource URL that has no row yet fails its FIRST check (here a newly added GitHub link returning 404), which is why it stayed hidden until a template gained a dead link.
+- **Fix:** [content_refresh.py:137](../backend/app/services/content_refresh.py#L137) passes `consecutive_failures=0` in the constructor. Regression test [test_content_refresh_link_health.py](../backend/tests/test_content_refresh_link_health.py) covers both failure paths (HTTP 404 and a network error) for a new link; it reproduced the exact production TypeError before the fix.
+- **Prevention:**
+  - Never read or increment an ORM attribute that relies on a column `default=` on an object constructed in the same unit of work. Pass the value in the constructor (or use `server_default` plus a refresh).
+  - A per-item failure inside a scheduled loop must not abort the whole run; this one only escaped because of the TypeError. Worth wrapping each link check when this function is next touched.
+  - The other `+= 1` sites (`certificates.py`, `verify.py`) act on rows loaded from the DB, so they are safe; checked 2026-09-20.
+
 ### 036 — Every proxied route returned 502 for ~13 hours after the backend container was recreated (2026-09-20) [Deploy / nginx upstream DNS]
 
 - **Symptom:** `/api/*`, `/blog`, `/jobs`, `/roadmap`, `/leaderboard`, `/vs` and all sitemaps returned 502 through nginx while the static home page stayed 200, so the outage was easy to miss. Found from Bing Webmaster Tools: `robots.txt` advertised `/sitemap_index.xml` and it answered 502. The backend itself was healthy and served every route 200 on `127.0.0.1:8000`.
@@ -348,6 +358,7 @@
 | Raw setattr from JSON | Medium | Always validate with Pydantic model first |
 | DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
 | Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
+| `+=` on a new ORM object relying on column `default=` | Medium | `default` applies at INSERT; set the value in the constructor (RCA-037) |
 | Literal service name in nginx `proxy_pass` | High | Variable + `resolver 127.0.0.11`; smoke-test through the public URL after every backend recreate (RCA-036) |
 | AI call without `db=` or `log_usage` | High | Every AI call must log to `ai_usage_log` with `tokens > 0`. Use `get_last_tokens()` helper. |
 | Scraped HTML with surrogate characters | Medium | Sanitize at ingest time with `_strip_surrogates`; fallback sanitizer in `_serialize` is a safety net only. |

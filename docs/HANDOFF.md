@@ -8,7 +8,7 @@
 
 **What happened:** Bing Webmaster data showed a 0.53% CTR and a 502 on `/sitemap_index.xml`. The 502 turned out to be every proxied route down for ~13 h (RCA-036: nginx held the old backend IP after the Brevo env recreate). Restored with an nginx reload, then fixed permanently in `nginx.conf` (resolver + variable upstream). Home page: new title and 141-char description, single h1, 10 crawlable links in the generated scaffold. Details: `docs/SEO.md` change log 2026-09-20, `docs/RCA.md` 036.
 
-**Not touched:** the founder's uncommitted work in `backend/app/ai/stream.py` and `docs/AI_PIPELINE_PLAN.md` (left unstaged). **Seen, not fixed:** backend log shows `roadmap.pipeline_scheduler` raising `TypeError: unsupported operand type(s) for +=: 'NoneType' and 'int'`; needs its own session.
+**Not touched:** the founder's uncommitted work in `backend/app/ai/stream.py` and `docs/AI_PIPELINE_PLAN.md` (left unstaged). **Fixed the same day (RCA-037):** the `roadmap.pipeline_scheduler` `TypeError: NoneType += int` was `check_link_health` incrementing `consecutive_failures` on a new, unflushed `LinkHealth`; one-line constructor fix plus a regression test. That deploy recreated the backend and every public route stayed 200 with no nginx reload, which is the real-world proof of the RCA-036 fix.
 
 **Next:** re-check Bing Search Performance around 2026-10-04; request re-indexing of `/` in Bing and GSC.
 

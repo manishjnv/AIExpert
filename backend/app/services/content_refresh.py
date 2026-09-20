@@ -134,6 +134,9 @@ async def check_link_health(db: AsyncSession) -> dict:
                                 week_num=week.n,
                                 resource_idx=idx,
                                 url=url,
+                                # Explicit: the column's default=0 only applies at INSERT, so a new
+                                # object holds None until flushed and `+= 1` below would crash (RCA-037).
+                                consecutive_failures=0,
                             )
                             db.add(health)
 
