@@ -215,11 +215,26 @@ def _week_description(week: dict) -> str:
     return ""
 
 
+_EXPLORE_LINKS = [
+    ("/roadmap", "All AI learning roadmaps"),
+    ("/roadmap/generalist", "AI generalist roadmap"),
+    ("/roadmap/ai-engineer", "AI engineer roadmap"),
+    ("/roadmap/ml-engineer", "ML engineer roadmap"),
+    ("/roadmap/data-scientist", "Data scientist roadmap"),
+    ("/roadmap/mlops", "MLOps roadmap"),
+    ("/blog", "Blog: guides for learning AI"),
+    ("/jobs", "AI jobs board"),
+    ("/vs", "AI role and tool comparisons"),
+    ("/leaderboard", "Learner leaderboard"),
+]
+
+
 def _render_scaffold(data: list[dict]) -> str:
     lines = [
         START_MARK,
         '  <section data-roadmap-scaffold>',
-        "    <h1>24-Week AI Generalist Roadmap</h1>",
+        # h2, not h1: the hero <h1 id="heroTitle"> is the page's single h1 (Bing flags more than one).
+        "    <h2>24-Week AI Generalist Roadmap</h2>",
         "    <p>Free, self-paced path from Python fundamentals to deployed AI applications. "
         "Six monthly phases, 24 weeks, curated resources from Stanford, MIT, "
         "Kaggle, Hugging Face, and leading practitioners. No signup, no paywall.</p>",
@@ -246,7 +261,7 @@ def _render_scaffold(data: list[dict]) -> str:
                 if r.get("name")
             )
             lines.append(f'    <section id="week-{n}">')
-            lines.append(f"      <h2>Week {n}: {title}</h2>")
+            lines.append(f"      <h3>Week {n}: {title}</h3>")
             lines.append(f"      <p>{desc}</p>")
             lines.append("      <ul>")
             # items already has trailing newlines; strip the final one for join
@@ -254,6 +269,15 @@ def _render_scaffold(data: list[dict]) -> str:
             lines.append("      </ul>")
             lines.append("    </section>")
             week_count += 1
+    # Crawlable internal links. The site nav is injected by nav.js, so the raw HTML otherwise has no
+    # <a href> to any inner page and crawlers that do not run JS cannot discover them.
+    lines.append('    <nav aria-label="Explore AutomateEdge">')
+    lines.append("      <h2>Explore AutomateEdge</h2>")
+    lines.append("      <ul>")
+    for href, label in _EXPLORE_LINKS:
+        lines.append(f'        <li><a href="{href}">{escape(label)}</a></li>')
+    lines.append("      </ul>")
+    lines.append("    </nav>")
     lines.append("  </section>")
     lines.append(f"  {END_MARK}")
 

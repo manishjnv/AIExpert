@@ -285,6 +285,16 @@
 
 ---
 
+### 036 — Every proxied route returned 502 for ~13 hours after the backend container was recreated (2026-09-20) [Deploy / nginx upstream DNS]
+
+- **Symptom:** `/api/*`, `/blog`, `/jobs`, `/roadmap`, `/leaderboard`, `/vs` and all sitemaps returned 502 through nginx while the static home page stayed 200, so the outage was easy to miss. Found from Bing Webmaster Tools: `robots.txt` advertised `/sitemap_index.xml` and it answered 502. The backend itself was healthy and served every route 200 on `127.0.0.1:8000`.
+- **Root cause:** [nginx.conf](../nginx.conf) used a literal `proxy_pass http://backend:8000;`. nginx resolves a literal upstream host once, at start-up. The `web` container had been up 2 months; the backend was force-recreated on 2026-09-20 (mail env switch to Brevo) and came back on a new Docker IP (`172.20.0.2`, was `172.20.0.3`). nginx kept connecting to the old IP: `connect() failed (111: Connection refused) while connecting to upstream`. The deploy procedure only reloads nginx for frontend or nginx.conf changes, not after a backend recreate.
+- **Fix:** Immediate: `docker compose exec web nginx -s reload` (all routes back to 200). Permanent: [nginx.conf:13](../nginx.conf#L13) adds `resolver 127.0.0.11 valid=10s ipv6=off;` and `set $backend_upstream http://backend:8000;`; all 18 `proxy_pass` lines use the variable, which forces run-time resolution through Docker's DNS. None of the 18 carried a URI part, so request URIs pass through unchanged.
+- **Prevention:**
+  - Never use a literal Docker service name in `proxy_pass`; use a variable plus `resolver 127.0.0.11`.
+  - Deploy smoke tests must go through the public URL (nginx + Cloudflare), never only the backend port or the container health check. A healthy container proved nothing here.
+  - `nginx.conf` is a single-file bind mount: after `git pull` changes it, recreate `web` (`docker compose up -d --force-recreate web`); a reload can keep reading the old inode.
+
 ### 035 — Social-card crawlers blocked by robots.txt Disallow on /og/ (2026-04-26) [Crawler etiquette / OG image delivery]
 
 - **Symptom:** Tweets sharing automateedge.cloud blog posts rendered as Twitter's generic `summary` placeholder card (📰 icon, no image) instead of the gold-logo + title OG card. The `/og/blog/<slug>.png` URL returned a valid 1200×630 PNG when fetched manually with any user-agent (including `User-Agent: Twitterbot/1.0` — server-side check passed cleanly).
@@ -338,6 +348,7 @@
 | Raw setattr from JSON | Medium | Always validate with Pydantic model first |
 | DB strings in AI prompts | Medium | JSON-encode lists, truncate strings, validate output |
 | Opt-in feature with prerequisite gate | Medium | Opt-in must work independently of other state |
+| Literal service name in nginx `proxy_pass` | High | Variable + `resolver 127.0.0.11`; smoke-test through the public URL after every backend recreate (RCA-036) |
 | AI call without `db=` or `log_usage` | High | Every AI call must log to `ai_usage_log` with `tokens > 0`. Use `get_last_tokens()` helper. |
 | Scraped HTML with surrogate characters | Medium | Sanitize at ingest time with `_strip_surrogates`; fallback sanitizer in `_serialize` is a safety net only. |
 | SSR HTMLResponse missing viewport meta | Medium | Every `return f"""<!DOCTYPE html>` must include `<meta name="viewport" content="width=device-width, initial-scale=1">`. Missing = mobile renders at desktop width. |

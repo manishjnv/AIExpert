@@ -4,6 +4,14 @@
 >
 > **Every session MUST start by reading [RCA.md](./RCA.md) end-to-end.** New entries get added after every bug fix or security change. Scan the most recent 5 entries and the "Patterns to watch for" table before writing any new code — they encode the real mistakes this codebase has made, and repeating them is the #1 way to introduce regressions.
 
+## Current state as of 2026-09-20 (SEO CTR + crawl fix, RCA-036 nginx outage)
+
+**What happened:** Bing Webmaster data showed a 0.53% CTR and a 502 on `/sitemap_index.xml`. The 502 turned out to be every proxied route down for ~13 h (RCA-036: nginx held the old backend IP after the Brevo env recreate). Restored with an nginx reload, then fixed permanently in `nginx.conf` (resolver + variable upstream). Home page: new title and 141-char description, single h1, 10 crawlable links in the generated scaffold. Details: `docs/SEO.md` change log 2026-09-20, `docs/RCA.md` 036.
+
+**Not touched:** the founder's uncommitted work in `backend/app/ai/stream.py` and `docs/AI_PIPELINE_PLAN.md` (left unstaged). **Seen, not fixed:** backend log shows `roadmap.pipeline_scheduler` raising `TypeError: unsupported operand type(s) for +=: 'NoneType' and 'int'`; needs its own session.
+
+**Next:** re-check Bing Search Performance around 2026-10-04; request re-indexing of `/` in Bing and GSC.
+
 ## Current state as of 2026-06-01 (session 53 cont. — per-company job alerts, Phase 1)
 
 **Branch:** `master` · `d7b43b8` deployed. Backend rebuilt + healthy; **migration `20260601000000` applied (alembic head)**; daily cron installed. Live + smoke-verified.
